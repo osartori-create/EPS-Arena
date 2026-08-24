@@ -1,7 +1,7 @@
 // src/js/ui/prof/activities.js
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
-import { renderCircuits, getCircuits, addCircuit as addCircuitCO } from '../../modules/co/circuit-manager.js';
+import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 
 export function initActivities() {
     // Init palette
@@ -9,26 +9,41 @@ export function initActivities() {
 
     // Changement de discipline
     window.switchDiscipline = function(disc) {
+        // On cache tout par défaut
+        document.getElementById('viewSprintSettings').classList.add('hidden');
+        document.getElementById('viewCOSettings').classList.add('hidden');
+        document.getElementById('viewArcathlonSettings').classList.add('hidden');
+        document.getElementById('viewEscaladeSettings').classList.add('hidden');
+        
+        // On style les boutons
         ['sprint', 'co', 'arcathlon', 'escalade'].forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
-            const view = document.getElementById('view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings');
             if (d === disc) {
                 btn.classList.remove('border-slate-600', 'text-slate-400');
                 btn.classList.add('border-blue-500', 'text-blue-400');
-                if (view) view.classList.remove('hidden');
             } else {
                 btn.classList.remove('border-blue-500', 'text-blue-400');
                 btn.classList.add('border-slate-600', 'text-slate-400');
-                if (view) view.classList.add('hidden');
             }
         });
-        if (disc === 'co') renderCircuits('circuitList', "");
+
+        // On affiche le bon panneau
+        if (disc === 'sprint') {
+            document.getElementById('viewSprintSettings').classList.remove('hidden');
+        } else if (disc === 'co') {
+            document.getElementById('viewCOSettings').classList.remove('hidden');
+            renderCircuits('circuitList', ""); // On affiche les circuits existants
+        } else if (disc === 'arcathlon') {
+            document.getElementById('viewArcathlonSettings').classList.remove('hidden');
+        } else if (disc === 'escalade') {
+            document.getElementById('viewEscaladeSettings').classList.remove('hidden');
+        }
     };
 
     // Initialisation de la palette
     function initPalette() {
         const paletteContainer = document.getElementById('paletteCouleurs');
-        if (!paletteContainer) return; // Sécurité si l'élément n'existe pas encore
+        if (!paletteContainer) return;
         const couleursDispo = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
         paletteContainer.innerHTML = couleursDispo.map(c => 
             `<div onclick="toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
@@ -43,7 +58,7 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes (pour Sprint et autres)
+    // Génération des équipes (pour Sprint et autres activités à venir)
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -66,7 +81,6 @@ export function initActivities() {
 
         const teams = generateTeams(eleves, options);
 
-        // Chargement des photos
         const teamsWithPhotos = [];
         for (const team of teams) {
             const membersWithPhotos = [];
@@ -171,6 +185,6 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
 
-    // Initialisation au chargement
-    switchDiscipline('sprint'); // Active le Sprint par défaut
+    // On lance le Sprint par défaut
+    switchDiscipline('sprint'); 
 }
