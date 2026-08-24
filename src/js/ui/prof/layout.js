@@ -33,7 +33,7 @@ export function initLayout() {
         if (targetBtn) {
             targetBtn.classList.add('tab-active', 'text-blue-500');
         }
-    }; // Fin de window.switchTab
+    }; // ICI se termine correctement window.switchTab
 
     // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
