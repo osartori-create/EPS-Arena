@@ -2,10 +2,10 @@
 import { MATRICE } from './matrice.js';
 
 export function initCOInterface() {
-    console.log("🔍 Initialisation de l'interface CO...");
+    console.log("🔍 Initialisation CO...");
     const postesContainer = document.getElementById('postesGrid');
     if (!postesContainer) {
-        console.error("❌ Impossible de trouver #postesGrid !");
+        console.error("❌ #postesGrid introuvable !");
         return;
     }
     generatePostesGrid();
@@ -34,18 +34,14 @@ export function initSortableCO() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
     
-    // On détruit uniquement si le conteneur a changé (évite les conflits)
-    // Ici, on s'assure simplement que Sortable est bien lié.
-    if (reserveContainer.__sortable) {
-        return; // Déjà initialisé
-    }
+    if (reserveContainer.__sortable) return;
 
     try {
-        const sortableReserve = new Sortable(reserveContainer, {
+        new Sortable(reserveContainer, {
             group: 'co-groupes',
             animation: 150,
         });
-        reserveContainer.__sortable = true; // Marqueur pour éviter double init
+        reserveContainer.__sortable = true;
 
         document.querySelectorAll('.poste-members').forEach(el => {
             if (!el.__sortable) {
@@ -67,7 +63,12 @@ export function initSortableCO() {
 
 export function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
-    if (!reserveContainer) return;
+    console.log("🔍 Tentative de remplissage de la réserve avec élèves. Div présente ?", !!reserveContainer);
+    
+    if (!reserveContainer) {
+        alert("❌ ERREUR : La div 'reserveList' est introuvable. Vérifiez le HTML !");
+        return;
+    }
     
     let html = '';
     eleves.forEach(eleve => {
@@ -80,7 +81,8 @@ export function populateReserveWithStudents(eleves) {
     });
     
     reserveContainer.innerHTML = html;
-    // On initialise direct, la div est peut-être masquée mais pas de souci
+    console.log("✅ Réserve remplie !");
+    
     initSortableCO();
 }
 

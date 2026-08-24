@@ -4,13 +4,10 @@ import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 
-let currentDiscipline = 'sprint'; // Par défaut
-
 export function initActivities() {
     initPalette();
     initCOInterface();
 
-    // Mise à jour de la discipline courante (stockée dans une variable)
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
@@ -66,7 +63,7 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes (LE POINT CRUCIAL)
+    // GÉNÉRATION DES ÉQUIPES
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -74,17 +71,16 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // >>> ON TESTE SI ON EST EN MODE CO <<<
-        // 1. Via la variable (fiable si le clic a bien fonctionné)
-        // 2. Via le DOM (si la div CO n'a pas la classe 'hidden')
+        // 🚨 ON FORCE LA VÉRIFICATION DU DOM
         const coView = document.getElementById('viewCOSettings');
-        const isCOVisible = coView && !coView.classList.contains('hidden');
-        
-        if (currentDiscipline === 'co' || isCOVisible) {
-            // ✅ MODE COURSE D'ORIENTATION
+        const isCO = coView && !coView.classList.contains('hidden');
+        console.log("🔍 Diagnostic : est-ce que CO est visible ?", isCO);
+
+        if (isCO) {
+            console.log("✅ MODE CO DÉTECTÉ, remplissage réserve...");
             populateReserveWithStudents(eleves);
-            document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
-            alert("✅ Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes de 2 ou 3 !");
+            document.getElementById('teamsGrid').innerHTML = '';
+            alert("Élèves dans la réserve !");
             return;
         }
 
