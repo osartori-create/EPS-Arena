@@ -1,5 +1,5 @@
 // src/js/ui/dashboard-ui.js
-import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto } from '../services/admin-service.js';
+import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto, updateStudentForce } from '../services/admin-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
@@ -15,7 +15,6 @@ function loadLocalEleves() {
 }
 
 export function initAdminUI() {
-    // On écoute le changement de classe
     const select = document.getElementById('selectClasse');
     if (select) {
         select.addEventListener('change', (e) => {
@@ -52,7 +51,6 @@ export function initAdminUI() {
         e.target.value = '';
     });
 
-    // Chargement initial si une classe est déjà sélectionnée
     activeClasse = select ? select.value : "";
     loadLocalEleves();
 }
@@ -90,6 +88,13 @@ async function renderEleves() {
         if (e.longueur) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-orange-400">L: ${e.longueur} cm</span>`;
         if (e.sprint30) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-purple-400">30m: ${e.sprint30}s</span>`;
 
+        // Génération des étoiles
+        let starsHtml = '';
+        for (let i = 1; i <= 5; i++) {
+            const filled = e.force >= i ? 'text-yellow-400' : 'text-slate-600';
+            starsHtml += `<span onclick="event.stopPropagation(); setForce('${e.id}', ${i})" class="cursor-pointer text-lg ${filled}">★</span>`;
+        }
+
         container.innerHTML += `
             <div class="bg-slate-800 rounded-2xl p-4 flex flex-col items-center border border-slate-700 text-center relative">
                 ${needsBadge}
@@ -100,14 +105,18 @@ async function renderEleves() {
                     <span class="bg-black px-2 py-1 rounded border border-slate-600 text-emerald-400">VMA: ${e.vma || '--'}</span>
                     ${extraData}
                 </div>
+                <div class="flex gap-1 mt-2">${starsHtml}</div>
                 <span class="text-[10px] text-slate-500 mt-1">${e.sexe ? e.sexe : 'Sexe inconnu'}</span>
             </div>
         `;
     }
 }
 
-// src/js/ui/dashboard-ui.js
-// ... (gardez les imports, loadLocalEleves, renderEleves, etc. identiques)
+// Fonction globale pour cliquer sur les étoiles
+window.setForce = function(studentId, force) {
+    updateStudentForce(studentId, force, activeClasse);
+    loadLocalEleves(); // Rafraîchit l'affichage
+};
 
 // === MODALE ASSOCIATION PAR CLIC (Fiable iPad) ===
 async function openManualAssignModal() {
@@ -117,14 +126,12 @@ async function openManualAssignModal() {
     const existing = document.getElementById('manualAssignModal');
     if (existing) existing.remove();
 
-    // Chargement des élèves sans photo
     const pendingWithUrls = [];
     for (const stu of pending) {
         const url = await getPhotoUrl(stu.id);
         pendingWithUrls.push({ ...stu, photoUrl: url || '' });
     }
 
-    // Chargement des photos orphelines
     const orphans = getOrphanPhotos(activeClasse);
     const orphansWithUrls = [];
     for (const o of orphans) {
@@ -142,7 +149,6 @@ async function openManualAssignModal() {
             </p>
             
             <div class="flex gap-6">
-                <!-- Colonne Gauche : Photos Orphelines -->
                 <div class="w-1/3">
                     <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Photos sans élève</h4>
                     <div id="orphansList" class="flex flex-col gap-3 min-h-[200px]">
@@ -160,7 +166,6 @@ async function openManualAssignModal() {
                     </div>
                 </div>
 
-                <!-- Colonne Droite : Élèves sans photo -->
                 <div class="w-2/3">
                     <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Élèves en attente d'une photo</h4>
                     <div id="pendingList" class="flex flex-col gap-3 min-h-[200px]">
@@ -186,18 +191,14 @@ async function openManualAssignModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    // Variable pour stocker l'ID de la photo sélectionnée
     window.selectedOrphanId = null;
 
-    // 1. Sélectionner une photo
     window.selectOrphan = (orphanId) => {
-        // Retirer la surbrillance de toutes les orphelines
         document.querySelectorAll('[id^="orphan-"]').forEach(el => {
             el.classList.remove('ring-4', 'ring-yellow-400', 'border-yellow-500');
             el.classList.add('border-slate-600');
         });
 
-        // Mettre en surbrillance la photo choisie
         window.selectedOrphanId = orphanId;
         const el = document.getElementById(`orphan-${orphanId}`);
         if (el) {
@@ -206,7 +207,6 @@ async function openManualAssignModal() {
         }
     };
 
-    // 2. Assigner la photo sélectionnée à un élève
     window.assignToStudent = async (studentId) => {
         if (!window.selectedOrphanId) {
             alert("Veuillez d'abord sélectionner une photo à gauche.");
@@ -227,7 +227,7 @@ async function openManualAssignModal() {
 window.addEleve = function() {
     const prenom = prompt("Prénom ?");
     const nom = prompt("Nom ?");
-    const vma = parseFloat(prompt("VMA ?"));
+    const vma = parseFloat(prompt("VMA (Palier) ?"));
     
     if (!prenom || !nom || isNaN(vma)) return alert("Champs invalides");
     
@@ -236,7 +236,7 @@ window.addEleve = function() {
     
     const newEleve = {
         id: id, prenom: prenom, nom: nom.toUpperCase(),
-        vma: vma, palier: 0, sexe: '', longueur: null, sprint30: null
+        vma: vma, palier: vma, sexe: '', longueur: null, sprint30: null, force: 0
     };
 
     currentEleves.push(newEleve);

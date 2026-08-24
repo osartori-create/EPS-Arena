@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
         body { background: #0f172a; color: white; font-family: sans-serif; user-select: none; }
         .tab-active { border-bottom: 4px solid #3b82f6; color: #3b82f6 !important; font-weight: 900; }
@@ -77,23 +78,53 @@
                 <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Configuration de l'activité</h3>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                     <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Mode d'épreuve :</label>
-                        <select id="modeEpreuve" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 font-bold text-white outline-none">
-                            <option value="sprint">🏃 Sprint</option>
-                            <option value="poursuite">⏱️ Poursuite</option>
-                            <option value="mille">🎯 Mille</option>
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Répartition</label>
+                        <select id="modeRepartition" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="homogene">Homogène (équilibrée)</option>
+                            <option value="heterogene">Hétérogène (serpentin)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Distance (m)</label>
-                        <input type="number" id="distance" value="200" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Mixité</label>
+                        <select id="modeMixite" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="mixte">Mixte</option>
+                            <option value="non-mixte">Non-mixte</option>
+                        </select>
                     </div>
                     <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Séries</label>
-                        <input type="number" id="series" value="3" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Critère de force</label>
+                        <select id="critereForce" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="vma">VMA (Palier)</option>
+                            <option value="force">Jauge de puissance (★)</option>
+                        </select>
                     </div>
-                    <div class="flex items-end">
-                        <button onclick="pushConfig()" class="w-full btn-success py-3 rounded-xl font-black uppercase text-white border-2 border-emerald-400 shadow-lg">📡 Transmettre</button>
+                    <div>
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Libellé des équipes</label>
+                        <select id="formatLibelle" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                            <option value="Lettres">Lettres (A, B, C)</option>
+                            <option value="Chiffres">Chiffres (1, 2, 3)</option>
+                            <option value="Couleurs">Couleurs (nom)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Zone du champ intelligent -->
+                <div class="flex gap-2 mt-4">
+                    <div>
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Nb. Équipes</label>
+                        <input type="number" id="nbEquipes" min="1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Joueurs / Équipe</label>
+                        <input type="number" id="nbParEquipe" min="1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                    </div>
+                </div>
+
+                <!-- Zone de la palette chromatique -->
+                <div class="mt-4">
+                    <label class="block font-bold text-slate-400 uppercase mb-2">Choisir les couleurs des chasubles :</label>
+                    <div id="paletteCouleurs" class="flex flex-wrap gap-2">
+                        <!-- Générées dynamiquement en JS -->
                     </div>
                 </div>
             </div>
@@ -127,12 +158,13 @@
         </div>
     </div>
 
-        <script type="module">
+    <script type="module">
         import { initApp } from './src/js/app.js';
         import { listenConfig, listenPassages } from './src/js/core/firebase-service.js';
         import { updateState } from './src/js/core/state.js';
         import { db } from './src/js/core/firebase-service.js';
         import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+        import { generateTeams } from './src/js/modules/teams/team-generator.js';
 
         // Initialisation générale
         initApp();
@@ -182,7 +214,6 @@
                     select.appendChild(option);
                     select.value = nom;
                     
-                    // Déclenche le chargement des élèves de cette nouvelle classe
                     select.dispatchEvent(new Event('change'));
                     
                     alert("Classe ajoutée !");
@@ -192,6 +223,103 @@
                     select.value = nom;
                     select.dispatchEvent(new Event('change'));
                 }
+            }
+        };
+
+        // Initialisation de la palette chromatique
+        function initPalette() {
+            const paletteContainer = document.getElementById('paletteCouleurs');
+            const couleursDispo = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
+            
+            paletteContainer.innerHTML = couleursDispo.map(c => 
+                `<div onclick="toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
+            ).join('');
+        }
+        initPalette();
+
+        window.toggleCouleur = function(couleur) {
+            const el = document.querySelector(`[data-couleur="${couleur}"]`);
+            if (el) {
+                el.classList.toggle('border-emerald-400');
+                el.classList.toggle('border-slate-600');
+            }
+        };
+
+        // Fonction de génération des équipes (appelée par le bouton)
+        window.generateTeams = function() {
+            const activeClasse = document.getElementById('selectClasse').value;
+            if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+            
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+            if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
+
+            // Récupération des options
+            const options = {
+                mode: document.getElementById('modeRepartition').value,
+                mixte: document.getElementById('modeMixite').value === 'mixte',
+                critere: document.getElementById('critereForce').value,
+                nbEquipes: parseInt(document.getElementById('nbEquipes').value) || 0,
+                nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
+                couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
+                labels: []
+            };
+
+            // Gestion du champ intelligent (calcul automatique)
+            if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
+            else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
+
+            // Génération des labels
+            const format = document.getElementById('formatLibelle').value;
+            const nomsCouleurs = ['Rouge', 'Bleu', 'Vert', 'Jaune', 'Orange', 'Violet', 'Rose', 'Cyan', 'Blanc', 'Noir'];
+            for (let i = 0; i < options.nbEquipes; i++) {
+                if (format === 'Lettres') options.labels.push(String.fromCharCode(65 + i));
+                else if (format === 'Chiffres') options.labels.push((i + 1).toString());
+                else options.labels.push(nomsCouleurs[i % nomsCouleurs.length]);
+            }
+
+            const teams = generateTeams(eleves, options);
+
+            // Affichage de la grille avec SortableJS
+            const container = document.getElementById('teamsGrid');
+            container.innerHTML = teams.map(team => `
+                <div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
+                        <button onclick="event.stopPropagation(); renameTeam('${team.id}')" class="text-[10px] text-slate-400 underline">Renommer</button>
+                    </div>
+                    <div class="team-members flex flex-col gap-2 min-h-[60px]" data-team-id="${team.id}">
+                        ${team.members.map(m => `
+                            <div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white" data-id="${m.id}">
+                                ${m.prenom} ${m.nom} (${m.vma || '?'})
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            // Initialisation de SortableJS pour le glisser-déposer
+            document.querySelectorAll('.team-members').forEach(el => {
+                new Sortable(el, {
+                    group: 'teams',
+                    animation: 150,
+                    onEnd: function(evt) {
+                        // Logique de sauvegarde des nouvelles équipes (à implémenter)
+                        console.log("Nouvelle répartition détectée");
+                    }
+                });
+            });
+
+            // Mise à jour des inputs intelligents
+            document.getElementById('nbEquipes').value = options.nbEquipes;
+            document.getElementById('nbParEquipe').value = options.nbParEquipe;
+        };
+
+        // Nouvelle fonction pour renommer une équipe
+        window.renameTeam = function(teamId) {
+            const newName = prompt("Nouveau nom pour cette équipe ?");
+            if (newName) {
+                // Logique de mise à jour du DOM et du stockage (à implémenter)
+                console.log(`Équipe ${teamId} renommée en ${newName}`);
             }
         };
 

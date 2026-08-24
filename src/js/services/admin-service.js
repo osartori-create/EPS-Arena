@@ -72,7 +72,6 @@ export async function importCSV(file, classeName) {
         Papa.parse(file, {
             delimiter: ";", header: false, skipEmptyLines: true,
             complete: async (results) => {
-                // Récupère les élèves déjà présents pour CETTE classe
                 const existingEleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
                 const existingMap = {};
                 existingEleves.forEach(e => { existingMap[e.id] = e; });
@@ -80,7 +79,7 @@ export async function importCSV(file, classeName) {
                 const newEleves = [];
                 results.data.forEach((row, index) => {
                     if (index === 0 || !row[0]) return;
-                    const [nomComplet, , , vitesse, palier, , longueur, , , , sprint1, sprint2, sprint3] = row;
+                    const [nomComplet, , , vitesse, palier, , longueur, , , , sprint1] = row;
                     const nomCompletClean = fixMojibake(nomComplet).trim();
                     const parts = nomCompletClean.split(' ');
                     const prenom = parts[0];
@@ -97,7 +96,8 @@ export async function importCSV(file, classeName) {
                         longueur: parseFloat(String(longueur).replace(",", ".")) || null,
                         sprint30: parseFloat(String(sprint1).replace(",", ".")) || null,
                         sexe: existing ? existing.sexe : '',
-                        needsManualCheck: existing ? existing.needsManualCheck : false
+                        needsManualCheck: existing ? existing.needsManualCheck : false,
+                        force: existing ? existing.force : 0, // Note subjective /5
                     });
                 });
 
@@ -140,7 +140,8 @@ export async function importZIP(file, classeName) {
                 id: newId, nom: infos.nom.toUpperCase(), prenom: infos.prenom,
                 vma: 0, vitessePalier: 0, palier: 0, sexe: infos.sexe,
                 longueur: null, sprint30: null,
-                needsManualCheck: true
+                needsManualCheck: true,
+                force: 0,
             });
             const blob = await entry.async('blob');
             savePhoto(newId, blob);
@@ -160,6 +161,16 @@ export function getPendingStudents(classeName) {
 export function getOrphanPhotos(classeName) {
     const eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
     return eleves.filter(e => e.needsManualCheck && (e.vma === 0 || !e.vma));
+}
+
+export function updateStudentForce(studentId, force, classeName) {
+    const key = `eps_arena_eleves_${classeName}`;
+    let eleves = JSON.parse(localStorage.getItem(key) || '[]');
+    const target = eleves.find(e => e.id === studentId);
+    if (target) {
+        target.force = force;
+        localStorage.setItem(key, JSON.stringify(eleves));
+    }
 }
 
 export async function assignPhotoToStudent(studentId, sourcePhotoId, classeName) {
