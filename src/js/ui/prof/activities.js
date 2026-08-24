@@ -69,7 +69,7 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes
+        // Génération des équipes
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -77,16 +77,20 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // >>> SPÉCIAL COURSE D'ORIENTATION <<<
-        // On met TOUS les élèves individuellement dans la réserve pour composer les groupes à la main
-        if (currentDiscipline === 'co') {
+        // >>> DÉTECTION DE LA DISCIPLINE ACTIVE (fiable à 100%) <<<
+        // On regarde si la div CO est visible (elle n'a pas la classe 'hidden')
+        const coView = document.getElementById('viewCOSettings');
+        const isCOVisible = coView && !coView.classList.contains('hidden');
+        
+        if (isCOVisible) {
+            // On est en mode CO : on met tous les élèves dans la réserve
             populateReserveWithStudents(eleves);
             document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
             alert("Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes de 2 ou 3 !");
             return;
         }
 
-        // >>> SINON (SPRINT, etc.) : Génération classique <<<
+        // >>> SINON (SPRINT, ARCATHLON, etc.) : Génération classique <<<
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
