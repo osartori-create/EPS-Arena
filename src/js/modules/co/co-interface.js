@@ -3,16 +3,12 @@ import { MATRICE } from './matrice.js';
 
 export function initCOInterface() {
     console.log("🔍 Initialisation de l'interface CO...");
-    const reserveContainer = document.getElementById('reserveList');
     const postesContainer = document.getElementById('postesGrid');
-
-    if (!reserveContainer || !postesContainer) {
-        console.error("❌ Impossible de trouver #reserveList ou #postesGrid ! Vérifiez le HTML.");
+    if (!postesContainer) {
+        console.error("❌ Impossible de trouver #postesGrid !");
         return;
     }
-
     generatePostesGrid();
-    initSortableCO();
     console.log("✅ Interface CO initialisée.");
 }
 
@@ -34,19 +30,14 @@ function generatePostesGrid() {
     postesContainer.innerHTML = html;
 }
 
-function initSortableCO() {
+export function initSortableCO() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
-
-    // On détruit les anciennes instances pour éviter les conflits
-    if (window.sortableCOInstances) {
-        window.sortableCOInstances.forEach(s => s.destroy());
-    }
-    window.sortableCOInstances = [];
-
-    // Vérification de visibilité (pour éviter le crash de Sortable)
-    if (reserveContainer.offsetParent === null) {
-        console.warn("⚠️ La réserve est masquée, SortableJS ne s'initialisera pas tout de suite.");
+    
+    // On détruit uniquement si le conteneur a changé (évite les conflits)
+    // Ici, on s'assure simplement que Sortable est bien lié.
+    if (reserveContainer.__sortable) {
+        return; // Déjà initialisé
     }
 
     try {
@@ -54,18 +45,20 @@ function initSortableCO() {
             group: 'co-groupes',
             animation: 150,
         });
-        window.sortableCOInstances.push(sortableReserve);
+        reserveContainer.__sortable = true; // Marqueur pour éviter double init
 
         document.querySelectorAll('.poste-members').forEach(el => {
-            const sortablePoste = new Sortable(el, {
-                group: 'co-groupes',
-                animation: 150,
-                onAdd: function(evt) {
-                    const posteId = el.closest('[data-poste]').dataset.poste;
-                    console.log('Élève assigné au poste : ' + posteId);
-                }
-            });
-            window.sortableCOInstances.push(sortablePoste);
+            if (!el.__sortable) {
+                new Sortable(el, {
+                    group: 'co-groupes',
+                    animation: 150,
+                    onAdd: function(evt) {
+                        const posteId = el.closest('[data-poste]').dataset.poste;
+                        console.log('Élève assigné au poste : ' + posteId);
+                    }
+                });
+                el.__sortable = true;
+            }
         });
     } catch (e) {
         console.error("Erreur Sortable :", e);
@@ -74,12 +67,7 @@ function initSortableCO() {
 
 export function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
-    console.log("🔍 Div trouvée :", reserveContainer);
-    
-    if (!reserveContainer) {
-        console.error("❌ Impossible de trouver #reserveList !");
-        return;
-    }
+    if (!reserveContainer) return;
     
     let html = '';
     eleves.forEach(eleve => {
@@ -91,15 +79,9 @@ export function populateReserveWithStudents(eleves) {
         `;
     });
     
-    console.log("🔍 HTML généré :", html.substring(0, 200) + "...");
     reserveContainer.innerHTML = html;
-    console.log("✅ Réserve remplie !");
-
-    // 🛠️ CORRECTION IMPORTANTE : On laisse le DOM se stabiliser avant d'initialiser Sortable
-    setTimeout(() => {
-        initSortableCO();
-        console.log("✅ Sortable réinitialisé !");
-    }, 100);
+    // On initialise direct, la div est peut-être masquée mais pas de souci
+    initSortableCO();
 }
 
 export function populateReserve(teams) {
@@ -117,8 +99,5 @@ export function populateReserve(teams) {
     });
 
     reserveContainer.innerHTML = html;
-    
-    setTimeout(() => {
-        initSortableCO();
-    }, 100);
+    initSortableCO();
 }

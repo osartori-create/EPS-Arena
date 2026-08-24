@@ -3,6 +3,7 @@ import { initCOInterface, populateReserve, populateReserveWithStudents } from '.
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
+import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO } from '../../modules/co/co-interface.js';
 
 let currentDiscipline = 'sprint'; // Par défaut
 
@@ -45,6 +46,8 @@ export function initActivities() {
         if (disc === 'co') {
             const circuitList = document.getElementById('circuitList');
             if (circuitList) renderCircuits('circuitList', "");
+            // >>> AJOUT IMPORTANT <<<
+            initSortableCO();
         }
     };
 
