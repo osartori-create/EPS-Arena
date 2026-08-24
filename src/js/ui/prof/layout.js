@@ -4,7 +4,7 @@ import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-
 
 export function initLayout() {
     
-    // 1. Gestion des onglets (Sécurisé avec vérification d'existence)
+    // 1. Gestion des onglets (Sécurisé)
     window.switchTab = function(tabName) {
         // On cache toutes les vues
         ['admin', 'activities', 'live'].forEach(t => {
@@ -33,12 +33,12 @@ export function initLayout() {
         if (targetBtn) {
             targetBtn.classList.add('tab-active', 'text-blue-500');
         }
-    };
+    }; // Fin de window.switchTab
 
     // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
         const select = document.getElementById('selectClasse');
-        if (!select) return;
+        if (!select) return; 
         select.innerHTML = '<option value="">-- Classe --</option>';
         let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
         classes.forEach(nom => {
@@ -76,7 +76,7 @@ export function initLayout() {
         }
     };
 
-    // 3. Code Prof (sorti de la fonction switchTab pour être initialisé au démarrage)
+    // 3. Gestion du Code Prof (pour les collègues)
     const profInput = document.getElementById('profCode');
     if (profInput) {
         profInput.value = localStorage.getItem('eps_arena_profCode') || '';
