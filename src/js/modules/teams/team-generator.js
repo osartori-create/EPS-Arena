@@ -1,60 +1,90 @@
 // src/js/modules/teams/team-generator.js
 export function generateTeams(eleves, options) {
-    // options = { mixte, critere: 'vma'|'force', mode: 'homogene'|'heterogene', nbEquipes, nbParEquipe, couleurs, labels }
+    // options: { mixite: 'mixte'|'non-mixte'|'ignore', critere: 'vma'|'force', 
+    //            mode: 'niveau'|'melange', nbEquipes, nbParEquipe, couleurs, formatLibelle }
 
-    // 1. Séparer les sexes si non-mixte
     let pool = [...eleves];
-    if (!options.mixte) {
-        // Pour la non-mixité, on filtre pour créer des équipes unisexes
+    let teams = [];
+
+    // 1. Gestion de la mixité
+    if (options.mixite === 'non-mixte') {
         const garcons = pool.filter(e => e.sexe === 'M');
-        const filles = pool.filter(e => e.sexe === 'F' || !e.sexe);
-        
-        // On génère des équipes pour les garçons, puis pour les filles
-        const teamsGarcons = buildTeams(garcons, options);
-        const teamsFilles = buildTeams(filles, options);
-        return [...teamsGarcons, ...teamsFilles];
+        const filles = pool.filter(e => e.sexe === 'F' || !e.sexe); // Le sexe vide est traité comme F par défaut
+        teams = [...buildTeams(garcons, options, 0), ...buildTeams(filles, options, garcons.length)];
     } else {
-        return buildTeams(pool, options);
+        // 'mixte' ou 'ignore' : on mélange tout
+        teams = buildTeams(pool, options, 0);
     }
+
+    return teams;
 }
 
-function buildTeams(pool, options) {
+function buildTeams(pool, options, startIndex) {
     if (pool.length === 0) return [];
 
-    // 2. Calcul du nombre d'équipes basé sur le champ intelligent
+    // Calcul du nombre d'équipes (champ intelligent)
     let nbEq = options.nbEquipes;
     if (!nbEq) nbEq = Math.ceil(pool.length / options.nbParEquipe);
-    
-    // Création des conteneurs d'équipes
-    let teams = Array.from({ length: nbEq }, (_, i) => ({
-        id: `EQ${i+1}`,
-        label: (options.labels[i] || `Équipe ${i+1}`),
-        color: options.couleurs[i % options.couleurs.length],
-        members: [],
-        totalScore: 0
-    }));
 
-    // 3. Tri des élèves selon le critère (VMA ou Force)
-    pool.sort((a, b) => (options.critere === 'vma' ? b.vma : b.force) - (options.critere === 'vma' ? a.vma : a.force));
+    // Génération des labels (Lettres, Chiffres, Couleurs) avec index global
+    const labels = [];
+    for (let i = 0; i < nbEq; i++) {
+        const globalIndex = startIndex + i;
+        if (options.formatLibelle === 'Lettres') labels.push(String.fromCharCode(65 + globalIndex)); // A, B, C...
+        else if (options.formatLibelle === 'Chiffres') labels.push((globalIndex + 1).toString()); // 1, 2, 3...
+        else if (options.formatLibelle === 'Couleurs') {
+            const nomCouleurs = ['Rouge', 'Bleu', 'Vert', 'Jaune', 'Orange', 'Violet', 'Rose', 'Cyan', 'Blanc', 'Noir'];
+            labels.push(nomCouleurs[globalIndex % nomCouleurs.length]);
+        } else {
+            labels.push(`Équipe ${globalIndex + 1}`);
+        }
+    }
 
-    // 4. Algorithme de répartition
-    if (options.mode === 'homogene') {
-        // GLOUTON : On place le meilleur dans l'équipe la plus faible
+    // Création des équipes (avec couleurs synchronisées sur les labels)
+    let teams = Array.from({ length: nbEq }, (_, i) => {
+        const globalIndex = startIndex + i;
+        const color = options.couleurs.length > 0 
+            ? options.couleurs[globalIndex % options.couleurs.length] 
+            : '#3b82f6'; // Couleur par défaut si aucune palette sélectionnée
+            
+        return {
+            id: `EQ${globalIndex + 1}`,
+            label: labels[i],
+            color: color,
+            members: [],
+            totalScore: 0
+        };
+    });
+
+    // Tri selon le critère (VMA ou Jauge de force)
+    pool.sort((a, b) => {
+        const valA = options.critere === 'vma' ? (a.vma || 0) : (a.force || 0);
+        const valB = options.critere === 'vma' ? (b.vma || 0) : (b.force || 0);
+        return valB - valA;
+    });
+
+    // Algorithme de répartition
+    if (options.mode === 'niveau') {
+        // "Hétérogènes entre elles, homogènes en leur sein" (Les forts ensemble)
+        // On remplit équipe par équipe avec les meilleurs restants
+        let index = 0;
         for (const eleve of pool) {
-            let targetTeam = teams.reduce((a, b) => a.totalScore <= b.totalScore ? a : b);
-            targetTeam.members.push(eleve);
-            targetTeam.totalScore += (options.critere === 'vma' ? eleve.vma : eleve.force);
+            teams[index].members.push(eleve);
+            teams[index].totalScore += (options.critere === 'vma' ? (eleve.vma||0) : (eleve.force||0));
+            index++;
+            if (index >= nbEq) index = 0;
         }
     } else {
-        // SERPENTIN : Répartition en zigzag pour équilibrer les niveaux
+        // "Homogènes entre elles, hétérogènes en leur sein" (Mélange des forces)
+        // Algorithme du serpentin
         let index = 0;
         let direction = 1;
         for (const eleve of pool) {
             teams[index].members.push(eleve);
-            teams[index].totalScore += (options.critere === 'vma' ? eleve.vma : eleve.force);
+            teams[index].totalScore += (options.critere === 'vma' ? (eleve.vma||0) : (eleve.force||0));
             
             index += direction;
-            if (index >= teams.length) { index = teams.length - 1; direction = -1; }
+            if (index >= nbEq) { index = nbEq - 1; direction = -1; }
             else if (index < 0) { index = 0; direction = 1; }
         }
     }

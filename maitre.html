@@ -80,8 +80,8 @@
                     <div>
                         <label class="block font-bold text-slate-400 uppercase mb-1">Répartition</label>
                         <select id="modeRepartition" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                            <option value="homogene">Homogène (équilibrée)</option>
-                            <option value="heterogene">Hétérogène (serpentin)</option>
+                            <option value="niveau">Hétérogènes entre elles, homogènes en leur sein</option>
+                            <option value="melange" selected>Homogènes entre elles, hétérogènes en leur sein</option>
                         </select>
                     </div>
                     <div>
@@ -89,6 +89,7 @@
                         <select id="modeMixite" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
                             <option value="mixte">Mixte</option>
                             <option value="non-mixte">Non-mixte</option>
+                            <option value="ignore" selected>Non prise en compte</option>
                         </select>
                     </div>
                     <div>
@@ -246,7 +247,7 @@
         };
 
         // Fonction de génération des équipes (appelée par le bouton)
-        window.generateTeams = function() {
+                window.generateTeams = function() {
             const activeClasse = document.getElementById('selectClasse').value;
             if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
             
@@ -256,30 +257,22 @@
             // Récupération des options
             const options = {
                 mode: document.getElementById('modeRepartition').value,
-                mixte: document.getElementById('modeMixite').value === 'mixte',
+                mixite: document.getElementById('modeMixite').value, // 'mixte', 'non-mixte', 'ignore'
                 critere: document.getElementById('critereForce').value,
                 nbEquipes: parseInt(document.getElementById('nbEquipes').value) || 0,
                 nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
                 couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
-                labels: []
+                formatLibelle: document.getElementById('formatLibelle').value
             };
 
-            // Gestion du champ intelligent (calcul automatique)
+            // Champ intelligent
             if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
             else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
-            // Génération des labels
-            const format = document.getElementById('formatLibelle').value;
-            const nomsCouleurs = ['Rouge', 'Bleu', 'Vert', 'Jaune', 'Orange', 'Violet', 'Rose', 'Cyan', 'Blanc', 'Noir'];
-            for (let i = 0; i < options.nbEquipes; i++) {
-                if (format === 'Lettres') options.labels.push(String.fromCharCode(65 + i));
-                else if (format === 'Chiffres') options.labels.push((i + 1).toString());
-                else options.labels.push(nomsCouleurs[i % nomsCouleurs.length]);
-            }
-
+            // Génération des équipes
             const teams = generateTeams(eleves, options);
 
-            // Affichage de la grille avec SortableJS
+            // Affichage de la grille
             const container = document.getElementById('teamsGrid');
             container.innerHTML = teams.map(team => `
                 <div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
@@ -288,22 +281,30 @@
                         <button onclick="event.stopPropagation(); renameTeam('${team.id}')" class="text-[10px] text-slate-400 underline">Renommer</button>
                     </div>
                     <div class="team-members flex flex-col gap-2 min-h-[60px]" data-team-id="${team.id}">
-                        ${team.members.map(m => `
-                            <div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white" data-id="${m.id}">
-                                ${m.prenom} ${m.nom} (${m.vma || '?'})
-                            </div>
-                        `).join('')}
+                        ${team.members.map(m => {
+                            // Affichage selon le critère choisi (VMA ou Jauge)
+                            let infoCritere = '';
+                            if (options.critere === 'force') {
+                                infoCritere = `(${'★'.repeat(Math.max(0, m.force || 0))}${'☆'.repeat(5 - Math.max(0, m.force || 0))})`;
+                            } else {
+                                infoCritere = `(${m.vma || '?'})`;
+                            }
+                            return `
+                                <div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white" data-id="${m.id}">
+                                    ${m.prenom} ${m.nom} ${infoCritere}
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             `).join('');
 
-            // Initialisation de SortableJS pour le glisser-déposer
+            // Initialisation de SortableJS
             document.querySelectorAll('.team-members').forEach(el => {
                 new Sortable(el, {
                     group: 'teams',
                     animation: 150,
                     onEnd: function(evt) {
-                        // Logique de sauvegarde des nouvelles équipes (à implémenter)
                         console.log("Nouvelle répartition détectée");
                     }
                 });
