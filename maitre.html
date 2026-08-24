@@ -127,16 +127,30 @@
         </div>
     </div>
 
-            <!-- POINT D'ENTRÉE DES MODULES -->
-        <!-- POINT D'ENTRÉE DES MODULES -->
-        <script type="module">
+    <script type="module">
         import { initApp } from './src/js/app.js';
         import { listenConfig, listenPassages } from './src/js/core/firebase-service.js';
         import { updateState } from './src/js/core/state.js';
         import { db } from './src/js/core/firebase-service.js';
         import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 
+        // Initialisation générale
         initApp();
+
+        // === NOUVEAU : Initialisation du menu déroulant des classes ===
+        function initClassesSelect() {
+            const select = document.getElementById('selectClasse');
+            select.innerHTML = '<option value="">-- Classe --</option>';
+            
+            let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
+            classes.forEach(nom => {
+                const option = document.createElement('option');
+                option.value = nom;
+                option.textContent = nom;
+                select.appendChild(option);
+            });
+        }
+        initClassesSelect();
 
         window.switchTab = function(tabName) {
             ['admin', 'activities', 'live'].forEach(t => {
@@ -159,6 +173,8 @@
                 if (!classes.includes(nom)) {
                     classes.push(nom);
                     localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
+                    
+                    // On met à jour le select immédiatement
                     const select = document.getElementById('selectClasse');
                     const option = document.createElement('option');
                     option.value = nom;
@@ -168,6 +184,9 @@
                     alert("Classe ajoutée !");
                 } else {
                     alert("Cette classe existe déjà.");
+                    // On sélectionne quand même la classe existante pour que l'utilisateur la voie
+                    const select = document.getElementById('selectClasse');
+                    select.value = nom;
                 }
             }
         };
