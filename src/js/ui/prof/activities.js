@@ -4,22 +4,28 @@ import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 
+// ✅ DÉCLARATION DE LA VARIABLE (C'EST ELLE QUI MANQUAIT !)
+let currentDiscipline = 'sprint'; // Par défaut
+
 export function initActivities() {
     initPalette();
     initCOInterface();
 
+    // Mise à jour de la discipline courante
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
+        
+        // Liste des panneaux à gérer
         const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
 
-        // 1. On cache tous les panneaux
+        // On cache tout par défaut
         panneaux.forEach(d => {
             const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
             const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
         });
 
-        // 2. On style les boutons
+        // On style les boutons
         panneaux.forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
             if (btn) {
@@ -33,11 +39,11 @@ export function initActivities() {
             }
         });
 
-        // 3. On affiche le panneau correspondant
+        // On affiche le panneau correspondant
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) targetView.classList.remove('hidden');
 
-        // 4. Actions spécifiques à la CO (afficher les circuits et initialiser Sortable)
+        // Actions spécifiques à la CO (afficher circuits + initialiser Sortable)
         if (disc === 'co') {
             const circuitList = document.getElementById('circuitList');
             if (circuitList) renderCircuits('circuitList', "");
@@ -63,7 +69,7 @@ export function initActivities() {
         }
     };
 
-    // GÉNÉRATION DES ÉQUIPES
+    // Génération des équipes
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -71,20 +77,19 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // 🚨 ON FORCE LA VÉRIFICATION DU DOM
+        // ✅ ON VÉRIFIE L'ACTIVITÉ ACTIVE VIA LA VARIABLE ET LE DOM
         const coView = document.getElementById('viewCOSettings');
-        const isCO = coView && !coView.classList.contains('hidden');
-        console.log("🔍 Diagnostic : est-ce que CO est visible ?", isCO);
-
-        if (isCO) {
-            console.log("✅ MODE CO DÉTECTÉ, remplissage réserve...");
+        const isCOVisible = coView && !coView.classList.contains('hidden');
+        
+        if (currentDiscipline === 'co' || isCOVisible) {
+            // MODE COURSE D'ORIENTATION
             populateReserveWithStudents(eleves);
-            document.getElementById('teamsGrid').innerHTML = '';
-            alert("Élèves dans la réserve !");
+            document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
+            alert("Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes !");
             return;
         }
 
-        // >>> SINON (SPRINT, ARCATHLON, etc.) : Génération classique <<<
+        // MODE SPRINT / AUTRES (Génération classique)
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -100,8 +105,7 @@ export function initActivities() {
 
         const teams = generateTeams(eleves, options);
         
-        // Pour le Sprint, on peut aussi remplir la réserve avec les équipes générées
-        populateReserve(teams);
+        populateReserve(teams); // Pour le sprint
 
         const teamsWithPhotos = [];
         for (const team of teams) {
@@ -208,5 +212,5 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
     
-    // IMPORTANT : On ne lance PAS switchDiscipline('sprint') ici !
+    // On ne lance PAS switchDiscipline('sprint') ici !
 }
