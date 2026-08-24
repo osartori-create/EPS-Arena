@@ -192,17 +192,22 @@
                 </div>
             </div>
 
-            <!-- PARAMÈTRES ESCALADE (Temporaire) -->
+                       <!-- PARAMÈTRES ESCALADE (Temporaire) -->
             <div id="viewEscaladeSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm">⛰️ Escalade (Bientôt disponible)</h3>
                     <p class="text-xs text-slate-400 mt-2">Le module Escalade est en cours de développement. Il utilisera les mêmes paramètres de génération d'équipes que le Sprint.</p>
                 </div>
             </div>
-     <!-- POINT D'ENTRÉE DES MODULES (AJOUTER CECI AVANT </body>) -->
+
+    </div> <!-- FERMETURE DE viewActivities -->
+
+    </div> <!-- FERMETURE DE LA DIV PRINCIPALE space-y-6 -->
+
+    <!-- POINT D'ENTRÉE DES MODULES -->
     <script type="module">
         import { initApp } from './src/js/app.js';
         initApp();
     </script>
 </body>
-</html>           
+</html>   
