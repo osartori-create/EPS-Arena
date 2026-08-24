@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <title>EPS-Arena | Professeur</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
@@ -159,15 +159,15 @@
         </div>
     </div>
 
-    <script type="module">
+        <script type="module">
         import { initApp } from './src/js/app.js';
         import { listenConfig, listenPassages } from './src/js/core/firebase-service.js';
         import { updateState } from './src/js/core/state.js';
         import { db } from './src/js/core/firebase-service.js';
         import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
         import { generateTeams } from './src/js/modules/teams/team-generator.js';
+        import { getPhotoUrl } from './src/js/services/admin-service.js'; // AJOUT IMPORTANT
 
-        // Initialisation générale
         initApp();
 
         // Initialisation du menu déroulant des classes
@@ -184,7 +184,6 @@
         }
         initClassesSelect();
 
-        // Fonction de changement d'onglet
         window.switchTab = function(tabName) {
             ['admin', 'activities', 'live'].forEach(t => {
                 document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
@@ -193,13 +192,11 @@
                 document.getElementById(b).classList.remove('tab-active', 'text-blue-500');
                 document.getElementById(b).classList.add('text-slate-500');
             });
-
             const map = { 'admin': '1', 'activities': '2', 'live': '3' };
             document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
             document.getElementById('btnTab' + map[tabName]).classList.add('tab-active', 'text-blue-500');
         };
 
-        // Fonction AJOUTER UNE CLASSE
         window.addClasse = function() {
             const nom = prompt("Nom de la classe ?");
             if (nom) {
@@ -207,22 +204,16 @@
                 if (!classes.includes(nom)) {
                     classes.push(nom);
                     localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
-                    
                     const select = document.getElementById('selectClasse');
                     const option = document.createElement('option');
-                    option.value = nom;
-                    option.textContent = nom;
-                    select.appendChild(option);
-                    select.value = nom;
-                    
+                    option.value = nom; option.textContent = nom;
+                    select.appendChild(option); select.value = nom;
                     select.dispatchEvent(new Event('change'));
-                    
                     alert("Classe ajoutée !");
                 } else {
                     alert("Cette classe existe déjà.");
                     const select = document.getElementById('selectClasse');
-                    select.value = nom;
-                    select.dispatchEvent(new Event('change'));
+                    select.value = nom; select.dispatchEvent(new Event('change'));
                 }
             }
         };
@@ -231,7 +222,6 @@
         function initPalette() {
             const paletteContainer = document.getElementById('paletteCouleurs');
             const couleursDispo = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
-            
             paletteContainer.innerHTML = couleursDispo.map(c => 
                 `<div onclick="toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
             ).join('');
@@ -246,8 +236,8 @@
             }
         };
 
-        // Fonction de génération des équipes (appelée par le bouton)
-                window.generateTeams = function() {
+        // Fonction de génération des équipes (ASYNCHRONE pour les photos)
+        window.generateTeams = async function() {
             const activeClasse = document.getElementById('selectClasse').value;
             if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
             
@@ -257,7 +247,7 @@
             // Récupération des options
             const options = {
                 mode: document.getElementById('modeRepartition').value,
-                mixite: document.getElementById('modeMixite').value, // 'mixte', 'non-mixte', 'ignore'
+                mixite: document.getElementById('modeMixite').value,
                 critere: document.getElementById('critereForce').value,
                 nbEquipes: parseInt(document.getElementById('nbEquipes').value) || 0,
                 nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
@@ -265,16 +255,25 @@
                 formatLibelle: document.getElementById('formatLibelle').value
             };
 
-            // Champ intelligent
             if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
             else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
-            // Génération des équipes
             const teams = generateTeams(eleves, options);
+
+            // Préparation des photos (AJOUT)
+            const teamsWithPhotos = [];
+            for (const team of teams) {
+                const membersWithPhotos = [];
+                for (const m of team.members) {
+                    const url = await getPhotoUrl(m.id);
+                    membersWithPhotos.push({ ...m, photoUrl: url });
+                }
+                teamsWithPhotos.push({ ...team, members: membersWithPhotos });
+            }
 
             // Affichage de la grille
             const container = document.getElementById('teamsGrid');
-            container.innerHTML = teams.map(team => `
+            container.innerHTML = teamsWithPhotos.map(team => `
                 <div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
@@ -282,16 +281,23 @@
                     </div>
                     <div class="team-members flex flex-col gap-2 min-h-[60px]" data-team-id="${team.id}">
                         ${team.members.map(m => {
-                            // Affichage selon le critère choisi (VMA ou Jauge)
-                            let infoCritere = '';
-                            if (options.critere === 'force') {
-                                infoCritere = `(${'★'.repeat(Math.max(0, m.force || 0))}${'☆'.repeat(5 - Math.max(0, m.force || 0))})`;
-                            } else {
-                                infoCritere = `(${m.vma || '?'})`;
-                            }
+                            // Photo (AJOUT)
+                            const photoHtml = m.photoUrl 
+                                ? `<img src="${m.photoUrl}" class="w-10 h-10 rounded-full object-cover border border-slate-600">`
+                                : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+                            
+                            // Étoiles (UNIQUEMENT LES PLEINES EN JAUNE)
+                            let starsHtml = '';
+                            const force = m.force || 0;
+                            if (force > 0) starsHtml = '<span class="text-yellow-400 text-xs">' + '★'.repeat(force) + '</span>';
+
                             return `
-                                <div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white" data-id="${m.id}">
-                                    ${m.prenom} ${m.nom} ${infoCritere}
+                                <div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white flex items-center gap-3" data-id="${m.id}">
+                                    ${photoHtml}
+                                    <div class="flex flex-col">
+                                        <span>${m.prenom} ${m.nom}</span>
+                                        ${starsHtml}
+                                    </div>
                                 </div>
                             `;
                         }).join('')}
@@ -299,28 +305,36 @@
                 </div>
             `).join('');
 
-            // Initialisation de SortableJS
+            // Initialisation de SortableJS (le glisser-déposer)
+            // On détruit les anciennes instances pour éviter les bugs
+            if (window.sortableInstances) {
+                window.sortableInstances.forEach(s => s.destroy());
+            }
+            window.sortableInstances = [];
+            
             document.querySelectorAll('.team-members').forEach(el => {
-                new Sortable(el, {
+                const sortable = new Sortable(el, {
                     group: 'teams',
                     animation: 150,
                     onEnd: function(evt) {
+                        // Ici vous pourrez ajouter la sauvegarde automatique des équipes modifiées
                         console.log("Nouvelle répartition détectée");
                     }
                 });
+                window.sortableInstances.push(sortable);
             });
 
-            // Mise à jour des inputs intelligents
             document.getElementById('nbEquipes').value = options.nbEquipes;
             document.getElementById('nbParEquipe').value = options.nbParEquipe;
         };
 
-        // Nouvelle fonction pour renommer une équipe
         window.renameTeam = function(teamId) {
             const newName = prompt("Nouveau nom pour cette équipe ?");
             if (newName) {
-                // Logique de mise à jour du DOM et du stockage (à implémenter)
-                console.log(`Équipe ${teamId} renommée en ${newName}`);
+                // Logique de mise à jour du DOM
+                const teamDiv = document.querySelector(`[data-team-id="${teamId}"]`).parentElement;
+                const h3 = teamDiv.querySelector('h3');
+                h3.textContent = newName;
             }
         };
 
