@@ -7,7 +7,7 @@ export function initCOInterface() {
     const postesContainer = document.getElementById('postesGrid');
 
     if (!reserveContainer || !postesContainer) {
-        console.error("❌ Impossible de trouver les éléments #reserveList ou #postesGrid. Vérifiez votre HTML !");
+        console.error("❌ Impossible de trouver #reserveList ou #postesGrid ! Vérifiez le HTML.");
         return;
     }
 
@@ -38,39 +38,46 @@ function initSortableCO() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
 
-    // Détruire les anciennes instances pour éviter les bugs
+    // On détruit les anciennes instances pour éviter les conflits
     if (window.sortableCOInstances) {
         window.sortableCOInstances.forEach(s => s.destroy());
     }
     window.sortableCOInstances = [];
 
-    // Initialiser la réserve
-    const sortableReserve = new Sortable(reserveContainer, {
-        group: 'co-groupes',
-        animation: 150,
-    });
-    window.sortableCOInstances.push(sortableReserve);
+    // Vérification de visibilité (pour éviter le crash de Sortable)
+    if (reserveContainer.offsetParent === null) {
+        console.warn("⚠️ La réserve est masquée, SortableJS ne s'initialisera pas tout de suite.");
+    }
 
-    // Initialiser chaque poste
-    document.querySelectorAll('.poste-members').forEach(el => {
-        const sortablePoste = new Sortable(el, {
+    try {
+        const sortableReserve = new Sortable(reserveContainer, {
             group: 'co-groupes',
             animation: 150,
-            onAdd: function(evt) {
-                const posteId = el.closest('[data-poste]').dataset.poste;
-                console.log('Élève assigné au poste : ' + posteId);
-            }
         });
-        window.sortableCOInstances.push(sortablePoste);
-    });
+        window.sortableCOInstances.push(sortableReserve);
+
+        document.querySelectorAll('.poste-members').forEach(el => {
+            const sortablePoste = new Sortable(el, {
+                group: 'co-groupes',
+                animation: 150,
+                onAdd: function(evt) {
+                    const posteId = el.closest('[data-poste]').dataset.poste;
+                    console.log('Élève assigné au poste : ' + posteId);
+                }
+            });
+            window.sortableCOInstances.push(sortablePoste);
+        });
+    } catch (e) {
+        console.error("Erreur Sortable :", e);
+    }
 }
 
 export function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
-    console.log("🔍 Populate Reserve With Students. Div trouvée ?", reserveContainer);
+    console.log("🔍 Div trouvée :", reserveContainer);
     
     if (!reserveContainer) {
-        console.error("❌ Impossible de trouver la div #reserveList !");
+        console.error("❌ Impossible de trouver #reserveList !");
         return;
     }
     
@@ -87,9 +94,12 @@ export function populateReserveWithStudents(eleves) {
     console.log("🔍 HTML généré :", html.substring(0, 200) + "...");
     reserveContainer.innerHTML = html;
     console.log("✅ Réserve remplie !");
-    
-    // On réinitialise le glisser-déposer après insertion
-    initSortableCO();
+
+    // 🛠️ CORRECTION IMPORTANTE : On laisse le DOM se stabiliser avant d'initialiser Sortable
+    setTimeout(() => {
+        initSortableCO();
+        console.log("✅ Sortable réinitialisé !");
+    }, 100);
 }
 
 export function populateReserve(teams) {
@@ -107,5 +117,8 @@ export function populateReserve(teams) {
     });
 
     reserveContainer.innerHTML = html;
-    initSortableCO();
+    
+    setTimeout(() => {
+        initSortableCO();
+    }, 100);
 }
