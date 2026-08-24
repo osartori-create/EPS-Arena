@@ -1,9 +1,8 @@
 // src/js/ui/prof/activities.js
-import { initCOInterface, populateReserve, populateReserveWithStudents } from '../../modules/co/co-interface.js';
+import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO } from '../../modules/co/co-interface.js';
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
-import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO } from '../../modules/co/co-interface.js';
 
 let currentDiscipline = 'sprint'; // Par défaut
 
@@ -17,14 +16,14 @@ export function initActivities() {
         // Liste des panneaux à gérer
         const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
 
-        // On cache tout par défaut (avec vérification d'existence)
+        // On cache tout par défaut
         panneaux.forEach(d => {
             const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
             const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
         });
 
-        // On style les boutons (avec vérification d'existence)
+        // On style les boutons
         panneaux.forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
             if (btn) {
@@ -42,11 +41,12 @@ export function initActivities() {
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) targetView.classList.remove('hidden');
 
-        // Actions spécifiques à la CO (afficher les circuits existants)
+        // Actions spécifiques à la CO
         if (disc === 'co') {
             const circuitList = document.getElementById('circuitList');
             if (circuitList) renderCircuits('circuitList', "");
-            // >>> AJOUT IMPORTANT <<<
+            
+            // ✅ IMPORTANT : On force l'initialisation du glisser-déposer
             initSortableCO();
         }
     };
@@ -69,7 +69,7 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes (Adaptée selon l'activité !)
+    // Génération des équipes
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -210,6 +210,6 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
     
-    // IMPORTANT : On ne lance PAS switchDiscipline('sprint') ici,
-    // car cela empêcherait de voir le panneau CO au clic !
+    // IMPORTANT : On ne lance PAS switchDiscipline('sprint') ici !
+    // Sinon, cela empêcherait de voir le panneau CO au clic.
 }
