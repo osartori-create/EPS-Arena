@@ -43,34 +43,35 @@ function buildTeams(pool, options, startIndex) {
 
         return {
             id: `EQ${globalIndex + 1}`,
-            label: labels[i], // Ici, c'est A, B, C... ou 1, 2, 3... ou Rouge, Bleu...
+            label: labels[i],
             color: color,
             members: [],
             totalScore: 0
         };
     });
 
-    // Tri selon le critère (VMA ou Jauge de puissance)
+    // Tri selon le critère (VMA ou Jauge de puissance) du plus fort au plus faible
     pool.sort((a, b) => {
         const valA = options.critere === 'vma' ? (a.vma || 0) : (a.force || 0);
         const valB = options.critere === 'vma' ? (b.vma || 0) : (b.force || 0);
         return valB - valA;
     });
 
-    // Algorithme de répartition
+    // >>> CORRECTION DE L'ALGORITHME <<<
     if (options.mode === 'niveau') {
-        // "Hétérogènes entre elles, homogènes en leur sein" (Les forts ensemble)
-        // On remplit équipe par équipe
-        let index = 0;
-        for (const eleve of pool) {
-            teams[index].members.push(eleve);
-            teams[index].totalScore += (options.critere === 'vma' ? (eleve.vma||0) : (eleve.force||0));
-            index++;
-            if (index >= nbEq) index = 0;
+        // >>> "Hétérogènes" (équipes de niveau) : On regroupe les élèves par paquets
+        // Exemple : 5 équipes de 5, on prend les 5 meilleurs pour la A, les 5 suivants pour la B, etc.
+        const perTeam = Math.ceil(pool.length / nbEq);
+        for (let i = 0; i < pool.length; i++) {
+            const teamIndex = Math.floor(i / perTeam);
+            if (teams[teamIndex]) {
+                teams[teamIndex].members.push(pool[i]);
+                teams[teamIndex].totalScore += (options.critere === 'vma' ? (pool[i].vma||0) : (pool[i].force||0));
+            }
         }
     } else {
-        // "Homogènes entre elles, hétérogènes en leur sein" (Mélange des forces)
-        // Algorithme du SERPENTIN
+        // >>> "Homogènes" (mélange des forces) : Algorithme du SERPENTIN
+        // Exemple : Les meilleurs sont répartis un par un dans chaque équipe, puis on remonte
         let index = 0;
         let direction = 1;
         for (const eleve of pool) {
