@@ -68,7 +68,7 @@
             </div>
         </div>
 
-        <!-- ONGLET 2 : ACTIVITÉS -->
+                <!-- ONGLET 2 : ACTIVITÉS -->
         <div id="viewActivities" class="hidden space-y-4">
             <!-- Sélecteur de discipline -->
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
@@ -81,11 +81,23 @@
                 </div>
             </div>
 
-                        <!-- PARAMÈTRES SPRINT (Le contenu actuel) -->
+            <!-- ZONE COMMUNE : Génération des équipes (Visible pour toutes les activités) -->
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-black text-blue-400 uppercase text-sm">Génération des équipes</h3>
+                    <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer Équipes</button>
+                </div>
+                <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Les équipes apparaîtront ici -->
+                </div>
+            </div>
+
+            <!-- PARAMÈTRES SPRINT -->
             <div id="viewSprintSettings" class="space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Configuration de l'activité</h3>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                        <!-- Vos selects existants pour la répartition, mixité, critère, libellé... -->
                         <div>
                             <label class="block font-bold text-slate-400 uppercase mb-1">Répartition</label>
                             <select id="modeRepartition" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
@@ -138,19 +150,9 @@
                         </div>
                     </div>
                 </div>
-                
-                <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-black text-blue-400 uppercase text-sm">Équipes générées</h3>
-                        <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer Équipes</button>
-                    </div>
-                    <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        <!-- Les équipes apparaîtront ici -->
-                    </div>
-                </div>
             </div>
 
-                         <!-- PARAMÈTRES COURSE D'ORIENTATION -->
+            <!-- PARAMÈTRES COURSE D'ORIENTATION -->
             <div id="viewCOSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Catégories de Parcours (CO)</h3>
@@ -164,7 +166,6 @@
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Assignation des groupes aux postes</h3>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        
                         <!-- Colonne Réserve -->
                         <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (Groupes non assignés)</h4>
@@ -192,13 +193,14 @@
                 </div>
             </div>
 
-                       <!-- PARAMÈTRES ESCALADE (Temporaire) -->
+            <!-- PARAMÈTRES ESCALADE (Temporaire) -->
             <div id="viewEscaladeSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm">⛰️ Escalade (Bientôt disponible)</h3>
                     <p class="text-xs text-slate-400 mt-2">Le module Escalade est en cours de développement. Il utilisera les mêmes paramètres de génération d'équipes que le Sprint.</p>
                 </div>
             </div>
+        </div>
 
     </div> <!-- FERMETURE DE viewActivities -->
 
