@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>EPS-Arena | Professeur</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
         body { background: #0f172a; color: white; font-family: sans-serif; user-select: none; }
         .tab-active { border-bottom: 4px solid #3b82f6; color: #3b82f6 !important; font-weight: 900; }
@@ -126,6 +128,7 @@
     </div>
 
             <!-- POINT D'ENTRÉE DES MODULES -->
+        <!-- POINT D'ENTRÉE DES MODULES -->
     <script type="module">
         import { initApp } from './src/js/app.js';
         import { listenConfig, listenPassages } from './src/js/core/firebase-service.js';
@@ -136,7 +139,7 @@
         // Initialisation générale
         initApp();
 
-        // Fonction de changement d'onglet (définie sur window pour les balises onclick)
+        // Fonction de changement d'onglet
         window.switchTab = function(tabName) {
             ['admin', 'activities', 'live'].forEach(t => {
                 document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
@@ -151,17 +154,15 @@
             document.getElementById('btnTab' + map[tabName]).classList.add('tab-active', 'text-blue-500');
         };
 
-        // Fonction AJOUTER UNE CLASSE (Pour le bouton du header)
+        // Fonction AJOUTER UNE CLASSE
         window.addClasse = function() {
             const nom = prompt("Nom de la classe ?");
             if (nom) {
-                // On utilise le LocalStorage pour garder les classes en local (RGPD)
                 let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
                 if (!classes.includes(nom)) {
                     classes.push(nom);
                     localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
                     
-                    // Mise à jour du select
                     const select = document.getElementById('selectClasse');
                     const option = document.createElement('option');
                     option.value = nom;

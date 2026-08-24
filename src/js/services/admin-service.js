@@ -1,6 +1,7 @@
 // src/js/services/admin-service.js
-import Papa from 'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js';
-import JSZip from 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+// On utilise les objets globaux définis par les balises <script> dans le HTML
+const Papa = window.Papa;
+const JSZip = window.JSZip;
 
 // ==========================================
 // CONFIGURATION LOCALE (RGPD) - INDEXEDDB
