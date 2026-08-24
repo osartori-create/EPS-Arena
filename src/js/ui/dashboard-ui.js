@@ -106,6 +106,10 @@ async function renderEleves() {
     }
 }
 
+// src/js/ui/dashboard-ui.js
+// ... (gardez les imports, loadLocalEleves, renderEleves, etc. identiques)
+
+// === MODALE ASSOCIATION PAR CLIC (Fiable iPad) ===
 async function openManualAssignModal() {
     const pending = getPendingStudents(activeClasse);
     if (pending.length === 0) return;
@@ -113,12 +117,14 @@ async function openManualAssignModal() {
     const existing = document.getElementById('manualAssignModal');
     if (existing) existing.remove();
 
+    // Chargement des élèves sans photo
     const pendingWithUrls = [];
     for (const stu of pending) {
         const url = await getPhotoUrl(stu.id);
         pendingWithUrls.push({ ...stu, photoUrl: url || '' });
     }
 
+    // Chargement des photos orphelines
     const orphans = getOrphanPhotos(activeClasse);
     const orphansWithUrls = [];
     for (const o of orphans) {
@@ -128,34 +134,50 @@ async function openManualAssignModal() {
 
     const modalHtml = `
     <div id="manualAssignModal" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 class="text-xl font-black text-blue-400 uppercase mb-4">Gestion manuelle des photos</h3>
-            <p class="text-xs text-slate-400 mb-4">Ces élèves ont été créés depuis le ZIP (VMA manquante) ou n'ont pas pu être associés. Associez-les manuellement.</p>
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-black text-blue-400 uppercase mb-4">Association des photos</h3>
+            <p class="text-xs text-slate-400 mb-4">
+                <strong>1.</strong> Cliquez sur une photo à gauche pour la sélectionner (elle devient jaune).<br>
+                <strong>2.</strong> Cliquez ensuite sur l'élève à droite pour lui attribuer la photo.
+            </p>
             
-            <div class="space-y-3">
-                ${pendingWithUrls.map(stu => `
-                    <div class="bg-slate-800 p-4 rounded-2xl flex items-center justify-between gap-4 border border-slate-700">
-                        <div class="flex items-center gap-3">
-                            <img src="${stu.photoUrl}" class="w-12 h-12 rounded-full object-cover bg-slate-700">
-                            <div>
-                                <p class="font-bold text-white">${stu.prenom} ${stu.nom}</p>
-                                <p class="text-xs text-slate-500">VMA: ${stu.vma || '???'} | Sexe: ${stu.sexe || '?'}</p>
+            <div class="flex gap-6">
+                <!-- Colonne Gauche : Photos Orphelines -->
+                <div class="w-1/3">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Photos sans élève</h4>
+                    <div id="orphansList" class="flex flex-col gap-3 min-h-[200px]">
+                        ${orphansWithUrls.length === 0 ? '<p class="text-slate-500 text-xs">Aucune photo orpheline.</p>' : ''}
+                        ${orphansWithUrls.map(o => `
+                            <div id="orphan-${o.id}" onclick="selectOrphan('${o.id}')" 
+                                 class="bg-slate-800 p-3 rounded-2xl border-2 border-slate-600 cursor-pointer transition-all hover:border-purple-400 flex items-center gap-3">
+                                <img src="${o.photoUrl}" class="w-12 h-12 rounded-full object-cover pointer-events-none">
+                                <div class="pointer-events-none">
+                                    <p class="font-bold text-white text-sm">${o.prenom} ${o.nom}</p>
+                                    <p class="text-[10px] text-slate-500">Sexe: ${o.sexe || '?'}</p>
+                                </div>
                             </div>
-                        </div>
-                        <div class="flex flex-col gap-2">
-                            <button onclick="document.getElementById('file_${stu.id}').click()" class="btn bg-blue-600 text-xs uppercase">📁 Téléverser</button>
-                            <input type="file" id="file_${stu.id}" accept="image/*" class="hidden" onchange="window.uploadManual('${stu.id}', this)">
-                            
-                            <select id="orphanSelect_${stu.id}" class="bg-slate-900 border border-slate-600 text-xs rounded p-1 text-white">
-                                <option value="">🔗 Lier orpheline...</option>
-                                ${orphansWithUrls.filter(o => o.id !== stu.id).map(o => 
-                                    `<option value="${o.id}">${o.prenom} ${o.nom}</option>`
-                                ).join('')}
-                            </select>
-                            <button onclick="assignExistingOrphan('${stu.id}')" class="btn bg-purple-600 text-xs uppercase">Valider l'association</button>
-                        </div>
+                        `).join('')}
                     </div>
-                `).join('')}
+                </div>
+
+                <!-- Colonne Droite : Élèves sans photo -->
+                <div class="w-2/3">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Élèves en attente d'une photo</h4>
+                    <div id="pendingList" class="flex flex-col gap-3 min-h-[200px]">
+                        ${pendingWithUrls.map(stu => `
+                            <div id="student-${stu.id}" onclick="assignToStudent('${stu.id}')"
+                                 class="bg-slate-800 p-4 rounded-2xl border-2 border-dashed border-slate-600 flex items-center justify-between transition-colors hover:border-emerald-500 cursor-pointer">
+                                <div class="flex items-center gap-3">
+                                    <img src="${stu.photoUrl || 'https://via.placeholder.com/50'}" class="w-12 h-12 rounded-full object-cover bg-slate-700">
+                                    <div>
+                                        <p class="font-bold text-white">${stu.prenom} ${stu.nom}</p>
+                                        <p class="text-xs text-slate-500">VMA: ${stu.vma || '???'} | Sexe: ${stu.sexe || '?'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
             </div>
             
             <button onclick="document.getElementById('manualAssignModal').remove()" class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white text-sm uppercase">Fermer</button>
@@ -164,24 +186,38 @@ async function openManualAssignModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    window.uploadManual = async (studentId, input) => {
-        if (input.files.length > 0) {
-            await uploadManualPhoto(studentId, input.files[0], activeClasse);
-            loadLocalEleves();
-            document.getElementById('manualAssignModal').remove();
-            alert("✅ Photo associée !");
+    // Variable pour stocker l'ID de la photo sélectionnée
+    window.selectedOrphanId = null;
+
+    // 1. Sélectionner une photo
+    window.selectOrphan = (orphanId) => {
+        // Retirer la surbrillance de toutes les orphelines
+        document.querySelectorAll('[id^="orphan-"]').forEach(el => {
+            el.classList.remove('ring-4', 'ring-yellow-400', 'border-yellow-500');
+            el.classList.add('border-slate-600');
+        });
+
+        // Mettre en surbrillance la photo choisie
+        window.selectedOrphanId = orphanId;
+        const el = document.getElementById(`orphan-${orphanId}`);
+        if (el) {
+            el.classList.remove('border-slate-600');
+            el.classList.add('ring-4', 'ring-yellow-400', 'border-yellow-500');
         }
     };
 
-    window.assignExistingOrphan = async (studentId) => {
-        const select = document.getElementById(`orphanSelect_${studentId}`);
-        const sourceId = select.value;
-        if (!sourceId) return alert("Veuillez choisir une photo orpheline.");
+    // 2. Assigner la photo sélectionnée à un élève
+    window.assignToStudent = async (studentId) => {
+        if (!window.selectedOrphanId) {
+            alert("Veuillez d'abord sélectionner une photo à gauche.");
+            return;
+        }
 
-        if (await assignPhotoToStudent(studentId, sourceId, activeClasse)) {
+        if (await assignPhotoToStudent(studentId, window.selectedOrphanId, activeClasse)) {
+            alert("✅ Photo associée avec succès !");
             loadLocalEleves();
             document.getElementById('manualAssignModal').remove();
-            alert("✅ Association réussie !");
+            checkPendingStudents();
         } else {
             alert("Erreur lors de l'association.");
         }
