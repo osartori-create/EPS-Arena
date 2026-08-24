@@ -10,20 +10,19 @@ export function initActivities() {
     initPalette();
     initCOInterface();
 
-    // Mise à jour de la discipline courante
+    // Mise à jour de la discipline courante (stockée dans une variable)
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
-        // Liste des panneaux à gérer
         const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
 
-        // On cache tout par défaut
+        // 1. On cache tous les panneaux
         panneaux.forEach(d => {
             const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
             const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
         });
 
-        // On style les boutons
+        // 2. On style les boutons
         panneaux.forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
             if (btn) {
@@ -37,16 +36,14 @@ export function initActivities() {
             }
         });
 
-        // On affiche le panneau correspondant
+        // 3. On affiche le panneau correspondant
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) targetView.classList.remove('hidden');
 
-        // Actions spécifiques à la CO
+        // 4. Actions spécifiques à la CO (afficher les circuits et initialiser Sortable)
         if (disc === 'co') {
             const circuitList = document.getElementById('circuitList');
             if (circuitList) renderCircuits('circuitList', "");
-            
-            // ✅ IMPORTANT : On force l'initialisation du glisser-déposer
             initSortableCO();
         }
     };
@@ -69,7 +66,7 @@ export function initActivities() {
         }
     };
 
-        // Génération des équipes
+    // Génération des équipes (LE POINT CRUCIAL)
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -77,16 +74,17 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // >>> DÉTECTION DE LA DISCIPLINE ACTIVE (fiable à 100%) <<<
-        // On regarde si la div CO est visible (elle n'a pas la classe 'hidden')
+        // >>> ON TESTE SI ON EST EN MODE CO <<<
+        // 1. Via la variable (fiable si le clic a bien fonctionné)
+        // 2. Via le DOM (si la div CO n'a pas la classe 'hidden')
         const coView = document.getElementById('viewCOSettings');
         const isCOVisible = coView && !coView.classList.contains('hidden');
         
-        if (isCOVisible) {
-            // On est en mode CO : on met tous les élèves dans la réserve
+        if (currentDiscipline === 'co' || isCOVisible) {
+            // ✅ MODE COURSE D'ORIENTATION
             populateReserveWithStudents(eleves);
             document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
-            alert("Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes de 2 ou 3 !");
+            alert("✅ Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes de 2 ou 3 !");
             return;
         }
 
@@ -106,7 +104,7 @@ export function initActivities() {
 
         const teams = generateTeams(eleves, options);
         
-        // Remplir la réserve CO avec les équipes générées
+        // Pour le Sprint, on peut aussi remplir la réserve avec les équipes générées
         populateReserve(teams);
 
         const teamsWithPhotos = [];
@@ -215,5 +213,4 @@ export function initActivities() {
     };
     
     // IMPORTANT : On ne lance PAS switchDiscipline('sprint') ici !
-    // Sinon, cela empêcherait de voir le panneau CO au clic.
 }
