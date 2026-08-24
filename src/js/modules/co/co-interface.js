@@ -1,20 +1,22 @@
 // src/js/modules/co/co-interface.js
 import { MATRICE } from './matrice.js';
 
-let reserveContainer = null;
-let postesContainer = null;
-
 export function initCOInterface() {
-    reserveContainer = document.getElementById('reserveList');
-    postesContainer = document.getElementById('postesGrid');
+    const reserveContainer = document.getElementById('reserveList');
+    const postesContainer = document.getElementById('postesGrid');
 
     if (!reserveContainer || !postesContainer) return;
+
     generatePostesGrid();
     initSortableCO();
 }
 
+// Génère la grille des postes basée sur la matrice (A1, A2... F6)
 function generatePostesGrid() {
+    const postesContainer = document.getElementById('postesGrid');
     if (!postesContainer) return;
+    
+    // On prend les colonnes de la ligne 31 (les en-têtes A1, A2, etc.)
     const headers = Object.keys(MATRICE['31'] || {});
     
     let html = '';
@@ -27,19 +29,22 @@ function generatePostesGrid() {
             </div>
         `;
     });
+    
     postesContainer.innerHTML = html;
 }
 
+// Initialise le glisser-déposer entre la réserve et les postes
 function initSortableCO() {
+    const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
-    
-    // La réserve accepte les élèves individuels
+
+    // Initialiser la réserve comme zone de départ
     new Sortable(reserveContainer, {
         group: 'co-groupes',
         animation: 150,
     });
 
-    // Chaque poste accepte les élèves
+    // Initialiser chaque poste comme zone de réception
     document.querySelectorAll('.poste-members').forEach(el => {
         new Sortable(el, {
             group: 'co-groupes',
@@ -54,25 +59,30 @@ function initSortableCO() {
 
 // Remplir la réserve avec des ÉLÈVES INDIVIDUELS (pour la CO)
 export function populateReserveWithStudents(eleves) {
+    const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
     
     let html = '';
     eleves.forEach(eleve => {
-        // On crée une carte individuelle avec le nom et la photo si possible
         html += `
             <div class="bg-slate-800 p-2 rounded-lg border border-slate-600 cursor-grab active:cursor-grabbing flex items-center gap-2" data-id="${eleve.id}">
                 <span class="font-bold text-white text-sm">${eleve.prenom} ${eleve.nom}</span>
-                <span class="text-xs text-slate-400 ml-auto">(${eleve.vma ? 'VMA: ' + eleve.vma : ''})</span>
+                <span class="text-xs text-slate-400 ml-auto">${eleve.vma ? 'VMA: ' + eleve.vma : ''}</span>
             </div>
         `;
     });
     
     reserveContainer.innerHTML = html;
+    
+    // IMPORTANT : On réinitialise le glisser-déposer après avoir ajouté les élèves
+    initSortableCO();
 }
 
-// (Ancienne fonction pour les équipes, on la garde pour le Sprint)
+// (Ancienne fonction pour les équipes, utilisée pour le Sprint)
 export function populateReserve(teams) {
+    const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
+    
     let html = '';
     teams.forEach(team => {
         html += `
@@ -82,5 +92,9 @@ export function populateReserve(teams) {
             </div>
         `;
     });
+    
     reserveContainer.innerHTML = html;
+    
+    // IMPORTANT : On réinitialise le glisser-déposer après avoir ajouté les équipes
+    initSortableCO();
 }
