@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>EPS-Arena | Professeur</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; user-select: none; }
+        .tab-active { border-bottom: 4px solid #3b82f6; color: #3b82f6 !important; font-weight: 900; }
+        .btn { padding: 10px 16px; border-radius: 12px; font-weight: 800; border: none; cursor: pointer; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 12px; }
+    </style>
+</head>
+<body class="p-4">
+
+    <!-- En-tête -->
+    <header class="flex justify-between items-center mb-4 border-b border-slate-800 pb-4 flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-black text-blue-500 uppercase italic">EPS-Arena</h1>
+            <span class="text-[10px] font-black uppercase text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full bg-slate-900">Espace Professeur</span>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <span id="connDot" class="w-3 h-3 rounded-full bg-slate-600"></span>
+            <span id="connLabel" class="text-xs font-bold uppercase text-slate-500">Connexion...</span>
+            
+            <select id="selectClasse" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-xs font-bold text-white outline-none">
+                <option value="">-- Classe --</option>
+            </select>
+            <button onclick="addClasse()" class="btn btn-primary text-xs uppercase">+ Classe</button>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
+        <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
+        <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
+        <button id="btnTab3" onclick="switchTab('live')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📊 Résultats Live</button>
+    </nav>
+
+    <!-- Contenu principal -->
+    <div class="space-y-6">
+        
+        <!-- ONGLET 1 : ADMINISTRATION -->
+        <div id="viewAdmin" class="space-y-4">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
+                <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
+                <p class="text-xs text-slate-400 w-full">Les noms et photos restent sur cet appareil (IndexedDB). Seuls les codes couleurs vont sur Firebase.</p>
+                
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('csvFile').click()" class="btn btn-primary text-xs uppercase">📄 Import CSV</button>
+                    <input type="file" id="csvFile" accept=".csv" class="hidden">
+                    
+                    <button onclick="document.getElementById('zipFile').click()" class="btn btn-primary text-xs uppercase">📸 Import ZIP Photos</button>
+                    <input type="file" id="zipFile" accept=".zip" class="hidden">
+                    
+                    <button onclick="addEleve()" class="btn bg-slate-700 text-xs uppercase border border-slate-500">+ Élève</button>
+                    <button onclick="purgeEleves()" class="btn btn-danger text-xs uppercase">🗑 Purger</button>
+                </div>
+            </div>
+            
+            <div id="eleveList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <!-- Les cartes des élèves apparaîtront ici dynamiquement -->
+            </div>
+        </div>
+
+        <!-- ONGLET 2 : ACTIVITÉS -->
+<div id="viewActivities" class="hidden space-y-4">
+    
+    <!-- SÉLECTEUR DE DISCIPLINE -->
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Quelle activité ?</h3>
+        <div id="disciplineSelector" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button onclick="switchDiscipline('sprint')" id="btnDisc-sprint" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">
+                🏃 Sprint
+            </button>
+            <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">
+                🧭 Course d'Orientation
+            </button>
+            <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">
+                🎯 Arcathlon
+            </button>
+            <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">
+                ⛰️ Escalade
+            </button>
+        </div>
+    </div>
+
+    <!-- PARAMÈTRES SPRINT (Le contenu actuel) -->
+    <div id="viewSprintSettings" class="space-y-4">
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <!-- (Votre code de configuration actuel : Répartition, Mixité, etc. reste ici) -->
+        </div>
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <!-- (Votre code de génération d'équipes et grille Sortable reste ici) -->
+        </div>
+    </div>
+
+    <!-- PARAMÈTRES COURSE D'ORIENTATION (Vide pour l'instant) -->
+    <div id="viewCOSettings" class="hidden space-y-4">
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Catégories de Parcours (CO)</h3>
+            <p class="text-xs text-slate-400 mb-4">Ces circuits utilisent la matrice des balises. Vous pourrez ensuite glisser-déposer les équipes sur les codes (A1, C4, etc.)</p>
+            <div id="circuitList" class="space-y-4 mb-6"></div>
+            <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
+            <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
+        </div>
+    </div>
+
+</div>
+
+        <!-- ONGLET 3 : LIVE -->
+        <div id="viewLive" class="hidden space-y-4">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Classement en temps réel</h3>
+                <div id="grosGlobe" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Les cartes de scores par équipe apparaîtront ici -->
+                </div>
+            </div>
+            
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Journal des passages</h3>
+                <div id="journalPassages" class="space-y-2">
+                    <!-- Les passages en direct apparaîtront ici -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+            <script type="module">
+        import { initApp } from './src/js/app.js';
+        import { listenConfig, listenPassages } from './src/js/core/firebase-service.js';
+        import { updateState } from './src/js/core/state.js';
+        import { db } from './src/js/core/firebase-service.js';
+        import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+        import { generateTeams } from './src/js/modules/teams/team-generator.js';
+        import { getPhotoUrl } from './src/js/services/admin-service.js';
+        
+        // Imports des nouveaux modules CO
+        import { MATRICE } from './src/js/modules/co/matrice.js';
+        import { addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit, renderCircuits, getCircuits } from './src/js/modules/co/circuit-manager.js';
+
+        initApp();
+
+        function initClassesSelect() {
+            const select = document.getElementById('selectClasse');
+            select.innerHTML = '<option value="">-- Classe --</option>';
+            let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
+            classes.forEach(nom => {
+                const option = document.createElement('option');
+                option.value = nom; option.textContent = nom;
+                select.appendChild(option);
+            });
+        }
+        initClassesSelect();
+
+        window.switchTab = function(tabName) {
+            ['admin', 'activities', 'live'].forEach(t => {
+                document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
+            });
+            ['btnTab1', 'btnTab2', 'btnTab3'].forEach(b => {
+                document.getElementById(b).classList.remove('tab-active', 'text-blue-500');
+                document.getElementById(b).classList.add('text-slate-500');
+            });
+            const map = { 'admin': '1', 'activities': '2', 'live': '3' };
+            document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
+            document.getElementById('btnTab' + map[tabName]).classList.add('tab-active', 'text-blue-500');
+        };
+
+        window.addClasse = function() {
+            const nom = prompt("Nom de la classe ?");
+            if (nom) {
+                let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
+                if (!classes.includes(nom)) {
+                    classes.push(nom);
+                    localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
+                    const select = document.getElementById('selectClasse');
+                    const option = document.createElement('option');
+                    option.value = nom; option.textContent = nom;
+                    select.appendChild(option); select.value = nom;
+                    select.dispatchEvent(new Event('change'));
+                    alert("Classe ajoutée !");
+                } else {
+                    alert("Cette classe existe déjà.");
+                    const select = document.getElementById('selectClasse');
+                    select.value = nom; select.dispatchEvent(new Event('change'));
+                }
+            }
+        };
+
+        function initPalette() {
+            const paletteContainer = document.getElementById('paletteCouleurs');
+            const couleursDispo = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
+            paletteContainer.innerHTML = couleursDispo.map(c => 
+                `<div onclick="toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
+            ).join('');
+        }
+        initPalette();
+
+        window.toggleCouleur = function(couleur) {
+            const el = document.querySelector(`[data-couleur="${couleur}"]`);
+            if (el) {
+                el.classList.toggle('border-emerald-400');
+                el.classList.toggle('border-slate-600');
+            }
+        };
+
+        // NOUVELLE FONCTION : Changement de discipline
+        window.switchDiscipline = function(disc) {
+            ['sprint', 'co', 'arcathlon', 'escalade'].forEach(d => {
+                const btn = document.getElementById('btnDisc-' + d);
+                const view = document.getElementById('view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings');
+                
+                if(d === disc) {
+                    btn.classList.remove('border-slate-600', 'text-slate-400');
+                    btn.classList.add('border-blue-500', 'text-blue-400');
+                    if(view) view.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('border-blue-500', 'text-blue-400');
+                    btn.classList.add('border-slate-600', 'text-slate-400');
+                    if(view) view.classList.add('hidden');
+                }
+            });
+        };
+
+        // FONCTIONS CO (extraites de votre ancien code)
+        window.addCircuit = function() {
+            const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
+            if(!cat) return;
+            const nom = prompt("Nom du circuit (ex: 1, Rouge) :");
+            if(!nom) return;
+            const b = prompt("Liste des balises (ex: 31, 34*, 42) :");
+            if(b) {
+                addCircuitCO(cat, nom, b);
+                renderCircuits('circuitList', "");
+            }
+        };
+        
+        window.editCircuit = function(id) {
+            const circ = getCircuits().find(c => c.id === id);
+            const n = prompt("Modifier les balises :", circ.balises.join(', '));
+            if(n !== null) {
+                editCircuitCO(id, n);
+                renderCircuits('circuitList', "");
+            }
+        };
+
+        window.delCircuit = function(id) {
+            if(confirm("Supprimer ce circuit ?")) {
+                delCircuit(id);
+                renderCircuits('circuitList', "");
+            }
+        };
+
+        window.autoAssignCodes = function() {
+            // (Logique à venir pour assigner automatiquement A1, A2... aux équipes générées)
+            alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
+        };
+
+        // Initialisation au chargement
+        switchDiscipline('sprint'); // Active le Sprint par défaut
+        renderCircuits('circuitList', ""); // Affiche les circuits CO (s'ils existent)
+
+        window.generateTeams = async function() {
+            const activeClasse = document.getElementById('selectClasse').value;
+            if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+            
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+            if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
+
+            const options = {
+                mode: document.getElementById('modeRepartition').value,
+                mixite: document.getElementById('modeMixite').value,
+                critere: document.getElementById('critereForce').value,
+                formatLibelle: document.getElementById('formatLibelle').value, // Lettres, Chiffres ou Couleurs
+                nbEquipes: parseInt(document.getElementById('nbEquipes').value) || 0,
+                nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
+                couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
+            };
+
+            if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
+            else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
+
+            const teams = generateTeams(eleves, options);
+
+            // Chargement des photos
+            const teamsWithPhotos = [];
+            for (const team of teams) {
+                const membersWithPhotos = [];
+                for (const m of team.members) {
+                    const url = await getPhotoUrl(m.id);
+                    membersWithPhotos.push({ ...m, photoUrl: url });
+                }
+                teamsWithPhotos.push({ ...team, members: membersWithPhotos });
+            }
+
+            const container = document.getElementById('teamsGrid');
+            container.innerHTML = teamsWithPhotos.map(team => `
+                <div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
+                        <button onclick="event.stopPropagation(); renameTeam('${team.id}')" class="text-[10px] text-slate-400 underline">Renommer</button>
+                    </div>
+                    <div class="team-members flex flex-col gap-2 min-h-[60px]" data-team-id="${team.id}">
+                        ${team.members.map(m => {
+                            const photoHtml = m.photoUrl 
+                                ? `<img src="${m.photoUrl}" class="w-10 h-10 rounded-full object-cover border border-slate-600">`
+                                : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+                            
+                            let starsHtml = '';
+                            const force = m.force || 0;
+                            if (force > 0) starsHtml = '<span class="text-yellow-400 text-xs">' + '★'.repeat(force) + '</span>';
+
+                            return `
+                                <div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white flex items-center gap-3" data-id="${m.id}">
+                                    ${photoHtml}
+                                    <div class="flex flex-col flex-1">
+                                        <span>${m.prenom} ${m.nom}</span>
+                                        ${starsHtml}
+                                    </div>
+                                    <!-- RANG DE L'ÉLÈVE EN BLANC GRAND ET VISIBLE -->
+                                    <span class="text-3xl font-black text-white pr-2">${m.rank}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            if (window.sortableInstances) {
+                window.sortableInstances.forEach(s => s.destroy());
+            }
+            window.sortableInstances = [];
+            
+            document.querySelectorAll('.team-members').forEach(el => {
+                const sortable = new Sortable(el, {
+                    group: 'teams',
+                    animation: 150,
+                    onEnd: function(evt) {
+                        console.log("Nouvelle répartition détectée");
+                    }
+                });
+                window.sortableInstances.push(sortable);
+            });
+
+            document.getElementById('nbEquipes').value = options.nbEquipes;
+            document.getElementById('nbParEquipe').value = options.nbParEquipe;
+        };
+
+        window.renameTeam = function(teamId) {
+            const newName = prompt("Nouveau nom pour cette équipe ?");
+            if (newName) {
+                const teamDiv = document.querySelector(`[data-team-id="${teamId}"]`).parentElement;
+                const h3 = teamDiv.querySelector('h3');
+                h3.textContent = newName;
+            }
+        };
+
+        onValue(ref(db, '.info/connected'), (snap) => {
+            document.getElementById('connDot').className = "w-3 h-3 rounded-full " + (snap.val() ? "bg-emerald-500" : "bg-red-500");
+            document.getElementById('connLabel').textContent = snap.val() ? "En ligne" : "Hors ligne";
+        });
+    </script>
+</body>
+</html>
