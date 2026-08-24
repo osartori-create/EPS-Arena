@@ -1,42 +1,44 @@
 // src/js/ui/prof/activities.js
+import { initCOInterface, populateReserve } from '../../modules/co/co-interface.js';
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 
 export function initActivities() {
-    // Init palette
+    // Init palette et interface CO
     initPalette();
+    initCOInterface();
 
     // Changement de discipline
     window.switchDiscipline = function(disc) {
         // On cache tout par défaut
-        document.getElementById('viewSprintSettings').classList.add('hidden');
-        document.getElementById('viewCOSettings').classList.add('hidden');
-        document.getElementById('viewArcathlonSettings').classList.add('hidden');
-        document.getElementById('viewEscaladeSettings').classList.add('hidden');
+        const views = ['viewSprintSettings', 'viewCOSettings', 'viewArcathlonSettings', 'viewEscaladeSettings'];
+        views.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
         
         // On style les boutons
         ['sprint', 'co', 'arcathlon', 'escalade'].forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
-            if (d === disc) {
-                btn.classList.remove('border-slate-600', 'text-slate-400');
-                btn.classList.add('border-blue-500', 'text-blue-400');
-            } else {
-                btn.classList.remove('border-blue-500', 'text-blue-400');
-                btn.classList.add('border-slate-600', 'text-slate-400');
+            if (btn) {
+                if (d === disc) {
+                    btn.classList.remove('border-slate-600', 'text-slate-400');
+                    btn.classList.add('border-blue-500', 'text-blue-400');
+                } else {
+                    btn.classList.remove('border-blue-500', 'text-blue-400');
+                    btn.classList.add('border-slate-600', 'text-slate-400');
+                }
             }
         });
 
         // On affiche le bon panneau
-        if (disc === 'sprint') {
-            document.getElementById('viewSprintSettings').classList.remove('hidden');
-        } else if (disc === 'co') {
-            document.getElementById('viewCOSettings').classList.remove('hidden');
-            renderCircuits('circuitList', ""); // On affiche les circuits existants
-        } else if (disc === 'arcathlon') {
-            document.getElementById('viewArcathlonSettings').classList.remove('hidden');
-        } else if (disc === 'escalade') {
-            document.getElementById('viewEscaladeSettings').classList.remove('hidden');
+        const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
+        if (targetView) {
+            targetView.classList.remove('hidden');
+            if (disc === 'co') {
+                renderCircuits('circuitList', ""); // On affiche les circuits existants
+            }
         }
     };
 
@@ -58,7 +60,7 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes (pour Sprint et autres activités à venir)
+    // Génération des équipes
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -80,6 +82,9 @@ export function initActivities() {
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
         const teams = generateTeams(eleves, options);
+        
+        // Remplir la réserve CO avec les équipes générées
+        populateReserve(teams);
 
         const teamsWithPhotos = [];
         for (const team of teams) {
@@ -143,16 +148,18 @@ export function initActivities() {
         document.getElementById('nbParEquipe').value = options.nbParEquipe;
     };
 
+    // Renommer une équipe
     window.renameTeam = function(teamId) {
         const newName = prompt("Nouveau nom pour cette équipe ?");
         if (newName) {
             const teamDiv = document.querySelector(`[data-team-id="${teamId}"]`).parentElement;
             const h3 = teamDiv.querySelector('h3');
             h3.textContent = newName;
+            // Note : populateReserve est retiré ici car 'teams' n'est pas accessible dans cette portée
         }
     };
 
-    // Fonctions CO (extraites de l'ancien code)
+    // Fonctions CO
     window.addCircuit = function() {
         const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
         if(!cat) return;

@@ -4,7 +4,9 @@ export const FIREBASE_CONFIG = {
 };
 
 export const DB_PATHS = {
-    CONFIG: 'arena/config',
-    PASSAGES: 'arena/live/passages',
-    SETTINGS: 'arena/settings'
+    // Racine par établissement (Code RNE)
+    ETAB: 'etablissements/0680013V',
+    // Le code prof sera ajouté dynamiquement (ex: /profs/MARTIN/config)
+    CONFIG: 'etablissements/0680013V/profs/{profCode}/config',
+    PASSAGES: 'etablissements/0680013V/profs/{profCode}/live/passages'
 };

@@ -38,7 +38,7 @@ export function initLayout() {
     // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
         const select = document.getElementById('selectClasse');
-        if (!select) return; // Sécurité si l'élément n'existe pas encore
+        if (!select) return;
         select.innerHTML = '<option value="">-- Classe --</option>';
         let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
         classes.forEach(nom => {
@@ -76,7 +76,17 @@ export function initLayout() {
         }
     };
 
-    // 3. Connexion Firebase
+    // 3. Code Prof (sorti de la fonction switchTab pour être initialisé au démarrage)
+    const profInput = document.getElementById('profCode');
+    if (profInput) {
+        profInput.value = localStorage.getItem('eps_arena_profCode') || '';
+        profInput.addEventListener('change', (e) => {
+            localStorage.setItem('eps_arena_profCode', e.target.value.toUpperCase());
+            alert("Code Prof enregistré !");
+        });
+    }
+
+    // 4. Connexion Firebase
     onValue(ref(db, '.info/connected'), (snap) => {
         const dot = document.getElementById('connDot');
         const label = document.getElementById('connLabel');
