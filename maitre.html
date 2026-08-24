@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EPS-Arena | Professeur</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0f172a; color: white; font-family: sans-serif; user-select: none; }
+        .tab-active { border-bottom: 4px solid #3b82f6; color: #3b82f6 !important; font-weight: 900; }
+        .btn { padding: 10px 16px; border-radius: 12px; font-weight: 800; border: none; cursor: pointer; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 12px; }
+    </style>
+</head>
+<body class="p-4">
+
+    <!-- En-tête -->
+    <header class="flex justify-between items-center mb-4 border-b border-slate-800 pb-4 flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-black text-blue-500 uppercase italic">EPS-Arena</h1>
+            <span class="text-[10px] font-black uppercase text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full bg-slate-900">Espace Professeur</span>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <span id="connDot" class="w-3 h-3 rounded-full bg-slate-600"></span>
+            <span id="connLabel" class="text-xs font-bold uppercase text-slate-500">Connexion...</span>
+            
+            <select id="selectClasse" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-xs font-bold text-white outline-none">
+                <option value="">-- Classe --</option>
+            </select>
+            <button onclick="addClasse()" class="btn btn-primary text-xs uppercase">+ Classe</button>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
+        <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
+        <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
+        <button id="btnTab3" onclick="switchTab('live')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📊 Résultats Live</button>
+    </nav>
+
+    <!-- Contenu principal -->
+    <div class="space-y-6">
+        
+        <!-- ONGLET 1 : ADMINISTRATION -->
+        <div id="viewAdmin" class="space-y-4">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
+                <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
+                <p class="text-xs text-slate-400 w-full">Les noms et photos restent sur cet appareil (IndexedDB). Seuls les codes couleurs vont sur Firebase.</p>
+                
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('csvFile').click()" class="btn btn-primary text-xs uppercase">📄 Import CSV</button>
+                    <input type="file" id="csvFile" accept=".csv" class="hidden">
+                    
+                    <button onclick="document.getElementById('zipFile').click()" class="btn btn-primary text-xs uppercase">📸 Import ZIP Photos</button>
+                    <input type="file" id="zipFile" accept=".zip" class="hidden">
+                    
+                    <button onclick="addEleve()" class="btn bg-slate-700 text-xs uppercase border border-slate-500">+ Élève</button>
+                    <button onclick="purgeEleves()" class="btn btn-danger text-xs uppercase">🗑 Purger</button>
+                </div>
+            </div>
+            
+            <div id="eleveList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <!-- Les cartes des élèves apparaîtront ici dynamiquement -->
+            </div>
+        </div>
+
+        <!-- ONGLET 2 : ACTIVITÉS -->
+        <div id="viewActivities" class="hidden space-y-4">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Configuration de l'activité</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Mode d'épreuve :</label>
+                        <select id="modeEpreuve" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 font-bold text-white outline-none">
+                            <option value="sprint">🏃 Sprint</option>
+                            <option value="poursuite">⏱️ Poursuite</option>
+                            <option value="mille">🎯 Mille</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Distance (m)</label>
+                        <input type="number" id="distance" value="200" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-400 uppercase mb-1">Séries</label>
+                        <input type="number" id="series" value="3" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="pushConfig()" class="w-full btn-success py-3 rounded-xl font-black uppercase text-white border-2 border-emerald-400 shadow-lg">📡 Transmettre</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-black text-blue-400 uppercase text-sm">Équipes générées</h3>
+                    <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer Équipes</button>
+                </div>
+                <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Les équipes apparaîtront ici -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ONGLET 3 : LIVE -->
+        <div id="viewLive" class="hidden space-y-4">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Classement en temps réel</h3>
+                <div id="grosGlobe" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Les cartes de scores par équipe apparaîtront ici -->
+                </div>
+            </div>
+            
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Journal des passages</h3>
+                <div id="journalPassages" class="space-y-2">
+                    <!-- Les passages en direct apparaîtront ici -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- POINT D'ENTRÉE DES MODULES -->
+    <script type="module">
+        import { initApp } from './src/js/app.js';
+        import { listenConfig, listenPassages } from './src/js/core/firebase-service.js';
+        import { updateState, state } from './src/js/core/state.js';
+        
+        // Initialisation générale
+        initApp();
+
+        // Fonction de changement d'onglet
+        window.switchTab = function(tabName) {
+            ['admin', 'activities', 'live'].forEach(t => {
+                document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
+            });
+            ['btnTab1', 'btnTab2', 'btnTab3'].forEach(b => {
+                document.getElementById(b).classList.remove('tab-active', 'text-blue-500');
+                document.getElementById(b).classList.add('text-slate-500');
+            });
+
+            const map = { 'admin': '1', 'activities': '2', 'live': '3' };
+            document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
+            document.getElementById('btnTab' + map[tabName]).classList.add('tab-active', 'text-blue-500');
+        };
+
+        // Écoute des données en temps réel
+        listenConfig((config) => {
+            updateState('equipesConfig', config.equipes || {});
+            // Appel des fonctions pour mettre à jour l'UI (à venir dans ui/dashboard-ui.js)
+        });
+
+        listenPassages((passages) => {
+            // Appel des fonctions pour mettre à jour le live (à venir dans ui/dashboard-ui.js)
+        });
+
+        // Écoute de la connexion
+        import { getDatabase, ref, onValue } from "firebase/database";
+        import { db } from './src/js/core/firebase-service.js'; // Assurez-vous d'exporter db
+        onValue(ref(db, '.info/connected'), (snap) => {
+            document.getElementById('connDot').className = "w-3 h-3 rounded-full " + (snap.val() ? "bg-emerald-500" : "bg-red-500");
+            document.getElementById('connLabel').textContent = snap.val() ? "En ligne" : "Hors ligne";
+        });
+    </script>
+</body>
+</html>
