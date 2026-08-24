@@ -6,13 +6,12 @@ import { initAdminUI } from './ui/dashboard-ui.js';
 // Initialise l'application
 export function initApp() {
     console.log("✅ EPS-Arena démarré !");
+    
+    // Initialisation de l'UI (Appel une seule fois)
+    initAdminUI();
+
+    // Écoute de la config
     listenConfig((config) => {
         updateState('equipesConfig', config.equipes || {});
-    console.log("✅ EPS-Arena démarré !");
-    initAdminUI();
     });
-    
-    // Ici, vous importerez et appellerez :
-    // - initAdminUI() depuis './ui/dashboard-ui.js'
-    // - initActivitiesUI() depuis './ui/action-ui.js'
 }
