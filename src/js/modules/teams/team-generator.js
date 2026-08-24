@@ -20,11 +20,30 @@ export function generateTeams(eleves, options) {
 function buildTeams(pool, options, startIndex) {
     if (pool.length === 0) return [];
 
-    // Calcul du nombre d'équipes
+    // >>> CORRECTION DU BUG DE DIVISION PAR ZÉRO <<<
     let nbEq = options.nbEquipes;
-    if (!nbEq) nbEq = Math.ceil(pool.length / options.nbParEquipe);
+    let nbParEquipe = options.nbParEquipe;
 
-    // Génération des labels selon le format choisi (Lettres, Chiffres, Couleurs)
+    // Si les deux champs sont vides, on prend une valeur par défaut raisonnable (max 4 par équipe)
+    if ((!nbEq || nbEq <= 0) && (!nbParEquipe || nbParEquipe <= 0)) {
+        nbEq = Math.max(1, Math.ceil(pool.length / 4));
+    } 
+    // Si seul le nombre d'équipes est défini, on calcule les joueurs par équipe
+    else if (nbEq && nbEq > 0 && (!nbParEquipe || nbParEquipe <= 0)) {
+        nbParEquipe = Math.ceil(pool.length / nbEq);
+    }
+    // Si seul les joueurs par équipe sont définis, on calcule le nombre d'équipes
+    else if ((!nbEq || nbEq <= 0) && nbParEquipe && nbParEquipe > 0) {
+        nbEq = Math.ceil(pool.length / nbParEquipe);
+    }
+
+    // Sécurité ultime contre les valeurs invalides (NaN, Infinity, négatif)
+    if (!nbEq || nbEq < 1 || isNaN(nbEq) || nbEq > pool.length) {
+        nbEq = Math.max(1, Math.min(pool.length, 4));
+    }
+    // <<< FIN DE LA CORRECTION >>>
+
+    // Génération des labels
     const nomsCouleurs = ['Rouge', 'Bleu', 'Vert', 'Jaune', 'Orange', 'Violet', 'Rose', 'Cyan', 'Blanc', 'Noir'];
     const labels = [];
     for (let i = 0; i < nbEq; i++) {
@@ -50,17 +69,15 @@ function buildTeams(pool, options, startIndex) {
         };
     });
 
-    // Tri selon le critère (VMA ou Jauge de puissance) du plus fort au plus faible
+    // Tri selon le critère
     pool.sort((a, b) => {
         const valA = options.critere === 'vma' ? (a.vma || 0) : (a.force || 0);
         const valB = options.critere === 'vma' ? (b.vma || 0) : (b.force || 0);
         return valB - valA;
     });
 
-    // >>> CORRECTION DE L'ALGORITHME <<<
+    // Algorithme de répartition
     if (options.mode === 'niveau') {
-        // >>> "Hétérogènes" (équipes de niveau) : On regroupe les élèves par paquets
-        // Exemple : 5 équipes de 5, on prend les 5 meilleurs pour la A, les 5 suivants pour la B, etc.
         const perTeam = Math.ceil(pool.length / nbEq);
         for (let i = 0; i < pool.length; i++) {
             const teamIndex = Math.floor(i / perTeam);
@@ -70,8 +87,6 @@ function buildTeams(pool, options, startIndex) {
             }
         }
     } else {
-        // >>> "Homogènes" (mélange des forces) : Algorithme du SERPENTIN
-        // Exemple : Les meilleurs sont répartis un par un dans chaque équipe, puis on remonte
         let index = 0;
         let direction = 1;
         for (const eleve of pool) {
@@ -84,7 +99,7 @@ function buildTeams(pool, options, startIndex) {
         }
     }
 
-    // Attribution du rang dans l'équipe (1, 2, 3...)
+    // Attribution du rang
     teams.forEach(team => {
         team.members.forEach((m, idx) => {
             m.rank = idx + 1;
