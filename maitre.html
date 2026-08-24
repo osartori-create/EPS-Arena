@@ -44,9 +44,27 @@
 
     <div class="space-y-6">
         
-        <!-- ONGLET 1 : ADMINISTRATION -->
+                <!-- ONGLET 1 : ADMINISTRATION -->
         <div id="viewAdmin" class="space-y-4">
-            <!-- Imports et grille des élèves (contenu inchangé) -->
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
+                <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
+                <p class="text-xs text-slate-400 w-full">Les noms et photos restent sur cet appareil (IndexedDB). Seuls les codes couleurs vont sur Firebase.</p>
+                
+                <div class="flex gap-2">
+                    <button onclick="document.getElementById('csvFile').click()" class="btn btn-primary text-xs uppercase">📄 Import CSV</button>
+                    <input type="file" id="csvFile" accept=".csv" class="hidden">
+                    
+                    <button onclick="document.getElementById('zipFile').click()" class="btn btn-primary text-xs uppercase">📸 Import ZIP Photos</button>
+                    <input type="file" id="zipFile" accept=".zip" class="hidden">
+                    
+                    <button onclick="addEleve()" class="btn bg-slate-700 text-xs uppercase border border-slate-500">+ Élève</button>
+                    <button onclick="purgeEleves()" class="btn btn-danger text-xs uppercase">🗑 Purger</button>
+                </div>
+            </div>
+            
+            <div id="eleveList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <!-- Les cartes des élèves apparaîtront ici dynamiquement -->
+            </div>
         </div>
 
         <!-- ONGLET 2 : ACTIVITÉS -->
@@ -62,17 +80,86 @@
                 </div>
             </div>
 
-            <!-- Paramètres Sprint -->
+                        <!-- PARAMÈTRES SPRINT (Le contenu actuel) -->
             <div id="viewSprintSettings" class="space-y-4">
-                <!-- Configuration, palette et génération d'équipes (contenu inchangé) -->
+                <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Configuration de l'activité</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                        <div>
+                            <label class="block font-bold text-slate-400 uppercase mb-1">Répartition</label>
+                            <select id="modeRepartition" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                                <option value="niveau">Hétérogènes</option>
+                                <option value="melange" selected>Homogènes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-400 uppercase mb-1">Mixité</label>
+                            <select id="modeMixite" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                                <option value="mixte">Mixte</option>
+                                <option value="non-mixte">Non-mixte</option>
+                                <option value="ignore" selected>Non prise en compte</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-400 uppercase mb-1">Critère de force</label>
+                            <select id="critereForce" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                                <option value="vma">VMA (Palier)</option>
+                                <option value="force">Jauge de puissance (★)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-400 uppercase mb-1">Libellé des équipes</label>
+                            <select id="formatLibelle" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                                <option value="Lettres">Lettres (A, B, C)</option>
+                                <option value="Chiffres">Chiffres (1, 2, 3)</option>
+                                <option value="Couleurs" selected>Couleurs (nom)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Zone du champ intelligent -->
+                    <div class="flex gap-2 mt-4">
+                        <div>
+                            <label class="block font-bold text-slate-400 uppercase mb-1">Nb. Équipes</label>
+                            <input type="number" id="nbEquipes" min="1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                        </div>
+                        <div>
+                            <label class="block font-bold text-slate-400 uppercase mb-1">Joueurs / Équipe</label>
+                            <input type="number" id="nbParEquipe" min="1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
+                        </div>
+                    </div>
+
+                    <!-- Zone de la palette chromatique -->
+                    <div class="mt-4">
+                        <label class="block font-bold text-slate-400 uppercase mb-2">Choisir les couleurs des chasubles :</label>
+                        <div id="paletteCouleurs" class="flex flex-wrap gap-2">
+                            <!-- Générées dynamiquement en JS -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-black text-blue-400 uppercase text-sm">Équipes générées</h3>
+                        <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer Équipes</button>
+                    </div>
+                    <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <!-- Les équipes apparaîtront ici -->
+                    </div>
+                </div>
             </div>
 
-            <!-- Paramètres CO -->
+                        <!-- PARAMÈTRES COURSE D'ORIENTATION -->
             <div id="viewCOSettings" class="hidden space-y-4">
-                <!-- Circuits CO -->
+                <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Catégories de Parcours (CO)</h3>
+                    <p class="text-xs text-slate-400 mb-4">Ces circuits utilisent la matrice des balises. Vous pourrez ensuite glisser-déposer les équipes sur les codes (A1, C4, etc.)</p>
+                    <div id="circuitList" class="space-y-4 mb-6"></div>
+                    <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
+                    <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
+                </div>
             </div>
-        </div>
-
+            
         <!-- ONGLET 3 : LIVE -->
         <div id="viewLive" class="hidden space-y-4">
             <!-- Résultats en direct -->
