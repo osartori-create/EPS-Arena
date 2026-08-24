@@ -47,6 +47,8 @@ function checkPendingStudents() {
     }
 }
 
+// Dans src/js/ui/dashboard-ui.js, remplacez la fonction renderEleves par :
+
 async function renderEleves() {
     const container = document.getElementById('eleveList');
     if (!container) return;
@@ -69,15 +71,20 @@ async function renderEleves() {
             needsBadge = '<span class="absolute top-2 right-2 bg-yellow-500 text-black px-2 py-0.5 rounded-full text-[10px] font-black">!</span>';
         }
 
+        // Affichage des nouvelles données
+        let extraData = '';
+        if (e.longueur) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-orange-400">Longueur: ${e.longueur} cm</span>`;
+        if (e.sprint30) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-purple-400">30m: ${e.sprint30}s</span>`;
+
         container.innerHTML += `
             <div class="bg-slate-800 rounded-2xl p-4 flex flex-col items-center border border-slate-700 text-center relative">
                 ${needsBadge}
                 <div class="mb-2">${photoHtml}</div>
                 <p class="font-black text-white leading-tight">${e.prenom}</p>
                 <p class="text-xs text-slate-400 uppercase font-bold mb-2">${e.nom}</p>
-                <div class="flex gap-2 text-xs font-bold">
+                <div class="flex flex-wrap justify-center gap-2 text-xs font-bold">
                     <span class="bg-black px-2 py-1 rounded border border-slate-600 text-emerald-400">VMA: ${e.vma || '--'}</span>
-                    <span class="bg-black px-2 py-1 rounded border border-slate-600 text-blue-400">Palier: ${e.palier || '--'}</span>
+                    ${extraData}
                 </div>
                 <span class="text-[10px] text-slate-500 mt-1">${e.sexe ? e.sexe : 'Sexe inconnu'}</span>
             </div>
