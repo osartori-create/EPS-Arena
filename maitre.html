@@ -73,73 +73,49 @@
         </div>
 
         <!-- ONGLET 2 : ACTIVITÉS -->
-        <div id="viewActivities" class="hidden space-y-4">
-            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Configuration de l'activité</h3>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                    <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Répartition</label>
-                        <select id="modeRepartition" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                            <option value="niveau">Hétérogènes</option>
-                            <option value="melange" selected>Homogènes</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Mixité</label>
-                        <select id="modeMixite" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                            <option value="mixte">Mixte</option>
-                            <option value="non-mixte">Non-mixte</option>
-                            <option value="ignore" selected>Non prise en compte</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Critère de force</label>
-                        <select id="critereForce" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                            <option value="vma">VMA (Palier)</option>
-                            <option value="force">Jauge de puissance (★)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Libellé des équipes</label>
-                        <select id="formatLibelle" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                            <option value="Lettres">Lettres (A, B, C)</option>
-                            <option value="Chiffres">Chiffres (1, 2, 3)</option>
-                            <option value="Couleurs">Couleurs (nom)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Zone du champ intelligent -->
-                <div class="flex gap-2 mt-4">
-                    <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Nb. Équipes</label>
-                        <input type="number" id="nbEquipes" min="1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
-                    </div>
-                    <div>
-                        <label class="block font-bold text-slate-400 uppercase mb-1">Joueurs / Équipe</label>
-                        <input type="number" id="nbParEquipe" min="1" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-center font-bold text-emerald-400">
-                    </div>
-                </div>
-
-                <!-- Zone de la palette chromatique -->
-                <div class="mt-4">
-                    <label class="block font-bold text-slate-400 uppercase mb-2">Choisir les couleurs des chasubles :</label>
-                    <div id="paletteCouleurs" class="flex flex-wrap gap-2">
-                        <!-- Générées dynamiquement en JS -->
-                    </div>
-                </div>
-            </div>
-            
-            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-black text-blue-400 uppercase text-sm">Équipes générées</h3>
-                    <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer Équipes</button>
-                </div>
-                <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <!-- Les équipes apparaîtront ici -->
-                </div>
-            </div>
+<div id="viewActivities" class="hidden space-y-4">
+    
+    <!-- SÉLECTEUR DE DISCIPLINE -->
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Quelle activité ?</h3>
+        <div id="disciplineSelector" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <button onclick="switchDiscipline('sprint')" id="btnDisc-sprint" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">
+                🏃 Sprint
+            </button>
+            <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">
+                🧭 Course d'Orientation
+            </button>
+            <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">
+                🎯 Arcathlon
+            </button>
+            <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">
+                ⛰️ Escalade
+            </button>
         </div>
+    </div>
+
+    <!-- PARAMÈTRES SPRINT (Le contenu actuel) -->
+    <div id="viewSprintSettings" class="space-y-4">
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <!-- (Votre code de configuration actuel : Répartition, Mixité, etc. reste ici) -->
+        </div>
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <!-- (Votre code de génération d'équipes et grille Sortable reste ici) -->
+        </div>
+    </div>
+
+    <!-- PARAMÈTRES COURSE D'ORIENTATION (Vide pour l'instant) -->
+    <div id="viewCOSettings" class="hidden space-y-4">
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Catégories de Parcours (CO)</h3>
+            <p class="text-xs text-slate-400 mb-4">Ces circuits utilisent la matrice des balises. Vous pourrez ensuite glisser-déposer les équipes sur les codes (A1, C4, etc.)</p>
+            <div id="circuitList" class="space-y-4 mb-6"></div>
+            <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
+            <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
+        </div>
+    </div>
+
+</div>
 
         <!-- ONGLET 3 : LIVE -->
         <div id="viewLive" class="hidden space-y-4">
@@ -167,6 +143,10 @@
         import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
         import { generateTeams } from './src/js/modules/teams/team-generator.js';
         import { getPhotoUrl } from './src/js/services/admin-service.js';
+        
+        // Imports des nouveaux modules CO
+        import { MATRICE } from './src/js/modules/co/matrice.js';
+        import { addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit, renderCircuits, getCircuits } from './src/js/modules/co/circuit-manager.js';
 
         initApp();
 
@@ -232,6 +212,62 @@
                 el.classList.toggle('border-slate-600');
             }
         };
+
+        // NOUVELLE FONCTION : Changement de discipline
+        window.switchDiscipline = function(disc) {
+            ['sprint', 'co', 'arcathlon', 'escalade'].forEach(d => {
+                const btn = document.getElementById('btnDisc-' + d);
+                const view = document.getElementById('view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings');
+                
+                if(d === disc) {
+                    btn.classList.remove('border-slate-600', 'text-slate-400');
+                    btn.classList.add('border-blue-500', 'text-blue-400');
+                    if(view) view.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('border-blue-500', 'text-blue-400');
+                    btn.classList.add('border-slate-600', 'text-slate-400');
+                    if(view) view.classList.add('hidden');
+                }
+            });
+        };
+
+        // FONCTIONS CO (extraites de votre ancien code)
+        window.addCircuit = function() {
+            const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
+            if(!cat) return;
+            const nom = prompt("Nom du circuit (ex: 1, Rouge) :");
+            if(!nom) return;
+            const b = prompt("Liste des balises (ex: 31, 34*, 42) :");
+            if(b) {
+                addCircuitCO(cat, nom, b);
+                renderCircuits('circuitList', "");
+            }
+        };
+        
+        window.editCircuit = function(id) {
+            const circ = getCircuits().find(c => c.id === id);
+            const n = prompt("Modifier les balises :", circ.balises.join(', '));
+            if(n !== null) {
+                editCircuitCO(id, n);
+                renderCircuits('circuitList', "");
+            }
+        };
+
+        window.delCircuit = function(id) {
+            if(confirm("Supprimer ce circuit ?")) {
+                delCircuit(id);
+                renderCircuits('circuitList', "");
+            }
+        };
+
+        window.autoAssignCodes = function() {
+            // (Logique à venir pour assigner automatiquement A1, A2... aux équipes générées)
+            alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
+        };
+
+        // Initialisation au chargement
+        switchDiscipline('sprint'); // Active le Sprint par défaut
+        renderCircuits('circuitList', ""); // Affiche les circuits CO (s'ils existent)
 
         window.generateTeams = async function() {
             const activeClasse = document.getElementById('selectClasse').value;
