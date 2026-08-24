@@ -28,11 +28,7 @@ async function getPhotoUrl(id) {
 }
 
 function fixMojibake(str) {
-    try {
-        return decodeURIComponent(escape(str));
-    } catch (e) {
-        return str;
-    }
+    try { return decodeURIComponent(escape(str)); } catch (e) { return str; }
 }
 
 function normalizeForComparison(str) {
@@ -66,91 +62,55 @@ function parseZipFileName(fileName) {
     };
 }
 
-// ... (gardez tout le haut du fichier : constantes, dbPhotos, savePhoto, etc.)
-
-// Fonction pour nettoyer les en-têtes de colonnes (enlève émojis, accents, caractères spéciaux)
-function cleanHeader(header) {
-    // Corrige le mojibake (ex: ðŸƒ -> 🏃)
-    let h = fixMojibake(header || "");
-    // Enlève les emojis et caractères non alphanumériques (sauf espaces)
-    h = h.replace(/[^\w\sÀ-ÿ]/g, '').trim();
-    // Supprime les accents pour la comparaison
-    h = h.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return h.toLowerCase();
-}
-
+// --- IMPORT CSV avec Fusion (CORRIGÉ) ---
 export async function importCSV(file) {
     return new Promise((resolve) => {
         Papa.parse(file, {
-            delimiter: ";",
-            header: false,
-            skipEmptyLines: true,
+            delimiter: ";", header: false, skipEmptyLines: true,
             complete: async (results) => {
-                // 1. Identifier les index de colonnes en fonction des en-têtes nettoyés
-                const headers = (results.data[0] || []).map(cleanHeader);
-                // Index des colonnes importantes (trouvées par mots-clés)
-                let idxNom = headers.findIndex(h => h.includes('prenom') || h.includes('nom') || (h === ''));
-                if (idxNom === -1) idxNom = 0; // Fallback : 1ère colonne
+                // On récupère la liste existante (créée par le ZIP, par exemple)
+                const existingEleves = JSON.parse(localStorage.getItem('eps_arena_eleves') || '[]');
                 
-                let idxVMA = headers.findIndex(h => h.includes('vitesse palier') || h.includes('vma') || h.includes('luc'));
-                let idxLongueur = headers.findIndex(h => h.includes('longueur'));
-                let idxSprint = headers.findIndex(h => h.includes('sprint') || h.includes('30m'));
+                // On prépare une map pour retrouver facilement les élèves existants par ID
+                const existingMap = {};
+                existingEleves.forEach(e => { existingMap[e.id] = e; });
 
-                // 2. Parcourir les lignes de données
-                const eleves = [];
-                // On démarre à l'index 2 car la ligne 0 = en-têtes et la ligne 1 = sous-titre
-                for (let i = 2; i < results.data.length; i++) {
-                    const row = results.data[i];
-                    if (!row || !row[0]) continue; // Ligne vide
-
-                    const nomComplet = row[0]; // Colonne 0 = Prenom NOM
-                    const parts = nomComplet.trim().split(' ');
+                const newEleves = [];
+                results.data.forEach((row, index) => {
+                    if (index === 0 || !row[0]) return;
+                    
+                    // Nettoyage des colonnes (comme précédemment)
+                    const [nomComplet, , , vitesse, palier, , longueur, , , , sprint1, sprint2, sprint3] = row;
+                    const nomCompletClean = fixMojibake(nomComplet).trim();
+                    const parts = nomCompletClean.split(' ');
                     const prenom = parts[0];
                     const nom = parts.slice(1).join(' ').toUpperCase();
+                    const id = `${normalizeForComparison(nom)}_${normalizeForComparison(prenom).charAt(0)}`;
 
-                    // Extraire les valeurs (avec gestion des valeurs manquantes et des virgules)
-                    const getVal = (idx) => {
-                        if (idx === -1 || idx >= row.length) return null;
-                        let val = row[idx];
-                        if (val === undefined || val === null || val === '') return null;
-                        // Remplacer la virgule par un point pour les décimales
-                        val = String(val).replace(',', '.');
-                        // Si plusieurs valeurs (ex: 3 essais), on prend la première non vide
-                        if (val.includes(';')) val = val.split(';')[0];
-                        return parseFloat(val);
-                    };
-
-                    // Récupération des données
-                    const vma = getVal(idxVMA);
-                    const longueur = getVal(idxLongueur);
-                    const sprint30 = getVal(idxSprint);
-
-                    // Création de l'objet élève
-                    eleves.push({
-                        id: `${normalizeForComparison(nom)}_${normalizeForComparison(prenom).charAt(0)}`,
-                        nom: nom,
-                        prenom: prenom,
-                        vma: vma,                       // VMA (Vitesse)
-                        vitessePalier: vma,             // Pour compatibilité
-                        palier: 0,                      // Palier (non extrait ici, pourrait être déduit de la VMA)
-                        longueur: longueur,             // Longueur sans élan (cm)
-                        sprint30: sprint30,             // 30m (secondes)
-                        sexe: ''
+                    // Fusion : On récupère l'existant pour garder la photo et le sexe s'il y en a
+                    const existing = existingMap[id];
+                    
+                    newEleves.push({
+                        id: id,
+                        nom: nom, prenom: prenom,
+                        vma: parseFloat(String(vitesse).replace(",", ".")) || 0,
+                        palier: parseInt(palier) || 0,
+                        longueur: parseFloat(String(longueur).replace(",", ".")) || null,
+                        sprint30: parseFloat(String(sprint1).replace(",", ".")) || null,
+                        sexe: existing ? existing.sexe : '', // On garde le sexe du ZIP
+                        needsManualCheck: existing ? existing.needsManualCheck : false // On garde le flag
                     });
+                });
 
-                    // Log de débogage pour vérifier
-                    console.log(`[CSV] ${prenom} ${nom} -> VMA: ${vma}, Longueur: ${longueur}, 30m: ${sprint30}`);
-                }
-
-                localStorage.setItem('eps_arena_eleves', JSON.stringify(eleves));
-                resolve(eleves);
+                // Sauvegarde : On remplace la liste par la nouvelle fusionnée
+                localStorage.setItem('eps_arena_eleves', JSON.stringify(newEleves));
+                resolve(newEleves);
             }
         });
     });
 }
 
-// ... (gardez le reste du fichier : importZIP, etc.)
-
+// --- IMPORT ZIP (inchangé, mais assurez-vous qu'il est bien après le CSV) ---
 export async function importZIP(file) {
     const zip = await JSZip.loadAsync(file);
     let eleves = JSON.parse(localStorage.getItem('eps_arena_eleves') || '[]');
@@ -166,6 +126,7 @@ export async function importZIP(file) {
         ) || eleves.find(e => e.id === infos.cleUnique);
 
         if (!eleve) {
+            // Fallback
             eleve = eleves.find(e => {
                 const csvNom = normalizeForComparison(e.nom);
                 const csvPrenomInit = normalizeForComparison(e.prenom).charAt(0);
@@ -178,10 +139,12 @@ export async function importZIP(file) {
             const blob = await entry.async('blob');
             savePhoto(eleve.id, blob);
         } else {
+            // Création orpheline (car elle n'existait pas dans le CSV)
             const newId = infos.cleUnique;
             eleves.push({
                 id: newId, nom: infos.nom.toUpperCase(), prenom: infos.prenom,
                 vma: 0, vitessePalier: 0, palier: 0, sexe: infos.sexe,
+                longueur: null, sprint30: null,
                 needsManualCheck: true
             });
             const blob = await entry.async('blob');
@@ -193,14 +156,18 @@ export async function importZIP(file) {
     return eleves;
 }
 
-// === NOUVELLES FONCTIONS EXPORTÉES ===
+// --- NOUVELLE FONCTION : Récupérer les photos orphelines (pour le bouton "Lier") ---
+export function getOrphanPhotos() {
+    const eleves = JSON.parse(localStorage.getItem('eps_arena_eleves') || '[]');
+    // On retourne les élèves créés depuis le ZIP (VMA=0 et needsManualCheck=true)
+    return eleves.filter(e => e.needsManualCheck && (e.vma === 0 || !e.vma));
+}
 
 export function getPendingStudents() {
     const eleves = JSON.parse(localStorage.getItem('eps_arena_eleves') || '[]');
     return eleves.filter(e => e.needsManualCheck || !e.vma || e.vma === 0);
 }
 
-// Fonction pour assigner une photo source (orpheline) à un élève
 export async function assignPhotoToStudent(studentId, sourcePhotoId) {
     const tx = dbPhotos.transaction("eleves", "readwrite");
     const req = tx.objectStore("eleves").get(sourcePhotoId);
@@ -212,8 +179,15 @@ export async function assignPhotoToStudent(studentId, sourcePhotoId) {
                 savePhoto(studentId, sourceData.blob);
                 const eleves = JSON.parse(localStorage.getItem('eps_arena_eleves') || '[]');
                 const target = eleves.find(e => e.id === studentId);
-                if (target) target.needsManualCheck = false;
-                localStorage.setItem('eps_arena_eleves', JSON.stringify(eleves));
+                if (target) {
+                    target.needsManualCheck = false;
+                    // On met à jour le sexe et le nom si l'orpheline avait plus d'infos
+                    const sourceEleve = eleves.find(e => e.id === sourcePhotoId);
+                    if (sourceEleve) target.sexe = sourceEleve.sexe;
+                }
+                // On supprime l'orpheline de la liste active pour nettoyer
+                const filtered = eleves.filter(e => e.id !== sourcePhotoId);
+                localStorage.setItem('eps_arena_eleves', JSON.stringify(filtered));
                 resolve(true);
             } else {
                 resolve(false);
@@ -223,7 +197,6 @@ export async function assignPhotoToStudent(studentId, sourcePhotoId) {
     });
 }
 
-// Fonction pour téléverser manuellement une photo
 export async function uploadManualPhoto(studentId, file) {
     const blob = await file;
     savePhoto(studentId, blob);

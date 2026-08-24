@@ -92,6 +92,11 @@ async function renderEleves() {
     }
 }
 
+// ... (imports en haut)
+import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto } from '../services/admin-service.js';
+
+// ...
+
 async function openManualAssignModal() {
     const pending = getPendingStudents();
     if (pending.length === 0) return;
@@ -105,11 +110,19 @@ async function openManualAssignModal() {
         pendingWithUrls.push({ ...stu, photoUrl: url || '' });
     }
 
+    // Récupérer les "orphelines" pour les proposer dans le menu déroulant
+    const orphans = getOrphanPhotos();
+    const orphansWithUrls = [];
+    for (const o of orphans) {
+        const url = await getPhotoUrl(o.id);
+        orphansWithUrls.push({ ...o, photoUrl: url || '' });
+    }
+
     const modalHtml = `
     <div id="manualAssignModal" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-xl font-black text-blue-400 uppercase mb-4">Gestion manuelle des photos</h3>
-            <p class="text-xs text-slate-400 mb-4">Ces élèves ont été créés depuis le ZIP, mais n'ont pas pu être associés au CSV (nom mal orthographié, VMA manquante, etc.). Associez-les manuellement.</p>
+            <p class="text-xs text-slate-400 mb-4">Ces élèves ont été créés depuis le ZIP (VMA manquante) ou n'ont pas pu être associés. Importez d'abord le CSV, puis le ZIP pour une association automatique. Sinon, associez-les manuellement.</p>
             
             <div class="space-y-3">
                 ${pendingWithUrls.map(stu => `
@@ -121,10 +134,17 @@ async function openManualAssignModal() {
                                 <p class="text-xs text-slate-500">VMA: ${stu.vma || '???'} | Sexe: ${stu.sexe || '?'}</p>
                             </div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex flex-col gap-2">
                             <button onclick="document.getElementById('file_${stu.id}').click()" class="btn bg-blue-600 text-xs uppercase">📁 Téléverser</button>
                             <input type="file" id="file_${stu.id}" accept="image/*" class="hidden" onchange="window.uploadManual('${stu.id}', this)">
-                            <button onclick="assignOrphan('${stu.id}')" class="btn bg-purple-600 text-xs uppercase">🔗 Lier orpheline</button>
+                            
+                            <select id="orphanSelect_${stu.id}" class="bg-slate-900 border border-slate-600 text-xs rounded p-1 text-white">
+                                <option value="">🔗 Lier orpheline...</option>
+                                ${orphansWithUrls.filter(o => o.id !== stu.id).map(o => 
+                                    `<option value="${o.id}">${o.prenom} ${o.nom}</option>`
+                                ).join('')}
+                            </select>
+                            <button onclick="assignExistingOrphan('${stu.id}')" class="btn bg-purple-600 text-xs uppercase">Valider l'association</button>
                         </div>
                     </div>
                 `).join('')}
@@ -145,19 +165,19 @@ async function openManualAssignModal() {
         }
     };
 
-    window.assignOrphan = async (studentId) => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.onchange = async (e) => {
-            if (e.target.files.length > 0) {
-                await uploadManualPhoto(studentId, e.target.files[0]);
-                loadLocalEleves();
-                document.getElementById('manualAssignModal').remove();
-                alert("✅ Photo associée !");
-            }
-        };
-        input.click();
+    // NOUVELLE FONCTION pour associer une photo déjà importée
+    window.assignExistingOrphan = async (studentId) => {
+        const select = document.getElementById(`orphanSelect_${studentId}`);
+        const sourceId = select.value;
+        if (!sourceId) return alert("Veuillez choisir une photo orpheline.");
+
+        if (await assignPhotoToStudent(studentId, sourceId)) {
+            loadLocalEleves();
+            document.getElementById('manualAssignModal').remove();
+            alert("✅ Association réussie !");
+        } else {
+            alert("Erreur lors de l'association.");
+        }
     };
 }
 
