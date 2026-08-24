@@ -83,7 +83,7 @@ export function initActivities() {
         
         if (currentDiscipline === 'co' || isCOVisible) {
             // MODE COURSE D'ORIENTATION
-            populateReserveWithStudents(eleves);
+            await populateReserveWithStudents(eleves);
             document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
             alert("Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes !");
             return;

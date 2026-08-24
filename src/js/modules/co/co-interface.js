@@ -1,5 +1,6 @@
 // src/js/modules/co/co-interface.js
 import { MATRICE } from './matrice.js';
+import { getPhotoUrl } from '../../services/admin-service.js'; // Import pour les photos
 
 export function initCOInterface() {
     console.log("🔍 Initialisation CO...");
@@ -30,12 +31,10 @@ function generatePostesGrid() {
     postesContainer.innerHTML = html;
 }
 
-// On force l'initialisation du glisser-déposer, mais on s'assure de ne pas effacer le contenu
 export function initSortableCO() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
 
-    // Si déjà initialisé, on ne fait rien (pour ne pas effacer le HTML)
     if (reserveContainer.__sortable) return;
 
     try {
@@ -63,41 +62,43 @@ export function initSortableCO() {
     }
 }
 
-export function populateReserveWithStudents(eleves) {
+export async function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
-    if (!reserveContainer) {
-        alert("❌ ERREUR : La div 'reserveList' est introuvable. Vérifiez le HTML !");
-        return;
-    }
+    if (!reserveContainer) return;
 
-    // 🛠️ CORRECTIF MAJEUR : On force l'affichage du panneau CO !
+    // Forcer l'affichage du panneau CO
     const coView = document.getElementById('viewCOSettings');
-    if (coView) {
-        coView.classList.remove('hidden');
-        console.log("✅ Panneau CO forcé visible !");
-    }
+    if (coView) coView.classList.remove('hidden');
 
-    // Construction du HTML
     let html = '';
-    eleves.forEach(eleve => {
+    for (const eleve of eleves) {
+        const url = await getPhotoUrl(eleve.id);
+        
+        // Définition du style de fond selon le sexe
+        let bgClass = 'bg-slate-200 border-slate-400'; // Couleur neutre par défaut
+        if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+        else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+        
+        const photoHtml = url 
+            ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+            : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+            
         html += `
-            <div class="bg-slate-800 p-2 rounded-lg border border-slate-600 cursor-grab active:cursor-grabbing flex items-center gap-2" data-id="${eleve.id}">
-                <span class="font-bold text-white text-sm">${eleve.prenom} ${eleve.nom}</span>
-                <span class="text-xs text-slate-400 ml-auto">${eleve.vma ? 'VMA: ' + eleve.vma : ''}</span>
+            <div class="p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}" data-id="${eleve.id}">
+                ${photoHtml}
+                <div class="flex flex-col leading-tight">
+                    <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
+                    <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
+                </div>
             </div>
         `;
-    });
+    }
 
-    // Injection du HTML
     reserveContainer.innerHTML = html;
-    console.log("✅ Réserve remplie !");
-    console.log("📋 Nombre de caractères injectés :", html.length);
+    console.log("✅ Réserve remplie avec photos et couleurs !");
 
-    // 🛠️ CORRECTIF MAJEUR : On initialise Sortable APRÈS un délai pour éviter qu'il efface le contenu
-    setTimeout(() => {
-        initSortableCO();
-        console.log("✅ Sortable réinitialisé !");
-    }, 100);
+    // Réinitialiser le tri après insertion
+    setTimeout(() => initSortableCO(), 100);
 }
 
 export function populateReserve(teams) {
@@ -116,7 +117,5 @@ export function populateReserve(teams) {
 
     reserveContainer.innerHTML = html;
 
-    setTimeout(() => {
-        initSortableCO();
-    }, 100);
+    setTimeout(() => initSortableCO(), 100);
 }
