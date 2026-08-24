@@ -30,10 +30,12 @@ function generatePostesGrid() {
     postesContainer.innerHTML = html;
 }
 
+// On force l'initialisation du glisser-déposer, mais on s'assure de ne pas effacer le contenu
 export function initSortableCO() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
-    
+
+    // Si déjà initialisé, on ne fait rien (pour ne pas effacer le HTML)
     if (reserveContainer.__sortable) return;
 
     try {
@@ -63,13 +65,19 @@ export function initSortableCO() {
 
 export function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
-    console.log("🔍 Tentative de remplissage de la réserve avec élèves. Div présente ?", !!reserveContainer);
-    
     if (!reserveContainer) {
         alert("❌ ERREUR : La div 'reserveList' est introuvable. Vérifiez le HTML !");
         return;
     }
-    
+
+    // 🛠️ CORRECTIF MAJEUR : On force l'affichage du panneau CO !
+    const coView = document.getElementById('viewCOSettings');
+    if (coView) {
+        coView.classList.remove('hidden');
+        console.log("✅ Panneau CO forcé visible !");
+    }
+
+    // Construction du HTML
     let html = '';
     eleves.forEach(eleve => {
         html += `
@@ -79,11 +87,17 @@ export function populateReserveWithStudents(eleves) {
             </div>
         `;
     });
-    
+
+    // Injection du HTML
     reserveContainer.innerHTML = html;
     console.log("✅ Réserve remplie !");
-    
-    initSortableCO();
+    console.log("📋 Nombre de caractères injectés :", html.length);
+
+    // 🛠️ CORRECTIF MAJEUR : On initialise Sortable APRÈS un délai pour éviter qu'il efface le contenu
+    setTimeout(() => {
+        initSortableCO();
+        console.log("✅ Sortable réinitialisé !");
+    }, 100);
 }
 
 export function populateReserve(teams) {
@@ -101,5 +115,8 @@ export function populateReserve(teams) {
     });
 
     reserveContainer.innerHTML = html;
-    initSortableCO();
+
+    setTimeout(() => {
+        initSortableCO();
+    }, 100);
 }
