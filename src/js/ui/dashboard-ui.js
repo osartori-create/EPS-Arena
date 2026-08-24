@@ -1,5 +1,5 @@
 // src/js/ui/dashboard-ui.js
-import { importCSV, importZIP, getPhotoUrl, getPendingStudents, assignPhotoToStudent, uploadManualPhoto } from '../services/admin-service.js';
+import { importCSV, importZIP, getPhotoUrl, getPendingStudents, uploadManualPhoto } from '../services/admin-service.js';
 
 let currentEleves = [];
 
@@ -37,7 +37,6 @@ export function initAdminUI() {
         e.target.value = '';
     });
 
-    // Vérifie au chargement initial s'il y a des élèves à associer
     checkPendingStudents();
 }
 
@@ -65,7 +64,6 @@ async function renderEleves() {
             ? `<img src="${url}" class="w-20 h-20 rounded-full object-cover shadow-lg border-2 border-slate-600">`
             : `<div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-3xl">👤</div>`;
 
-        // Badge jaune si l'élève a besoin d'une vérification manuelle (VMA manquante ou créé depuis ZIP)
         let needsBadge = '';
         if (e.needsManualCheck || !e.vma) {
             needsBadge = '<span class="absolute top-2 right-2 bg-yellow-500 text-black px-2 py-0.5 rounded-full text-[10px] font-black">!</span>';
@@ -87,23 +85,19 @@ async function renderEleves() {
     }
 }
 
-// === MODAL DE GESTION MANUELLE (CORRIGÉE) ===
 async function openManualAssignModal() {
     const pending = getPendingStudents();
     if (pending.length === 0) return;
 
-    // On retire une modal existante si elle est déjà là
     const existing = document.getElementById('manualAssignModal');
     if (existing) existing.remove();
 
-    // 1. On pré-calcule les URLs des photos AVANT de générer le HTML (pour éviter le "await" dans le map)
     const pendingWithUrls = [];
     for (const stu of pending) {
         const url = await getPhotoUrl(stu.id);
         pendingWithUrls.push({ ...stu, photoUrl: url || '' });
     }
 
-    // 2. On génère le HTML avec les données prêtes
     const modalHtml = `
     <div id="manualAssignModal" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -123,7 +117,6 @@ async function openManualAssignModal() {
                         <div class="flex gap-2">
                             <button onclick="document.getElementById('file_${stu.id}').click()" class="btn bg-blue-600 text-xs uppercase">📁 Téléverser</button>
                             <input type="file" id="file_${stu.id}" accept="image/*" class="hidden" onchange="window.uploadManual('${stu.id}', this)">
-                            
                             <button onclick="assignOrphan('${stu.id}')" class="btn bg-purple-600 text-xs uppercase">🔗 Lier orpheline</button>
                         </div>
                     </div>
@@ -136,7 +129,6 @@ async function openManualAssignModal() {
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    // Fonctions globales pour les boutons
     window.uploadManual = async (studentId, input) => {
         if (input.files.length > 0) {
             await uploadManualPhoto(studentId, input.files[0]);
@@ -147,7 +139,6 @@ async function openManualAssignModal() {
     };
 
     window.assignOrphan = async (studentId) => {
-        // Ici, on demandera de choisir un fichier (simulation)
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
@@ -163,7 +154,6 @@ async function openManualAssignModal() {
     };
 }
 
-// Fonctions globales pour les boutons principaux
 window.addEleve = function() {
     const prenom = prompt("Prénom ?");
     const nom = prompt("Nom ?");

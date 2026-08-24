@@ -138,11 +138,37 @@ export async function importZIP(file) {
     return eleves;
 }
 
+// === NOUVELLES FONCTIONS EXPORTÉES ===
+
 export function getPendingStudents() {
     const eleves = JSON.parse(localStorage.getItem('eps_arena_eleves') || '[]');
     return eleves.filter(e => e.needsManualCheck || !e.vma || e.vma === 0);
 }
 
+// Fonction pour assigner une photo source (orpheline) à un élève
+export async function assignPhotoToStudent(studentId, sourcePhotoId) {
+    const tx = dbPhotos.transaction("eleves", "readwrite");
+    const req = tx.objectStore("eleves").get(sourcePhotoId);
+    
+    return new Promise((resolve) => {
+        req.onsuccess = () => {
+            const sourceData = req.result;
+            if (sourceData && sourceData.blob) {
+                savePhoto(studentId, sourceData.blob);
+                const eleves = JSON.parse(localStorage.getItem('eps_arena_eleves') || '[]');
+                const target = eleves.find(e => e.id === studentId);
+                if (target) target.needsManualCheck = false;
+                localStorage.setItem('eps_arena_eleves', JSON.stringify(eleves));
+                resolve(true);
+            } else {
+                resolve(false);
+            }
+        };
+        req.onerror = () => resolve(false);
+    });
+}
+
+// Fonction pour téléverser manuellement une photo
 export async function uploadManualPhoto(studentId, file) {
     const blob = await file;
     savePhoto(studentId, blob);
