@@ -9,17 +9,20 @@ export function initActivities() {
     initPalette();
     initCOInterface();
 
-    // Changement de discipline
+        // Changement de discipline (BLINDÉ)
     window.switchDiscipline = function(disc) {
-        // On cache tout par défaut
-        const views = ['viewSprintSettings', 'viewCOSettings', 'viewArcathlonSettings', 'viewEscaladeSettings'];
-        views.forEach(id => {
-            const el = document.getElementById(id);
+        // Liste des panneaux à gérer
+        const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
+
+        // On cache tout par défaut (avec vérification d'existence)
+        panneaux.forEach(d => {
+            const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
+            const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
         });
-        
-        // On style les boutons
-        ['sprint', 'co', 'arcathlon', 'escalade'].forEach(d => {
+
+        // On style les boutons (avec vérification d'existence)
+        panneaux.forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
             if (btn) {
                 if (d === disc) {
@@ -32,13 +35,16 @@ export function initActivities() {
             }
         });
 
-        // On affiche le bon panneau
+        // On affiche le panneau correspondant (avec vérification d'existence)
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) {
             targetView.classList.remove('hidden');
-            if (disc === 'co') {
-                renderCircuits('circuitList', ""); // On affiche les circuits existants
-            }
+        }
+
+        // Actions spécifiques à la CO
+        if (disc === 'co') {
+            const circuitList = document.getElementById('circuitList');
+            if (circuitList) renderCircuits('circuitList', "");
         }
     };
 
