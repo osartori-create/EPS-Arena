@@ -2,23 +2,25 @@
 import { MATRICE } from './matrice.js';
 
 export function initCOInterface() {
+    console.log("🔍 Initialisation de l'interface CO...");
     const reserveContainer = document.getElementById('reserveList');
     const postesContainer = document.getElementById('postesGrid');
 
-    if (!reserveContainer || !postesContainer) return;
+    if (!reserveContainer || !postesContainer) {
+        console.error("❌ Impossible de trouver les éléments #reserveList ou #postesGrid. Vérifiez votre HTML !");
+        return;
+    }
 
     generatePostesGrid();
     initSortableCO();
+    console.log("✅ Interface CO initialisée.");
 }
 
-// Génère la grille des postes basée sur la matrice (A1, A2... F6)
 function generatePostesGrid() {
     const postesContainer = document.getElementById('postesGrid');
     if (!postesContainer) return;
-    
-    // On prend les colonnes de la ligne 31 (les en-têtes A1, A2, etc.)
+
     const headers = Object.keys(MATRICE['31'] || {});
-    
     let html = '';
     headers.forEach(poste => {
         html += `
@@ -29,24 +31,29 @@ function generatePostesGrid() {
             </div>
         `;
     });
-    
     postesContainer.innerHTML = html;
 }
 
-// Initialise le glisser-déposer entre la réserve et les postes
 function initSortableCO() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
 
-    // Initialiser la réserve comme zone de départ
-    new Sortable(reserveContainer, {
+    // Détruire les anciennes instances pour éviter les bugs
+    if (window.sortableCOInstances) {
+        window.sortableCOInstances.forEach(s => s.destroy());
+    }
+    window.sortableCOInstances = [];
+
+    // Initialiser la réserve
+    const sortableReserve = new Sortable(reserveContainer, {
         group: 'co-groupes',
         animation: 150,
     });
+    window.sortableCOInstances.push(sortableReserve);
 
-    // Initialiser chaque poste comme zone de réception
+    // Initialiser chaque poste
     document.querySelectorAll('.poste-members').forEach(el => {
-        new Sortable(el, {
+        const sortablePoste = new Sortable(el, {
             group: 'co-groupes',
             animation: 150,
             onAdd: function(evt) {
@@ -54,13 +61,18 @@ function initSortableCO() {
                 console.log('Élève assigné au poste : ' + posteId);
             }
         });
+        window.sortableCOInstances.push(sortablePoste);
     });
 }
 
-// Remplir la réserve avec des ÉLÈVES INDIVIDUELS (pour la CO)
 export function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
-    if (!reserveContainer) return;
+    console.log("🔍 Populate Reserve With Students. Div trouvée ?", reserveContainer);
+    
+    if (!reserveContainer) {
+        console.error("❌ Impossible de trouver la div #reserveList !");
+        return;
+    }
     
     let html = '';
     eleves.forEach(eleve => {
@@ -72,17 +84,18 @@ export function populateReserveWithStudents(eleves) {
         `;
     });
     
+    console.log("🔍 HTML généré :", html.substring(0, 200) + "...");
     reserveContainer.innerHTML = html;
+    console.log("✅ Réserve remplie !");
     
-    // IMPORTANT : On réinitialise le glisser-déposer après avoir ajouté les élèves
+    // On réinitialise le glisser-déposer après insertion
     initSortableCO();
 }
 
-// (Ancienne fonction pour les équipes, utilisée pour le Sprint)
 export function populateReserve(teams) {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
-    
+
     let html = '';
     teams.forEach(team => {
         html += `
@@ -92,9 +105,7 @@ export function populateReserve(teams) {
             </div>
         `;
     });
-    
+
     reserveContainer.innerHTML = html;
-    
-    // IMPORTANT : On réinitialise le glisser-déposer après avoir ajouté les équipes
     initSortableCO();
 }
