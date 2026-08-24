@@ -1,9 +1,10 @@
 // src/js/ui/prof/layout.js
 import { db } from '../../core/firebase-service.js';
-import { ref, onValue } from 'https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js';
+import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 
 export function initLayout() {
-    // Gestion des onglets
+    
+    // 1. Gestion des onglets (Attaché à window pour les onclick HTML)
     window.switchTab = function(tabName) {
         ['admin', 'activities', 'live'].forEach(t => {
             document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
@@ -18,7 +19,7 @@ export function initLayout() {
         document.getElementById('btnTab' + map[tabName]).classList.add('tab-active', 'text-blue-500');
     };
 
-    // Gestion des classes
+    // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
         const select = document.getElementById('selectClasse');
         select.innerHTML = '<option value="">-- Classe --</option>';
@@ -39,6 +40,7 @@ export function initLayout() {
             if (!classes.includes(nom)) {
                 classes.push(nom);
                 localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
+                
                 const select = document.getElementById('selectClasse');
                 const option = document.createElement('option');
                 option.value = nom; option.textContent = nom;
@@ -53,7 +55,7 @@ export function initLayout() {
         }
     };
 
-    // Gestion de la connexion Firebase
+    // 3. Connexion Firebase
     onValue(ref(db, '.info/connected'), (snap) => {
         const dot = document.getElementById('connDot');
         const label = document.getElementById('connLabel');

@@ -175,5 +175,10 @@
                     <p class="text-xs text-slate-400 mt-2">Le module Escalade est en cours de développement. Il utilisera les mêmes paramètres de génération d'équipes que le Sprint.</p>
                 </div>
             </div>
+     <!-- POINT D'ENTRÉE DES MODULES (AJOUTER CECI AVANT </body>) -->
+    <script type="module">
+        import { initApp } from './src/js/app.js';
+        initApp();
+    </script>
 </body>
-</html>
+</html>           
