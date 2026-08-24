@@ -4,24 +4,41 @@ import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-
 
 export function initLayout() {
     
-    // 1. Gestion des onglets (Attaché à window pour les onclick HTML)
+    // 1. Gestion des onglets (Sécurisé avec vérification d'existence)
     window.switchTab = function(tabName) {
+        // On cache toutes les vues
         ['admin', 'activities', 'live'].forEach(t => {
-            document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
-        });
-        ['btnTab1', 'btnTab2', 'btnTab3'].forEach(b => {
-            document.getElementById(b).classList.remove('tab-active', 'text-blue-500');
-            document.getElementById(b).classList.add('text-slate-500');
+            const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
+            const el = document.getElementById(viewId);
+            if (el) el.classList.add('hidden');
         });
 
+        // On retire le style actif de tous les boutons
+        ['btnTab1', 'btnTab2', 'btnTab3'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.classList.remove('tab-active', 'text-blue-500');
+                btn.classList.add('text-slate-500');
+            }
+        });
+
+        // On affiche la vue ciblée
         const map = { 'admin': '1', 'activities': '2', 'live': '3' };
-        document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1)).classList.remove('hidden');
-        document.getElementById('btnTab' + map[tabName]).classList.add('tab-active', 'text-blue-500');
+        const targetViewId = 'view' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
+        const targetView = document.getElementById(targetViewId);
+        if (targetView) targetView.classList.remove('hidden');
+
+        // On active le bouton correspondant
+        const targetBtn = document.getElementById('btnTab' + map[tabName]);
+        if (targetBtn) {
+            targetBtn.classList.add('tab-active', 'text-blue-500');
+        }
     };
 
     // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
         const select = document.getElementById('selectClasse');
+        if (!select) return; // Sécurité si l'élément n'existe pas encore
         select.innerHTML = '<option value="">-- Classe --</option>';
         let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
         classes.forEach(nom => {
@@ -42,15 +59,19 @@ export function initLayout() {
                 localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
                 
                 const select = document.getElementById('selectClasse');
-                const option = document.createElement('option');
-                option.value = nom; option.textContent = nom;
-                select.appendChild(option); select.value = nom;
-                select.dispatchEvent(new Event('change'));
+                if (select) {
+                    const option = document.createElement('option');
+                    option.value = nom; option.textContent = nom;
+                    select.appendChild(option); select.value = nom;
+                    select.dispatchEvent(new Event('change'));
+                }
                 alert("Classe ajoutée !");
             } else {
                 alert("Cette classe existe déjà.");
                 const select = document.getElementById('selectClasse');
-                select.value = nom; select.dispatchEvent(new Event('change'));
+                if (select) {
+                    select.value = nom; select.dispatchEvent(new Event('change'));
+                }
             }
         }
     };
