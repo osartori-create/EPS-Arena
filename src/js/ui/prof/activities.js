@@ -1,16 +1,18 @@
 // src/js/ui/prof/activities.js
-import { initCOInterface, populateReserve } from '../../modules/co/co-interface.js';
+import { initCOInterface, populateReserve, populateReserveWithStudents } from '../../modules/co/co-interface.js';
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 
+let currentDiscipline = 'sprint'; // Par défaut
+
 export function initActivities() {
-    // Init palette et interface CO
     initPalette();
     initCOInterface();
 
-        // Changement de discipline (BLINDÉ)
+    // Mise à jour de la discipline courante
     window.switchDiscipline = function(disc) {
+        currentDiscipline = disc;
         // Liste des panneaux à gérer
         const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
 
@@ -35,13 +37,11 @@ export function initActivities() {
             }
         });
 
-        // On affiche le panneau correspondant (avec vérification d'existence)
+        // On affiche le panneau correspondant
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
-        if (targetView) {
-            targetView.classList.remove('hidden');
-        }
+        if (targetView) targetView.classList.remove('hidden');
 
-        // Actions spécifiques à la CO
+        // Actions spécifiques à la CO (afficher les circuits existants)
         if (disc === 'co') {
             const circuitList = document.getElementById('circuitList');
             if (circuitList) renderCircuits('circuitList', "");
@@ -66,7 +66,7 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes
+    // Génération des équipes (Adaptée selon l'activité !)
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -74,6 +74,16 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
+        // >>> SPÉCIAL COURSE D'ORIENTATION <<<
+        // On met TOUS les élèves individuellement dans la réserve pour composer les groupes à la main
+        if (currentDiscipline === 'co') {
+            populateReserveWithStudents(eleves);
+            document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
+            alert("Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes de 2 ou 3 !");
+            return;
+        }
+
+        // >>> SINON (SPRINT, etc.) : Génération classique <<<
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -161,7 +171,6 @@ export function initActivities() {
             const teamDiv = document.querySelector(`[data-team-id="${teamId}"]`).parentElement;
             const h3 = teamDiv.querySelector('h3');
             h3.textContent = newName;
-            // Note : populateReserve est retiré ici car 'teams' n'est pas accessible dans cette portée
         }
     };
 
@@ -197,7 +206,7 @@ export function initActivities() {
     window.autoAssignCodes = function() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
-
-    // On lance le Sprint par défaut
-    switchDiscipline('sprint'); 
+    
+    // IMPORTANT : On ne lance PAS switchDiscipline('sprint') ici,
+    // car cela empêcherait de voir le panneau CO au clic !
 }
