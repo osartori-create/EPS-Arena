@@ -1,5 +1,6 @@
 // src/js/services/admin-service.js
-// On utilise les objets globaux définis par les balises <script> dans le HTML
+
+// Récupération des librairies chargées via les balises <script> dans maitre.html
 const Papa = window.Papa;
 const JSZip = window.JSZip;
 
@@ -35,33 +36,26 @@ async function getPhotoUrl(id) {
 }
 
 // ==========================================
-// CORRECTION DU PROBLÈME D'ENCODAGE iDOCEO
+// UTILITAIRES DE PARSING & DÉCODAGE
 // ==========================================
-
-// 1. Fonction pour corriger le "Mojibake" (Time╠üo -> Timéo)
-function decodeFileName(name) {
-    try {
-        // iDoceo encode les noms en Windows-1252. On force le décodage.
-        const bytes = new TextEncoder().encode(name); // Repasse la chaîne en octets
-        return new TextDecoder('windows-1252').decode(bytes); // Décode en CP1252
-    } catch (e) {
-        return name;
-    }
-}
-
-// 2. Normaliser le texte pour la comparaison (Majuscules, sans accents, sans tirets)
 function normalizeText(str) {
     return (str || "")
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Enlève les accents (é -> e)
-        .replace(/[^a-zA-Z\s]/g, '') // Enlève tirets, apostrophes, etc.
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z\s]/g, '')
         .trim()
         .toUpperCase();
 }
 
-// 3. Extraire les infos du nom de fichier ZIP: _NOM,_Prenom_M.JPG
+// Extraction des infos du fichier ZIP (gestion des accents et noms composés)
 function parseZipFileName(fileName) {
-    const decoded = decodeFileName(fileName); // 🔥 CORRECTION : Décodage CP1252
+    // On décode en Windows-1252 pour récupérer les accents (ex: Time╠üo -> Timéo)
+    let decoded = fileName;
+    try {
+        const bytes = new TextEncoder().encode(fileName);
+        decoded = new TextDecoder('windows-1252').decode(bytes);
+    } catch(e) { decoded = fileName; }
+
     const match = decoded.match(/^_(.+),_(.+)_([MF])\./i);
     if (!match) return null;
 
@@ -73,18 +67,15 @@ function parseZipFileName(fileName) {
         nom: nomBrut,
         prenom: prenomBrut,
         sexe,
-        // Normalisation pour matcher le CSV
         nomNormalise: normalizeText(nomBrut),
         prenomNormalise: normalizeText(prenomBrut),
-        // Clé unique : Nom + Première lettre du prénom
         cleUnique: `${normalizeText(nomBrut)}_${normalizeText(prenomBrut).charAt(0)}`
     };
 }
 
 // ==========================================
-// CŒUR DU MODULE : IMPORTS
+// IMPORTS CSV & ZIP
 // ==========================================
-
 export async function importCSV(file) {
     return new Promise((resolve) => {
         Papa.parse(file, {
@@ -96,8 +87,6 @@ export async function importCSV(file) {
                 results.data.forEach((row, index) => {
                     if (index === 0 || !row[0]) return;
                     const [nomComplet, vitesse, palier, palierNum] = row;
-                    
-                    // Séparation Nom / Prénom (le prénom est le premier mot)
                     const parts = nomComplet.trim().split(' ');
                     const prenom = parts[0];
                     const nom = parts.slice(1).join(' ').toUpperCase();
@@ -109,10 +98,9 @@ export async function importCSV(file) {
                         vma: parseFloat(String(vitesse).replace(",", ".")),
                         vitessePalier: parseFloat(String(palier).replace(",", ".")),
                         palier: parseInt(palierNum),
-                        sexe: '' // Sera rempli par le ZIP
+                        sexe: ''
                     });
                 });
-                
                 localStorage.setItem('eps_arena_eleves', JSON.stringify(eleves));
                 resolve(eleves);
             }
@@ -130,7 +118,6 @@ export async function importZIP(file) {
         const infos = parseZipFileName(entry.name);
         if (!infos) continue;
 
-        // Correspondance exacte (Nom + Prénom normalisés)
         let eleve = eleves.find(e => normalizeText(e.nom) === infos.nomNormalise && normalizeText(e.prenom) === infos.prenomNormalise)
                  || eleves.find(e => e.id === infos.cleUnique);
 
@@ -139,7 +126,6 @@ export async function importZIP(file) {
             const blob = await entry.async('blob');
             savePhoto(eleve.id, blob);
         } else {
-            // Fallback : Première lettre du prénom si aucune correspondance exacte
             const fallbackKey = `${infos.nomNormalise}_${infos.prenom.charAt(0)}`;
             eleve = eleves.find(e => e.id === fallbackKey);
             
