@@ -127,7 +127,7 @@
         </div>
     </div>
 
-    <script type="module">
+        <script type="module">
         import { initApp } from './src/js/app.js';
         import { listenConfig, listenPassages } from './src/js/core/firebase-service.js';
         import { updateState } from './src/js/core/state.js';
@@ -137,11 +137,10 @@
         // Initialisation générale
         initApp();
 
-        // === NOUVEAU : Initialisation du menu déroulant des classes ===
+        // Initialisation du menu déroulant des classes
         function initClassesSelect() {
             const select = document.getElementById('selectClasse');
             select.innerHTML = '<option value="">-- Classe --</option>';
-            
             let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
             classes.forEach(nom => {
                 const option = document.createElement('option');
@@ -152,6 +151,7 @@
         }
         initClassesSelect();
 
+        // Fonction de changement d'onglet
         window.switchTab = function(tabName) {
             ['admin', 'activities', 'live'].forEach(t => {
                 document.getElementById('view' + t.charAt(0).toUpperCase() + t.slice(1)).classList.add('hidden');
@@ -166,6 +166,7 @@
             document.getElementById('btnTab' + map[tabName]).classList.add('tab-active', 'text-blue-500');
         };
 
+        // Fonction AJOUTER UNE CLASSE
         window.addClasse = function() {
             const nom = prompt("Nom de la classe ?");
             if (nom) {
@@ -174,23 +175,27 @@
                     classes.push(nom);
                     localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
                     
-                    // On met à jour le select immédiatement
                     const select = document.getElementById('selectClasse');
                     const option = document.createElement('option');
                     option.value = nom;
                     option.textContent = nom;
                     select.appendChild(option);
                     select.value = nom;
+                    
+                    // Déclenche le chargement des élèves de cette nouvelle classe
+                    select.dispatchEvent(new Event('change'));
+                    
                     alert("Classe ajoutée !");
                 } else {
                     alert("Cette classe existe déjà.");
-                    // On sélectionne quand même la classe existante pour que l'utilisateur la voie
                     const select = document.getElementById('selectClasse');
                     select.value = nom;
+                    select.dispatchEvent(new Event('change'));
                 }
             }
         };
 
+        // Connexion Firebase
         onValue(ref(db, '.info/connected'), (snap) => {
             document.getElementById('connDot').className = "w-3 h-3 rounded-full " + (snap.val() ? "bg-emerald-500" : "bg-red-500");
             document.getElementById('connLabel').textContent = snap.val() ? "En ligne" : "Hors ligne";

@@ -1,23 +1,37 @@
 // src/js/ui/dashboard-ui.js
-import { importCSV, importZIP, getPhotoUrl, getPendingStudents, uploadManualPhoto } from '../services/admin-service.js';
+import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto } from '../services/admin-service.js';
 
 let currentEleves = [];
+let activeClasse = "";
+
+function getStorageKey() {
+    return `eps_arena_eleves_${activeClasse}`;
+}
 
 function loadLocalEleves() {
-    const stored = localStorage.getItem('eps_arena_eleves');
+    const stored = localStorage.getItem(getStorageKey());
     currentEleves = stored ? JSON.parse(stored) : [];
     renderEleves();
 }
 
 export function initAdminUI() {
-    loadLocalEleves();
+    // On écoute le changement de classe
+    const select = document.getElementById('selectClasse');
+    if (select) {
+        select.addEventListener('change', (e) => {
+            activeClasse = e.target.value;
+            loadLocalEleves();
+            checkPendingStudents();
+        });
+    }
 
     const csvInput = document.getElementById('csvFile');
     const zipInput = document.getElementById('zipFile');
 
     if (csvInput) csvInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
-            currentEleves = await importCSV(e.target.files[0]);
+            if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
+            currentEleves = await importCSV(e.target.files[0], activeClasse);
             renderEleves();
         }
         e.target.value = '';
@@ -25,8 +39,9 @@ export function initAdminUI() {
 
     if (zipInput) zipInput.addEventListener('change', async (e) => {
         if (e.target.files.length > 0) {
+            if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
             try {
-                currentEleves = await importZIP(e.target.files[0]);
+                currentEleves = await importZIP(e.target.files[0], activeClasse);
                 renderEleves();
                 checkPendingStudents();
             } catch (err) {
@@ -37,17 +52,17 @@ export function initAdminUI() {
         e.target.value = '';
     });
 
-    checkPendingStudents();
+    // Chargement initial si une classe est déjà sélectionnée
+    activeClasse = select ? select.value : "";
+    loadLocalEleves();
 }
 
 function checkPendingStudents() {
-    const pending = getPendingStudents();
+    const pending = getPendingStudents(activeClasse);
     if (pending.length > 0) {
         openManualAssignModal();
     }
 }
-
-// Dans src/js/ui/dashboard-ui.js, remplacez la fonction renderEleves par :
 
 async function renderEleves() {
     const container = document.getElementById('eleveList');
@@ -56,7 +71,7 @@ async function renderEleves() {
     container.innerHTML = '';
 
     if (currentEleves.length === 0) {
-        container.innerHTML = '<p class="text-slate-500 text-sm col-span-full">Aucun élève importé. Importez un CSV ou un ZIP.</p>';
+        container.innerHTML = '<p class="text-slate-500 text-sm col-span-full">Aucun élève importé pour cette classe.</p>';
         return;
     }
 
@@ -71,9 +86,8 @@ async function renderEleves() {
             needsBadge = '<span class="absolute top-2 right-2 bg-yellow-500 text-black px-2 py-0.5 rounded-full text-[10px] font-black">!</span>';
         }
 
-        // Affichage des nouvelles données
         let extraData = '';
-        if (e.longueur) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-orange-400">Longueur: ${e.longueur} cm</span>`;
+        if (e.longueur) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-orange-400">L: ${e.longueur} cm</span>`;
         if (e.sprint30) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-purple-400">30m: ${e.sprint30}s</span>`;
 
         container.innerHTML += `
@@ -92,13 +106,8 @@ async function renderEleves() {
     }
 }
 
-// ... (imports en haut)
-import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto } from '../services/admin-service.js';
-
-// ...
-
 async function openManualAssignModal() {
-    const pending = getPendingStudents();
+    const pending = getPendingStudents(activeClasse);
     if (pending.length === 0) return;
 
     const existing = document.getElementById('manualAssignModal');
@@ -110,8 +119,7 @@ async function openManualAssignModal() {
         pendingWithUrls.push({ ...stu, photoUrl: url || '' });
     }
 
-    // Récupérer les "orphelines" pour les proposer dans le menu déroulant
-    const orphans = getOrphanPhotos();
+    const orphans = getOrphanPhotos(activeClasse);
     const orphansWithUrls = [];
     for (const o of orphans) {
         const url = await getPhotoUrl(o.id);
@@ -122,7 +130,7 @@ async function openManualAssignModal() {
     <div id="manualAssignModal" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h3 class="text-xl font-black text-blue-400 uppercase mb-4">Gestion manuelle des photos</h3>
-            <p class="text-xs text-slate-400 mb-4">Ces élèves ont été créés depuis le ZIP (VMA manquante) ou n'ont pas pu être associés. Importez d'abord le CSV, puis le ZIP pour une association automatique. Sinon, associez-les manuellement.</p>
+            <p class="text-xs text-slate-400 mb-4">Ces élèves ont été créés depuis le ZIP (VMA manquante) ou n'ont pas pu être associés. Associez-les manuellement.</p>
             
             <div class="space-y-3">
                 ${pendingWithUrls.map(stu => `
@@ -158,20 +166,19 @@ async function openManualAssignModal() {
 
     window.uploadManual = async (studentId, input) => {
         if (input.files.length > 0) {
-            await uploadManualPhoto(studentId, input.files[0]);
+            await uploadManualPhoto(studentId, input.files[0], activeClasse);
             loadLocalEleves();
             document.getElementById('manualAssignModal').remove();
             alert("✅ Photo associée !");
         }
     };
 
-    // NOUVELLE FONCTION pour associer une photo déjà importée
     window.assignExistingOrphan = async (studentId) => {
         const select = document.getElementById(`orphanSelect_${studentId}`);
         const sourceId = select.value;
         if (!sourceId) return alert("Veuillez choisir une photo orpheline.");
 
-        if (await assignPhotoToStudent(studentId, sourceId)) {
+        if (await assignPhotoToStudent(studentId, sourceId, activeClasse)) {
             loadLocalEleves();
             document.getElementById('manualAssignModal').remove();
             alert("✅ Association réussie !");
@@ -192,22 +199,18 @@ window.addEleve = function() {
     const id = `${normalized(nom)}_${normalized(prenom).charAt(0)}`;
     
     const newEleve = {
-        id: id,
-        prenom: prenom,
-        nom: nom.toUpperCase(),
-        vma: vma,
-        palier: 0,
-        sexe: ''
+        id: id, prenom: prenom, nom: nom.toUpperCase(),
+        vma: vma, palier: 0, sexe: '', longueur: null, sprint30: null
     };
 
     currentEleves.push(newEleve);
-    localStorage.setItem('eps_arena_eleves', JSON.stringify(currentEleves));
+    localStorage.setItem(getStorageKey(), JSON.stringify(currentEleves));
     renderEleves();
 };
 
 window.purgeEleves = function() {
-    if (!confirm("Supprimer tous les élèves ? (Les photos resteront dans le navigateur)")) return;
+    if (!confirm("Supprimer tous les élèves de cette classe ?")) return;
     currentEleves = [];
-    localStorage.removeItem('eps_arena_eleves');
+    localStorage.removeItem(getStorageKey());
     renderEleves();
 };
