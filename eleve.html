@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>EPS-Arena | Élève</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
+        import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+
+        const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // ==========================================
+        // CONFIGURATION & ÉTAT
+        // ==========================================
+        let selectedClass = "";
+        let selectedCode = "";
+        let currentConfig = null;
+
+        // Barème pour l'escalade (identique au prof)
+        const BAREME = {
+            "4a": 1, "4b": 1.1, "4c": 1.2,
+            "5a": 1.3, "5b": 1.4, "5c": 1.5,
+            "6a": 1.6, "6b": 1.8, "6c": 2
+        };
+        const LONGUEUR_VOIE = 9;
+
+        // ==========================================
+        // ÉLÉMENTS DU DOM
+        // ==========================================
+        const classSelect = document.getElementById('class-select');
+        const waitingScreen = document.getElementById('waiting-screen');
+        const loginScreen = document.getElementById('login-screen');
+        const activityScreen = document.getElementById('activity-screen');
+        const codeList = document.getElementById('code-list');
+        const activityTitle = document.getElementById('activity-title');
+        const selectedCodeDisplay = document.getElementById('selected-code');
+
+        // Sous-modules
+        const escaladeModule = document.getElementById('escalade-module');
+        const coModule = document.getElementById('co-module');
+        const multiModule = document.getElementById('multi-module');
+
+        // ==========================================
+        // CHARGEMENT DES CLASSES DISPONIBLES
+        // ==========================================
+        onValue(ref(db, 'active_classes'), (snap) => {
+            const data = snap.val() || {};
+            classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
+                Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
+        });
+
+        // ==========================================
+        // ÉCOUTE DE LA CONFIGURATION DU PROF
+        // ==========================================
+        classSelect.addEventListener('change', () => {
+            selectedClass = classSelect.value;
+            if (!selectedClass) return;
+            
+            const configRef = ref(db, `${selectedClass}/config`);
+            onValue(configRef, (snap) => {
+                currentConfig = snap.val();
+                if (currentConfig) {
+                    showLogin();
+                } else {
+                    showWaiting();
+                }
+            });
+        });
+
+        function showWaiting() {
+            loginScreen.classList.add('hidden');
+            activityScreen.classList.add('hidden');
+            waitingScreen.classList.remove('hidden');
+        }
+
+        function showLogin() {
+            waitingScreen.classList.add('hidden');
+            activityScreen.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+            
+            codeList.innerHTML = '';
+            const config = currentConfig;
+            activityTitle.innerText = "Choisis ton code";
+
+            // Génération des codes selon l'activité
+            if (config.activite === 'co') {
+                // Les postes CO (ex: A1, B2...)
+                Object.keys(config).forEach(poste => {
+                    if (poste !== 'activite' && poste !== 'reserve' && Array.isArray(config[poste])) {
+                        const btn = document.createElement('button');
+                        btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
+                        btn.innerText = poste;
+                        btn.onclick = () => selectCode(poste);
+                        codeList.appendChild(btn);
+                    }
+                });
+            } else if (config.activite === 'escalade') {
+                // Les groupes Escalade (ex: A1, A2, B1...)
+                Object.keys(config).forEach(groupe => {
+                    if (groupe !== 'activite' && groupe !== 'reserve' && Array.isArray(config[groupe])) {
+                        config[groupe].forEach((_, index) => {
+                            const code = `${groupe}${index + 1}`;
+                            const btn = document.createElement('button');
+                            btn.className = "bg-purple-600 p-4 rounded-xl font-black text-white text-xl";
+                            btn.innerText = code;
+                            btn.onclick = () => selectCode(code);
+                            codeList.appendChild(btn);
+                        });
+                    }
+                });
+            } else {
+                // Multi-activités : l'élève saisit son code librement
+                const input = document.createElement('input');
+                input.placeholder = "Ton code (ex: A1)";
+                input.className = "bg-slate-800 p-4 rounded-xl text-white w-full mb-2 text-xl text-center";
+                
+                const btn = document.createElement('button');
+                btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white w-full";
+                btn.innerText = "Valider";
+                btn.onclick = () => selectCode(input.value.trim().toUpperCase());
+                
+                codeList.appendChild(input);
+                codeList.appendChild(btn);
+            }
+        }
+
+        function selectCode(code) {
+            selectedCode = code;
+            document.getElementById('selected-code').innerText = code;
+            loginScreen.classList.add('hidden');
+            activityScreen.classList.remove('hidden');
+
+            // Affichage du bon module
+            escaladeModule.classList.add('hidden');
+            coModule.classList.add('hidden');
+            multiModule.classList.add('hidden');
+
+            if (currentConfig.activite === 'escalade') {
+                escaladeModule.classList.remove('hidden');
+                initEscaladeUI();
+            } else if (currentConfig.activite === 'co') {
+                coModule.classList.remove('hidden');
+            } else {
+                multiModule.classList.remove('hidden');
+            }
+        }
+
+        // ==========================================
+        // INTERFACE ESCALADE
+        // ==========================================
+        function initEscaladeUI() {
+            // Génération des boutons de cotation
+            const cotationGrid = document.getElementById('cotation-grid');
+            cotationGrid.innerHTML = '';
+            
+            Object.keys(BAREME).forEach(cot => {
+                const btn = document.createElement('button');
+                btn.className = "bg-slate-700 p-3 rounded-xl font-black text-white border-2 border-slate-500";
+                btn.innerText = cot.toUpperCase();
+                btn.onclick = () => {
+                    // Sélection visuelle
+                    cotationGrid.querySelectorAll('button').forEach(b => b.classList.remove('bg-blue-600'));
+                    btn.classList.add('bg-blue-600');
+                    btn.dataset.selected = cot;
+                };
+                btn.dataset.selected = cot;
+                cotationGrid.appendChild(btn);
+            });
+
+            // Initialisation par défaut (5a)
+            const defaultBtn = cotationGrid.querySelector('button');
+            if (defaultBtn) {
+                defaultBtn.classList.add('bg-blue-600');
+                defaultBtn.dataset.selected = '5a';
+            }
+        }
+
+        window.sendEscalade = async function() {
+            const voie = document.getElementById('voie-num').value;
+            const couleur = document.getElementById('couleur-select').value;
+            const cotationBtn = document.querySelector('#cotation-grid button.bg-blue-600');
+            const cotation = cotationBtn ? cotationBtn.dataset.selected : '5a';
+
+            if (!voie) return alert("Entrez un numéro de voie.");
+
+            const points = Math.round(LONGUEUR_VOIE * (BAREME[cotation] || 1) * 10) / 10;
+
+            await push(ref(db, `${selectedClass}/escalade/montees`), {
+                groupe: selectedCode.slice(0, -1),
+                role: selectedCode.slice(-1),
+                voie_num: voie,
+                couleur: couleur,
+                cotation: cotation,
+                points: points,
+                timestamp: Date.now()
+            });
+
+            document.getElementById('voie-num').value = '';
+            alert("✅ Montée envoyée !");
+        };
+
+        // ==========================================
+        // INTERFACE CO
+        // ==========================================
+        window.sendBalise = async function() {
+            const balise = document.getElementById('balise-input').value.trim();
+            if (!balise) return alert("Entrez un numéro de balise.");
+
+            await push(ref(db, `${selectedClass}/co/validations`), {
+                code: selectedCode,
+                balise: balise,
+                timestamp: Date.now()
+            });
+
+            document.getElementById('balise-input').value = '';
+            alert("✅ Balise vérifiée !");
+        };
+
+        // ==========================================
+        // INTERFACE MULTI-ACTIVITÉS (CHRONO)
+        // ==========================================
+        let chronoInterval = null;
+        let chronoStart = 0;
+
+        window.startChrono = function() {
+            const display = document.getElementById('chrono-display');
+            chronoStart = Date.now();
+            
+            if (chronoInterval) clearInterval(chronoInterval);
+            chronoInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - chronoStart) / 1000);
+                const min = Math.floor(elapsed / 60);
+                const sec = elapsed % 60;
+                display.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+            }, 1000);
+
+            document.getElementById('start-btn').classList.add('hidden');
+            document.getElementById('stop-btn').classList.remove('hidden');
+        };
+
+        window.stopChrono = async function() {
+            clearInterval(chronoInterval);
+            
+            const display = document.getElementById('chrono-display');
+            const temps = display.innerText;
+
+            await push(ref(db, `${selectedClass}/multi/performances`), {
+                code: selectedCode,
+                temps: temps,
+                timestamp: Date.now()
+            });
+
+            document.getElementById('start-btn').classList.remove('hidden');
+            document.getElementById('stop-btn').classList.add('hidden');
+            display.innerText = "00:00";
+            
+            alert("⏱️ Temps envoyé !");
+        };
+
+        // Bouton Quitter
+        window.quitActivity = function() {
+            location.reload();
+        };
+
+        showWaiting();
+    </script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen p-6 font-sans">
+
+    <div class="max-w-md mx-auto">
+        
+        <!-- EN-TÊTE -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-black text-blue-500 italic">EPS-Arena</h1>
+            <select id="class-select" class="bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs font-bold text-blue-400 outline-none">
+                <option value="">-- Classe --</option>
+            </select>
+        </div>
+
+        <!-- ÉCRAN D'ATTENTE -->
+        <div id="waiting-screen" class="text-center py-20">
+            <div class="text-6xl mb-6">⏳</div>
+            <p class="text-slate-400 font-bold">En attente de l'activité<br>du professeur...</p>
+        </div>
+
+        <!-- ÉCRAN DE CONNEXION (CHOIX DU CODE) -->
+        <div id="login-screen" class="hidden">
+            <h2 id="activity-title" class="text-xl font-black text-center mb-6">Choisis ton code</h2>
+            <div id="code-list" class="grid grid-cols-3 gap-3"></div>
+        </div>
+
+        <!-- ÉCRAN D'ACTIVITÉ -->
+        <div id="activity-screen" class="hidden">
+            <div class="flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <div>
+                    <h2 class="text-xs uppercase text-slate-400 font-bold">Code sélectionné</h2>
+                    <span id="selected-code" class="text-3xl font-black text-blue-400">--</span>
+                </div>
+                <button onclick="quitActivity()" class="bg-red-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">✖ Quitter</button>
+            </div>
+
+            <!-- MODULE ESCALADE -->
+            <div id="escalade-module" class="hidden space-y-4">
+                <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <label class="text-xs font-bold text-slate-400 uppercase">N° Voie</label>
+                    <input type="number" id="voie-num" min="1" max="21" class="w-full bg-slate-900 p-3 rounded-xl text-white text-2xl font-black mb-4 border border-slate-600">
+
+                    <label class="text-xs font-bold text-slate-400 uppercase">Couleur des prises</label>
+                    <select id="couleur-select" class="w-full bg-slate-900 p-3 rounded-xl text-white mb-4 border border-slate-600">
+                        <option value="bleue">Bleue</option>
+                        <option value="rouge">Rouge</option>
+                        <option value="verte">Verte</option>
+                        <option value="jaune">Jaune</option>
+                        <option value="rose">Rose</option>
+                        <option value="orange">Orange</option>
+                        <option value="sable">Sable</option>
+                        <option value="tc">TC (Toutes Couleurs)</option>
+                    </select>
+
+                    <label class="text-xs font-bold text-slate-400 uppercase">Cotation (Points)</label>
+                    <div id="cotation-grid" class="grid grid-cols-5 gap-2 mb-4"></div>
+
+                    <button onclick="sendEscalade()" class="w-full bg-emerald-600 py-5 rounded-3xl text-xl font-black uppercase shadow-xl active:scale-95 transition-all">📤 Envoyer la montée</button>
+                </div>
+            </div>
+
+            <!-- MODULE CO -->
+            <div id="co-module" class="hidden space-y-4">
+                <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <label class="text-xs font-bold text-slate-400 uppercase">Numéro de la balise</label>
+                    <input type="text" id="balise-input" placeholder="Ex: 31, 45..." class="w-full bg-slate-900 p-4 rounded-xl text-white text-2xl font-black text-center mb-4 border border-slate-600">
+                    <button onclick="sendBalise()" class="w-full bg-blue-600 py-5 rounded-3xl text-xl font-black uppercase shadow-xl active:scale-95 transition-all">✅ Valider la balise</button>
+                    <p class="text-xs text-slate-500 text-center mt-4">Choisissez la bonne balise correspondant à votre code (ex: C4).</p>
+                </div>
+            </div>
+
+            <!-- MODULE MULTI-ACTIVITÉS (CHRONO) -->
+            <div id="multi-module" class="hidden space-y-4">
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
+                    <div id="chrono-display" class="text-8xl font-black tabular-nums text-yellow-400 mb-8">00:00</div>
+                    
+                    <button id="start-btn" onclick="startChrono()" class="w-full bg-emerald-600 py-5 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95 transition-all mb-2">▶ Démarrer</button>
+                    <button id="stop-btn" onclick="stopChrono()" class="hidden w-full bg-red-600 py-5 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95 transition-all">⏹ Arrêter</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
