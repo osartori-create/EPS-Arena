@@ -6,6 +6,7 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 import { calculerStatsGlobales, initEscaladeListener, exportIDoceo } from '../../modules/escalade/escalade-controller.js';
 import { db, ref, set } from '../../core/firebase-service.js';
+import { db, ref, set, remove } from '../../core/firebase-service.js';
 
 let currentDiscipline = 'multi';
 
@@ -328,6 +329,59 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
 
+        // ==========================================
+    // MODULE DE PURGE FIREBASE
+    // ==========================================
+
+    window.openPurgeModal = function() {
+        const choix = prompt("🧹 Purge Firebase\n\n1️⃣  Purger la classe active\n2️⃣  Purger TOUTE la base (Code RNE requis)\n\nEntrez 1 ou 2 :");
+        
+        if (choix === "1") {
+            window.purgeClasseActive();
+        } else if (choix === "2") {
+            window.purgeTout();
+        } else {
+            alert("Action annulée.");
+        }
+    };
+
+    window.purgeClasseActive = async function() {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+        
+        if (confirm(`⚠️ Voulez-vous vraiment supprimer TOUTES les données Firebase de la classe "${activeClasse}" ?\n(Config, Performances, Scores...)`)) {
+            try {
+                await remove(ref(db, `${activeClasse}`));
+                alert("✅ Données de la classe purgées !");
+                // Recharger l'interface pour éviter les données fantômes
+                location.reload();
+            } catch(e) {
+                console.error("Erreur purge classe :", e);
+                alert("❌ Erreur lors de la purge.");
+            }
+        }
+    };
+
+    window.purgeTout = async function() {
+        const code = prompt("🔐 Code RNE pour la PURGE TOTALE :");
+        
+        if (code !== "0680013V") {
+            alert("❌ Code incorrect.");
+            return;
+        }
+
+        if (confirm("⚠️⚠️ ATTENTION !!\n\nCette action supprimera TOUT l'établissement de Firebase (toutes les classes).\n\nÊtes-vous absolument sûr ?")) {
+            try {
+                await remove(ref(db));
+                alert("✅ Base entièrement purgée !");
+                location.reload();
+            } catch(e) {
+                console.error("Erreur purge totale :", e);
+                alert("❌ Erreur lors de la purge totale.");
+            }
+        }
+    };
+    
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
     window.exportEscaladeConfig = exportEscaladeConfig;
