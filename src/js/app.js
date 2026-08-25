@@ -1,4 +1,3 @@
-// src/js/app.js
 import { listenConfig } from './core/firebase-service.js';
 import { updateState } from './core/state.js';
 import { initLayout } from './ui/prof/layout.js';
@@ -7,13 +6,9 @@ import { initAdminUI } from './ui/dashboard-ui.js';
 
 export function initApp() {
     console.log("✅ EPS-Arena démarré !");
-    
-    // Initialisation des modules
     initLayout();
     initAdminUI();
     initActivities();
-
-    // Écoute de la config Firebase
     listenConfig((config) => {
         updateState('equipesConfig', config.equipes || {});
     });
