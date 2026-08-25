@@ -1,5 +1,5 @@
 // src/js/ui/prof/activities.js
-import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO, loadCOAssignments } from '../../modules/co/co-interface.js';
+import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
@@ -19,7 +19,7 @@ export function initActivities() {
                 loadCOAssignments();
             }
         });
-    } // ✅ Fin du if (classeSelect) -> AJOUTÉ ICI
+    }
 
     // Mise à jour de la discipline courante
     window.switchDiscipline = function(disc) {
@@ -210,4 +210,9 @@ export function initActivities() {
     window.autoAssignCodes = function() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
+
+    // ✅ AJOUTEZ CES LIGNES ICI, justes avant la fermeture de initActivities !
+    window.exportCOConfig = exportCOConfig;
+    window.importCOConfig = importCOConfig;
+    
 }

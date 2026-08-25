@@ -213,3 +213,78 @@ export function loadCOAssignments() {
     // 🔄 On réinitialise le glisser-déposer pour les nouveaux éléments
     setTimeout(() => initSortableCO(), 100);
 }
+
+// ==========================================
+// EXPORT / IMPORT DE LA CONFIGURATION CO (JSON)
+// ==========================================
+
+// Sauvegarde et téléchargement du fichier JSON
+export function exportCOConfig() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+    
+    // Récupération des données d'affectation
+    const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
+    
+    // Formatage de la date (YYYYMMDD)
+    const date = new Date();
+    const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+    
+    // Construction de l'objet de sauvegarde
+    const data = {
+        version: 1,
+        classe: activeClasse,
+        activite: 'co',
+        date: dateStr, // 20260825
+        postes: assignments // { A1: [id1, id2], C4: [id3] ... }
+    };
+
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeClasse}_co_${dateStr}.json`; // Ex: 504_co_20260825.json
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    console.log("💾 Export CO effectué :", data);
+}
+
+// Lecture et importation d'un fichier JSON
+export function importCOConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.postes) throw new Error("Format de fichier invalide");
+            
+            // Sauvegarde dans le localStorage de la classe spécifiée
+            const storageKey = `eps_arena_co_assignments_${data.classe}`;
+            localStorage.setItem(storageKey, JSON.stringify(data.postes));
+            
+            // Sélection de la classe importée dans l'interface
+            const select = document.getElementById('selectClasse');
+            if (select.value !== data.classe) {
+                select.value = data.classe;
+                select.dispatchEvent(new Event('change')); // Déclenche la mise à jour des élèves et du stockage
+            }
+            
+            // Rechargement des affectations dans l'interface CO
+            loadCOAssignments();
+            alert("✅ Configuration CO importée avec succès !");
+        } catch (err) {
+            alert("❌ Erreur lors de l'import : " + err.message);
+        }
+    };
+    reader.readAsText(file);
+    
+    // Réinitialisation de l'input pour permettre une nouvelle sélection
+    event.target.value = '';
+}
