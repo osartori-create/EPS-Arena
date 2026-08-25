@@ -37,3 +37,30 @@ export function sendPassage(passageData) {
     const refPassages = ref(db, `${getProfBasePath()}/live/passages`);
     return push(refPassages, passageData);
 }
+
+// NOUVELLE FONCTION : Écoute les données des élèves pour une classe donnée
+export function listenToActivityData(className, callback) {
+    // Chemin : {classe}/escalade/montees, {classe}/co/validations, {classe}/multi/performances
+    const refEscalade = ref(db, `${className}/escalade/montees`);
+    const refCO = ref(db, `${className}/co/validations`);
+    const refMulti = ref(db, `${className}/multi/performances`);
+
+    const unsubscribeEscalade = onValue(refEscalade, (snap) => {
+        callback('escalade', snap.val() || {});
+    });
+
+    const unsubscribeCO = onValue(refCO, (snap) => {
+        callback('co', snap.val() || {});
+    });
+
+    const unsubscribeMulti = onValue(refMulti, (snap) => {
+        callback('multi', snap.val() || {});
+    });
+
+    // Retourne une fonction pour couper les écoutes si on change de classe
+    return () => {
+        unsubscribeEscalade();
+        unsubscribeCO();
+        unsubscribeMulti();
+    };
+}

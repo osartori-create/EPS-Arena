@@ -19,14 +19,12 @@
         .btn-primary { background: #3b82f6; color: white; }
         .btn-success { background: #22c55e; color: white; }
         .btn-danger { background: #ef4444; color: white; }
-        /* Style simple pour la grille Escalade */
         .escalade-col { background: #1e293b; border: 1px solid #334155; border-radius: 12px; min-height: 60px; display: flex; flex-direction: column; gap: 4px; padding: 8px; }
         .header-col { background: #3b82f6; color: white; font-weight: 900; text-align: center; padding: 8px; border-radius: 8px 8px 0 0; }
     </style>
 </head>
 <body class="p-4">
 
-    <!-- Header -->
     <header class="flex justify-between items-center mb-4 border-b border-slate-800 pb-4 flex-wrap gap-4">
         <div class="flex items-center gap-3">
             <h1 class="text-2xl font-black text-blue-500 uppercase italic">EPS-Arena</h1>
@@ -44,7 +42,6 @@
         </div>
     </header>
 
-    <!-- Navigation -->
     <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
         <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
         <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
@@ -70,7 +67,7 @@
             <div id="eleveList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
         </div>
 
-                <!-- ONGLET 2 : ACTIVITÉS -->
+        <!-- ONGLET 2 : ACTIVITÉS -->
         <div id="viewActivities" class="hidden space-y-4">
             
             <!-- Sélecteur de discipline -->
@@ -137,19 +134,15 @@
                 <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
             </div>
 
-            <!-- PARAMÈTRES COURSE D'ORIENTATION (Bouton restauré !) -->
+            <!-- PARAMÈTRES COURSE D'ORIENTATION -->
             <div id="viewCOSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="font-black text-blue-400 uppercase text-sm">Catégories & Génération CO</h3>
                         <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer CO</button>
                     </div>
-
                     <p class="text-xs text-slate-400 mb-4">Ces circuits utilisent la matrice des balises. Vous pourrez ensuite glisser-déposer les équipes sur les codes (A1, C4, etc.)</p>
-                    
                     <div id="circuitList" class="space-y-4 mb-6"></div>
-                    
                     <div class="flex flex-wrap gap-2 mb-6">
                         <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
                         <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
@@ -157,7 +150,6 @@
                         <button onclick="document.getElementById('importCOFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
                         <input type="file" id="importCOFile" class="hidden" onchange="importCOConfig(event)">
                     </div>
-
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (non assignés)</h4>
@@ -187,13 +179,11 @@
                         <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer Escalade</button>
                     </div>
                     <p class="text-xs text-slate-400 mb-4">Glissez les élèves dans les colonnes (A, B, C...). Le numéro à droite indique son rang (ex: B2).</p>
-                    
                     <div class="flex flex-wrap gap-2 mb-4">
                         <button onclick="exportEscaladeConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
                         <button onclick="document.getElementById('importEscaladeFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
                         <input type="file" id="importEscaladeFile" class="hidden" onchange="importEscaladeConfig(event)">
                     </div>
-
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (non affectés)</h4>
@@ -208,6 +198,21 @@
             </div>
 
         </div> <!-- Fin viewActivities -->
+
+        <!-- ONGLET 3 : LIVE (NOUVEAU) -->
+        <div id="viewLive" class="hidden space-y-4">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-black text-blue-400 uppercase text-sm">📊 Résultats en direct</h3>
+                    <button onclick="exportResultsLive()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">📥 Export CSV</button>
+                </div>
+                
+                <div id="live-content" class="space-y-4">
+                    <p class="text-slate-500 text-center">En attente des données des élèves...</p>
+                </div>
+            </div>
+        </div>
+
     </div> <!-- Fin space-y-6 -->
 
     <script type="module">
