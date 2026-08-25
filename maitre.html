@@ -74,7 +74,7 @@
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Quelle activité ?</h3>
                 <div id="disciplineSelector" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button onclick="switchDiscipline('sprint')" id="btnDisc-sprint" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏃 Sprint</button>
+                    <button onclick="switchDiscipline('Multi-activités')" id="btnDisc-sprint" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏃 Multi-activités</button>
                     <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🧭 CO</button>
                     <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🎯 Arcathlon</button>
                     <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button>
@@ -92,8 +92,8 @@
                 </div>
             </div>
 
-            <!-- PARAMÈTRES SPRINT -->
-            <div id="viewSprintSettings" class="space-y-4">
+            <!-- PARAMÈTRES Multi-activités -->
+            <div id="viewMultiSettings" class="space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Configuration de l'activité</h3>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
@@ -205,18 +205,61 @@
             <div id="viewArcathlonSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm">🎯 Arcathlon (Bientôt disponible)</h3>
-                    <p class="text-xs text-slate-400 mt-2">Le module Arcathlon est en cours de développement. Il utilisera les mêmes paramètres de génération d'équipes que le Sprint.</p>
+                    <p class="text-xs text-slate-400 mt-2">Le module Arcathlon est en cours de développement. Il utilisera les mêmes paramètres de génération d'équipes que le Multi-activités.</p>
                 </div>
             </div>
 
-            <!-- PARAMÈTRES ESCALADE (Temporaire) -->
+                        <!-- PARAMÈTRES ESCALADE -->
             <div id="viewEscaladeSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <h3 class="font-black text-blue-400 uppercase text-sm">⛰️ Escalade (Bientôt disponible)</h3>
-                    <p class="text-xs text-slate-400 mt-2">Le module Escalade est en cours de développement. Il utilisera les mêmes paramètres de génération d'équipes que le Sprint.</p>
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-black text-blue-400 uppercase text-sm">🧗 Escalade - Suivi de session</h3>
+                        <button onclick="exportIDoceo()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">📊 Export iDoceo</button>
+                    </div>
+
+                    <!-- Objectif 1000m -->
+                    <div class="bg-slate-900 p-5 rounded-2xl border border-slate-700 mb-6">
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-[10px] font-bold text-slate-500 uppercase italic">Objectif 1000m</p>
+                            <span class="text-2xl font-black text-emerald-400"><span id="total-metres">0</span>m</span>
+                        </div>
+                        <div class="w-full h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                            <div id="progress-bar" class="h-full bg-emerald-500 transition-all duration-1000" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Tableau des élèves -->
+                        <div class="bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden">
+                            <div class="p-4 bg-slate-800 border-b border-slate-700">
+                                <h4 class="font-black text-slate-300 text-xs uppercase">Élèves</h4>
+                            </div>
+                            <div class="max-h-[400px] overflow-y-auto">
+                                <table class="w-full text-left">
+                                    <thead class="text-slate-500 text-[10px] uppercase tracking-widest sticky top-0 bg-slate-800">
+                                        <tr>
+                                            <th class="p-3">Élève</th>
+                                            <th class="p-3 text-center">Code</th>
+                                            <th class="p-3 text-right">Points</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="escalade-student-table">
+                                        <!-- Rempli dynamiquement par JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Top 5 Live -->
+                        <div class="bg-slate-900 rounded-2xl border border-slate-700 p-5">
+                            <h4 class="font-black text-slate-300 text-xs uppercase mb-4">🏆 Top 5 Live</h4>
+                            <div id="top-5-list" class="space-y-2 text-xs">
+                                <!-- Rempli dynamiquement -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
     </div> <!-- FERMETURE DE viewActivities -->
 

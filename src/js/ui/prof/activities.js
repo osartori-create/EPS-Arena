@@ -3,14 +3,15 @@ import { initCOInterface, populateReserve, populateReserveWithStudents, initSort
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
+import { BAREME, calculerPoints, exportIDoceo, calculerStatsGlobales, initEscaladeListener, envoyerMontee } from '../../modules/escalade/escalade-controller.js';
 
-let currentDiscipline = 'sprint';
+let currentDiscipline = 'multi';
 
 export function initActivities() {
     initPalette();
     initCOInterface();
 
-    // ✅ NOUVEAU : Écouteur sur le changement de classe
+    // Écouteur sur le changement de classe
     const classeSelect = document.getElementById('selectClasse');
     if (classeSelect) {
         classeSelect.addEventListener('change', () => {
@@ -25,7 +26,7 @@ export function initActivities() {
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         
-        const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
+        const panneaux = ['multi', 'co', 'arcathlon', 'escalade'];
 
         panneaux.forEach(d => {
             const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
@@ -54,6 +55,11 @@ export function initActivities() {
             if (circuitList) renderCircuits('circuitList', "");
             initSortableCO();
             loadCOAssignments();
+        }
+
+        // 🔥 AJOUT : Initialisation de l'écoute Escalade quand on ouvre l'onglet
+        if (disc === 'escalade') {
+            window.initEscalade();
         }
     };
 
@@ -211,8 +217,40 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
 
-    // ✅ AJOUTEZ CES LIGNES ICI, justes avant la fermeture de initActivities !
+    // Initialisation de l'écoute Escalade (appelée depuis switchDiscipline)
+    window.initEscalade = function() {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (!activeClasse) return;
+        
+        initEscaladeListener(activeClasse, (montees) => {
+            const stats = calculerStatsGlobales(montees);
+            // Mise à jour de l'interface
+            document.getElementById('total-metres').innerText = stats.totalMetres;
+            document.getElementById('progress-bar').style.width = stats.progressionPct + "%";
+            
+            // Top 5
+            const top5List = document.getElementById('top-5-list');
+            top5List.innerHTML = stats.top5.map((s, i) => 
+                `<div class="flex justify-between items-center bg-white/5 p-2 rounded-lg border-l-4 border-blue-500">
+                    <span class="font-bold text-[10px]">${i+1}. ${s.code}</span>
+                    <span class="font-black text-emerald-400">${s.score}m</span>
+                </div>`
+            ).join('');
+            
+            // Mise à jour du tableau des élèves
+            updateStudentTable(montees);
+        });
+    };
+
+    function updateStudentTable(montees) {
+        // (Cette fonction sera complétée lors de l'intégration avec les élèves, 
+        // elle utilisera les données locales pour afficher les noms)
+    }
+
+    // ✅ AJOUTEZ CES LIGNES ICI !
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
     
+    // Pour l'escalade, on expose la fonction d'export iDoceo
+    window.exportIDoceo = exportIDoceo;
 }
