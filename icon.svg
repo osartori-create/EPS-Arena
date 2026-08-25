@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Fond arrondi bleu foncé -->
+  <rect x="2" y="2" width="96" height="96" rx="20" fill="#0f172a" />
+  
+  <!-- Lettre "E" stylisée en bleu clair -->
+  <text x="50" y="68" font-family="Arial, sans-serif" font-size="60" font-weight="900" fill="#3b82f6" text-anchor="middle" font-style="italic">E</text>
+  
+  <!-- Un petit accent vert (rappel sport) -->
+  <circle cx="75" cy="25" r="12" fill="#22c55e" />
+</svg>
