@@ -1,6 +1,6 @@
 // src/js/modules/co/co-interface.js
 import { MATRICE } from './matrice.js';
-import { getPhotoUrl } from '../../services/admin-service.js'; // Pour les photos
+import { getPhotoUrl } from '../../services/admin-service.js';
 
 export function initCOInterface() {
     console.log("🔍 Initialisation CO...");
@@ -10,8 +10,6 @@ export function initCOInterface() {
         return;
     }
     generatePostesGrid();
-    
-    
     console.log("✅ Interface CO initialisée.");
 }
 
@@ -43,7 +41,6 @@ export function initSortableCO() {
         new Sortable(reserveContainer, {
             group: 'co-groupes',
             animation: 150,
-            // Déclencher la sauvegarde après chaque déplacement
             onEnd: function() {
                 saveCOAssignments();
             }
@@ -58,9 +55,7 @@ export function initSortableCO() {
                     onEnd: function() {
                         saveCOAssignments();
                     },
-                    onAdd: function(evt) {
-                        const posteId = el.closest('[data-poste]').dataset.poste;
-                        console.log('Élève assigné au poste : ' + posteId);
+                    onAdd: function() {
                         saveCOAssignments();
                     },
                     onRemove: function() {
@@ -106,9 +101,8 @@ export async function populateReserveWithStudents(eleves) {
     }
 
     reserveContainer.innerHTML = html;
-    console.log("✅ Réserve remplie !");
-
-    // On efface les anciennes affectations car on régénère
+    
+    // 🔄 On efface les anciennes affectations car on vient de remplir une nouvelle réserve
     localStorage.removeItem(getStorageKey());
     
     setTimeout(() => initSortableCO(), 100);
@@ -171,22 +165,51 @@ export function loadCOAssignments() {
     const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
     const postes = document.querySelectorAll('[data-poste]');
     
-    // On parcourt les postes pour replacer les élèves sauvegardés
-    postes.forEach(posteDiv => {
+    if (Object.keys(assignments).length === 0) return;
+
+    // 🔄 Récupérer la liste complète des élèves de la classe active
+    const activeClasse = document.getElementById('selectClasse').value;
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+
+    // On parcourt chaque poste
+    postes.forEach(async posteDiv => {
         const posteId = posteDiv.dataset.poste;
         const membersDiv = posteDiv.querySelector('.poste-members');
+        
         if (membersDiv && assignments[posteId]) {
-            assignments[posteId].forEach(id => {
-                // On cherche l'élève dans la réserve par son ID
-                const reserveEl = document.querySelector(`#reserveList [data-id="${id}"]`);
-                if (reserveEl) {
-                    membersDiv.appendChild(reserveEl);
+            // On vide le poste avant de le remplir (évite les doublons)
+            membersDiv.innerHTML = '';
+
+            for (const id of assignments[posteId]) {
+                const eleve = eleves.find(e => e.id === id);
+                if (eleve) {
+                    const url = await getPhotoUrl(eleve.id);
+                    let bgClass = 'bg-slate-200 border-slate-400';
+                    if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+                    else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+                    
+                    const photoHtml = url 
+                        ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+                        : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+
+                    const div = document.createElement('div');
+                    div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
+                    div.dataset.id = eleve.id;
+                    div.innerHTML = `
+                        ${photoHtml}
+                        <div class="flex flex-col leading-tight">
+                            <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
+                            <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
+                        </div>
+                    `;
+                    membersDiv.appendChild(div);
                 }
-            });
+            }
         }
     });
     
-    if (Object.keys(assignments).length > 0) {
-        console.log("📂 Affectations CO chargées :", assignments);
-    }
+    console.log("📂 Affectations CO chargées :", assignments);
+    
+    // 🔄 On réinitialise le glisser-déposer pour les nouveaux éléments
+    setTimeout(() => initSortableCO(), 100);
 }
