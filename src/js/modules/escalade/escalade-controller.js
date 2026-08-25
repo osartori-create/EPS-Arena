@@ -1,3 +1,4 @@
+// src/js/modules/escalade/escalade-controller.js
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
 export const BAREME = {
@@ -11,13 +12,17 @@ export const OBJECTIF_METRES = 1000;
 
 export function calculerPoints(cotation, couleur, essai = 1) {
     const coeff = BAREME[cotation] || 1;
-    let bonusEssai = (essai === 1) ? 1.2 : (essai === 2 ? 1 : 0.8);
+    let bonusEssai = 1;
+    if (essai === 1) bonusEssai = 1.2;
+    else if (essai === 2) bonusEssai = 1;
+    else bonusEssai = 0.8;
+    
     let bonusCouleur = (couleur === 'tc') ? 0.9 : 1;
+    
     return Math.round(LONGUEUR_VOIE * coeff * bonusEssai * bonusCouleur * 10) / 10;
 }
 
 export function exportIDoceo(students, montees, assignments, className) {
-    // ... (Code d'export inchangé, mais ne doit JAMAIS toucher à firebase global)
     let csv = "\uFEFFNom,Total_Metres,Nb_Voies,Meilleure_Cotation\n";
     students.forEach(name => {
         const post = assignments[name] || "";
@@ -41,7 +46,6 @@ export function exportIDoceo(students, montees, assignments, className) {
 }
 
 export function calculerStatsGlobales(montees) {
-    // ... (Code de stats inchangé)
     const allMontees = Object.values(montees || {});
     const totalMetres = allMontees.reduce((sum, m) => sum + (parseFloat(m.points) || 0), 0);
     const progressionPct = Math.min((totalMetres / OBJECTIF_METRES) * 100, 100);

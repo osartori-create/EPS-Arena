@@ -4,8 +4,7 @@ import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, l
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
-// ✅ CORRECTION ICI : ../config devient ../../config !
-import { BAREME, calculerPoints, exportIDoceo, calculerStatsGlobales, initEscaladeListener, envoyerMontee } from '../../modules/escalade/escalade-controller.js';
+import { BAREME, calculerPoints, exportIDoceo, calculerStatsGlobales, initEscaladeListener } from '../../modules/escalade/escalade-controller.js';
 
 let currentDiscipline = 'multi';
 
@@ -26,27 +25,27 @@ export function initActivities() {
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
-        const panneaux = ['multi', 'co', 'arcathlon', 'escalade'];
-
-        panneaux.forEach(d => {
+        
+        // On désélectionne tous les boutons
+        ['multi', 'co', 'arcathlon', 'escalade'].forEach(d => {
+            const btn = document.getElementById('btnDisc-' + d);
+            if (btn) {
+                btn.classList.remove('border-blue-500', 'text-blue-400');
+                btn.classList.add('border-slate-600', 'text-slate-400');
+            }
             const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
             const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
         });
 
-        panneaux.forEach(d => {
-            const btn = document.getElementById('btnDisc-' + d);
-            if (btn) {
-                if (d === disc) {
-                    btn.classList.remove('border-slate-600', 'text-slate-400');
-                    btn.classList.add('border-blue-500', 'text-blue-400');
-                } else {
-                    btn.classList.remove('border-blue-500', 'text-blue-400');
-                    btn.classList.add('border-slate-600', 'text-slate-400');
-                }
-            }
-        });
+        // On sélectionne le bouton actif
+        const activeBtn = document.getElementById('btnDisc-' + disc);
+        if (activeBtn) {
+            activeBtn.classList.remove('border-slate-600', 'text-slate-400');
+            activeBtn.classList.add('border-blue-500', 'text-blue-400');
+        }
 
+        // On affiche le panneau correspondant
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) targetView.classList.remove('hidden');
 
@@ -91,14 +90,21 @@ export function initActivities() {
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
-        
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        const coView = document.getElementById('viewCOSettings');
-        const isCOVisible = coView && !coView.classList.contains('hidden');
+        // Détection fiable : on regarde si les panneaux sont visibles
         const escView = document.getElementById('viewEscaladeSettings');
         const isEscVisible = escView && !escView.classList.contains('hidden');
+        const coView = document.getElementById('viewCOSettings');
+        const isCOVisible = coView && !coView.classList.contains('hidden');
+
+        if (currentDiscipline === 'escalade' || isEscVisible) {
+            await populateReserveEscalade(eleves);
+            document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
+            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes !");
+            return;
+        }
 
         if (currentDiscipline === 'co' || isCOVisible) {
             await populateReserveWithStudents(eleves);
@@ -107,14 +113,7 @@ export function initActivities() {
             return;
         }
 
-        if (currentDiscipline === 'escalade' || isEscVisible) {
-            await populateReserveEscalade(eleves);
-            document.getElementById('teamsGrid').innerHTML = '';
-            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes A, B, C... !");
-            return;
-        }
-
-        // Génération classique Multi-activités
+        // Si on est en Multi-activités, on génère les équipes classiques
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -124,7 +123,6 @@ export function initActivities() {
             nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
             couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
         };
-
         if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
