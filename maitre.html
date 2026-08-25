@@ -45,7 +45,7 @@
 
     <div class="space-y-6">
         
-                <!-- ONGLET 1 : ADMINISTRATION -->
+        <!-- ONGLET 1 : ADMINISTRATION -->
         <div id="viewAdmin" class="space-y-4">
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
                 <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
@@ -68,20 +68,20 @@
             </div>
         </div>
 
-                <!-- ONGLET 2 : ACTIVITÉS -->
+        <!-- ONGLET 2 : ACTIVITÉS -->
         <div id="viewActivities" class="hidden space-y-4">
             <!-- Sélecteur de discipline -->
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Quelle activité ?</h3>
                 <div id="disciplineSelector" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button onclick="switchDiscipline('Multi-activités')" id="btnDisc-sprint" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏃 Multi-activités</button>
+                    <button onclick="switchDiscipline('multi')" id="btnDisc-multi" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏋️ Multi-activités</button>
                     <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🧭 CO</button>
                     <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🎯 Arcathlon</button>
                     <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button>
                 </div>
             </div>
 
-            <!-- ZONE COMMUNE : Génération des équipes (Visible pour toutes les activités) -->
+            <!-- ZONE COMMUNE : Génération des équipes -->
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-black text-blue-400 uppercase text-sm">Génération des équipes</h3>
@@ -92,12 +92,11 @@
                 </div>
             </div>
 
-            <!-- PARAMÈTRES Multi-activités -->
+            <!-- PARAMÈTRES MULTI-ACTIVITÉS -->
             <div id="viewMultiSettings" class="space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Configuration de l'activité</h3>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                        <!-- Vos selects existants pour la répartition, mixité, critère, libellé... -->
                         <div>
                             <label class="block font-bold text-slate-400 uppercase mb-1">Répartition</label>
                             <select id="modeRepartition" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
@@ -130,7 +129,6 @@
                         </div>
                     </div>
 
-                    <!-- Zone du champ intelligent -->
                     <div class="flex gap-2 mt-4">
                         <div>
                             <label class="block font-bold text-slate-400 uppercase mb-1">Nb. Équipes</label>
@@ -142,7 +140,6 @@
                         </div>
                     </div>
 
-                    <!-- Zone de la palette chromatique -->
                     <div class="mt-4">
                         <label class="block font-bold text-slate-400 uppercase mb-2">Choisir les couleurs des chasubles :</label>
                         <div id="paletteCouleurs" class="flex flex-wrap gap-2">
@@ -152,50 +149,35 @@
                 </div>
             </div>
 
-                        <!-- PARAMÈTRES COURSE D'ORIENTATION -->
+            <!-- PARAMÈTRES COURSE D'ORIENTATION (Nettoyé) -->
             <div id="viewCOSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Catégories de Parcours (CO)</h3>
                     <p class="text-xs text-slate-400 mb-4">Ces circuits utilisent la matrice des balises. Vous pourrez ensuite glisser-déposer les équipes sur les codes (A1, C4, etc.)</p>
                     <div id="circuitList" class="space-y-4 mb-6"></div>
-                    <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
-                    <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
-                    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-    <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Catégories de Parcours (CO)</h3>
-    <p class="text-xs text-slate-400 mb-4">Ces circuits utilisent la matrice des balises. Vous pourrez ensuite glisser-déposer les équipes sur les codes (A1, C4, etc.)</p>
-    <div id="circuitList" class="space-y-4 mb-6"></div>
-    
-    <div class="flex gap-2">
-        <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
-        <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
-        
-        <!-- NOUVEAUX BOUTONS EXPORT / IMPORT -->
-        <button onclick="exportCOConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
-        <button onclick="document.getElementById('importCOFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
-        <input type="file" id="importCOFile" class="hidden" onchange="importCOConfig(event)">
-    </div>
-</div>
-                
+                    
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
+                        <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
+                        
+                        <button onclick="exportCOConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
+                        <button onclick="document.getElementById('importCOFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
+                        <input type="file" id="importCOFile" class="hidden" onchange="importCOConfig(event)">
+                    </div>
+                </div>
 
-                <!-- Zone de glisser-déposer pour les équipes -->
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Assignation des groupes aux postes</h3>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        
                         <!-- Colonne Réserve -->
                         <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (Groupes non assignés)</h4>
-                            <div id="reserveList" class="flex flex-col gap-2 min-h-[200px]">
-                                <!-- Les groupes apparaîtront ici -->
-                            </div>
+                            <div id="reserveList" class="flex flex-col gap-2 min-h-[200px]"></div>
                         </div>
-
                         <!-- Colonne Postes (Grille) -->
                         <div class="lg:col-span-2">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Postes de balises</h4>
-                            <div id="postesGrid" class="grid grid-cols-3 md:grid-cols-4 gap-2">
-                                <!-- Les postes apparaîtront ici -->
-                            </div>
+                            <div id="postesGrid" class="grid grid-cols-3 md:grid-cols-4 gap-2"></div>
                         </div>
                     </div>
                 </div>
@@ -209,13 +191,13 @@
                 </div>
             </div>
 
-                        <!-- PARAMÈTRES ESCALADE (CLONE CO avec postes A, B, C) -->
+            <!-- PARAMÈTRES ESCALADE (CLONE CO avec postes A, B, C) -->
             <div id="viewEscaladeSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Groupes d'escalade (A, B, C...)</h3>
                     <p class="text-xs text-slate-400 mb-4">Glissez les élèves dans les groupes. Ils sont identifiés par "A1", "A2", "B1", etc.</p>
                     
-                    <div class="flex gap-2 mb-4">
+                    <div class="flex flex-wrap gap-2 mb-4">
                         <button onclick="exportEscaladeConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
                         <button onclick="document.getElementById('importEscaladeFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
                         <input type="file" id="importEscaladeFile" class="hidden" onchange="importEscaladeConfig(event)">
@@ -227,7 +209,6 @@
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (non affectés)</h4>
                             <div id="reserveListEscalade" class="flex flex-col gap-2 min-h-[200px]"></div>
                         </div>
-
                         <!-- Postes (Groupes A, B, C...) -->
                         <div class="lg:col-span-2">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes</h4>
@@ -247,4 +228,4 @@
         initApp();
     </script>
 </body>
-</html>   
+</html>

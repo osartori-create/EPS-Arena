@@ -113,20 +113,18 @@ export function calculerStatsGlobales(montees) {
 export function initEscaladeListener(className, callback) {
     const refMontees = ref(db, `escalade/${className}/montees`);
     
-    // Retourne la fonction d'annulation correctement
     return onValue(refMontees, (snap) => {
         callback(snap.val() || {});
     });
 }
 
 // ==========================================
-// ENVOI D'UNE MONTÉE
+// ENVOI D'UNE MONTÉE (CORRIGÉE, PLUS DE firebase GLOBAL)
 // ==========================================
 
 export async function envoyerMontee(className, groupe, role, voieNum, couleur, cotation, essai = 1) {
     const points = calculerPoints(cotation, couleur, essai);
     
-    // ✅ CORRECTION : Utilisation de push() avec ref()
     await push(ref(db, `escalade/${className}/montees`), {
         groupe: groupe,
         role: role,
