@@ -5,7 +5,7 @@ import { generateTeams as generateClassicTeams } from '../../modules/teams/team-
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 import { calculerStatsGlobales, initEscaladeListener, exportIDoceo } from '../../modules/escalade/escalade-controller.js';
-import { db, ref, set } from '../../core/firebase-service.js';
+// ✅ IMPORT UNIFIÉ (plus de doublon !)
 import { db, ref, set, remove } from '../../core/firebase-service.js';
 
 let currentDiscipline = 'multi';
@@ -119,7 +119,7 @@ export function initActivities() {
     };
 
     // ✅ Fonction Transmettre CORRIGÉE (plus de doublon ni de firebase global)
-        window.transmettreConfig = async function() {
+    window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         
@@ -129,11 +129,8 @@ export function initActivities() {
         if (currentDiscipline === 'co') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
             configData.activite = 'co';
-            // On reconstruit le mapping local pour la CO
-            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
             Object.keys(configData).forEach(poste => {
                 if (poste !== 'activite' && poste !== 'reserve' && Array.isArray(configData[poste])) {
-                    // Le mapping "C4 -> ID" est stocké localement
                     localMapping[`${activeClasse}_${poste}`] = configData[poste];
                 }
             });
@@ -141,8 +138,6 @@ export function initActivities() {
         else if (currentDiscipline === 'escalade') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
             configData.activite = 'escalade';
-            // Idem pour l'escalade
-            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
             Object.keys(configData).forEach(groupe => {
                 if (groupe !== 'activite' && groupe !== 'reserve' && Array.isArray(configData[groupe])) {
                     localMapping[`${activeClasse}_${groupe}`] = configData[groupe];
@@ -329,7 +324,7 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
 
-        // ==========================================
+    // ==========================================
     // MODULE DE PURGE FIREBASE
     // ==========================================
 
@@ -353,7 +348,6 @@ export function initActivities() {
             try {
                 await remove(ref(db, `${activeClasse}`));
                 alert("✅ Données de la classe purgées !");
-                // Recharger l'interface pour éviter les données fantômes
                 location.reload();
             } catch(e) {
                 console.error("Erreur purge classe :", e);
