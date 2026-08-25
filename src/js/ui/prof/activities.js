@@ -91,48 +91,25 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
+        // Détection robuste
         const coView = document.getElementById('viewCOSettings');
         const escView = document.getElementById('viewEscaladeSettings');
-        const multiView = document.getElementById('viewMultiSettings');
 
-        if (coView && !coView.classList.contains('hidden')) {
+        const isCOVisible = coView && !coView.classList.contains('hidden');
+        const isEscVisible = escView && !escView.classList.contains('hidden');
+
+        if (currentDiscipline === 'co' || isCOVisible) {
             await populateReserveWithStudents(eleves);
             document.getElementById('teamsGrid').innerHTML = '';
             alert("Tous les élèves sont dans la réserve CO.");
             return;
         }
 
-        if (escView && !escView.classList.contains('hidden')) {
+        if (currentDiscipline === 'escalade' || isEscVisible) {
             await populateReserveEscalade(eleves);
             document.getElementById('teamsGrid').innerHTML = '';
             alert("Tous les élèves sont dans la réserve Escalade.");
             return;
-        }
-
-        // Sinon, on est en Multi-activités
-        const options = {
-            mode: document.getElementById('modeRepartition').value,
-            mixite: document.getElementById('modeMixite').value,
-            critere: document.getElementById('critereForce').value,
-            formatLibelle: document.getElementById('formatLibelle').value,
-            nbEquipes: parseInt(document.getElementById('nbEquipes').value) || 0,
-            nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
-            couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
-        };
-        if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
-        else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
-
-        const teams = generateTeams(eleves, options);
-        populateReserve(teams);
-
-        const teamsWithPhotos = [];
-        for (const team of teams) {
-            const membersWithPhotos = [];
-            for (const m of team.members) {
-                const url = await getPhotoUrl(m.id);
-                membersWithPhotos.push({ ...m, photoUrl: url });
-            }
-            teamsWithPhotos.push({ ...team, members: membersWithPhotos });
         }
 
         const container = document.getElementById('teamsGrid');

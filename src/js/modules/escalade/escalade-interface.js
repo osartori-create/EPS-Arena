@@ -4,7 +4,7 @@ export function initEscaladeInterface() {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
-    // Création des blocs de tableaux (A, B, C) puis (D, E, F)
+    // Création des blocs (ABC) et (DEF)
     const blocs = [
         { colonnes: ['A', 'B', 'C'] },
         { colonnes: ['D', 'E', 'F'] }
@@ -12,8 +12,8 @@ export function initEscaladeInterface() {
 
     let html = '';
     blocs.forEach(bloc => {
-        html += `<div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 mb-4">`;
-        html += `<div class="grid" style="grid-template-columns: 50px repeat(${bloc.colonnes.length}, 1fr); gap: 2px;">`;
+        html += `<div class="escalade-block mb-4">`;
+        html += `<div class="grid" style="grid-template-columns: 60px repeat(${bloc.colonnes.length}, 1fr); gap: 4px;">`;
 
         // En-têtes de colonnes
         html += `<div></div>`;
@@ -21,18 +21,15 @@ export function initEscaladeInterface() {
             html += `<div class="header-groupe">${col}</div>`;
         });
 
-        // Lignes 1 à 10
-        for (let ligne = 1; ligne <= 10; ligne++) {
-            html += `<div class="header-num" data-ligne="${ligne}">${ligne}</div>`;
-            bloc.colonnes.forEach(col => {
-                const posteId = `${col}${ligne}`;
-                html += `
-                    <div class="bg-slate-900 border border-slate-600 p-1 min-h-[40px]" data-poste="${posteId}" id="poste-${posteId}">
-                        <div class="poste-members w-full h-full flex flex-col gap-1"></div>
-                    </div>
-                `;
-            });
-        }
+        // Ligne dynamique (une seule ligne, car les élèves s'empilent)
+        bloc.colonnes.forEach(col => {
+            // La case jaune dynamique
+            html += `<div class="groupe-num" data-groupe="${col}"></div>`;
+            // La colonne de dépôt des élèves
+            html += `<div class="groupe-col" data-groupe="${col}">
+                        <div class="groupe-members" style="min-height: 50px;"></div>
+                     </div>`;
+        });
 
         html += `</div></div>`;
     });
@@ -45,12 +42,27 @@ export function initSortableEscalade() {
     if (!reserveContainer || reserveContainer.__sortable) return;
 
     try {
-        new Sortable(reserveContainer, { group: 'escalade', animation: 150, onEnd: saveEscaladeAssignments });
+        new Sortable(reserveContainer, {
+            group: 'escalade',
+            animation: 150,
+            onEnd: () => {
+                saveEscaladeAssignments();
+                updateRankNumbers();
+            }
+        });
         reserveContainer.__sortable = true;
 
-        document.querySelectorAll('.poste-members').forEach(el => {
+        // On initialise chaque colonne de groupe
+        document.querySelectorAll('.groupe-members').forEach(el => {
             if (!el.__sortable) {
-                new Sortable(el, { group: 'escalade', animation: 150, onEnd: updateRankNumbers });
+                new Sortable(el, {
+                    group: 'escalade',
+                    animation: 150,
+                    onEnd: () => {
+                        saveEscaladeAssignments();
+                        updateRankNumbers();
+                    }
+                });
                 el.__sortable = true;
             }
         });
@@ -91,9 +103,10 @@ export async function populateReserveEscalade(eleves) {
 
     reserveContainer.innerHTML = '';
     localStorage.removeItem(getStorageKey());
-
-    document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
-    document.querySelectorAll('.header-num').forEach(el => { el.textContent = el.dataset.ligne; });
+    
+    // On vide toutes les colonnes
+    document.querySelectorAll('.groupe-members').forEach(el => el.innerHTML = '');
+    updateRankNumbers();
 
     for (const eleve of eleves) {
         reserveContainer.appendChild(await createEleveCard(eleve));
@@ -116,40 +129,36 @@ export function saveEscaladeAssignments() {
     reserveContainer.querySelectorAll('[data-id]').forEach(el => reserveIds.push(el.dataset.id));
     if (reserveIds.length > 0) assignments.reserve = reserveIds;
 
-    document.querySelectorAll('[data-poste]').forEach(posteDiv => {
-        const posteId = posteDiv.dataset.poste;
-        const membersDiv = posteDiv.querySelector('.poste-members');
+    // On lit les groupes (A, B, C...)
+    document.querySelectorAll('.groupe-col').forEach(colDiv => {
+        const groupe = colDiv.dataset.groupe;
+        const membersDiv = colDiv.querySelector('.groupe-members');
         if (membersDiv) {
             const ids = [];
             membersDiv.querySelectorAll('[data-id]').forEach(el => ids.push(el.dataset.id));
-            if (ids.length > 0) assignments[posteId] = ids;
+            if (ids.length > 0) assignments[groupe] = ids;
         }
     });
 
     localStorage.setItem(getStorageKey(), JSON.stringify(assignments));
 }
 
-// Mise à jour des numéros dans la partie jaune en fonction du rang
-function updateRankNumbers() {
-    const postes = document.querySelectorAll('[data-poste]');
-    postes.forEach(posteDiv => {
-        const posteId = posteDiv.dataset.poste;
-        const ligne = posteId.slice(1); // Ex: "A1" -> "1"
-        const headerNum = document.querySelector(`.header-num[data-ligne="${ligne}"]`);
+// Mise à jour des numéros dans la partie jaune (1, 2, 3...)
+export function updateRankNumbers() {
+    document.querySelectorAll('.groupe-col').forEach(colDiv => {
+        const groupe = colDiv.dataset.groupe;
+        const membersDiv = colDiv.querySelector('.groupe-members');
+        const count = membersDiv ? membersDiv.querySelectorAll('[data-id]').length : 0;
         
-        if (headerNum) {
-            const membersDiv = posteDiv.querySelector('.poste-members');
-            const count = membersDiv ? membersDiv.querySelectorAll('[data-id]').length : 0;
-            
-            // Affiche "1, 2, 3..." ou vide si aucun élève
+        const numDiv = document.querySelector(`.groupe-num[data-groupe="${groupe}"]`);
+        if (numDiv) {
             if (count > 0) {
-                headerNum.textContent = Array.from({ length: count }, (_, i) => i + 1).join(', ');
+                numDiv.textContent = Array.from({ length: count }, (_, i) => i + 1).join(', ');
             } else {
-                headerNum.textContent = ligne;
+                numDiv.textContent = '';
             }
         }
     });
-    saveEscaladeAssignments();
 }
 
 export async function loadEscaladeAssignments() {
@@ -157,24 +166,24 @@ export async function loadEscaladeAssignments() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${document.getElementById('selectClasse').value}`) || '[]');
 
     document.getElementById('reserveListEscalade').innerHTML = '';
-    document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
+    document.querySelectorAll('.groupe-members').forEach(el => el.innerHTML = '');
 
-    const postes = document.querySelectorAll('[data-poste]');
-    for (const posteDiv of postes) {
-        const posteId = posteDiv.dataset.poste;
-        const membersDiv = posteDiv.querySelector('.poste-members');
-        if (membersDiv && assignments[posteId]) {
-            for (const id of assignments[posteId]) {
+    // Restaurer les élèves dans les groupes
+    document.querySelectorAll('.groupe-col').forEach(async colDiv => {
+        const groupe = colDiv.dataset.groupe;
+        const membersDiv = colDiv.querySelector('.groupe-members');
+        if (membersDiv && assignments[groupe]) {
+            for (const id of assignments[groupe]) {
                 const eleve = eleves.find(e => e.id === id);
                 if (eleve) membersDiv.appendChild(await createEleveCard(eleve));
             }
         }
-    }
+    });
 
+    // Restaurer la réserve avec les non affectés
     const affectedIds = new Set();
-    postes.forEach(posteDiv => {
-        const membersDiv = posteDiv.querySelector('.poste-members');
-        if (membersDiv) membersDiv.querySelectorAll('[data-id]').forEach(el => affectedIds.add(el.dataset.id));
+    document.querySelectorAll('.groupe-members').forEach(membersDiv => {
+        membersDiv.querySelectorAll('[data-id]').forEach(el => affectedIds.add(el.dataset.id));
     });
 
     let reserveIds = assignments.reserve || [];
@@ -201,7 +210,7 @@ export function exportEscaladeConfig() {
     const date = new Date();
     const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
     
-    const data = { version: 1, classe: activeClasse, activite: 'escalade', date: dateStr, postes: assignments };
+    const data = { version: 1, classe: activeClasse, activite: 'escalade', date: dateStr, groupes: assignments };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -216,8 +225,8 @@ export function importEscaladeConfig(event) {
     reader.onload = async function(e) {
         try {
             const data = JSON.parse(e.target.result);
-            if (!data.classe || !data.postes) throw new Error("Format de fichier invalide");
-            localStorage.setItem(`eps_arena_escalade_assignments_${data.classe}`, JSON.stringify(data.postes));
+            if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
+            localStorage.setItem(`eps_arena_escalade_assignments_${data.classe}`, JSON.stringify(data.groupes));
             const select = document.getElementById('selectClasse');
             if (select.value !== data.classe) {
                 select.value = data.classe;
