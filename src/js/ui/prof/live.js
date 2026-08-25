@@ -1,7 +1,6 @@
 // src/js/ui/prof/live.js
 import { listenToActivityData, ref, onValue } from '../../core/firebase-service.js';
 import { db } from '../../core/firebase-service.js';
-import { calculerStatsGlobales } from '../../modules/escalade/escalade-controller.js';
 
 let currentUnsub = null;
 let currentClasse = "";
@@ -26,7 +25,7 @@ async function loadConfig() {
     const configRef = ref(db, `${currentClasse}/config`);
     onValue(configRef, (snap) => {
         configData = snap.val() || {};
-        renderLiveData(); // On relance le rendu si la config change
+        renderLiveData(); // Relance le rendu si la config change
     });
 }
 
@@ -47,32 +46,37 @@ function getStudentsMap() {
     return map;
 }
 
+// Récupère le mapping Code -> ID sauvegardé en local
+function getLocalMapping() {
+    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
+    return mapping;
+}
+
 // Rendu des tableaux
 function renderLiveData(type, data) {
     const container = document.getElementById('live-content');
     if (!container) return;
 
+    const localMap = getLocalMapping();
     const studentsMap = getStudentsMap();
-    let html = '';
 
-    // Fonction pour retrouver le nom à partir d'un code (A1, B2...)
+    // Fonction pour retrouver le nom à partir d'un code (ex: "A1")
     function getNomFromCode(code) {
-        // On regarde dans la config multi : configData["A"] = ["id1", "id2"] -> code "A1" = index 0
-        if (configData.activite === 'multi') {
-            const lettre = code.slice(0, 1);
-            const num = parseInt(code.slice(1)) - 1;
-            if (configData[lettre] && configData[lettre][num]) {
-                const id = configData[lettre][num];
-                return studentsMap[id] || id;
-            }
+        // Clé pour chercher dans le mapping local (ex: "504_A1")
+        const localKey = `${currentClasse}_${code}`;
+        const eleveId = localMap[localKey];
+        
+        if (eleveId && studentsMap[eleveId]) {
+            return studentsMap[eleveId];
         }
-        // Pour l'escalade, les codes sont directement clés ? (Ex: A1 comme clé) ?
-        // On aura un mapping différent, mais pour l'instant on retourne le code si rien n'est trouvé.
+        
+        // Si le mapping est perdu, on affiche le code (anonyme)
         return code;
     }
 
+    let html = '';
+
     if (type === 'escalade') {
-        // ... (reste identique, mais utilisez getNomFromCode(m.groupe + m.role))
         const entries = Object.values(data).reverse();
         html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade</h3>`;
         html += `<div class="space-y-2">`;
@@ -115,3 +119,35 @@ function renderLiveData(type, data) {
 
     container.innerHTML = html;
 }
+
+// Export CSV Global pour les résultats de la classe
+window.exportResultsLive = function() {
+    if (!currentClasse) return alert("Sélectionnez une classe.");
+
+    const studentsMap = getStudentsMap();
+    const localMap = getLocalMapping();
+
+    let csv = "\uFEFFNom;Type;Valeur\n";
+
+    // On lit le DOM pour exporter les données déjà affichées
+    const rows = document.querySelectorAll('#live-content .bg-slate-800');
+    rows.forEach(row => {
+        const nameSpan = row.querySelector('.text-white');
+        const valueSpan = row.querySelector('span:last-child');
+
+        const name = nameSpan ? nameSpan.innerText : '';
+        const value = valueSpan ? valueSpan.innerText : '';
+
+        // On tente de retrouver le code depuis le nom (si mapping dispo)
+        // Ceci est une simplification, le mieux est de stocker les données brutes en mémoire.
+        // Pour l'instant on exporte ce qui est visible.
+        csv += `${name};Performance;${value}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Live_${currentClasse}.csv`;
+    a.click();
+};

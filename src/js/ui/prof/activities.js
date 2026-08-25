@@ -123,34 +123,58 @@ export function initActivities() {
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         
         let configData = {};
-        
+        let localMapping = {}; // Stockage local Code -> ID (RGPD)
+
         if (currentDiscipline === 'co') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
             configData.activite = 'co';
+            // On reconstruit le mapping local pour la CO
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+            Object.keys(configData).forEach(poste => {
+                if (poste !== 'activite' && poste !== 'reserve' && Array.isArray(configData[poste])) {
+                    // Le mapping "C4 -> ID" est stocké localement
+                    localMapping[`${activeClasse}_${poste}`] = configData[poste];
+                }
+            });
         } 
         else if (currentDiscipline === 'escalade') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
             configData.activite = 'escalade';
+            // Idem pour l'escalade
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+            Object.keys(configData).forEach(groupe => {
+                if (groupe !== 'activite' && groupe !== 'reserve' && Array.isArray(configData[groupe])) {
+                    localMapping[`${activeClasse}_${groupe}`] = configData[groupe];
+                }
+            });
         } 
         else {
-            // Multi-activités : on reconstruit la structure depuis les équipes générées
+            // Multi-activités : On reconstruit la structure
             configData.activite = 'multi';
             
             if (window.lastTeams) {
-                // On parcourt les équipes et on assigne un code A1, A2, B1...
                 const lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
                 window.lastTeams.forEach((team, index) => {
                     const lettre = lettres[index] || `EQ${index+1}`;
-                    configData[lettre] = team.members.map(m => m.id); // IDs anonymes (RGPD)
+                    // ✅ ON N'ENVOIE QUE LA LONGUEUR DU TABLEAU (pas les IDs) !
+                    configData[lettre] = team.members.length; 
+                    
+                    // ✅ ON SAUVEGARDE LE MAPPING EN LOCAL
+                    team.members.forEach((m, i) => {
+                        localMapping[`${activeClasse}_${lettre}${i+1}`] = m.id;
+                    });
                 });
             } else {
-                return alert("Veuillez d'abord générer les équipes.");
+                return alert("⚠️ Veuillez d'abord générer les équipes avant de transmettre !");
             }
         }
-        
+
+        // Sauvegarde locale du mapping (aucune donnée sensible dans Firebase)
+        localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
+
         try {
             await set(ref(db, `${activeClasse}/config`), configData);
-            alert("✅ Configuration transmise aux iPads !");
+            alert("✅ Configuration transmise aux iPads ! (Aucun nom envoyé sur Firebase)");
         } catch(e) {
             console.error("Erreur transmission :", e);
             alert("❌ Erreur lors de la transmission.");
