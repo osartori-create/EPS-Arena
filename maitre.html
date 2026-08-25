@@ -135,22 +135,28 @@
                 <div id="teamsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
             </div>
 
-            <!-- PARAMÈTRES COURSE D'ORIENTATION -->
+                        <!-- PARAMÈTRES COURSE D'ORIENTATION -->
             <div id="viewCOSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    
+                    <!-- En-tête avec le bouton Générer -->
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="font-black text-blue-400 uppercase text-sm">Catégories & Génération CO</h3>
                         <button onclick="generateTeams()" class="btn-success text-xs uppercase">🔄 Générer CO</button>
                     </div>
+
+                    <p class="text-xs text-slate-400 mb-4">Ces circuits utilisent la matrice des balises. Vous pourrez ensuite glisser-déposer les équipes sur les codes (A1, C4, etc.)</p>
+                    
                     <div id="circuitList" class="space-y-4 mb-6"></div>
+                    
                     <div class="flex flex-wrap gap-2 mb-6">
                         <button onclick="addCircuit()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">+ Nouveau circuit</button>
-                        <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner</button>
+                        <button onclick="autoAssignCodes()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-500">🔀 Auto-Assigner les codes</button>
                         <button onclick="exportCOConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
                         <button onclick="document.getElementById('importCOFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
                         <input type="file" id="importCOFile" class="hidden" onchange="importCOConfig(event)">
                     </div>
-                    
+
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (non assignés)</h4>
