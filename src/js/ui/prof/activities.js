@@ -134,7 +134,12 @@ export function initActivities() {
         }
         
         try {
+            // 1. On envoie la configuration spécifique à l'activité
             await set(ref(db, `${activeClasse}/config`), configData);
+            
+            // 2. ✅ AJOUT CRUCIAL : On enregistre la classe dans "active_classes" pour qu'elle apparaisse chez l'élève !
+            await set(ref(db, `active_classes/${activeClasse}`), true);
+            
             alert("✅ Configuration transmise aux iPads !");
         } catch(e) {
             console.error("Erreur transmission :", e);
