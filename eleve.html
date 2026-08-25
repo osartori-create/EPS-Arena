@@ -118,21 +118,33 @@
                         });
                     }
                 });
-            } else {
-                // Multi-activités
-                const hasTeams = Object.keys(config).some(key => key !== 'activite' && Array.isArray(config[key]));
+                        } else {
+                // Multi-activités : le prof envoie un NOMBRE (ex: A: 3) pour dire "3 élèves dans ce groupe"
+                const hasTeams = Object.keys(config).some(key => 
+                    key !== 'activite' && (Array.isArray(config[key]) || typeof config[key] === 'number')
+                );
                 
                 if (hasTeams) {
                     Object.keys(config).forEach(lettre => {
-                        if (lettre !== 'activite' && Array.isArray(config[lettre])) {
-                            config[lettre].forEach((_, index) => {
-                                const code = `${lettre}${index + 1}`;
-                                const btn = document.createElement('button');
-                                btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
-                                btn.innerText = code;
-                                btn.onclick = () => selectCode(code);
-                                codeList.appendChild(btn);
-                            });
+                        if (lettre === 'activite') return;
+                        
+                        let nombreDansGroupe = 0;
+                        if (Array.isArray(config[lettre])) {
+                            // Cas CO / Escalade : on a un tableau d'IDs
+                            nombreDansGroupe = config[lettre].length;
+                        } else if (typeof config[lettre] === 'number') {
+                            // Cas Multi : on a directement le nombre
+                            nombreDansGroupe = config[lettre];
+                        }
+                        
+                        // Générer les boutons A1, A2, A3... jusqu'au nombre
+                        for (let i = 0; i < nombreDansGroupe; i++) {
+                            const code = `${lettre}${i + 1}`;
+                            const btn = document.createElement('button');
+                            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
+                            btn.innerText = code;
+                            btn.onclick = () => selectCode(code);
+                            codeList.appendChild(btn);
                         }
                     });
                 } else {
