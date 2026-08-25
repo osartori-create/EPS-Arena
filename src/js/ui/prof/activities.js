@@ -10,23 +10,29 @@ let currentDiscipline = 'multi';
 
 export function initActivities() {
     initPalette();
-    // On initialise les grilles avec try...catch pour éviter les blocages
-    try { initCOInterface(); } catch(e) { console.error("Erreur init CO:", e); }
-    try { initEscaladeInterface(6); } catch(e) { console.error("Erreur init Escalade:", e); }
+    
+    // 🔥 On NE met PLUS l'initialisation des interfaces ici !
+    // Pour éviter tout blocage au démarrage, on les appellera uniquement quand on clique sur l'onglet.
 
     const classeSelect = document.getElementById('selectClasse');
     if (classeSelect) {
         classeSelect.addEventListener('change', () => {
-            const coView = document.getElementById('viewCOSettings');
-            if (coView && !coView.classList.contains('hidden')) loadCOAssignments();
-            const escView = document.getElementById('viewEscaladeSettings');
-            if (escView && !escView.classList.contains('hidden')) loadEscaladeAssignments();
+            // On recharge seulement les données si on est sur l'onglet concerné
+            if (currentDiscipline === 'co') {
+                try { loadCOAssignments(); } catch(e) { console.error("Change Classe CO:", e); }
+            }
+            if (currentDiscipline === 'escalade') {
+                try { loadEscaladeAssignments(); } catch(e) { console.error("Change Classe Escalade:", e); }
+            }
         });
     }
 
+    // ✅ LA FONCTION D'AFFICHAGE EST MAINTENANT ULTRA SIMPLE ET SANS RISQUE
     window.switchDiscipline = function(disc) {
+        console.log("👉 Changement d'onglet vers :", disc);
         currentDiscipline = disc;
-        
+
+        // 1. On cache tous les panneaux
         ['multi', 'co', 'arcathlon', 'escalade'].forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
             if (btn) {
@@ -38,31 +44,39 @@ export function initActivities() {
             if (el) el.classList.add('hidden');
         });
 
+        // 2. On style le bouton actif
         const activeBtn = document.getElementById('btnDisc-' + disc);
         if (activeBtn) {
             activeBtn.classList.remove('border-slate-600', 'text-slate-400');
             activeBtn.classList.add('border-blue-500', 'text-blue-400');
         }
 
-        // On affiche le panneau correspondant
+        // 3. On AFFICHE le panneau (C'est ici que se passe la magie !)
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
-        if (targetView) targetView.classList.remove('hidden');
+        if (targetView) {
+            targetView.classList.remove('hidden');
+            console.log("✅ Panneau affiché :", targetView.id);
+        } else {
+            console.error("❌ Panneau INTROUVABLE ! ID attendu :", 'view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
+            return; // On s'arrête là car le panneau n'existe pas
+        }
 
-        // Gestion spécifique à la CO (avec try...catch pour ne pas bloquer l'affichage)
+        // 4. On initialise les modules APRÈS l'affichage (dans des try/catch)
         if (disc === 'co') {
             try {
+                console.log("Initialisation CO...");
                 const circuitList = document.getElementById('circuitList');
                 if (circuitList) renderCircuits('circuitList', "");
                 initSortableCO();
                 loadCOAssignments();
             } catch (e) {
-                console.error("Erreur lors de l'initialisation CO :", e);
+                console.error("Erreur lors de l'init CO :", e);
             }
         }
 
-        // Gestion spécifique à l'Escalade
         if (disc === 'escalade') {
             try {
+                console.log("Initialisation Escalade...");
                 const activeClasse = document.getElementById('selectClasse').value;
                 const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
                 const nbColonnes = Math.ceil(eleves.length / 3) || 6;
@@ -78,7 +92,7 @@ export function initActivities() {
                     });
                 }
             } catch (e) {
-                console.error("Erreur lors de l'initialisation Escalade :", e);
+                console.error("Erreur lors de l'init Escalade :", e);
             }
         }
     };
@@ -118,7 +132,7 @@ export function initActivities() {
             const nbColonnes = Math.ceil(eleves.length / 3) || 6;
             initEscaladeInterface(nbColonnes);
             await populateReserveEscalade(eleves);
-            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes !");
+            alert("Tous les élèves sont dans la réserve Escalade.");
             return;
         }
 
@@ -132,7 +146,6 @@ export function initActivities() {
             nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
             couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
         };
-
         if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
