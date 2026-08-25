@@ -5,6 +5,7 @@ import { generateTeams as generateClassicTeams } from '../../modules/teams/team-
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 import { calculerStatsGlobales, initEscaladeListener, exportIDoceo } from '../../modules/escalade/escalade-controller.js';
+import { db, ref, set } from '../../core/firebase-service.js';
 
 let currentDiscipline = 'multi';
 
@@ -116,12 +117,11 @@ export function initActivities() {
         }
     };
 
-
-        window.transmettreConfig = async function() {
+    // ✅ Fonction Transmettre CORRIGÉE (plus de doublon ni de firebase global)
+    window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         
-        // On récupère les affectations sauvegardées selon l'activité
         let configData = {};
         if (currentDiscipline === 'co') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
@@ -130,14 +130,16 @@ export function initActivities() {
             configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
             configData.activite = 'escalade';
         } else {
-            // Multi-activités (génération classique)
             configData.activite = 'multi';
         }
         
-        // On envoie vers Firebase (structure anonyme)
-        const db = firebase.database();
-        await db.ref(`${activeClasse}/config`).set(configData);
-        alert("✅ Configuration transmise aux iPads !");
+        try {
+            await set(ref(db, `${activeClasse}/config`), configData);
+            alert("✅ Configuration transmise aux iPads !");
+        } catch(e) {
+            console.error("Erreur transmission :", e);
+            alert("❌ Erreur lors de la transmission.");
+        }
     };
 
     window.generateTeams = async function() {
@@ -243,12 +245,46 @@ export function initActivities() {
         document.getElementById('nbParEquipe').value = options.nbParEquipe;
     };
 
-    // ... (le reste des fonctions identiques)
-    window.renameTeam = function(teamId) { /* ... */ };
-    window.addCircuit = function() { /* ... */ };
-    window.editCircuit = function(id) { /* ... */ };
-    window.delCircuit = function(id) { /* ... */ };
-    window.autoAssignCodes = function() { /* ... */ };
+    window.renameTeam = function(teamId) {
+        const newName = prompt("Nouveau nom pour cette équipe ?");
+        if (newName) {
+            const teamDiv = document.querySelector(`[data-team-id="${teamId}"]`).parentElement;
+            const h3 = teamDiv.querySelector('h3');
+            h3.textContent = newName;
+        }
+    };
+
+    window.addCircuit = function() {
+        const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
+        if(!cat) return;
+        const nom = prompt("Nom du circuit (ex: 1, Rouge) :");
+        if(!nom) return;
+        const b = prompt("Liste des balises (ex: 31, 34*, 42) :");
+        if(b) {
+            addCircuitCO(cat, nom, b);
+            renderCircuits('circuitList', "");
+        }
+    };
+    
+    window.editCircuit = function(id) {
+        const circ = getCircuits().find(c => c.id === id);
+        const n = prompt("Modifier les balises :", circ.balises.join(', '));
+        if(n !== null) {
+            editCircuitCO(id, n);
+            renderCircuits('circuitList', "");
+        }
+    };
+
+    window.delCircuit = function(id) {
+        if(confirm("Supprimer ce circuit ?")) {
+            delCircuit(id);
+            renderCircuits('circuitList', "");
+        }
+    };
+
+    window.autoAssignCodes = function() {
+        alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
+    };
 
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
