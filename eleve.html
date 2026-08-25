@@ -10,6 +10,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
         import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+        import { BAREME_ESCALADE } from './src/js/config/constants.js';
 
         const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
         const app = initializeApp(firebaseConfig);
@@ -23,11 +24,7 @@
         let currentConfig = null;
 
         // Barème pour l'escalade (identique au prof)
-        const BAREME = {
-            "4a": 1, "4b": 1.1, "4c": 1.2,
-            "5a": 1.3, "5b": 1.4, "5c": 1.5,
-            "6a": 1.6, "6b": 1.8, "6c": 2
-        };
+        const BAREME = BAREME_ESCALADE;
         const LONGUEUR_VOIE = 9;
 
         // ==========================================

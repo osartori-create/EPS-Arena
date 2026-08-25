@@ -1,11 +1,8 @@
 // src/js/modules/escalade/escalade-controller.js
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
+import { BAREME_ESCALADE } from '../../config/constants.js';
 
-export const BAREME = {
-    "4a": 1, "4b": 1.1, "4c": 1.2,
-    "5a": 1.3, "5b": 1.4, "5c": 1.5,
-    "6a": 1.6, "6b": 1.8, "6c": 2
-};
+export const BAREME = BAREME_ESCALADE;
 
 const LONGUEUR_VOIE = 9;
 export const OBJECTIF_METRES = 1000;
