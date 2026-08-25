@@ -11,8 +11,6 @@ export function initCOInterface() {
     }
     generatePostesGrid();
     
-    // Charger les affectations sauvegardées
-    loadCOAssignments();
     
     console.log("✅ Interface CO initialisée.");
 }

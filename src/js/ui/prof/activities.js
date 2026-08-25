@@ -4,28 +4,35 @@ import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 
-// ✅ DÉCLARATION DE LA VARIABLE (C'EST ELLE QUI MANQUAIT !)
-let currentDiscipline = 'sprint'; // Par défaut
+let currentDiscipline = 'sprint';
 
 export function initActivities() {
     initPalette();
     initCOInterface();
 
+    // ✅ NOUVEAU : Écouteur sur le changement de classe
+    const classeSelect = document.getElementById('selectClasse');
+    if (classeSelect) {
+        classeSelect.addEventListener('change', () => {
+            const coView = document.getElementById('viewCOSettings');
+            if (coView && !coView.classList.contains('hidden')) {
+                loadCOAssignments();
+            }
+        });
+    } // ✅ Fin du if (classeSelect) -> AJOUTÉ ICI
+
     // Mise à jour de la discipline courante
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         
-        // Liste des panneaux à gérer
         const panneaux = ['sprint', 'co', 'arcathlon', 'escalade'];
 
-        // On cache tout par défaut
         panneaux.forEach(d => {
             const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
             const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
         });
 
-        // On style les boutons
         panneaux.forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
             if (btn) {
@@ -39,22 +46,17 @@ export function initActivities() {
             }
         });
 
-        // On affiche le panneau correspondant
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) targetView.classList.remove('hidden');
 
-        // Actions spécifiques à la CO (afficher circuits + initialiser Sortable)
         if (disc === 'co') {
             const circuitList = document.getElementById('circuitList');
             if (circuitList) renderCircuits('circuitList', "");
             initSortableCO();
-            
-            // 🔄 Recharger les groupes sauvegardés
-            loadCOAssignments(); // Importez cette fonction depuis co-interface.js en haut du fichier !
+            loadCOAssignments();
         }
     };
 
-    // Initialisation de la palette
     function initPalette() {
         const paletteContainer = document.getElementById('paletteCouleurs');
         if (!paletteContainer) return;
@@ -72,7 +74,6 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
@@ -80,19 +81,16 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // ✅ ON VÉRIFIE L'ACTIVITÉ ACTIVE VIA LA VARIABLE ET LE DOM
         const coView = document.getElementById('viewCOSettings');
         const isCOVisible = coView && !coView.classList.contains('hidden');
         
         if (currentDiscipline === 'co' || isCOVisible) {
-            // MODE COURSE D'ORIENTATION
             await populateReserveWithStudents(eleves);
-            document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
+            document.getElementById('teamsGrid').innerHTML = '';
             alert("Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes !");
             return;
         }
 
-        // MODE SPRINT / AUTRES (Génération classique)
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -108,7 +106,7 @@ export function initActivities() {
 
         const teams = generateTeams(eleves, options);
         
-        populateReserve(teams); // Pour le sprint
+        populateReserve(teams);
 
         const teamsWithPhotos = [];
         for (const team of teams) {
@@ -172,7 +170,6 @@ export function initActivities() {
         document.getElementById('nbParEquipe').value = options.nbParEquipe;
     };
 
-    // Renommer une équipe
     window.renameTeam = function(teamId) {
         const newName = prompt("Nouveau nom pour cette équipe ?");
         if (newName) {
@@ -182,7 +179,6 @@ export function initActivities() {
         }
     };
 
-    // Fonctions CO
     window.addCircuit = function() {
         const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
         if(!cat) return;
@@ -214,6 +210,4 @@ export function initActivities() {
     window.autoAssignCodes = function() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
-    
-    // On ne lance PAS switchDiscipline('sprint') ici !
 }
