@@ -1,5 +1,5 @@
 // src/js/ui/prof/activities.js
-import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO } from '../../modules/co/co-interface.js';
+import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO, loadCOAssignments } from '../../modules/co/co-interface.js';
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
@@ -48,6 +48,9 @@ export function initActivities() {
             const circuitList = document.getElementById('circuitList');
             if (circuitList) renderCircuits('circuitList', "");
             initSortableCO();
+            
+            // 🔄 Recharger les groupes sauvegardés
+            loadCOAssignments(); // Importez cette fonction depuis co-interface.js en haut du fichier !
         }
     };
 

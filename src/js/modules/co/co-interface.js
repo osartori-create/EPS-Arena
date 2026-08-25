@@ -1,6 +1,6 @@
 // src/js/modules/co/co-interface.js
 import { MATRICE } from './matrice.js';
-import { getPhotoUrl } from '../../services/admin-service.js'; // Import pour les photos
+import { getPhotoUrl } from '../../services/admin-service.js'; // Pour les photos
 
 export function initCOInterface() {
     console.log("🔍 Initialisation CO...");
@@ -10,6 +10,10 @@ export function initCOInterface() {
         return;
     }
     generatePostesGrid();
+    
+    // Charger les affectations sauvegardées
+    loadCOAssignments();
+    
     console.log("✅ Interface CO initialisée.");
 }
 
@@ -41,6 +45,10 @@ export function initSortableCO() {
         new Sortable(reserveContainer, {
             group: 'co-groupes',
             animation: 150,
+            // Déclencher la sauvegarde après chaque déplacement
+            onEnd: function() {
+                saveCOAssignments();
+            }
         });
         reserveContainer.__sortable = true;
 
@@ -49,9 +57,16 @@ export function initSortableCO() {
                 new Sortable(el, {
                     group: 'co-groupes',
                     animation: 150,
+                    onEnd: function() {
+                        saveCOAssignments();
+                    },
                     onAdd: function(evt) {
                         const posteId = el.closest('[data-poste]').dataset.poste;
                         console.log('Élève assigné au poste : ' + posteId);
+                        saveCOAssignments();
+                    },
+                    onRemove: function() {
+                        saveCOAssignments();
                     }
                 });
                 el.__sortable = true;
@@ -66,7 +81,6 @@ export async function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
 
-    // Forcer l'affichage du panneau CO
     const coView = document.getElementById('viewCOSettings');
     if (coView) coView.classList.remove('hidden');
 
@@ -74,8 +88,7 @@ export async function populateReserveWithStudents(eleves) {
     for (const eleve of eleves) {
         const url = await getPhotoUrl(eleve.id);
         
-        // Définition du style de fond selon le sexe
-        let bgClass = 'bg-slate-200 border-slate-400'; // Couleur neutre par défaut
+        let bgClass = 'bg-slate-200 border-slate-400';
         if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
         else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
         
@@ -95,9 +108,11 @@ export async function populateReserveWithStudents(eleves) {
     }
 
     reserveContainer.innerHTML = html;
-    console.log("✅ Réserve remplie avec photos et couleurs !");
+    console.log("✅ Réserve remplie !");
 
-    // Réinitialiser le tri après insertion
+    // On efface les anciennes affectations car on régénère
+    localStorage.removeItem(getStorageKey());
+    
     setTimeout(() => initSortableCO(), 100);
 }
 
@@ -118,4 +133,62 @@ export function populateReserve(teams) {
     reserveContainer.innerHTML = html;
 
     setTimeout(() => initSortableCO(), 100);
+}
+
+// ==========================================
+// SAUVEGARDE LOCALE DES AFFECTATIONS CO
+// ==========================================
+
+function getStorageKey() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    return `eps_arena_co_assignments_${activeClasse}`;
+}
+
+export function saveCOAssignments() {
+    const reserveContainer = document.getElementById('reserveList');
+    if (!reserveContainer) return;
+    
+    const assignments = {};
+    const postes = document.querySelectorAll('[data-poste]');
+    
+    postes.forEach(posteDiv => {
+        const posteId = posteDiv.dataset.poste;
+        const membersDiv = posteDiv.querySelector('.poste-members');
+        if (membersDiv) {
+            const ids = [];
+            membersDiv.querySelectorAll('[data-id]').forEach(el => {
+                ids.push(el.dataset.id);
+            });
+            if (ids.length > 0) {
+                assignments[posteId] = ids;
+            }
+        }
+    });
+
+    localStorage.setItem(getStorageKey(), JSON.stringify(assignments));
+    console.log("💾 Affectations CO sauvegardées :", assignments);
+}
+
+export function loadCOAssignments() {
+    const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
+    const postes = document.querySelectorAll('[data-poste]');
+    
+    // On parcourt les postes pour replacer les élèves sauvegardés
+    postes.forEach(posteDiv => {
+        const posteId = posteDiv.dataset.poste;
+        const membersDiv = posteDiv.querySelector('.poste-members');
+        if (membersDiv && assignments[posteId]) {
+            assignments[posteId].forEach(id => {
+                // On cherche l'élève dans la réserve par son ID
+                const reserveEl = document.querySelector(`#reserveList [data-id="${id}"]`);
+                if (reserveEl) {
+                    membersDiv.appendChild(reserveEl);
+                }
+            });
+        }
+    });
+    
+    if (Object.keys(assignments).length > 0) {
+        console.log("📂 Affectations CO chargées :", assignments);
+    }
 }
