@@ -158,7 +158,9 @@ export function initActivities() {
             for (const m of team.members) {
                 const url = await getPhotoUrl(m.id);
                 let infoCritere = '';
-                if (options.critere === 'vma') {
+                if (options.critere === 'polyvalent') {
+                    infoCritere = `<span class="text-emerald-400 text-xs font-bold">VMA: ${m.vma || '--'} | L: ${m.longueur || '--'}cm | 30m: ${m.sprint30 || '--'}s</span>`;
+                } else if (options.critere === 'vma') {
                     infoCritere = `<span class="text-emerald-400 text-xs font-bold">VMA: ${m.vma || '--'}</span>`;
                 } else {
                     let starsHtml = '';

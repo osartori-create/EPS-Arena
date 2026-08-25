@@ -71,9 +71,21 @@ function buildTeams(pool, options, startIndex) {
 
     // Tri selon le critère
     pool.sort((a, b) => {
-        const valA = options.critere === 'vma' ? (a.vma || 0) : (a.force || 0);
-        const valB = options.critere === 'vma' ? (b.vma || 0) : (b.force || 0);
-        return valB - valA;
+        // CRITÈRE POLYVALENT (VMA + Longueur + 30m)
+        if (options.critere === 'polyvalent') {
+            // Calcul des rangs inversés pour le 30m (plus bas = mieux)
+            const scoreA = (a.vma || 0) + ((a.longueur || 0) / 10) - (a.sprint30 || 99);
+            const scoreB = (b.vma || 0) + ((b.longueur || 0) / 10) - (b.sprint30 || 99);
+            return scoreB - scoreA;
+        }
+        
+        // CRITÈRE VMA
+        if (options.critere === 'vma') {
+            return (b.vma || 0) - (a.vma || 0);
+        }
+        
+        // CRITÈRE FORCE (Étoiles)
+        return (b.force || 0) - (a.force || 0);
     });
 
     // Algorithme de répartition
