@@ -116,6 +116,30 @@ export function initActivities() {
         }
     };
 
+
+        window.transmettreConfig = async function() {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+        
+        // On récupère les affectations sauvegardées selon l'activité
+        let configData = {};
+        if (currentDiscipline === 'co') {
+            configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
+            configData.activite = 'co';
+        } else if (currentDiscipline === 'escalade') {
+            configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+            configData.activite = 'escalade';
+        } else {
+            // Multi-activités (génération classique)
+            configData.activite = 'multi';
+        }
+        
+        // On envoie vers Firebase (structure anonyme)
+        const db = firebase.database();
+        await db.ref(`${activeClasse}/config`).set(configData);
+        alert("✅ Configuration transmise aux iPads !");
+    };
+
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
