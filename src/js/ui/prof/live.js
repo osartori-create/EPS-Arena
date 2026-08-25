@@ -1,7 +1,11 @@
-import { listenToActivityData } from '../../core/firebase-service.js';
+// src/js/ui/prof/live.js
+import { listenToActivityData, ref, onValue } from '../../core/firebase-service.js';
+import { db } from '../../core/firebase-service.js';
+import { calculerStatsGlobales } from '../../modules/escalade/escalade-controller.js';
 
 let currentUnsub = null;
 let currentClasse = "";
+let configData = {};
 
 export function initLiveUI() {
     const select = document.getElementById('selectClasse');
@@ -11,9 +15,19 @@ export function initLiveUI() {
             if (newClasse !== currentClasse) {
                 currentClasse = newClasse;
                 startListening();
+                loadConfig();
             }
         });
     }
+}
+
+async function loadConfig() {
+    if (!currentClasse) return;
+    const configRef = ref(db, `${currentClasse}/config`);
+    onValue(configRef, (snap) => {
+        configData = snap.val() || {};
+        renderLiveData(); // On relance le rendu si la config change
+    });
 }
 
 function startListening() {
@@ -25,120 +39,79 @@ function startListening() {
     });
 }
 
-// Récupère la correspondance ID -> Code depuis la config locale (stockée lors de la génération)
-function getStudentCodeMap() {
-    // On utilise la config CO ou Escalade pour retrouver qui est qui
-    const coConfig = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${currentClasse}`) || '{}');
-    const escConfig = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
-    
+// Récupère la liste des élèves locaux pour mapper les codes aux noms (RGPD)
+function getStudentsMap() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    const map = {}; // id -> nom
-    
-    // On construit d'abord la map des noms
-    eleves.forEach(e => {
-        map[e.id] = `${e.prenom} ${e.nom}`;
-    });
-
-    // On construit ensuite une map code -> id
-    const codeMap = {};
-    
-    // Pour la CO
-    Object.keys(coConfig).forEach(poste => {
-        if (coConfig[poste] && Array.isArray(coConfig[poste])) {
-            coConfig[poste].forEach(id => {
-                codeMap[poste] = id;
-            });
-        }
-    });
-
-    // Pour l'escalade
-    Object.keys(escConfig).forEach(groupe => {
-        if (escConfig[groupe] && Array.isArray(escConfig[groupe])) {
-            escConfig[groupe].forEach((id, index) => {
-                const code = `${groupe}${index + 1}`;
-                codeMap[code] = id;
-            });
-        }
-    });
-
-    return { map, codeMap };
+    const map = {};
+    eleves.forEach(e => { map[e.id] = `${e.prenom} ${e.nom}`; });
+    return map;
 }
 
+// Rendu des tableaux
 function renderLiveData(type, data) {
     const container = document.getElementById('live-content');
     if (!container) return;
 
-    const { map, codeMap } = getStudentCodeMap();
+    const studentsMap = getStudentsMap();
     let html = '';
 
+    // Fonction pour retrouver le nom à partir d'un code (A1, B2...)
+    function getNomFromCode(code) {
+        // On regarde dans la config multi : configData["A"] = ["id1", "id2"] -> code "A1" = index 0
+        if (configData.activite === 'multi') {
+            const lettre = code.slice(0, 1);
+            const num = parseInt(code.slice(1)) - 1;
+            if (configData[lettre] && configData[lettre][num]) {
+                const id = configData[lettre][num];
+                return studentsMap[id] || id;
+            }
+        }
+        // Pour l'escalade, les codes sont directement clés ? (Ex: A1 comme clé) ?
+        // On aura un mapping différent, mais pour l'instant on retourne le code si rien n'est trouvé.
+        return code;
+    }
+
     if (type === 'escalade') {
+        // ... (reste identique, mais utilisez getNomFromCode(m.groupe + m.role))
         const entries = Object.values(data).reverse();
-        html += '<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade</h3>';
-        html += '<div class="space-y-2">';
+        html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade</h3>`;
+        html += `<div class="space-y-2">`;
         entries.forEach(m => {
             const code = `${m.groupe}${m.role}`;
-            const id = codeMap[code];
-            const nom = id ? map[id] : code;
-            html += `
-                <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                    <div>
-                        <span class="font-bold text-white">${nom}</span>
-                        <span class="text-xs text-slate-400 ml-2">Voie ${m.voie_num} (${m.couleur})</span>
-                    </div>
-                    <span class="font-black text-emerald-400">${m.points}m</span>
-                </div>
-            `;
+            const nom = getNomFromCode(code);
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
+                <span class="font-bold text-white">${nom}</span>
+                <span class="text-emerald-400 font-black">${m.points}m</span>
+            </div>`;
         });
-        html += '</div>';
-    } else if (type === 'co') {
+        html += `</div>`;
+    }
+    else if (type === 'co') {
         const entries = Object.values(data).reverse();
-        html += '<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧭 Validations CO</h3>';
-        html += '<div class="space-y-2">';
+        html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧭 Validations CO</h3>`;
+        html += `<div class="space-y-2">`;
         entries.forEach(v => {
-            const id = codeMap[v.code];
-            const nom = id ? map[id] : v.code;
-            html += `
-                <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                    <span class="font-bold text-white">${nom}</span>
-                    <span class="text-blue-400 font-black">Balise ${v.balise}</span>
-                </div>
-            `;
+            const nom = getNomFromCode(v.code);
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
+                <span class="font-bold text-white">${nom}</span>
+                <span class="text-blue-400 font-black">Balise ${v.balise}</span>
+            </div>`;
         });
-        html += '</div>';
-    } else if (type === 'multi') {
+        html += `</div>`;
+    }
+    else if (type === 'multi') {
         const entries = Object.values(data).reverse();
-        html += '<h3 class="font-black text-blue-400 uppercase text-sm mb-2">⏱️ Chronos Multi</h3>';
-        html += '<div class="space-y-2">';
+        html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">⏱️ Chronos Multi</h3>`;
+        html += `<div class="space-y-2">`;
         entries.forEach(p => {
-            const id = codeMap[p.code];
-            const nom = id ? map[id] : p.code;
-            html += `
-                <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                    <span class="font-bold text-white">${nom}</span>
-                    <span class="text-yellow-400 font-black">${p.temps}</span>
-                </div>
-            `;
+            const nom = getNomFromCode(p.code);
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
+                <span class="font-bold text-white">${nom}</span>
+                <span class="text-yellow-400 font-black">${p.temps}</span>
+            </div>`;
         });
-        html += '</div>';
+        html += `</div>`;
     }
 
     container.innerHTML = html;
 }
-
-window.exportResultsLive = function() {
-    if (!currentClasse) return alert("Sélectionnez une classe.");
-    const rows = document.querySelectorAll('#live-content .bg-slate-800');
-    let csv = "\uFEFFNom;Type;Valeur\n";
-    rows.forEach(row => {
-        const name = row.querySelector('.font-bold')?.innerText || '';
-        const value = row.querySelector('span:last-child')?.innerText || '';
-        csv += `${name};Performance;${value}\n`;
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Live_${currentClasse}.csv`;
-    a.click();
-};

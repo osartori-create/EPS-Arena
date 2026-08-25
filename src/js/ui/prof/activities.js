@@ -118,28 +118,38 @@ export function initActivities() {
     };
 
     // ✅ Fonction Transmettre CORRIGÉE (plus de doublon ni de firebase global)
-    window.transmettreConfig = async function() {
+        window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         
         let configData = {};
+        
         if (currentDiscipline === 'co') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
             configData.activite = 'co';
-        } else if (currentDiscipline === 'escalade') {
+        } 
+        else if (currentDiscipline === 'escalade') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
             configData.activite = 'escalade';
-        } else {
+        } 
+        else {
+            // Multi-activités : on reconstruit la structure depuis les équipes générées
             configData.activite = 'multi';
+            
+            if (window.lastTeams) {
+                // On parcourt les équipes et on assigne un code A1, A2, B1...
+                const lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                window.lastTeams.forEach((team, index) => {
+                    const lettre = lettres[index] || `EQ${index+1}`;
+                    configData[lettre] = team.members.map(m => m.id); // IDs anonymes (RGPD)
+                });
+            } else {
+                return alert("Veuillez d'abord générer les équipes.");
+            }
         }
         
         try {
-            // 1. On envoie la configuration spécifique à l'activité
             await set(ref(db, `${activeClasse}/config`), configData);
-            
-            // 2. ✅ AJOUT CRUCIAL : On enregistre la classe dans "active_classes" pour qu'elle apparaisse chez l'élève !
-            await set(ref(db, `active_classes/${activeClasse}`), true);
-            
             alert("✅ Configuration transmise aux iPads !");
         } catch(e) {
             console.error("Erreur transmission :", e);

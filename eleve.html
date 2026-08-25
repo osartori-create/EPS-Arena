@@ -112,18 +112,19 @@
                     }
                 });
             } else {
-                // Multi-activités : l'élève saisit son code librement
-                const input = document.createElement('input');
-                input.placeholder = "Ton code (ex: A1)";
-                input.className = "bg-slate-800 p-4 rounded-xl text-white w-full mb-2 text-xl text-center";
-                
-                const btn = document.createElement('button');
-                btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white w-full";
-                btn.innerText = "Valider";
-                btn.onclick = () => selectCode(input.value.trim().toUpperCase());
-                
-                codeList.appendChild(input);
-                codeList.appendChild(btn);
+                // Multi-activités : afficher les codes depuis la config
+                Object.keys(config).forEach(lettre => {
+                    if (lettre !== 'activite' && Array.isArray(config[lettre])) {
+                        config[lettre].forEach((_, index) => {
+                            const code = `${lettre}${index + 1}`;
+                            const btn = document.createElement('button');
+                            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
+                            btn.innerText = code;
+                            btn.onclick = () => selectCode(code);
+                            codeList.appendChild(btn);
+                        });
+                    }
+                });
             }
         }
 
