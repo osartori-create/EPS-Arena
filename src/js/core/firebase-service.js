@@ -4,6 +4,7 @@ import { FIREBASE_CONFIG, DB_PATHS } from "../config/firebase-config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
 export const db = getDatabase(app);
+
 export { ref, onValue, push, set, update, remove };
 
 function getProfBasePath() {
