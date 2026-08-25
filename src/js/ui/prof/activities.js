@@ -1,10 +1,10 @@
 // src/js/ui/prof/activities.js
 import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
 import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
-import { generateTeams } from '../../modules/teams/team-generator.js';
+import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js'; // Renommé pour éviter la confusion
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
-import { BAREME, calculerPoints, exportIDoceo, calculerStatsGlobales, initEscaladeListener } from '../../modules/escalade/escalade-controller.js';
+import { calculerStatsGlobales, initEscaladeListener, exportIDoceo } from '../../modules/escalade/escalade-controller.js';
 
 let currentDiscipline = 'multi';
 
@@ -18,7 +18,6 @@ export function initActivities() {
         classeSelect.addEventListener('change', () => {
             const coView = document.getElementById('viewCOSettings');
             if (coView && !coView.classList.contains('hidden')) loadCOAssignments();
-            
             const escView = document.getElementById('viewEscaladeSettings');
             if (escView && !escView.classList.contains('hidden')) loadEscaladeAssignments();
         });
@@ -85,31 +84,51 @@ export function initActivities() {
         }
     };
 
+    // FONCTION GÉNÉRER UNIQUE MAIS CIBLÉE SELON L'ONGLET ACTIF
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // Détection robuste
-        const coView = document.getElementById('viewCOSettings');
-        const escView = document.getElementById('viewEscaladeSettings');
-
-        const isCOVisible = coView && !coView.classList.contains('hidden');
-        const isEscVisible = escView && !escView.classList.contains('hidden');
-
-        if (currentDiscipline === 'co' || isCOVisible) {
+        // 1. Si on est en CO
+        if (currentDiscipline === 'co') {
             await populateReserveWithStudents(eleves);
-            document.getElementById('teamsGrid').innerHTML = '';
             alert("Tous les élèves sont dans la réserve CO.");
             return;
         }
 
-        if (currentDiscipline === 'escalade' || isEscVisible) {
+        // 2. Si on est en Escalade
+        if (currentDiscipline === 'escalade') {
             await populateReserveEscalade(eleves);
-            document.getElementById('teamsGrid').innerHTML = '';
             alert("Tous les élèves sont dans la réserve Escalade.");
             return;
+        }
+
+        // 3. Sinon, on est en Multi-activités
+        const options = {
+            mode: document.getElementById('modeRepartition').value,
+            mixite: document.getElementById('modeMixite').value,
+            critere: document.getElementById('critereForce').value,
+            formatLibelle: document.getElementById('formatLibelle').value,
+            nbEquipes: parseInt(document.getElementById('nbEquipes').value) || 0,
+            nbParEquipe: parseInt(document.getElementById('nbParEquipe').value) || 0,
+            couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
+        };
+
+        if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
+        else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
+
+        const teams = generateClassicTeams(eleves, options);
+
+        const teamsWithPhotos = [];
+        for (const team of teams) {
+            const membersWithPhotos = [];
+            for (const m of team.members) {
+                const url = await getPhotoUrl(m.id);
+                membersWithPhotos.push({ ...m, photoUrl: url });
+            }
+            teamsWithPhotos.push({ ...team, members: membersWithPhotos });
         }
 
         const container = document.getElementById('teamsGrid');
@@ -203,33 +222,10 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
 
+    // Export / Import
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
     window.exportEscaladeConfig = exportEscaladeConfig;
     window.importEscaladeConfig = importEscaladeConfig;
     window.exportIDoceo = exportIDoceo;
 }
-
-    window.switchDiscipline = function(disc) {
-        currentDiscipline = disc;
-        
-        ['multi', 'co', 'arcathlon', 'escalade'].forEach(d => {
-            const btn = document.getElementById('btnDisc-' + d);
-            if (btn) {
-                btn.classList.remove('border-blue-500', 'text-blue-400');
-                btn.classList.add('border-slate-600', 'text-slate-400');
-            }
-            const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
-            const el = document.getElementById(viewId);
-            if (el) el.classList.add('hidden');
-        });
-
-        const activeBtn = document.getElementById('btnDisc-' + disc);
-        if (activeBtn) {
-            activeBtn.classList.remove('border-slate-600', 'text-slate-400');
-            activeBtn.classList.add('border-blue-500', 'text-blue-400');
-        }
-
-        const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
-        if (targetView) targetView.classList.remove('hidden');
-    };
