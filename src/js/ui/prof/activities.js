@@ -258,6 +258,9 @@ export function initActivities() {
 
         document.getElementById('nbEquipes').value = options.nbEquipes;
         document.getElementById('nbParEquipe').value = options.nbParEquipe;
+
+        // ✅ AJOUT OBLIGATOIRE : On sauvegarde les équipes générées pour la transmission
+        window.lastTeams = teams;
     };
 
     window.renameTeam = function(teamId) {

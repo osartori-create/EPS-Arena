@@ -85,9 +85,17 @@
             const config = currentConfig;
             activityTitle.innerText = "Choisis ton code";
 
+            // 📍 DIAGNOSTIC : On affiche ce que le prof a envoyé dans la console
+            console.log("Configuration reçue du prof :", config);
+
+            // Si le prof n'a encore rien envoyé
+            if (!config) {
+                codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
+                return;
+            }
+
             // Génération des codes selon l'activité
             if (config.activite === 'co') {
-                // Les postes CO (ex: A1, B2...)
                 Object.keys(config).forEach(poste => {
                     if (poste !== 'activite' && poste !== 'reserve' && Array.isArray(config[poste])) {
                         const btn = document.createElement('button');
@@ -98,7 +106,6 @@
                     }
                 });
             } else if (config.activite === 'escalade') {
-                // Les groupes Escalade (ex: A1, A2, B1...)
                 Object.keys(config).forEach(groupe => {
                     if (groupe !== 'activite' && groupe !== 'reserve' && Array.isArray(config[groupe])) {
                         config[groupe].forEach((_, index) => {
@@ -112,19 +119,25 @@
                     }
                 });
             } else {
-                // Multi-activités : afficher les codes depuis la config
-                Object.keys(config).forEach(lettre => {
-                    if (lettre !== 'activite' && Array.isArray(config[lettre])) {
-                        config[lettre].forEach((_, index) => {
-                            const code = `${lettre}${index + 1}`;
-                            const btn = document.createElement('button');
-                            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
-                            btn.innerText = code;
-                            btn.onclick = () => selectCode(code);
-                            codeList.appendChild(btn);
-                        });
-                    }
-                });
+                // Multi-activités
+                const hasTeams = Object.keys(config).some(key => key !== 'activite' && Array.isArray(config[key]));
+                
+                if (hasTeams) {
+                    Object.keys(config).forEach(lettre => {
+                        if (lettre !== 'activite' && Array.isArray(config[lettre])) {
+                            config[lettre].forEach((_, index) => {
+                                const code = `${lettre}${index + 1}`;
+                                const btn = document.createElement('button');
+                                btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
+                                btn.innerText = code;
+                                btn.onclick = () => selectCode(code);
+                                codeList.appendChild(btn);
+                            });
+                        }
+                    });
+                } else {
+                    codeList.innerHTML = '<p class="text-red-400 text-center">Les équipes Multi n\'ont pas été générées<br>ou transmises correctement.</p>';
+                }
             }
         }
 
@@ -162,7 +175,6 @@
                 btn.className = "bg-slate-700 p-3 rounded-xl font-black text-white border-2 border-slate-500";
                 btn.innerText = cot.toUpperCase();
                 btn.onclick = () => {
-                    // Sélection visuelle
                     cotationGrid.querySelectorAll('button').forEach(b => b.classList.remove('bg-blue-600'));
                     btn.classList.add('bg-blue-600');
                     btn.dataset.selected = cot;
@@ -171,7 +183,6 @@
                 cotationGrid.appendChild(btn);
             });
 
-            // Initialisation par défaut (5a)
             const defaultBtn = cotationGrid.querySelector('button');
             if (defaultBtn) {
                 defaultBtn.classList.add('bg-blue-600');
