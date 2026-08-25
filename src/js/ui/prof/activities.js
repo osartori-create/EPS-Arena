@@ -1,5 +1,5 @@
 // src/js/ui/prof/activities.js
-import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
+import { initCOInterface, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
 import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
@@ -8,7 +8,7 @@ import { calculerStatsGlobales, initEscaladeListener, exportIDoceo } from '../..
 
 let currentDiscipline = 'multi';
 
-// 🗺️ Dictionnaire pour éviter les erreurs de casse (co -> CO, multi -> Multi...)
+// Dictionnaire pour éviter les erreurs de casse
 const VIEW_MAP = {
     'multi': 'viewMultiSettings',
     'co': 'viewCOSettings',
@@ -67,9 +67,7 @@ export function initActivities() {
         // 4. Initialisation des modules
         if (disc === 'co') {
             try {
-                // 🔥 CORRECTION ICI : On appelle initCOInterface pour générer la grille des postes !
                 initCOInterface();
-                
                 const circuitList = document.getElementById('circuitList');
                 if (circuitList) renderCircuits('circuitList', "");
                 initSortableCO();
@@ -125,10 +123,9 @@ export function initActivities() {
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
         if (currentDiscipline === 'co') {
-            // On appelle initCOInterface pour s'assurer que le tableau est bien là
             initCOInterface();
             await populateReserveWithStudents(eleves);
-            alert("Tous les élèves sont dans la réserve CO. Glissez-les dans les postes (A1, C4...) !");
+            alert("Tous les élèves sont dans la réserve CO. Glissez-les dans les postes !");
             return;
         }
 
@@ -140,7 +137,7 @@ export function initActivities() {
             return;
         }
 
-        // Multi-activités
+        // Multi-activités : génération classique sans réserve
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -220,7 +217,7 @@ export function initActivities() {
         document.getElementById('nbParEquipe').value = options.nbParEquipe;
     };
 
-    // ... (Le reste des fonctions : renameTeam, addCircuit, etc. restent identiques)
+    // ... (le reste des fonctions identiques)
     window.renameTeam = function(teamId) { /* ... */ };
     window.addCircuit = function() { /* ... */ };
     window.editCircuit = function(id) { /* ... */ };
