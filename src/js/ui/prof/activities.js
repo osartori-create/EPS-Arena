@@ -18,6 +18,7 @@ export function initActivities() {
         classeSelect.addEventListener('change', () => {
             const coView = document.getElementById('viewCOSettings');
             if (coView && !coView.classList.contains('hidden')) loadCOAssignments();
+            
             const escView = document.getElementById('viewEscaladeSettings');
             if (escView && !escView.classList.contains('hidden')) loadEscaladeAssignments();
         });
@@ -26,7 +27,6 @@ export function initActivities() {
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         
-        // On désélectionne tous les boutons
         ['multi', 'co', 'arcathlon', 'escalade'].forEach(d => {
             const btn = document.getElementById('btnDisc-' + d);
             if (btn) {
@@ -38,14 +38,12 @@ export function initActivities() {
             if (el) el.classList.add('hidden');
         });
 
-        // On sélectionne le bouton actif
         const activeBtn = document.getElementById('btnDisc-' + disc);
         if (activeBtn) {
             activeBtn.classList.remove('border-slate-600', 'text-slate-400');
             activeBtn.classList.add('border-blue-500', 'text-blue-400');
         }
 
-        // On affiche le panneau correspondant
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) targetView.classList.remove('hidden');
 
@@ -93,27 +91,29 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // Détection fiable : on regarde si les panneaux sont visibles
-        const escView = document.getElementById('viewEscaladeSettings');
-        const isEscVisible = escView && !escView.classList.contains('hidden');
+        // >>> DÉTECTION ROBUSTE DE L'ONGLET ACTIF (via le DOM) <<<
         const coView = document.getElementById('viewCOSettings');
+        const escView = document.getElementById('viewEscaladeSettings');
+        const multiView = document.getElementById('viewMultiSettings');
+
         const isCOVisible = coView && !coView.classList.contains('hidden');
+        const isEscVisible = escView && !escView.classList.contains('hidden');
 
-        if (currentDiscipline === 'escalade' || isEscVisible) {
-            await populateReserveEscalade(eleves);
-            document.getElementById('teamsGrid').innerHTML = ''; // On vide la grille des équipes générées
-            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes !");
-            return;
-        }
-
-        if (currentDiscipline === 'co' || isCOVisible) {
+        if (isCOVisible) {
             await populateReserveWithStudents(eleves);
             document.getElementById('teamsGrid').innerHTML = '';
             alert("Tous les élèves sont dans la réserve CO. Glissez-les dans les postes !");
             return;
         }
 
-        // Si on est en Multi-activités, on génère les équipes classiques
+        if (isEscVisible) {
+            await populateReserveEscalade(eleves);
+            document.getElementById('teamsGrid').innerHTML = '';
+            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes !");
+            return;
+        }
+
+        // Sinon, on est en Multi-activités
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,

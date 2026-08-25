@@ -24,6 +24,19 @@
         .btn-success { background: #22c55e; color: white; }
         .btn-danger { background: #ef4444; color: white; }
         .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 12px; }
+                .escalade-grid {
+            display: grid;
+            grid-template-columns: 40px repeat(3, 1fr);
+            gap: 4px;
+        }
+        .header-groupe {
+            background: #3b82f6;
+            border-radius: 8px 8px 0 0;
+        }
+        .header-num {
+            background: #eab308; /* Case jaune */
+            border-radius: 8px 0 0 8px;
+        }
     </style>
 </head>
 <body class="p-4">
@@ -198,11 +211,11 @@
                 </div>
             </div>
 
-            <!-- PARAMÈTRES ESCALADE (CLONE CO avec postes A, B, C) -->
+            <!-- PARAMÈTRES ESCALADE (GRILLE LIGNES / COLONNES) -->
             <div id="viewEscaladeSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Groupes d'escalade (A, B, C...)</h3>
-                    <p class="text-xs text-slate-400 mb-4">Glissez les élèves dans les groupes. Ils sont identifiés par "A1", "A2", "B1", etc.</p>
+                    <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Grille d'escalade (A, B, C...)</h3>
+                    <p class="text-xs text-slate-400 mb-4">Les colonnes sont les groupes (A, B, C). Les lignes sont les numéros d'élèves (1, 2, 3...).</p>
                     
                     <div class="flex flex-wrap gap-2 mb-4">
                         <button onclick="exportEscaladeConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
@@ -216,10 +229,11 @@
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (non affectés)</h4>
                             <div id="reserveListEscalade" class="flex flex-col gap-2 min-h-[200px]"></div>
                         </div>
-                        <!-- Postes (Groupes A, B, C...) -->
+
+                        <!-- Grille A, B, C / 1, 2, 3 -->
                         <div class="lg:col-span-2">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes</h4>
-                            <div id="postesGridEscalade" class="grid grid-cols-3 md:grid-cols-4 gap-2"></div>
+                            <div id="postesGridEscalade"></div>
                         </div>
                     </div>
                 </div>
