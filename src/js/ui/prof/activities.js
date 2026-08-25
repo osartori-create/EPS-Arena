@@ -1,31 +1,31 @@
 // src/js/ui/prof/activities.js
 import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
+import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
 import { generateTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
-import { BAREME, calculerPoints, exportIDoceo, calculerStatsGlobales, initEscaladeListener, envoyerMontee } from '../../modules/escalade/escalade-controller.js';
+import { BAREME, calculerPoints, exportIDoceo, calculerStatsGlobales, initEscaladeListener } from '../../modules/escalade/escalade-controller.js';
 
 let currentDiscipline = 'multi';
 
 export function initActivities() {
     initPalette();
     initCOInterface();
+    initEscaladeInterface();
 
-    // Écouteur sur le changement de classe
     const classeSelect = document.getElementById('selectClasse');
     if (classeSelect) {
         classeSelect.addEventListener('change', () => {
             const coView = document.getElementById('viewCOSettings');
-            if (coView && !coView.classList.contains('hidden')) {
-                loadCOAssignments();
-            }
+            if (coView && !coView.classList.contains('hidden')) loadCOAssignments();
+            
+            const escView = document.getElementById('viewEscaladeSettings');
+            if (escView && !escView.classList.contains('hidden')) loadEscaladeAssignments();
         });
     }
 
-    // Mise à jour de la discipline courante
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
-        
         const panneaux = ['multi', 'co', 'arcathlon', 'escalade'];
 
         panneaux.forEach(d => {
@@ -57,9 +57,12 @@ export function initActivities() {
             loadCOAssignments();
         }
 
-        // 🔥 AJOUT : Initialisation de l'écoute Escalade quand on ouvre l'onglet
         if (disc === 'escalade') {
-            window.initEscalade();
+            initSortableEscalade();
+            loadEscaladeAssignments();
+            initEscaladeListener(document.getElementById('selectClasse').value, (montees) => {
+                console.log("Stats Escalade :", montees);
+            });
         }
     };
 
@@ -80,20 +83,30 @@ export function initActivities() {
         }
     };
 
-    window.generateTeams = async function() {
+   window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
-        
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
         const coView = document.getElementById('viewCOSettings');
         const isCOVisible = coView && !coView.classList.contains('hidden');
-        
+        const escView = document.getElementById('viewEscaladeSettings');
+        const isEscVisible = escView && !escView.classList.contains('hidden');
+
+        // CO : Réserve + Postes A1, A2...
         if (currentDiscipline === 'co' || isCOVisible) {
             await populateReserveWithStudents(eleves);
             document.getElementById('teamsGrid').innerHTML = '';
-            alert("Tous les élèves sont dans la réserve. Glissez-les dans les postes (A1, C4...) pour former vos groupes !");
+            alert("Tous les élèves sont dans la réserve CO. Glissez-les dans les postes !");
+            return;
+        }
+
+        // ESCALADE : Réserve + Groupes A, B, C...
+        if (currentDiscipline === 'escalade' || isEscVisible) {
+            await populateReserveEscalade(eleves);
+            document.getElementById('teamsGrid').innerHTML = '';
+            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes A, B, C... !");
             return;
         }
 
@@ -247,10 +260,10 @@ export function initActivities() {
         // elle utilisera les données locales pour afficher les noms)
     }
 
-    // ✅ AJOUTEZ CES LIGNES ICI !
-    window.exportCOConfig = exportCOConfig;
-    window.importCOConfig = importCOConfig;
-    
-    // Pour l'escalade, on expose la fonction d'export iDoceo
-    window.exportIDoceo = exportIDoceo;
+    // Exports
+        window.exportCOConfig = exportCOConfig;
+        window.importCOConfig = importCOConfig;
+        window.exportEscaladeConfig = exportEscaladeConfig;
+        window.importEscaladeConfig = importEscaladeConfig;
+        window.exportIDoceo = exportIDoceo;
 }

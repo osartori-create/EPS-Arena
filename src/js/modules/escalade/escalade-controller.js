@@ -1,5 +1,8 @@
 // src/js/modules/escalade/escalade-controller.js
 
+// En haut du fichier, ajoutez :
+import { db, ref, onValue } from '../../core/firebase-service.js';
+
 // ==========================================
 // CONFIGURATION ET BARÈME
 // ==========================================
@@ -151,16 +154,9 @@ export function calculerStatsGlobales(montees) {
  * @param {Function} callback - Fonction appelée à chaque mise à jour des montées
  */
 export function initEscaladeListener(className, callback) {
-    // On suppose que la base est structurée comme suit :
-    // etablissements/0680013V/profs/{codeProf}/escalade/{className}/montees
-    // (À adapter selon votre structure Firebase réelle)
-    
-    const db = firebase.database();
-    const refMontees = db.ref(`escalade/${className}/montees`);
-    
-    refMontees.on('value', snap => {
-        const montees = snap.val() || {};
-        callback(montees);
+    const refMontees = ref(db, `escalade/${className}/montees`);
+    return onValue(refMontees, (snap) => {
+        callback(snap.val() || {});
     });
     
     // Retourne une fonction pour arrêter l'écoute si nécessaire
