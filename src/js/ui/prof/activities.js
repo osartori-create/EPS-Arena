@@ -91,25 +91,21 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // >>> DÉTECTION ROBUSTE DE L'ONGLET ACTIF (via le DOM) <<<
         const coView = document.getElementById('viewCOSettings');
         const escView = document.getElementById('viewEscaladeSettings');
         const multiView = document.getElementById('viewMultiSettings');
 
-        const isCOVisible = coView && !coView.classList.contains('hidden');
-        const isEscVisible = escView && !escView.classList.contains('hidden');
-
-        if (isCOVisible) {
+        if (coView && !coView.classList.contains('hidden')) {
             await populateReserveWithStudents(eleves);
             document.getElementById('teamsGrid').innerHTML = '';
-            alert("Tous les élèves sont dans la réserve CO. Glissez-les dans les postes !");
+            alert("Tous les élèves sont dans la réserve CO.");
             return;
         }
 
-        if (isEscVisible) {
+        if (escView && !escView.classList.contains('hidden')) {
             await populateReserveEscalade(eleves);
             document.getElementById('teamsGrid').innerHTML = '';
-            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes !");
+            alert("Tous les élèves sont dans la réserve Escalade.");
             return;
         }
 
@@ -236,3 +232,27 @@ export function initActivities() {
     window.importEscaladeConfig = importEscaladeConfig;
     window.exportIDoceo = exportIDoceo;
 }
+
+    window.switchDiscipline = function(disc) {
+        currentDiscipline = disc;
+        
+        ['multi', 'co', 'arcathlon', 'escalade'].forEach(d => {
+            const btn = document.getElementById('btnDisc-' + d);
+            if (btn) {
+                btn.classList.remove('border-blue-500', 'text-blue-400');
+                btn.classList.add('border-slate-600', 'text-slate-400');
+            }
+            const viewId = 'view' + d.charAt(0).toUpperCase() + d.slice(1) + 'Settings';
+            const el = document.getElementById(viewId);
+            if (el) el.classList.add('hidden');
+        });
+
+        const activeBtn = document.getElementById('btnDisc-' + disc);
+        if (activeBtn) {
+            activeBtn.classList.remove('border-slate-600', 'text-slate-400');
+            activeBtn.classList.add('border-blue-500', 'text-blue-400');
+        }
+
+        const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
+        if (targetView) targetView.classList.remove('hidden');
+    };
