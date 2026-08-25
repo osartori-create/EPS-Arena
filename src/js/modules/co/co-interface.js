@@ -120,13 +120,24 @@ function getStorageKey() {
     return `eps_arena_co_assignments_${activeClasse}`;
 }
 
+// 🔄 CORRECTION MAJEURE : Sauvegarde de la réserve
 export function saveCOAssignments() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
     
     const assignments = {};
+
+    // 1. Sauvegarder les élèves dans la réserve
+    const reserveIds = [];
+    reserveContainer.querySelectorAll('[data-id]').forEach(el => {
+        reserveIds.push(el.dataset.id);
+    });
+    if (reserveIds.length > 0) {
+        assignments.reserve = reserveIds;
+    }
+
+    // 2. Sauvegarder les élèves dans les postes
     const postes = document.querySelectorAll('[data-poste]');
-    
     postes.forEach(posteDiv => {
         const posteId = posteDiv.dataset.poste;
         const membersDiv = posteDiv.querySelector('.poste-members');
@@ -153,6 +164,38 @@ export function loadCOAssignments() {
     const activeClasse = document.getElementById('selectClasse').value;
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
 
+    // 🔄 Restaurer la réserve sauvegardée
+    const reserveList = document.getElementById('reserveList');
+    if (reserveList && assignments.reserve) {
+        reserveList.innerHTML = '';
+        assignments.reserve.forEach(async id => {
+            const eleve = eleves.find(e => e.id === id);
+            if (eleve) {
+                const url = await getPhotoUrl(eleve.id);
+                let bgClass = 'bg-slate-200 border-slate-400';
+                if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+                else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+                
+                const photoHtml = url 
+                    ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+                    : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+
+                const div = document.createElement('div');
+                div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
+                div.dataset.id = eleve.id;
+                div.innerHTML = `
+                    ${photoHtml}
+                    <div class="flex flex-col leading-tight">
+                        <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
+                        <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
+                    </div>
+                `;
+                reserveList.appendChild(div);
+            }
+        });
+    }
+
+    // Restaurer les postes sauvegardés
     postes.forEach(async posteDiv => {
         const posteId = posteDiv.dataset.poste;
         const membersDiv = posteDiv.querySelector('.poste-members');
@@ -198,6 +241,9 @@ export function exportCOConfig() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
     
+    // 🔄 On sauvegarde d'abord l'état actuel (y compris la réserve) pour être sûr que le JSON est à jour
+    saveCOAssignments();
+    
     const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
     
     const date = new Date();
@@ -208,7 +254,7 @@ export function exportCOConfig() {
         classe: activeClasse,
         activite: 'co',
         date: dateStr,
-        postes: assignments
+        postes: assignments // Contient maintenant la clé "reserve" si des élèves y sont !
     };
 
     const jsonString = JSON.stringify(data, null, 2);
@@ -226,7 +272,7 @@ export function exportCOConfig() {
     console.log("💾 Export CO effectué :", data);
 }
 
-// Lecture et importation d'un fichier JSON (CORRIGÉ POUR ÉVITER LES DOUBLONS)
+// Lecture et importation d'un fichier JSON (CORRIGÉ POUR RESTAURER LA RÉSERVE)
 export function importCOConfig(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -237,7 +283,7 @@ export function importCOConfig(event) {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.postes) throw new Error("Format de fichier invalide");
             
-            // 1. VIDER TOUTES LES ZONES AVANT D'APPLIQUER LE JSON
+            // 1. VIDER TOUTES LES ZONES (Postes + Réserve)
             const reserveList = document.getElementById('reserveList');
             if (reserveList) reserveList.innerHTML = '';
             
@@ -261,7 +307,36 @@ export function importCOConfig(event) {
             // 4. RÉCUPÉRER LES ÉLÈVES DE CETTE CLASSE POUR RECRÉER LES CARTES
             const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${data.classe}`) || '[]');
 
-            // 5. RECRÉER LES CARTES DANS LES POSTES SANS DOUBLON
+            // 5. 🔄 RESTAURER LES ÉLÈVES DE LA RÉSERVE (si présents dans le JSON)
+            if (reserveList && data.postes.reserve) {
+                data.postes.reserve.forEach(async id => {
+                    const eleve = eleves.find(e => e.id === id);
+                    if (eleve) {
+                        const url = await getPhotoUrl(eleve.id);
+                        let bgClass = 'bg-slate-200 border-slate-400';
+                        if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+                        else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+                        
+                        const photoHtml = url 
+                            ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+                            : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+
+                        const div = document.createElement('div');
+                        div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
+                        div.dataset.id = eleve.id;
+                        div.innerHTML = `
+                            ${photoHtml}
+                            <div class="flex flex-col leading-tight">
+                                <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
+                                <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
+                            </div>
+                        `;
+                        reserveList.appendChild(div);
+                    }
+                });
+            }
+
+            // 6. RESTAURER LES ÉLÈVES DANS LES POSTES
             postes.forEach(async posteDiv => {
                 const posteId = posteDiv.dataset.poste;
                 const membersDiv = posteDiv.querySelector('.poste-members');
@@ -295,7 +370,7 @@ export function importCOConfig(event) {
                 }
             });
 
-            // 6. RÉINITIALISER SORTABLE
+            // 7. RÉINITIALISER SORTABLE
             setTimeout(() => initSortableCO(), 100);
             
             alert("✅ Configuration CO importée avec succès !");
