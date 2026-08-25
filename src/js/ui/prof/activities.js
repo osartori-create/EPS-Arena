@@ -1,7 +1,7 @@
 // src/js/ui/prof/activities.js
 import { initCOInterface, populateReserve, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
 import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
-import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js'; // Renommé pour éviter la confusion
+import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 import { calculerStatsGlobales, initEscaladeListener, exportIDoceo } from '../../modules/escalade/escalade-controller.js';
@@ -84,28 +84,29 @@ export function initActivities() {
         }
     };
 
-    // FONCTION GÉNÉRER UNIQUE MAIS CIBLÉE SELON L'ONGLET ACTIF
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // 1. Si on est en CO
+        // 1. CO
         if (currentDiscipline === 'co') {
             await populateReserveWithStudents(eleves);
             alert("Tous les élèves sont dans la réserve CO.");
             return;
         }
 
-        // 2. Si on est en Escalade
+        // 2. Escalade (ajustement dynamique des colonnes)
         if (currentDiscipline === 'escalade') {
+            const nbColonnes = Math.ceil(eleves.length / 3); // 3 élèves max par colonne
+            initEscaladeInterface(nbColonnes); // Mise à jour des colonnes en fonction du nombre d'élèves
             await populateReserveEscalade(eleves);
             alert("Tous les élèves sont dans la réserve Escalade.");
             return;
         }
 
-        // 3. Sinon, on est en Multi-activités
+        // 3. Multi-activités
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -121,12 +122,23 @@ export function initActivities() {
 
         const teams = generateClassicTeams(eleves, options);
 
+        // Préparer l'affichage des membres avec les bonnes infos
         const teamsWithPhotos = [];
         for (const team of teams) {
             const membersWithPhotos = [];
             for (const m of team.members) {
                 const url = await getPhotoUrl(m.id);
-                membersWithPhotos.push({ ...m, photoUrl: url });
+                // Si le critère est vma, on affiche la VMA, sinon les étoiles
+                let infoCritere = '';
+                if (options.critere === 'vma') {
+                    infoCritere = `<span class="text-emerald-400 text-xs font-bold">VMA: ${m.vma || '--'}</span>`;
+                } else {
+                    let starsHtml = '';
+                    const force = m.force || 0;
+                    if (force > 0) starsHtml = '<span class="text-yellow-400 text-xs">' + '★'.repeat(force) + '</span>';
+                    infoCritere = starsHtml;
+                }
+                membersWithPhotos.push({ ...m, photoUrl: url, infoCritere: infoCritere });
             }
             teamsWithPhotos.push({ ...team, members: membersWithPhotos });
         }
@@ -143,17 +155,13 @@ export function initActivities() {
                         const photoHtml = m.photoUrl 
                             ? `<img src="${m.photoUrl}" class="w-10 h-10 rounded-full object-cover border border-slate-600">`
                             : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
-                        
-                        let starsHtml = '';
-                        const force = m.force || 0;
-                        if (force > 0) starsHtml = '<span class="text-yellow-400 text-xs">' + '★'.repeat(force) + '</span>';
 
                         return `
                             <div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white flex items-center gap-3" data-id="${m.id}">
                                 ${photoHtml}
                                 <div class="flex flex-col flex-1">
                                     <span>${m.prenom} ${m.nom}</span>
-                                    ${starsHtml}
+                                    ${m.infoCritere}
                                 </div>
                                 <span class="text-3xl font-black text-white pr-2">${m.rank}</span>
                             </div>

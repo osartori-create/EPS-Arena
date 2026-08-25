@@ -1,22 +1,22 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 
-export function initEscaladeInterface() {
+// Génère les colonnes A, B, C... en fonction du nombre d'élèves
+export function initEscaladeInterface(nbColonnes = 6) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
-    // Création des colonnes simples A, B, C, D...
-    const groupes = ['A', 'B', 'C', 'D', 'E', 'F'];
     let html = '';
-    groupes.forEach(col => {
+    for (let i = 0; i < nbColonnes; i++) {
+        const lettre = String.fromCharCode(65 + i); // A, B, C...
         html += `
             <div class="flex flex-col">
-                <div class="header-col">${col}</div>
-                <div class="escalade-col" data-groupe="${col}">
+                <div class="header-col">${lettre}</div>
+                <div class="escalade-col" data-groupe="${lettre}">
                     <div class="groupe-members flex flex-col gap-2"></div>
                 </div>
             </div>
         `;
-    });
+    }
     container.innerHTML = html;
 }
 
@@ -57,7 +57,6 @@ async function createEleveCard(eleve, rank = null) {
         ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
         : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
 
-    // Badge numéro très visible à droite (bleu foncé, chiffre blanc)
     const rankHtml = rank 
         ? `<span class="rank-badge bg-blue-900 text-white text-2xl font-black px-3 py-1 rounded-lg ml-auto">${rank}</span>` 
         : '';
