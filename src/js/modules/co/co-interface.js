@@ -5,13 +5,8 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 export function initCOInterface() {
     const postesContainer = document.getElementById('postesGrid');
     if (!postesContainer) return;
-    generatePostesGrid();
-}
 
-function generatePostesGrid() {
-    const postesContainer = document.getElementById('postesGrid');
-    if (!postesContainer) return;
-
+    // Génération de la grille A1, A2, B1...
     const headers = Object.keys(MATRICE['31'] || {});
     let html = '';
     headers.forEach(poste => {
@@ -23,6 +18,11 @@ function generatePostesGrid() {
         `;
     });
     postesContainer.innerHTML = html;
+
+    // 🔥 Réinitialisation des marqueurs pour permettre le glisser-déposer
+    const reserve = document.getElementById('reserveList');
+    if (reserve) reserve.__sortable = false;
+    document.querySelectorAll('.poste-members').forEach(el => el.__sortable = false);
 }
 
 export function initSortableCO() {
@@ -48,21 +48,20 @@ export function initSortableCO() {
             }
         });
     } catch (e) {
-        console.error("Erreur Sortable :", e);
+        console.error("Erreur Sortable CO :", e);
     }
 }
 
-// Créer un élément HTML pour un élève (avec photo et couleur)
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
     let bgClass = 'bg-slate-200 border-slate-400';
     if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
     else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-    
-    const photoHtml = url 
+
+    const photoHtml = url
         ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
         : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-    
+
     const div = document.createElement('div');
     div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
     div.dataset.id = eleve.id;
@@ -83,17 +82,82 @@ export async function populateReserveWithStudents(eleves) {
     const coView = document.getElementById('viewCOSettings');
     if (coView) coView.classList.remove('hidden');
 
-    // On vide tout et on reconstruit la réserve
     reserveContainer.innerHTML = '';
     localStorage.removeItem(getStorageKey());
-
-    // On réinitialise les postes
     document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
 
     for (const eleve of eleves) {
         reserveContainer.appendChild(await createEleveCard(eleve));
     }
 
+    // 🔥 On force la réinitialisation après insertion
+    setTimeout(() => initSortableCO(), 100);
+}
+
+function getStorageKey() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    return `eps_arena_co_assignments_${activeClasse}`;
+}
+
+export function saveCOAssignments() {
+    const reserveContainer = document.getElementById('reserveList');
+    if (!reserveContainer) return;
+
+    const assignments = {};
+    const reserveIds = [];
+    reserveContainer.querySelectorAll('[data-id]').forEach(el => reserveIds.push(el.dataset.id));
+    if (reserveIds.length > 0) assignments.reserve = reserveIds;
+
+    document.querySelectorAll('[data-poste]').forEach(posteDiv => {
+        const posteId = posteDiv.dataset.poste;
+        const membersDiv = posteDiv.querySelector('.poste-members');
+        if (membersDiv) {
+            const ids = [];
+            membersDiv.querySelectorAll('[data-id]').forEach(el => ids.push(el.dataset.id));
+            if (ids.length > 0) assignments[posteId] = ids;
+        }
+    });
+
+    localStorage.setItem(getStorageKey(), JSON.stringify(assignments));
+}
+
+export async function loadCOAssignments() {
+    const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${document.getElementById('selectClasse').value}`) || '[]');
+
+    document.getElementById('reserveList').innerHTML = '';
+    document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
+
+    const postes = document.querySelectorAll('[data-poste]');
+    for (const posteDiv of postes) {
+        const posteId = posteDiv.dataset.poste;
+        const membersDiv = posteDiv.querySelector('.poste-members');
+        if (membersDiv && assignments[posteId]) {
+            for (const id of assignments[posteId]) {
+                const eleve = eleves.find(e => e.id === id);
+                if (eleve) membersDiv.appendChild(await createEleveCard(eleve));
+            }
+        }
+    }
+
+    const affectedIds = new Set();
+    postes.forEach(posteDiv => {
+        const membersDiv = posteDiv.querySelector('.poste-members');
+        if (membersDiv) membersDiv.querySelectorAll('[data-id]').forEach(el => affectedIds.add(el.dataset.id));
+    });
+
+    let reserveIds = assignments.reserve || [];
+    eleves.forEach(eleve => {
+        if (!affectedIds.has(eleve.id) && !reserveIds.includes(eleve.id)) reserveIds.push(eleve.id);
+    });
+
+    const reserveContainer = document.getElementById('reserveList');
+    for (const id of reserveIds) {
+        const eleve = eleves.find(e => e.id === id);
+        if (eleve) reserveContainer.appendChild(await createEleveCard(eleve));
+    }
+
+    saveCOAssignments();
     setTimeout(() => initSortableCO(), 100);
 }
 
