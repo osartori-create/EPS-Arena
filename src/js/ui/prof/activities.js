@@ -10,10 +10,9 @@ let currentDiscipline = 'multi';
 
 export function initActivities() {
     initPalette();
-    initCOInterface();
-    
-    // Initialisation par défaut (6 colonnes si aucune classe sélectionnée)
-    initEscaladeInterface(6);
+    // On initialise les grilles avec try...catch pour éviter les blocages
+    try { initCOInterface(); } catch(e) { console.error("Erreur init CO:", e); }
+    try { initEscaladeInterface(6); } catch(e) { console.error("Erreur init Escalade:", e); }
 
     const classeSelect = document.getElementById('selectClasse');
     if (classeSelect) {
@@ -21,13 +20,7 @@ export function initActivities() {
             const coView = document.getElementById('viewCOSettings');
             if (coView && !coView.classList.contains('hidden')) loadCOAssignments();
             const escView = document.getElementById('viewEscaladeSettings');
-            if (escView && !escView.classList.contains('hidden')) {
-                // Recalcul dynamique des colonnes au changement de classe
-                const activeClasse = classeSelect.value;
-                const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-                initEscaladeInterface(Math.ceil(eleves.length / 3) || 6);
-                loadEscaladeAssignments();
-            }
+            if (escView && !escView.classList.contains('hidden')) loadEscaladeAssignments();
         });
     }
 
@@ -51,32 +44,41 @@ export function initActivities() {
             activeBtn.classList.add('border-blue-500', 'text-blue-400');
         }
 
+        // On affiche le panneau correspondant
         const targetView = document.getElementById('view' + disc.charAt(0).toUpperCase() + disc.slice(1) + 'Settings');
         if (targetView) targetView.classList.remove('hidden');
 
+        // Gestion spécifique à la CO (avec try...catch pour ne pas bloquer l'affichage)
         if (disc === 'co') {
-            const circuitList = document.getElementById('circuitList');
-            if (circuitList) renderCircuits('circuitList', "");
-            initSortableCO();
-            loadCOAssignments();
+            try {
+                const circuitList = document.getElementById('circuitList');
+                if (circuitList) renderCircuits('circuitList', "");
+                initSortableCO();
+                loadCOAssignments();
+            } catch (e) {
+                console.error("Erreur lors de l'initialisation CO :", e);
+            }
         }
 
+        // Gestion spécifique à l'Escalade
         if (disc === 'escalade') {
-            // ✅ AJOUT CRUCIAL : Redessiner la grille avec le bon nombre de colonnes
-            const activeClasse = document.getElementById('selectClasse').value;
-            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-            const nbColonnes = Math.ceil(eleves.length / 3) || 6; // 3 élèves par groupe
-            initEscaladeInterface(nbColonnes);
-            
-            initSortableEscalade();
-            loadEscaladeAssignments();
-            
-            if (activeClasse) {
-                initEscaladeListener(activeClasse, (montees) => {
-                    const stats = calculerStatsGlobales(montees);
-                    if (document.getElementById('total-metres')) document.getElementById('total-metres').innerText = stats.totalMetres;
-                    if (document.getElementById('progress-bar')) document.getElementById('progress-bar').style.width = stats.progressionPct + "%";
-                });
+            try {
+                const activeClasse = document.getElementById('selectClasse').value;
+                const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+                const nbColonnes = Math.ceil(eleves.length / 3) || 6;
+                initEscaladeInterface(nbColonnes);
+                initSortableEscalade();
+                loadEscaladeAssignments();
+                
+                if (activeClasse) {
+                    initEscaladeListener(activeClasse, (montees) => {
+                        const stats = calculerStatsGlobales(montees);
+                        if (document.getElementById('total-metres')) document.getElementById('total-metres').innerText = stats.totalMetres;
+                        if (document.getElementById('progress-bar')) document.getElementById('progress-bar').style.width = stats.progressionPct + "%";
+                    });
+                }
+            } catch (e) {
+                console.error("Erreur lors de l'initialisation Escalade :", e);
             }
         }
     };
@@ -113,7 +115,6 @@ export function initActivities() {
 
         // 2. Escalade
         if (currentDiscipline === 'escalade') {
-            // ✅ Recalcul du nombre de colonnes avant génération
             const nbColonnes = Math.ceil(eleves.length / 3) || 6;
             initEscaladeInterface(nbColonnes);
             await populateReserveEscalade(eleves);
@@ -122,7 +123,6 @@ export function initActivities() {
         }
 
         // 3. Multi-activités
-        // ... (Code existant pour Multi-activités) ...
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -244,7 +244,6 @@ export function initActivities() {
         alert("Fonction d'assignation automatique des codes (à connecter avec les équipes générées)");
     };
 
-    // Export / Import
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
     window.exportEscaladeConfig = exportEscaladeConfig;
