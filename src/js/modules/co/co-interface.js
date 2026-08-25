@@ -3,14 +3,9 @@ import { MATRICE } from './matrice.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 export function initCOInterface() {
-    console.log("🔍 Initialisation CO...");
     const postesContainer = document.getElementById('postesGrid');
-    if (!postesContainer) {
-        console.error("❌ #postesGrid introuvable !");
-        return;
-    }
+    if (!postesContainer) return;
     generatePostesGrid();
-    console.log("✅ Interface CO initialisée.");
 }
 
 function generatePostesGrid() {
@@ -23,8 +18,7 @@ function generatePostesGrid() {
         html += `
             <div class="bg-slate-900 border-2 border-slate-600 p-4 rounded-2xl min-h-[80px] flex flex-col items-center justify-center" data-poste="${poste}" id="poste-${poste}">
                 <h4 class="font-black text-yellow-400 text-xl mb-2">${poste}</h4>
-                <div class="poste-members w-full flex flex-col gap-2 min-h-[40px]">
-                </div>
+                <div class="poste-members w-full flex flex-col gap-2 min-h-[40px]"></div>
             </div>
         `;
     });
@@ -33,14 +27,13 @@ function generatePostesGrid() {
 
 export function initSortableCO() {
     const reserveContainer = document.getElementById('reserveList');
-    if (!reserveContainer) return;
-    if (reserveContainer.__sortable) return;
+    if (!reserveContainer || reserveContainer.__sortable) return;
 
     try {
         new Sortable(reserveContainer, {
             group: 'co-groupes',
             animation: 150,
-            onEnd: function() { saveCOAssignments(); }
+            onEnd: saveCOAssignments
         });
         reserveContainer.__sortable = true;
 
@@ -49,7 +42,7 @@ export function initSortableCO() {
                 new Sortable(el, {
                     group: 'co-groupes',
                     animation: 150,
-                    onEnd: function() { saveCOAssignments(); }
+                    onEnd: saveCOAssignments
                 });
                 el.__sortable = true;
             }
@@ -59,6 +52,30 @@ export function initSortableCO() {
     }
 }
 
+// Créer un élément HTML pour un élève (avec photo et couleur)
+async function createEleveCard(eleve) {
+    const url = await getPhotoUrl(eleve.id);
+    let bgClass = 'bg-slate-200 border-slate-400';
+    if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+    else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+    
+    const photoHtml = url 
+        ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+        : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+    
+    const div = document.createElement('div');
+    div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
+    div.dataset.id = eleve.id;
+    div.innerHTML = `
+        ${photoHtml}
+        <div class="flex flex-col leading-tight">
+            <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
+            <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
+        </div>
+    `;
+    return div;
+}
+
 export async function populateReserveWithStudents(eleves) {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
@@ -66,30 +83,17 @@ export async function populateReserveWithStudents(eleves) {
     const coView = document.getElementById('viewCOSettings');
     if (coView) coView.classList.remove('hidden');
 
-    let html = '';
+    // On vide tout et on reconstruit la réserve
+    reserveContainer.innerHTML = '';
+    localStorage.removeItem(getStorageKey());
+
+    // On réinitialise les postes
+    document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
+
     for (const eleve of eleves) {
-        const url = await getPhotoUrl(eleve.id);
-        let bgClass = 'bg-slate-200 border-slate-400';
-        if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
-        else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-        
-        const photoHtml = url 
-            ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
-            : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-            
-        html += `
-            <div class="p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}" data-id="${eleve.id}">
-                ${photoHtml}
-                <div class="flex flex-col leading-tight">
-                    <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
-                    <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
-                </div>
-            </div>
-        `;
+        reserveContainer.appendChild(await createEleveCard(eleve));
     }
 
-    reserveContainer.innerHTML = html;
-    localStorage.removeItem(getStorageKey());
     setTimeout(() => initSortableCO(), 100);
 }
 
@@ -111,139 +115,100 @@ export function populateReserve(teams) {
     setTimeout(() => initSortableCO(), 100);
 }
 
-// ==========================================
-// SAUVEGARDE LOCALE DES AFFECTATIONS CO
-// ==========================================
-
 function getStorageKey() {
     const activeClasse = document.getElementById('selectClasse').value;
     return `eps_arena_co_assignments_${activeClasse}`;
 }
 
-// 🔄 CORRECTION MAJEURE : Sauvegarde de la réserve
 export function saveCOAssignments() {
     const reserveContainer = document.getElementById('reserveList');
     if (!reserveContainer) return;
     
     const assignments = {};
-
-    // 1. Sauvegarder les élèves dans la réserve
     const reserveIds = [];
-    reserveContainer.querySelectorAll('[data-id]').forEach(el => {
-        reserveIds.push(el.dataset.id);
-    });
-    if (reserveIds.length > 0) {
-        assignments.reserve = reserveIds;
-    }
+    reserveContainer.querySelectorAll('[data-id]').forEach(el => reserveIds.push(el.dataset.id));
+    if (reserveIds.length > 0) assignments.reserve = reserveIds;
 
-    // 2. Sauvegarder les élèves dans les postes
     const postes = document.querySelectorAll('[data-poste]');
     postes.forEach(posteDiv => {
         const posteId = posteDiv.dataset.poste;
         const membersDiv = posteDiv.querySelector('.poste-members');
         if (membersDiv) {
             const ids = [];
-            membersDiv.querySelectorAll('[data-id]').forEach(el => {
-                ids.push(el.dataset.id);
-            });
-            if (ids.length > 0) {
-                assignments[posteId] = ids;
-            }
+            membersDiv.querySelectorAll('[data-id]').forEach(el => ids.push(el.dataset.id));
+            if (ids.length > 0) assignments[posteId] = ids;
         }
     });
 
     localStorage.setItem(getStorageKey(), JSON.stringify(assignments));
-    console.log("💾 Affectations CO sauvegardées :", assignments);
+}
+
+// Fonction qui reconstruit toute l'interface à partir des affectations
+export async function rebuildUI(assignments) {
+    const activeClasse = document.getElementById('selectClasse').value;
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+
+    // 1. Vider tout
+    const reserveList = document.getElementById('reserveList');
+    if (reserveList) reserveList.innerHTML = '';
+    document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
+
+    // 2. Remplir les postes
+    const postes = document.querySelectorAll('[data-poste]');
+    for (const posteDiv of postes) {
+        const posteId = posteDiv.dataset.poste;
+        const membersDiv = posteDiv.querySelector('.poste-members');
+        if (membersDiv && assignments[posteId]) {
+            for (const id of assignments[posteId]) {
+                const eleve = eleves.find(e => e.id === id);
+                if (eleve) membersDiv.appendChild(await createEleveCard(eleve));
+            }
+        }
+    }
+
+    // 3. Remplir la réserve avec tous les élèves NON affectés (recalcul automatique)
+    const affectedIds = new Set();
+    postes.forEach(posteDiv => {
+        const membersDiv = posteDiv.querySelector('.poste-members');
+        if (membersDiv) {
+            membersDiv.querySelectorAll('[data-id]').forEach(el => affectedIds.add(el.dataset.id));
+        }
+    });
+
+    // Si le JSON contient explicitement la réserve, on l'utilise, sinon on prend les restants
+    let reserveIds = assignments.reserve || [];
+    // On filtre pour ne garder que ceux qui ne sont pas déjà dans un poste (évite les doublons)
+    reserveIds = reserveIds.filter(id => !affectedIds.has(id));
+
+    // Ajoute tous les élèves qui ne sont ni dans un poste ni dans la réserve
+    eleves.forEach(eleve => {
+        if (!affectedIds.has(eleve.id) && !reserveIds.includes(eleve.id)) {
+            reserveIds.push(eleve.id);
+        }
+    });
+
+    if (reserveList) {
+        for (const id of reserveIds) {
+            const eleve = eleves.find(e => e.id === id);
+            if (eleve) reserveList.appendChild(await createEleveCard(eleve));
+        }
+    }
+
+    // 4. Sauvegarder l'état et réinitialiser Sortable
+    saveCOAssignments();
+    setTimeout(() => initSortableCO(), 100);
 }
 
 export function loadCOAssignments() {
     const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
-    const postes = document.querySelectorAll('[data-poste]');
-    if (Object.keys(assignments).length === 0) return;
-
-    const activeClasse = document.getElementById('selectClasse').value;
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-
-    // 🔄 Restaurer la réserve sauvegardée
-    const reserveList = document.getElementById('reserveList');
-    if (reserveList && assignments.reserve) {
-        reserveList.innerHTML = '';
-        assignments.reserve.forEach(async id => {
-            const eleve = eleves.find(e => e.id === id);
-            if (eleve) {
-                const url = await getPhotoUrl(eleve.id);
-                let bgClass = 'bg-slate-200 border-slate-400';
-                if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
-                else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-                
-                const photoHtml = url 
-                    ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
-                    : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-
-                const div = document.createElement('div');
-                div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
-                div.dataset.id = eleve.id;
-                div.innerHTML = `
-                    ${photoHtml}
-                    <div class="flex flex-col leading-tight">
-                        <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
-                        <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
-                    </div>
-                `;
-                reserveList.appendChild(div);
-            }
-        });
-    }
-
-    // Restaurer les postes sauvegardés
-    postes.forEach(async posteDiv => {
-        const posteId = posteDiv.dataset.poste;
-        const membersDiv = posteDiv.querySelector('.poste-members');
-        
-        if (membersDiv && assignments[posteId]) {
-            membersDiv.innerHTML = '';
-            for (const id of assignments[posteId]) {
-                const eleve = eleves.find(e => e.id === id);
-                if (eleve) {
-                    const url = await getPhotoUrl(eleve.id);
-                    let bgClass = 'bg-slate-200 border-slate-400';
-                    if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
-                    else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-                    
-                    const photoHtml = url 
-                        ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
-                        : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-
-                    const div = document.createElement('div');
-                    div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
-                    div.dataset.id = eleve.id;
-                    div.innerHTML = `
-                        ${photoHtml}
-                        <div class="flex flex-col leading-tight">
-                            <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
-                            <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
-                        </div>
-                    `;
-                    membersDiv.appendChild(div);
-                }
-            }
-        }
-    });
-    
-    setTimeout(() => initSortableCO(), 100);
+    rebuildUI(assignments);
 }
-
-// ==========================================
-// EXPORT / IMPORT DE LA CONFIGURATION CO (JSON)
-// ==========================================
 
 export function exportCOConfig() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
     
-    // 🔄 On sauvegarde d'abord l'état actuel (y compris la réserve) pour être sûr que le JSON est à jour
     saveCOAssignments();
-    
     const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
     
     const date = new Date();
@@ -254,7 +219,7 @@ export function exportCOConfig() {
         classe: activeClasse,
         activite: 'co',
         date: dateStr,
-        postes: assignments // Contient maintenant la clé "reserve" si des élèves y sont !
+        postes: assignments
     };
 
     const jsonString = JSON.stringify(data, null, 2);
@@ -268,11 +233,8 @@ export function exportCOConfig() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    console.log("💾 Export CO effectué :", data);
 }
 
-// Lecture et importation d'un fichier JSON (CORRIGÉ POUR RESTAURER LA RÉSERVE)
 export function importCOConfig(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -283,42 +245,24 @@ export function importCOConfig(event) {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.postes) throw new Error("Format de fichier invalide");
 
-            // 1. VIDER TOUTES LES ZONES (Postes + Réserve) et supprimer les flags Sortable
-            const reserveList = document.getElementById('reserveList');
-            if (reserveList) {
-                reserveList.innerHTML = '';
-                delete reserveList.__sortable; // Force la réinitialisation de Sortable
-            }
-            
-            const postes = document.querySelectorAll('[data-poste]');
-            postes.forEach(posteDiv => {
-                const membersDiv = posteDiv.querySelector('.poste-members');
-                if (membersDiv) {
-                    membersDiv.innerHTML = '';
-                    delete membersDiv.__sortable; // Force la réinitialisation de Sortable
-                }
-            });
-
-            // 2. SAUVEGARDER DANS LE LOCALSTORAGE DE LA CLASSE DU JSON
+            // 1. On enregistre les données dans le localStorage de la classe cible
             const storageKey = `eps_arena_co_assignments_${data.classe}`;
             localStorage.setItem(storageKey, JSON.stringify(data.postes));
 
-            // 3. GÉRER LE CHANGEMENT DE CLASSE
+            // 2. On sélectionne la bonne classe si nécessaire
             const select = document.getElementById('selectClasse');
             const classeChangee = (select.value !== data.classe);
             
             if (classeChangee) {
-                // Si la classe change, on sélectionne la nouvelle classe.
-                // Cela déclenchera automatiquement le listener 'change' qui appelle loadCOAssignments()
                 select.value = data.classe;
                 select.dispatchEvent(new Event('change'));
-                alert("✅ Configuration CO importée et classe changée !");
+                // Le listener 'change' appellera rebuildUI automatiquement
             } else {
-                // Si on est déjà sur la bonne classe, on appelle directement la restauration
-                loadCOAssignments();
-                alert("✅ Configuration CO importée !");
+                // Même classe : on reconstruit directement
+                rebuildUI(data.postes);
             }
-            
+
+            alert("✅ Configuration CO importée !");
         } catch (err) {
             alert("❌ Erreur lors de l'import : " + err.message);
         }
