@@ -11,7 +11,9 @@ let currentDiscipline = 'multi';
 export function initActivities() {
     initPalette();
     initCOInterface();
-    initEscaladeInterface();
+    
+    // Initialisation par défaut (6 colonnes si aucune classe sélectionnée)
+    initEscaladeInterface(6);
 
     const classeSelect = document.getElementById('selectClasse');
     if (classeSelect) {
@@ -19,7 +21,13 @@ export function initActivities() {
             const coView = document.getElementById('viewCOSettings');
             if (coView && !coView.classList.contains('hidden')) loadCOAssignments();
             const escView = document.getElementById('viewEscaladeSettings');
-            if (escView && !escView.classList.contains('hidden')) loadEscaladeAssignments();
+            if (escView && !escView.classList.contains('hidden')) {
+                // Recalcul dynamique des colonnes au changement de classe
+                const activeClasse = classeSelect.value;
+                const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+                initEscaladeInterface(Math.ceil(eleves.length / 3) || 6);
+                loadEscaladeAssignments();
+            }
         });
     }
 
@@ -54,9 +62,15 @@ export function initActivities() {
         }
 
         if (disc === 'escalade') {
+            // ✅ AJOUT CRUCIAL : Redessiner la grille avec le bon nombre de colonnes
+            const activeClasse = document.getElementById('selectClasse').value;
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+            const nbColonnes = Math.ceil(eleves.length / 3) || 6; // 3 élèves par groupe
+            initEscaladeInterface(nbColonnes);
+            
             initSortableEscalade();
             loadEscaladeAssignments();
-            const activeClasse = document.getElementById('selectClasse').value;
+            
             if (activeClasse) {
                 initEscaladeListener(activeClasse, (montees) => {
                     const stats = calculerStatsGlobales(montees);
@@ -97,16 +111,18 @@ export function initActivities() {
             return;
         }
 
-        // 2. Escalade (ajustement dynamique des colonnes)
+        // 2. Escalade
         if (currentDiscipline === 'escalade') {
-            const nbColonnes = Math.ceil(eleves.length / 3); // 3 élèves max par colonne
-            initEscaladeInterface(nbColonnes); // Mise à jour des colonnes en fonction du nombre d'élèves
+            // ✅ Recalcul du nombre de colonnes avant génération
+            const nbColonnes = Math.ceil(eleves.length / 3) || 6;
+            initEscaladeInterface(nbColonnes);
             await populateReserveEscalade(eleves);
-            alert("Tous les élèves sont dans la réserve Escalade.");
+            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes !");
             return;
         }
 
         // 3. Multi-activités
+        // ... (Code existant pour Multi-activités) ...
         const options = {
             mode: document.getElementById('modeRepartition').value,
             mixite: document.getElementById('modeMixite').value,
@@ -122,13 +138,11 @@ export function initActivities() {
 
         const teams = generateClassicTeams(eleves, options);
 
-        // Préparer l'affichage des membres avec les bonnes infos
         const teamsWithPhotos = [];
         for (const team of teams) {
             const membersWithPhotos = [];
             for (const m of team.members) {
                 const url = await getPhotoUrl(m.id);
-                // Si le critère est vma, on affiche la VMA, sinon les étoiles
                 let infoCritere = '';
                 if (options.critere === 'vma') {
                     infoCritere = `<span class="text-emerald-400 text-xs font-bold">VMA: ${m.vma || '--'}</span>`;
