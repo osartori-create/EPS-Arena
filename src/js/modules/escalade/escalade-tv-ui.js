@@ -5,16 +5,13 @@ export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // Conteneur principal (format iPad paysage)
-    container.style.display = 'flex';
+    // Conteneur principal : position relative, hauteur fixe
+    container.style.display = 'block';
     container.style.height = '600px';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
-    container.style.justifyContent = 'space-around';
-    container.style.alignItems = 'flex-end'; // Ancrage en bas
-    container.style.paddingBottom = '20px';
 
     const config = getConfigData();
     const montees = getEscaladeData();
@@ -22,7 +19,7 @@ export async function renderEscaladeTV() {
     const currentClasse = getCurrentClasse();
 
     if (!config) {
-        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente de la configuration du prof...</p>';
+        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente de la configuration du prof...</p>';
         return;
     }
 
@@ -40,27 +37,36 @@ export async function renderEscaladeTV() {
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 2. Garder uniquement les groupes avec des points
+    // 2. On garde uniquement les groupes avec un score > 0
     const equipesAvecScore = equipes.filter(eq => eq.score > 0);
 
     if (equipesAvecScore.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente des performances...</p>';
+        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente des performances...</p>';
         return;
     }
 
-    // 3. Score maximum pour définir la hauteur
+    // 3. Calculer le score maximum pour déterminer la hauteur
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
 
-    // 4. Réglages de hauteur (le meilleur monte TOUT EN HAUT !)
-    const maxHeight = 550; // On monte à 550px (sur un conteneur de 600px)
-    const minHeight = 60;  // Hauteur minimale pour un groupe qui a des points
+    // 4. Paramètres de hauteur (le meilleur est presque en haut, le pire en bas)
+    const maxBottom = 550; // Hauteur en pixels du groupe en tête (sur 600px)
+    const minBottom = 50;  // Hauteur en pixels du groupe le plus faible
+
+    // 5. Disposition horizontale équitable (ordre alphabétique)
+    const totalEquipes = equipesAvecScore.length;
+    const espaceHorizontal = 100 / totalEquipes;
 
     let html = '';
 
-    // 5. Boucle sur les équipes (ordre alphabétique A, B, C...)
-    for (const eq of equipesAvecScore) {
-        // Hauteur proportionnelle au score (le meilleur aura 550px, les autres descendront)
-        const height = Math.max((eq.score / maxScore) * maxHeight, minHeight);
+    // 6. Boucle sur les équipes
+    for (let i = 0; i < equipesAvecScore.length; i++) {
+        const eq = equipesAvecScore[i];
+        
+        // Calcul de la hauteur en pixels (proportionnelle au score)
+        const bottomOffset = Math.max((eq.score / maxScore) * maxBottom, minBottom);
+
+        // Position horizontale (centrée dans sa zone)
+        const leftPercent = (i + 0.5) * espaceHorizontal;
 
         // Récupérer les membres et leurs points
         const membresGroupes = {};
@@ -102,9 +108,9 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // Construire la colonne
+        // 7. Construire le bloc absolument positionné
         html += `
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: ${height}px; transition: height 0.5s ease;">
+        <div style="position: absolute; bottom: ${bottomOffset}px; left: ${leftPercent}%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center;">
             <div style="font-size: 60px;">🧗</div>
             <div style="background: #3b82f6; color: white; font-size: 30px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
             <div style="color: #facc15; font-size: 26px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
