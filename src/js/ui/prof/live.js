@@ -2,6 +2,7 @@ import { initLiveEngine, getConfigData, getStudentsMap, getLocalMapping } from '
 import { renderEscaladeLive } from '../../modules/escalade/escalade-live.js';
 import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
+import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
 
 let currentClasse = "";
 
@@ -14,6 +15,11 @@ export function initLiveUI() {
 
         if (type === 'escalade' && currentActivite === 'escalade') {
             renderEscaladeLive(data);
+         // ✅ Actualisation en direct de la TV si elle est ouverte
+            const tvView = document.getElementById('viewTV');
+            if (tvView && !tvView.classList.contains('hidden')) {
+                renderEscaladeTV();
+            }
         } else if (type === 'co' && currentActivite === 'co') {
             renderCOLive(data);
         } else if (type === 'multi' && currentActivite === 'multi') {

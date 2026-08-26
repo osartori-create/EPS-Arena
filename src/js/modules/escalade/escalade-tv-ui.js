@@ -13,7 +13,7 @@ export async function renderEscaladeTV() {
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
     container.style.justifyContent = 'space-around';
-    container.style.alignItems = 'flex-end';
+    container.style.alignItems = 'flex-end'; // Alignement en bas pour la montée verticale
     container.style.paddingBottom = '20px';
 
     const config = getConfigData();
@@ -21,16 +21,12 @@ export async function renderEscaladeTV() {
     const localMapping = getLocalMapping();
     const currentClasse = getCurrentClasse();
 
-    // LOG DE DIAGNOSTIC (F12)
-    console.log("🛠️ DIAG TV -> Classe:", currentClasse);
-    console.log("🛠️ DIAG TV -> Mapping local:", localMapping);
-
     if (!config) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente de la configuration du prof...</p>';
         return;
     }
 
-    // 1. Créer les équipes et calculer les scores
+    // 1. Créer les équipes et calculer les scores (ordre alphabétique conservé)
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
@@ -45,25 +41,35 @@ export async function renderEscaladeTV() {
     }
 
     // 2. Garder uniquement les groupes avec un score > 0
-    const equipesAvecScore = equipes.filter(eq => eq.score > 0).sort((a, b) => b.score - a.score);
+    const equipesAvecScore = equipes.filter(eq => eq.score > 0);
 
     if (equipesAvecScore.length === 0) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente des performances...</p>';
         return;
     }
 
-    // 3. Définir la hauteur maximale
-    const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
-    const maxHeight = 480;
-    const minHeight = 50;
+    // 3. Calculer les RANGS (sans changer l'ordre alphabétique pour l'affichage)
+    // On trie une copie pour attribuer les rangs
+    const equipesTriees = [...equipesAvecScore].sort((a, b) => b.score - a.score);
+    const maxScore = equipesTriees[0].score;
+    const minScore = equipesTriees[equipesTriees.length - 1].score;
+
+    // 4. Paramètres de la montagne verticale (le 1er est en haut)
+    const maxHeight = 480; // Hauteur de la colonne du 1er
+    const minHeight = 80;  // Hauteur minimale pour un groupe qui a des points
+    const step = (maxHeight - minHeight) / (equipesTriees.length > 1 ? equipesTriees.length - 1 : 1);
 
     let html = '';
 
-    // 4. Boucle sur les équipes
+    // 5. Boucle sur les équipes (dans l'ordre alphabétique A, B, C...)
     for (const eq of equipesAvecScore) {
-        const height = Math.max((eq.score / maxScore) * maxHeight, minHeight);
+        // Trouver le rang de cette équipe
+        const rang = equipesTriees.findIndex(e => e.lettre === eq.lettre) + 1; // 1 = meilleur
+        
+        // Hauteur de la colonne selon le rang (1er = maxHeight, dernier = minHeight)
+        const height = Math.max(maxHeight - (rang - 1) * step, minHeight);
 
-        // 5. Récupérer les membres et leurs points
+        // Récupérer les membres et leurs points
         const membresGroupes = {};
         monteesList.forEach(m => {
             if (m.groupe === eq.lettre) {
@@ -74,26 +80,19 @@ export async function renderEscaladeTV() {
 
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
-        // 6. Charger les photos avec la BONNE clé (TABLEAU PAR GROUPE)
+        // Charger les photos
         let photosHtml = '<div style="display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
             const index = parseInt(role) - 1;
-            
-            // ✅ ON CHERCHE D'ABORD LA CLÉ DU GROUPE : "504_A"
             const mappingKey = `${currentClasse}_${eq.lettre}`;
             let eleveId = null;
 
-            // Vérifier si le mapping contient bien un tableau pour ce groupe
             if (localMapping[mappingKey] && Array.isArray(localMapping[mappingKey])) {
                 eleveId = localMapping[mappingKey][index];
             }
-            // Fallback si le mapping est au format "504_A1" (ancienne méthode)
             else if (localMapping[`${currentClasse}_${eq.lettre}${role}`]) {
                 eleveId = localMapping[`${currentClasse}_${eq.lettre}${role}`];
             }
-
-            // LOG DE DIAGNOSTIC PAR ÉLÈVE
-            console.log(`Recherche photo élève ${eq.lettre}${role} -> ID:`, eleveId);
 
             let photoUrl = null;
             if (eleveId) {
@@ -110,7 +109,8 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // 7. Construire la colonne
+        // Construire la colonne (ordre alphabétique horizontal)
+        // Grâce à "height", le 1er est en haut, le 2e en dessous, etc.
         html += `
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: ${height}px; transition: height 0.5s ease;">
             <div style="font-size: 60px;">🧗</div>
