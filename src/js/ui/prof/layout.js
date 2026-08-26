@@ -1,4 +1,3 @@
-// src/js/ui/prof/layout.js
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 
@@ -14,7 +13,7 @@ export function initLayout() {
         });
 
         // On retire le style actif de tous les boutons
-        ['btnTab1', 'btnTab2', 'btnTab3'].forEach(id => {
+        ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
                 btn.classList.remove('tab-active', 'text-blue-500');
@@ -28,17 +27,19 @@ export function initLayout() {
         const targetView = document.getElementById(targetViewId);
         if (targetView) targetView.classList.remove('hidden');
 
+        // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
-            // Import dynamique pour récupérer le module et forcer le rendu
             import('../../modules/escalade/escalade-tv-ui.js').then(module => {
                 module.renderEscaladeTV();
+            });
+        }
 
         // On active le bouton correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) {
             targetBtn.classList.add('tab-active', 'text-blue-500');
         }
-    }; // ICI se termine correctement window.switchTab
+    }; // Fin de window.switchTab
 
     // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
