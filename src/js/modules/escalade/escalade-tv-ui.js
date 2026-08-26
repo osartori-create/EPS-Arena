@@ -21,6 +21,10 @@ export async function renderEscaladeTV() {
     const localMapping = getLocalMapping();
     const currentClasse = getCurrentClasse();
 
+    // LOG DE DIAGNOSTIC (F12)
+    console.log("🛠️ DIAG TV -> Classe:", currentClasse);
+    console.log("🛠️ DIAG TV -> Mapping local:", localMapping);
+
     if (!config) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente de la configuration du prof...</p>';
         return;
@@ -48,7 +52,7 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 3. Définir la hauteur maximale (pour la montagne horizontale)
+    // 3. Définir la hauteur maximale
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
     const maxHeight = 480;
     const minHeight = 50;
@@ -70,12 +74,26 @@ export async function renderEscaladeTV() {
 
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
-        // 6. Charger les photos avec la BONNE clé
+        // 6. Charger les photos avec la BONNE clé (TABLEAU PAR GROUPE)
         let photosHtml = '<div style="display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
-            // ✅ LA CLÉ EST : "504_A1" (classe + lettre + numéro)
-            const cleMapping = `${currentClasse}_${eq.lettre}${role}`;
-            const eleveId = localMapping[cleMapping];
+            const index = parseInt(role) - 1;
+            
+            // ✅ ON CHERCHE D'ABORD LA CLÉ DU GROUPE : "504_A"
+            const mappingKey = `${currentClasse}_${eq.lettre}`;
+            let eleveId = null;
+
+            // Vérifier si le mapping contient bien un tableau pour ce groupe
+            if (localMapping[mappingKey] && Array.isArray(localMapping[mappingKey])) {
+                eleveId = localMapping[mappingKey][index];
+            }
+            // Fallback si le mapping est au format "504_A1" (ancienne méthode)
+            else if (localMapping[`${currentClasse}_${eq.lettre}${role}`]) {
+                eleveId = localMapping[`${currentClasse}_${eq.lettre}${role}`];
+            }
+
+            // LOG DE DIAGNOSTIC PAR ÉLÈVE
+            console.log(`Recherche photo élève ${eq.lettre}${role} -> ID:`, eleveId);
 
             let photoUrl = null;
             if (eleveId) {
