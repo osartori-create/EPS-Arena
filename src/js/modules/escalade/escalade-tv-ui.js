@@ -55,4 +55,8 @@ export function renderEscaladeTV() {
     html += `</div></div>`;
 
     container.innerHTML = html;
+    
+    // ... fin de la fonction ...
+    console.log("Rendu TV exécuté, config:", config, "Montees:", Object.keys(montees).length);
+    container.innerHTML = html;
 }

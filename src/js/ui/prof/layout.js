@@ -29,11 +29,12 @@ export function initLayout() {
 
         // Cas spécifique pour l'onglet TV
          if (tabName === 'tv') {
-            // On force le rendu, même si la config n'a pas encore été chargée
-            import('../../modules/escalade/escalade-tv-ui.js').then(module => {
-                // Appel direct avec un petit délai pour laisser le DOM se stabiliser
-                setTimeout(() => module.renderEscaladeTV(), 100);
-            }).catch(err => console.error("Erreur import TV:", err));
+            // Rien à faire ici, le rendu est déjà géré par live.js
+            // On peut juste s'assurer que la div est vide au départ
+            const tvGlobe = document.getElementById('tvGlobe');
+            if (tvGlobe && tvGlobe.innerHTML === '') {
+                tvGlobe.innerHTML = '<p class="text-slate-500 text-center mt-20">En attente des performances...</p>';
+            }
         }
 
         // On active le bouton correspondant
