@@ -28,10 +28,12 @@ export function initLayout() {
         if (targetView) targetView.classList.remove('hidden');
 
         // Cas spécifique pour l'onglet TV
-        if (tabName === 'tv') {
+         if (tabName === 'tv') {
+            // On force le rendu, même si la config n'a pas encore été chargée
             import('../../modules/escalade/escalade-tv-ui.js').then(module => {
-                module.renderEscaladeTV();
-            });
+                // Appel direct avec un petit délai pour laisser le DOM se stabiliser
+                setTimeout(() => module.renderEscaladeTV(), 100);
+            }).catch(err => console.error("Erreur import TV:", err));
         }
 
         // On active le bouton correspondant
