@@ -5,13 +5,15 @@ export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // Conteneur principal : hauteur 100vh pour être responsive (iPad paysage)
-    container.style.display = 'block';
-    container.style.height = '100vh';
+    // ✅ ON PASSE EN COLONNE VERTICALE (de haut en bas) !
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column'; // Pour un classement vertical
+    container.style.height = '100vh'; // Responsive : prend toute la hauteur de l'écran
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
-    container.style.position = 'relative';
+    container.style.padding = '20px';
+    container.style.boxSizing = 'border-box';
 
     const config = getConfigData();
     const montees = getEscaladeData();
@@ -23,7 +25,7 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 1. Créer les équipes et calculer les scores (ordre alphabétique conservé)
+    // 1. Créer les équipes et calculer les scores
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
@@ -37,32 +39,27 @@ export async function renderEscaladeTV() {
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 2. Garder uniquement les groupes avec un score > 0
-    const equipesAvecScore = equipes.filter(eq => eq.score > 0);
+    // 2. Garder les groupes avec un score, et les trier du meilleur au pire
+    const equipesAvecScore = equipes.filter(eq => eq.score > 0).sort((a, b) => b.score - a.score);
 
     if (equipesAvecScore.length === 0) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente des performances...</p>';
         return;
     }
 
-    // 3. Score max pour définir la hauteur
-    const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
-
-    // 4. Réglages responsive : on limite la montée à 75% pour ne jamais sortir
-    const maxRise = 75; 
-    const minRise = 5;
+    // 3. Calculer la somme totale des points pour définir le pourcentage de hauteur
+    const totalPoints = equipesAvecScore.reduce((sum, eq) => sum + eq.score, 0);
 
     let html = '';
+    let accumulateur = 0; // Pour gérer le remplissage vertical
 
-    // 5. Boucle sur les équipes (ordre alphabétique pour l'horizontal)
+    // 4. Boucle sur les équipes (déjà triées par score : meilleur en premier)
     for (let i = 0; i < equipesAvecScore.length; i++) {
         const eq = equipesAvecScore[i];
 
-        // Calcul de la montée en pourcentage (proportionnelle au score)
-        const risePercent = Math.max((eq.score / maxScore) * maxRise, minRise);
-
-        // Position horizontale
-        const leftPercent = (i + 0.5) * (100 / equipesAvecScore.length);
+        // ✅ CALCUL DE LA HAUTEUR PROPORTIONNELLE : (score / total) * 100 %
+        // Cela garantit que le meilleur prend une grande place en haut, le pire tout en bas
+        const heightPercent = (eq.score / totalPoints) * 100;
 
         // Récupérer les membres et leurs points
         const membresGroupes = {};
@@ -76,7 +73,7 @@ export async function renderEscaladeTV() {
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
         // Charger les photos
-        let photosHtml = '<div style="display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 10px;">';
+        let photosHtml = '<div style="display: flex; flex-direction: row; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
             const index = parseInt(role) - 1;
             const mappingKey = `${currentClasse}_${eq.lettre}`;
@@ -97,19 +94,19 @@ export async function renderEscaladeTV() {
             }
 
             if (photoUrl) {
-                photosHtml += `<div style="width: 45px; height: 45px; border-radius: 50%; background-image: url('${photoUrl}'); background-size: cover; border: 3px solid #3b82f6;"></div>`;
+                photosHtml += `<div style="width: 40px; height: 40px; border-radius: 50%; background-image: url('${photoUrl}'); background-size: cover; border: 2px solid #3b82f6;"></div>`;
             } else {
-                photosHtml += `<div style="width: 45px; height: 45px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 20px;">👤</div>`;
+                photosHtml += `<div style="width: 40px; height: 40px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 18px;">👤</div>`;
             }
         }
         photosHtml += '</div>';
 
-        // 6. Construire le bloc : il est ancré en bas, puis remonté en % (jamais au-delà de 75%)
+        // 5. Construction du bloc pour CHAQUE équipe
         html += `
-        <div style="position: absolute; bottom: 0; left: ${leftPercent}%; transform: translateX(-50%) translateY(-${risePercent}%); display: flex; flex-direction: column; align-items: center;">
-            <div style="font-size: 60px;">🧗</div>
-            <div style="background: #3b82f6; color: white; font-size: 30px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
-            <div style="color: #facc15; font-size: 26px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: ${heightPercent}%; background: #1e293b; border-bottom: 2px solid #334155; padding: 10px;">
+            <div style="font-size: 50px;">🧗</div>
+            <div style="background: #3b82f6; color: white; font-size: 28px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
+            <div style="color: #facc15; font-size: 24px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
             ${photosHtml}
         </div>`;
     }
