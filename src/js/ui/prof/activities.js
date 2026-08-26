@@ -118,8 +118,7 @@ export function initActivities() {
         }
     };
 
-    // ✅ Fonction Transmettre CORRIGÉE (plus de doublon ni de firebase global)
-    window.transmettreConfig = async function() {
+        window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         
@@ -127,35 +126,33 @@ export function initActivities() {
         let localMapping = {}; // Stockage local Code -> ID (RGPD)
 
         if (currentDiscipline === 'co') {
-            configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
             configData.activite = 'co';
-            Object.keys(configData).forEach(poste => {
-                if (poste !== 'activite' && poste !== 'reserve' && Array.isArray(configData[poste])) {
-                    localMapping[`${activeClasse}_${poste}`] = configData[poste];
+            const data = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
+            Object.keys(data).forEach(poste => {
+                if (poste !== 'activite' && poste !== 'reserve' && Array.isArray(data[poste])) {
+                    configData[poste] = data[poste].length; // ✅ ON N'ENVOIE QUE LE NOMBRE
+                    localMapping[`${activeClasse}_${poste}`] = data[poste];
                 }
             });
         } 
         else if (currentDiscipline === 'escalade') {
-            configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
             configData.activite = 'escalade';
-            Object.keys(configData).forEach(groupe => {
-                if (groupe !== 'activite' && groupe !== 'reserve' && Array.isArray(configData[groupe])) {
-                    localMapping[`${activeClasse}_${groupe}`] = configData[groupe];
+            const data = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+            Object.keys(data).forEach(groupe => {
+                if (groupe !== 'activite' && groupe !== 'reserve' && Array.isArray(data[groupe])) {
+                    configData[groupe] = data[groupe].length; // ✅ ON N'ENVOIE QUE LE NOMBRE
+                    localMapping[`${activeClasse}_${groupe}`] = data[groupe];
                 }
             });
         } 
         else {
-            // Multi-activités : On reconstruit la structure
+            // Multi-activités
             configData.activite = 'multi';
-            
             if (window.lastTeams) {
                 const lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
                 window.lastTeams.forEach((team, index) => {
                     const lettre = lettres[index] || `EQ${index+1}`;
-                    // ✅ ON N'ENVOIE QUE LA LONGUEUR DU TABLEAU (pas les IDs) !
                     configData[lettre] = team.members.length; 
-                    
-                    // ✅ ON SAUVEGARDE LE MAPPING EN LOCAL
                     team.members.forEach((m, i) => {
                         localMapping[`${activeClasse}_${lettre}${i+1}`] = m.id;
                     });
@@ -165,7 +162,6 @@ export function initActivities() {
             }
         }
 
-        // Sauvegarde locale du mapping (aucune donnée sensible dans Firebase)
         localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
 
         try {

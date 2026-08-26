@@ -76,6 +76,7 @@
             waitingScreen.classList.remove('hidden');
         }
 
+        // ✅ FONCTION UNIFIÉE ET CORRECTE
         function showLogin() {
             waitingScreen.classList.add('hidden');
             activityScreen.classList.add('hidden');
@@ -85,72 +86,32 @@
             const config = currentConfig;
             activityTitle.innerText = "Choisis ton code";
 
-            // 📍 DIAGNOSTIC : On affiche ce que le prof a envoyé dans la console
-            console.log("Configuration reçue du prof :", config);
-
-            // Si le prof n'a encore rien envoyé
             if (!config) {
                 codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
                 return;
             }
 
-            // Génération des codes selon l'activité
-            if (config.activite === 'co') {
-                Object.keys(config).forEach(poste => {
-                    if (poste !== 'activite' && poste !== 'reserve' && Array.isArray(config[poste])) {
-                        const btn = document.createElement('button');
-                        btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
-                        btn.innerText = poste;
-                        btn.onclick = () => selectCode(poste);
-                        codeList.appendChild(btn);
-                    }
-                });
-            } else if (config.activite === 'escalade') {
-                Object.keys(config).forEach(groupe => {
-                    if (groupe !== 'activite' && groupe !== 'reserve' && Array.isArray(config[groupe])) {
-                        config[groupe].forEach((_, index) => {
-                            const code = `${groupe}${index + 1}`;
-                            const btn = document.createElement('button');
-                            btn.className = "bg-purple-600 p-4 rounded-xl font-black text-white text-xl";
-                            btn.innerText = code;
-                            btn.onclick = () => selectCode(code);
-                            codeList.appendChild(btn);
-                        });
-                    }
-                });
-                        } else {
-                // Multi-activités : le prof envoie un NOMBRE (ex: A: 3) pour dire "3 élèves dans ce groupe"
-                const hasTeams = Object.keys(config).some(key => 
-                    key !== 'activite' && (Array.isArray(config[key]) || typeof config[key] === 'number')
-                );
+            // Génération des codes pour Multi, CO et Escalade (unifiée)
+            Object.keys(config).forEach(key => {
+                if (key === 'activite') return; // On ignore le champ "activite"
                 
-                if (hasTeams) {
-                    Object.keys(config).forEach(lettre => {
-                        if (lettre === 'activite') return;
-                        
-                        let nombreDansGroupe = 0;
-                        if (Array.isArray(config[lettre])) {
-                            // Cas CO / Escalade : on a un tableau d'IDs
-                            nombreDansGroupe = config[lettre].length;
-                        } else if (typeof config[lettre] === 'number') {
-                            // Cas Multi : on a directement le nombre
-                            nombreDansGroupe = config[lettre];
-                        }
-                        
-                        // Générer les boutons A1, A2, A3... jusqu'au nombre
-                        for (let i = 0; i < nombreDansGroupe; i++) {
-                            const code = `${lettre}${i + 1}`;
-                            const btn = document.createElement('button');
-                            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
-                            btn.innerText = code;
-                            btn.onclick = () => selectCode(code);
-                            codeList.appendChild(btn);
-                        }
-                    });
-                } else {
-                    codeList.innerHTML = '<p class="text-red-400 text-center">Les équipes Multi n\'ont pas été générées<br>ou transmises correctement.</p>';
+                let count = 0;
+                if (typeof config[key] === 'number') {
+                    count = config[key];
+                } else if (Array.isArray(config[key])) {
+                    count = config[key].length;
                 }
-            }
+                
+                // Génère A1, A2, A3... selon le nombre
+                for (let i = 0; i < count; i++) {
+                    const code = `${key}${i + 1}`;
+                    const btn = document.createElement('button');
+                    btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
+                    btn.innerText = code;
+                    btn.onclick = () => selectCode(code);
+                    codeList.appendChild(btn);
+                }
+            });
         }
 
         function selectCode(code) {
