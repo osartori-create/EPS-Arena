@@ -25,7 +25,7 @@ async function loadConfig() {
     const configRef = ref(db, `${currentClasse}/config`);
     onValue(configRef, (snap) => {
         configData = snap.val() || {};
-        renderLiveData(); // Relance le rendu si la config change
+        renderLiveData();
     });
 }
 
@@ -38,7 +38,6 @@ function startListening() {
     });
 }
 
-// Récupère la liste des élèves locaux pour mapper les codes aux noms (RGPD)
 function getStudentsMap() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     const map = {};
@@ -46,36 +45,33 @@ function getStudentsMap() {
     return map;
 }
 
-// Récupère le mapping Code -> ID sauvegardé en local
 function getLocalMapping() {
     const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
     return mapping;
 }
 
-// Rendu des tableaux
-function renderLiveData(type, data) {
-    const container = document.getElementById('live-content');
-    if (!container) return;
-
-    const localMap = getLocalMapping();
-    const studentsMap = getStudentsMap();
-
-    // Récupère le mapping local et renvoie le nom
 function getNomFromCode(code) {
     // Exemple : code = "E1" -> lettre = "E", index = 0
-    const localKey = `${currentClasse}_${code.slice(0, 1)}`; 
+    if (code.length < 2) return code;
+    const lettre = code.slice(0, 1);
     const index = parseInt(code.slice(1)) - 1; 
     
-    const mapping = getLocalMapping();
-    if (mapping[localKey] && mapping[localKey][index]) {
-        const eleveId = mapping[localKey][index];
+    const localMap = getLocalMapping();
+    const key = `${currentClasse}_${lettre}`;
+    
+    if (localMap[key] && localMap[key][index]) {
+        const eleveId = localMap[key][index];
         const studentsMap = getStudentsMap();
         if (studentsMap[eleveId]) {
             return studentsMap[eleveId];
         }
     }
-    return code;
+    return code; // Si non trouvé, on affiche le code
 }
+
+function renderLiveData(type, data) {
+    const container = document.getElementById('live-content');
+    if (!container) return;
 
     let html = '';
 
@@ -84,10 +80,13 @@ function getNomFromCode(code) {
         html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade</h3>`;
         html += `<div class="space-y-2">`;
         entries.forEach(m => {
-            const code = `${m.groupe}${m.role}`;
-            const nom = getNomFromCode(code);
+            const nom = getNomFromCode(`${m.groupe}${m.role}`);
+            const hauteur = m.hauteur ? `${m.hauteur}m` : 'Top';
             html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                <span class="font-bold text-white">${nom}</span>
+                <div>
+                    <span class="font-bold text-white">${nom}</span>
+                    <span class="text-xs text-slate-400 ml-2">Voie ${m.voie_num} - ${hauteur}</span>
+                </div>
                 <span class="text-emerald-400 font-black">${m.points}m</span>
             </div>`;
         });
@@ -123,7 +122,6 @@ function getNomFromCode(code) {
     container.innerHTML = html;
 }
 
-// Export CSV Global pour les résultats de la classe
 window.exportResultsLive = function() {
     if (!currentClasse) return alert("Sélectionnez une classe.");
 

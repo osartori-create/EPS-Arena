@@ -21,7 +21,6 @@
         let currentConfig = null;
 
         const BAREME = BAREME_ESCALADE;
-        const LONGUEUR_VOIE = 9;
 
         // Éléments du DOM
         const classSelect = document.getElementById('class-select');
@@ -34,14 +33,12 @@
         const coModule = document.getElementById('co-module');
         const multiModule = document.getElementById('multi-module');
 
-        // Chargement des classes
         onValue(ref(db, 'active_classes'), (snap) => {
             const data = snap.val() || {};
             classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
                 Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
         });
 
-        // Écoute de la configuration
         classSelect.addEventListener('change', () => {
             selectedClass = classSelect.value;
             if (!selectedClass) return;
@@ -77,7 +74,6 @@
                 return;
             }
 
-            // Génération des codes
             Object.keys(config).forEach(key => {
                 if (key === 'activite') return;
                 
@@ -120,7 +116,7 @@
         }
 
         // ==========================================
-        // INTERFACE ESCALADE
+        // INTERFACE ESCALADE (MISE À JOUR)
         // ==========================================
         function initEscaladeUI() {
             const cotationGrid = document.getElementById('cotation-grid');
@@ -130,75 +126,65 @@
                 const btn = document.createElement('button');
                 btn.className = "bg-slate-700 p-3 rounded-xl font-black text-white border-2 border-slate-500";
                 btn.innerText = cot.toUpperCase();
-                btn.dataset.cotation = cot; // Stocker la valeur
+                btn.dataset.cotation = cot;
                 btn.onclick = () => {
-                    // Retirer la classe active de tous les boutons
                     cotationGrid.querySelectorAll('button').forEach(b => b.classList.remove('bg-blue-600', 'border-white'));
-                    // Ajouter la classe active au bouton cliqué
                     btn.classList.add('bg-blue-600', 'border-white');
                 };
                 cotationGrid.appendChild(btn);
             });
 
-            // Sélectionner "5a" par défaut
             const defaultBtn = cotationGrid.querySelector('button[data-cotation="5a"]');
             if (defaultBtn) {
                 defaultBtn.classList.add('bg-blue-600', 'border-white');
             }
+
+            // Initialisation par défaut (Voie 1, Hauteur Top 9m)
+            document.getElementById('voie-select').value = "1";
+            document.getElementById('hauteur-select').value = "9";
         }
 
         window.sendEscalade = async function() {
-            const voie = document.getElementById('voie-num').value;
+            const voie = document.getElementById('voie-select').value;
             const couleur = document.getElementById('couleur-select').value;
+            const hauteur = parseFloat(document.getElementById('hauteur-select').value);
             const selectedCotationBtn = document.querySelector('#cotation-grid button.bg-blue-600');
             const cotation = selectedCotationBtn ? selectedCotationBtn.dataset.cotation : '5a';
 
-            if (!voie) return alert("Entrez un numéro de voie.");
+            // Calcul des points basé sur la hauteur grimpée !
+            const points = Math.round(hauteur * (BAREME[cotation] || 1) * 10) / 10;
 
-            // Calcul des points (distance virtuelle)
-            const points = Math.round(LONGUEUR_VOIE * (BAREME[cotation] || 1) * 10) / 10;
-
-            // Envoi vers Firebase
             await push(ref(db, `${selectedClass}/escalade/montees`), {
                 groupe: selectedCode.slice(0, -1),
                 role: selectedCode.slice(-1),
                 voie_num: voie,
                 couleur: couleur,
                 cotation: cotation,
+                hauteur: hauteur,
                 points: points,
                 timestamp: Date.now()
             });
 
-            // Afficher le feedback
-            showFeedback(`Montée validée ! Points : ${points} m`, 5000);
+            showFeedback(`Montée : Voie ${voie} - ${hauteur}m<br>Points : ${points} m !`, 5000);
         };
 
         // ==========================================
-        // INTERFACE CO
+        // INTERFACE CO & MULTI
         // ==========================================
         window.sendBalise = async function() {
             const balise = document.getElementById('balise-input').value.trim();
             if (!balise) return alert("Entrez un numéro de balise.");
-
             await push(ref(db, `${selectedClass}/co/validations`), {
-                code: selectedCode,
-                balise: balise,
-                timestamp: Date.now()
+                code: selectedCode, balise: balise, timestamp: Date.now()
             });
-
             showFeedback("Balise vérifiée !", 3000);
         };
 
-        // ==========================================
-        // INTERFACE MULTI-ACTIVITÉS (CHRONO)
-        // ==========================================
         let chronoInterval = null;
         let chronoStart = 0;
-
         window.startChrono = function() {
             const display = document.getElementById('chrono-display');
             chronoStart = Date.now();
-            
             if (chronoInterval) clearInterval(chronoInterval);
             chronoInterval = setInterval(() => {
                 const elapsed = Math.floor((Date.now() - chronoStart) / 1000);
@@ -206,31 +192,22 @@
                 const sec = elapsed % 60;
                 display.innerText = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
             }, 1000);
-
             document.getElementById('start-btn').classList.add('hidden');
             document.getElementById('stop-btn').classList.remove('hidden');
         };
 
         window.stopChrono = async function() {
             clearInterval(chronoInterval);
-            
             const display = document.getElementById('chrono-display');
             const temps = display.innerText;
-
             await push(ref(db, `${selectedClass}/multi/performances`), {
-                code: selectedCode,
-                temps: temps,
-                timestamp: Date.now()
+                code: selectedCode, temps: temps, timestamp: Date.now()
             });
-
             showFeedback(`Temps enregistré : ${temps}`, 5000);
         };
 
-        // ==========================================
-        // FONCTION FEEDBACK ET RETOUR AUTOMATIQUE
-        // ==========================================
+        // Fonction Feedback
         function showFeedback(message, delay = 5000) {
-            // Créer l'overlay
             const feedbackDiv = document.createElement('div');
             feedbackDiv.id = 'feedback-overlay';
             feedbackDiv.className = 'fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-6';
@@ -242,7 +219,6 @@
             `;
             document.body.appendChild(feedbackDiv);
 
-            // Compte à rebours
             let countdown = Math.floor(delay/1000);
             const countdownEl = feedbackDiv.querySelector('#feedback-countdown');
             const interval = setInterval(() => {
@@ -251,12 +227,11 @@
                 if (countdown <= 0) {
                     clearInterval(interval);
                     feedbackDiv.remove();
-                    showLogin(); // Retour à l'écran de choix de code
+                    showLogin();
                 }
             }, 1000);
         }
 
-        // Bouton Quitter
         window.quitActivity = function() {
             location.reload();
         };
@@ -267,8 +242,6 @@
 <body class="bg-slate-900 text-white min-h-screen p-6 font-sans">
 
     <div class="max-w-md mx-auto">
-        
-        <!-- EN-TÊTE -->
         <div class="flex justify-between items-center mb-6">
             <h1 class="text-2xl font-black text-blue-500 italic">EPS-Arena</h1>
             <select id="class-select" class="bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs font-bold text-blue-400 outline-none">
@@ -276,19 +249,16 @@
             </select>
         </div>
 
-        <!-- ÉCRAN D'ATTENTE -->
         <div id="waiting-screen" class="text-center py-20">
             <div class="text-6xl mb-6">⏳</div>
             <p class="text-slate-400 font-bold">En attente de l'activité<br>du professeur...</p>
         </div>
 
-        <!-- ÉCRAN DE CONNEXION (CHOIX DU CODE) -->
         <div id="login-screen" class="hidden">
             <h2 id="activity-title" class="text-xl font-black text-center mb-6">Choisis ton code</h2>
             <div id="code-list" class="grid grid-cols-3 gap-3"></div>
         </div>
 
-        <!-- ÉCRAN D'ACTIVITÉ -->
         <div id="activity-screen" class="hidden">
             <div class="flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <div>
@@ -301,8 +271,15 @@
             <!-- MODULE ESCALADE -->
             <div id="escalade-module" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                    <label class="text-xs font-bold text-slate-400 uppercase">N° Voie</label>
-                    <input type="number" id="voie-num" min="1" max="21" class="w-full bg-slate-900 p-3 rounded-xl text-white text-2xl font-black mb-4 border border-slate-600">
+                    <label class="text-xs font-bold text-slate-400 uppercase">N° Voie (1 à 21)</label>
+                    <select id="voie-select" class="w-full bg-slate-900 p-3 rounded-xl text-white text-2xl font-black mb-4 border border-slate-600">
+                        <!-- Génération des voies 1 à 21 -->
+                        <script>
+                            for(let i = 1; i <= 21; i++) {
+                                document.write(`<option value="${i}">Voie ${i}</option>`);
+                            }
+                        </script>
+                    </select>
 
                     <label class="text-xs font-bold text-slate-400 uppercase">Couleur des prises</label>
                     <select id="couleur-select" class="w-full bg-slate-900 p-3 rounded-xl text-white mb-4 border border-slate-600">
@@ -314,6 +291,17 @@
                         <option value="orange">Orange</option>
                         <option value="sable">Sable</option>
                         <option value="tc">TC (Toutes Couleurs)</option>
+                    </select>
+
+                    <label class="text-xs font-bold text-slate-400 uppercase">Hauteur grimpée (m)</label>
+                    <select id="hauteur-select" class="w-full bg-slate-900 p-3 rounded-xl text-white text-2xl font-black mb-4 border border-slate-600">
+                        <option value="3">3m (Ligne de bloc)</option>
+                        <option value="4">4m</option>
+                        <option value="5">5m</option>
+                        <option value="6">6m</option>
+                        <option value="7">7m</option>
+                        <option value="8">8m</option>
+                        <option value="9" selected>9m (Top)</option>
                     </select>
 
                     <label class="text-xs font-bold text-slate-400 uppercase">Cotation (Points)</label>
