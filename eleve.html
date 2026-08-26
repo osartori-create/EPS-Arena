@@ -16,45 +16,32 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // ==========================================
-        // CONFIGURATION & ÉTAT
-        // ==========================================
         let selectedClass = "";
         let selectedCode = "";
         let currentConfig = null;
 
-        // Barème pour l'escalade (identique au prof)
         const BAREME = BAREME_ESCALADE;
         const LONGUEUR_VOIE = 9;
 
-        // ==========================================
-        // ÉLÉMENTS DU DOM
-        // ==========================================
+        // Éléments du DOM
         const classSelect = document.getElementById('class-select');
         const waitingScreen = document.getElementById('waiting-screen');
         const loginScreen = document.getElementById('login-screen');
         const activityScreen = document.getElementById('activity-screen');
         const codeList = document.getElementById('code-list');
         const activityTitle = document.getElementById('activity-title');
-        const selectedCodeDisplay = document.getElementById('selected-code');
-
-        // Sous-modules
         const escaladeModule = document.getElementById('escalade-module');
         const coModule = document.getElementById('co-module');
         const multiModule = document.getElementById('multi-module');
 
-        // ==========================================
-        // CHARGEMENT DES CLASSES DISPONIBLES
-        // ==========================================
+        // Chargement des classes
         onValue(ref(db, 'active_classes'), (snap) => {
             const data = snap.val() || {};
             classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
                 Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
         });
 
-        // ==========================================
-        // ÉCOUTE DE LA CONFIGURATION DU PROF
-        // ==========================================
+        // Écoute de la configuration
         classSelect.addEventListener('change', () => {
             selectedClass = classSelect.value;
             if (!selectedClass) return;
@@ -76,7 +63,6 @@
             waitingScreen.classList.remove('hidden');
         }
 
-        // ✅ FONCTION UNIFIÉE ET CORRECTE
         function showLogin() {
             waitingScreen.classList.add('hidden');
             activityScreen.classList.add('hidden');
@@ -91,9 +77,9 @@
                 return;
             }
 
-            // Génération des codes pour Multi, CO et Escalade (unifiée)
+            // Génération des codes
             Object.keys(config).forEach(key => {
-                if (key === 'activite') return; // On ignore le champ "activite"
+                if (key === 'activite') return;
                 
                 let count = 0;
                 if (typeof config[key] === 'number') {
@@ -102,7 +88,6 @@
                     count = config[key].length;
                 }
                 
-                // Génère A1, A2, A3... selon le nombre
                 for (let i = 0; i < count; i++) {
                     const code = `${key}${i + 1}`;
                     const btn = document.createElement('button');
@@ -120,7 +105,6 @@
             loginScreen.classList.add('hidden');
             activityScreen.classList.remove('hidden');
 
-            // Affichage du bon module
             escaladeModule.classList.add('hidden');
             coModule.classList.add('hidden');
             multiModule.classList.add('hidden');
@@ -139,7 +123,6 @@
         // INTERFACE ESCALADE
         // ==========================================
         function initEscaladeUI() {
-            // Génération des boutons de cotation
             const cotationGrid = document.getElementById('cotation-grid');
             cotationGrid.innerHTML = '';
             
@@ -147,32 +130,35 @@
                 const btn = document.createElement('button');
                 btn.className = "bg-slate-700 p-3 rounded-xl font-black text-white border-2 border-slate-500";
                 btn.innerText = cot.toUpperCase();
+                btn.dataset.cotation = cot; // Stocker la valeur
                 btn.onclick = () => {
-                    cotationGrid.querySelectorAll('button').forEach(b => b.classList.remove('bg-blue-600'));
-                    btn.classList.add('bg-blue-600');
-                    btn.dataset.selected = cot;
+                    // Retirer la classe active de tous les boutons
+                    cotationGrid.querySelectorAll('button').forEach(b => b.classList.remove('bg-blue-600', 'border-white'));
+                    // Ajouter la classe active au bouton cliqué
+                    btn.classList.add('bg-blue-600', 'border-white');
                 };
-                btn.dataset.selected = cot;
                 cotationGrid.appendChild(btn);
             });
 
-            const defaultBtn = cotationGrid.querySelector('button');
+            // Sélectionner "5a" par défaut
+            const defaultBtn = cotationGrid.querySelector('button[data-cotation="5a"]');
             if (defaultBtn) {
-                defaultBtn.classList.add('bg-blue-600');
-                defaultBtn.dataset.selected = '5a';
+                defaultBtn.classList.add('bg-blue-600', 'border-white');
             }
         }
 
         window.sendEscalade = async function() {
             const voie = document.getElementById('voie-num').value;
             const couleur = document.getElementById('couleur-select').value;
-            const cotationBtn = document.querySelector('#cotation-grid button.bg-blue-600');
-            const cotation = cotationBtn ? cotationBtn.dataset.selected : '5a';
+            const selectedCotationBtn = document.querySelector('#cotation-grid button.bg-blue-600');
+            const cotation = selectedCotationBtn ? selectedCotationBtn.dataset.cotation : '5a';
 
             if (!voie) return alert("Entrez un numéro de voie.");
 
+            // Calcul des points (distance virtuelle)
             const points = Math.round(LONGUEUR_VOIE * (BAREME[cotation] || 1) * 10) / 10;
 
+            // Envoi vers Firebase
             await push(ref(db, `${selectedClass}/escalade/montees`), {
                 groupe: selectedCode.slice(0, -1),
                 role: selectedCode.slice(-1),
@@ -183,8 +169,8 @@
                 timestamp: Date.now()
             });
 
-            document.getElementById('voie-num').value = '';
-            alert("✅ Montée envoyée !");
+            // Afficher le feedback
+            showFeedback(`Montée validée ! Points : ${points} m`, 5000);
         };
 
         // ==========================================
@@ -200,8 +186,7 @@
                 timestamp: Date.now()
             });
 
-            document.getElementById('balise-input').value = '';
-            alert("✅ Balise vérifiée !");
+            showFeedback("Balise vérifiée !", 3000);
         };
 
         // ==========================================
@@ -238,12 +223,38 @@
                 timestamp: Date.now()
             });
 
-            document.getElementById('start-btn').classList.remove('hidden');
-            document.getElementById('stop-btn').classList.add('hidden');
-            display.innerText = "00:00";
-            
-            alert("⏱️ Temps envoyé !");
+            showFeedback(`Temps enregistré : ${temps}`, 5000);
         };
+
+        // ==========================================
+        // FONCTION FEEDBACK ET RETOUR AUTOMATIQUE
+        // ==========================================
+        function showFeedback(message, delay = 5000) {
+            // Créer l'overlay
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.id = 'feedback-overlay';
+            feedbackDiv.className = 'fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-6';
+            feedbackDiv.innerHTML = `
+                <div class="text-6xl mb-4">✅</div>
+                <p class="text-2xl font-black text-center mb-4">${message}</p>
+                <p class="text-sm text-slate-400 mb-8">Retour au choix du code dans <span id="feedback-countdown">${Math.floor(delay/1000)}</span>s</p>
+                <button onclick="this.parentElement.remove(); showLogin();" class="bg-blue-600 px-6 py-3 rounded-xl font-bold">Retour maintenant</button>
+            `;
+            document.body.appendChild(feedbackDiv);
+
+            // Compte à rebours
+            let countdown = Math.floor(delay/1000);
+            const countdownEl = feedbackDiv.querySelector('#feedback-countdown');
+            const interval = setInterval(() => {
+                countdown--;
+                countdownEl.textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    feedbackDiv.remove();
+                    showLogin(); // Retour à l'écran de choix de code
+                }
+            }, 1000);
+        }
 
         // Bouton Quitter
         window.quitActivity = function() {
@@ -318,7 +329,6 @@
                     <label class="text-xs font-bold text-slate-400 uppercase">Numéro de la balise</label>
                     <input type="text" id="balise-input" placeholder="Ex: 31, 45..." class="w-full bg-slate-900 p-4 rounded-xl text-white text-2xl font-black text-center mb-4 border border-slate-600">
                     <button onclick="sendBalise()" class="w-full bg-blue-600 py-5 rounded-3xl text-xl font-black uppercase shadow-xl active:scale-95 transition-all">✅ Valider la balise</button>
-                    <p class="text-xs text-slate-500 text-center mt-4">Choisissez la bonne balise correspondant à votre code (ex: C4).</p>
                 </div>
             </div>
 
@@ -326,7 +336,6 @@
             <div id="multi-module" class="hidden space-y-4">
                 <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
                     <div id="chrono-display" class="text-8xl font-black tabular-nums text-yellow-400 mb-8">00:00</div>
-                    
                     <button id="start-btn" onclick="startChrono()" class="w-full bg-emerald-600 py-5 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95 transition-all mb-2">▶ Démarrer</button>
                     <button id="stop-btn" onclick="stopChrono()" class="hidden w-full bg-red-600 py-5 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95 transition-all">⏹ Arrêter</button>
                 </div>

@@ -60,19 +60,22 @@ function renderLiveData(type, data) {
     const localMap = getLocalMapping();
     const studentsMap = getStudentsMap();
 
-    // Fonction pour retrouver le nom à partir d'un code (ex: "A1")
-    function getNomFromCode(code) {
-        // Clé pour chercher dans le mapping local (ex: "504_A1")
-        const localKey = `${currentClasse}_${code}`;
-        const eleveId = localMap[localKey];
-        
-        if (eleveId && studentsMap[eleveId]) {
+    // Récupère le mapping local et renvoie le nom
+function getNomFromCode(code) {
+    // Exemple : code = "E1" -> lettre = "E", index = 0
+    const localKey = `${currentClasse}_${code.slice(0, 1)}`; 
+    const index = parseInt(code.slice(1)) - 1; 
+    
+    const mapping = getLocalMapping();
+    if (mapping[localKey] && mapping[localKey][index]) {
+        const eleveId = mapping[localKey][index];
+        const studentsMap = getStudentsMap();
+        if (studentsMap[eleveId]) {
             return studentsMap[eleveId];
         }
-        
-        // Si le mapping est perdu, on affiche le code (anonyme)
-        return code;
     }
+    return code;
+}
 
     let html = '';
 
