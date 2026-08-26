@@ -1,24 +1,28 @@
-import { getConfigData, getEscaladeData, getLocalMapping } from '../../core/live-engine.js';
+import { getConfigData, getEscaladeData, getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // Conteneur principal (hauteur fixe pour iPad paysage)
-    container.style.display = 'block';
+    // Conteneur principal en affichage HORIZONTAL (Flexbox)
+    container.style.display = 'flex';
     container.style.height = '600px';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
+    container.style.justifyContent = 'space-around'; // Espacement horizontal
+    container.style.alignItems = 'flex-end'; // Aligné en bas
+    container.style.paddingBottom = '20px';
 
     const config = getConfigData();
     const montees = getEscaladeData();
     const localMapping = getLocalMapping();
+    const currentClasse = getCurrentClasse(); // 🔑 IMPORTANT pour les photos
 
     if (!config) {
-        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente de la configuration du prof...</p>';
+        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente de la configuration du prof...</p>';
         return;
     }
 
@@ -36,25 +40,27 @@ export async function renderEscaladeTV() {
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 2. Filtrer les équipes sans score et trier par score décroissant
+    // 2. Garder uniquement les groupes avec un score > 0
     const equipesAvecScore = equipes.filter(eq => eq.score > 0).sort((a, b) => b.score - a.score);
 
     if (equipesAvecScore.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente des performances des élèves...</p>';
+        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente des performances...</p>';
         return;
     }
 
-    // 3. Positions verticales (en pixels) pour créer l'effet "Podium / Montagne"
-    // Le 1er est tout en haut, le 2e descend, etc.
-    const positionsTop = [50, 200, 350, 500]; // Ajustez selon votre besoin
-    let html = '<div style="position: absolute; top: 0; left: 0; right: 0; height: 100%;">';
+    // 3. Définir la hauteur maximale (pour la montagne horizontale)
+    const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
+    const maxHeight = 480; // Hauteur max des colonnes en pixels
+    const minHeight = 50;  // Hauteur min pour rester visible
 
-    // 4. Boucle sur les équipes avec score
-    for (let i = 0; i < equipesAvecScore.length; i++) {
-        const eq = equipesAvecScore[i];
-        const topPos = positionsTop[i] || (i * 150 + 50); // Fallback si plus de 4 équipes
+    let html = ''; // On n'utilise plus de position absolute, on utilise directement le flex du parent
 
-        // Récupérer les membres et leurs points
+    // 4. Boucle sur les équipes
+    for (const eq of equipesAvecScore) {
+        // Hauteur de la colonne (le meilleur est le plus haut)
+        const height = Math.max((eq.score / maxScore) * maxHeight, minHeight);
+
+        // 5. Récupérer les membres et leurs points
         const membresGroupes = {};
         monteesList.forEach(m => {
             if (m.groupe === eq.lettre) {
@@ -62,22 +68,23 @@ export async function renderEscaladeTV() {
                 membresGroupes[m.role] += (m.points || 0);
             }
         });
+
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
-        // Charger les photos des élèves (avec fallback)
+        // 6. Charger les photos avec la CORRECTE clé de mapping !
         let photosHtml = '<div style="display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
-            const index = parseInt(role) - 1;
-            const eleveId = localMapping[eq.lettre] ? localMapping[eq.lettre][index] : null;
-            
+            // 🔑 LA CLÉ EST : "504_A1" (classe + lettre + numéro)
+            const cleMapping = `${currentClasse}_${eq.lettre}${role}`;
+            const eleveId = localMapping[cleMapping];
+
             let photoUrl = null;
             if (eleveId) {
                 try {
                     photoUrl = await getPhotoUrl(eleveId);
                 } catch (e) { /* ignore */ }
             }
-            
-            // Si la photo est trouvée, on l'affiche. Sinon, on met une icône par défaut.
+
             if (photoUrl) {
                 photosHtml += `<div style="width: 45px; height: 45px; border-radius: 50%; background-image: url('${photoUrl}'); background-size: cover; border: 3px solid #3b82f6;"></div>`;
             } else {
@@ -86,9 +93,9 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // Assembler le bloc équipe (Grimpeur + Lettre + Score + Photos)
+        // 7. Construire la colonne de l'équipe
         html += `
-        <div style="position: absolute; top: ${topPos}px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: top 0.5s ease;">
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: ${height}px; transition: height 0.5s ease;">
             <div style="font-size: 60px;">🧗</div>
             <div style="background: #3b82f6; color: white; font-size: 30px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
             <div style="color: #facc15; font-size: 26px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
@@ -96,7 +103,6 @@ export async function renderEscaladeTV() {
         </div>`;
     }
 
-    html += '</div>';
     container.innerHTML = html;
 }
 
