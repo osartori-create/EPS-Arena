@@ -13,7 +13,7 @@ export async function renderEscaladeTV() {
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
     container.style.justifyContent = 'space-around';
-    container.style.alignItems = 'flex-end'; // Alignement en bas pour la montée verticale
+    container.style.alignItems = 'flex-end'; // Alignement en bas
     container.style.paddingBottom = '20px';
 
     const config = getConfigData();
@@ -48,26 +48,19 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 3. Calculer les RANGS (sans changer l'ordre alphabétique pour l'affichage)
-    // On trie une copie pour attribuer les rangs
-    const equipesTriees = [...equipesAvecScore].sort((a, b) => b.score - a.score);
-    const maxScore = equipesTriees[0].score;
-    const minScore = equipesTriees[equipesTriees.length - 1].score;
+    // 3. Déterminer le score maximum pour la hauteur
+    const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
 
-    // 4. Paramètres de la montagne verticale (le 1er est en haut)
-    const maxHeight = 480; // Hauteur de la colonne du 1er
-    const minHeight = 80;  // Hauteur minimale pour un groupe qui a des points
-    const step = (maxHeight - minHeight) / (equipesTriees.length > 1 ? equipesTriees.length - 1 : 1);
+    // 4. Hauteur maximale en pixels (le meilleur groupe sera à cette hauteur)
+    const maxHeight = 480;
+    const minHeight = 80; // Un groupe qui a des points reste toujours visible
 
     let html = '';
 
     // 5. Boucle sur les équipes (dans l'ordre alphabétique A, B, C...)
     for (const eq of equipesAvecScore) {
-        // Trouver le rang de cette équipe
-        const rang = equipesTriees.findIndex(e => e.lettre === eq.lettre) + 1; // 1 = meilleur
-        
-        // Hauteur de la colonne selon le rang (1er = maxHeight, dernier = minHeight)
-        const height = Math.max(maxHeight - (rang - 1) * step, minHeight);
+        // Hauteur proportionnelle au score !
+        const height = Math.max((eq.score / maxScore) * maxHeight, minHeight);
 
         // Récupérer les membres et leurs points
         const membresGroupes = {};
@@ -109,8 +102,7 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // Construire la colonne (ordre alphabétique horizontal)
-        // Grâce à "height", le 1er est en haut, le 2e en dessous, etc.
+        // Construire la colonne (ordre alphabétique horizontal + hauteur proportionnelle)
         html += `
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: ${height}px; transition: height 0.5s ease;">
             <div style="font-size: 60px;">🧗</div>
