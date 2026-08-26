@@ -28,13 +28,13 @@ export function initLayout() {
         if (targetView) targetView.classList.remove('hidden');
 
         // Cas spécifique pour l'onglet TV
-         if (tabName === 'tv') {
-            // Rien à faire ici, le rendu est déjà géré par live.js
-            // On peut juste s'assurer que la div est vide au départ
-            const tvGlobe = document.getElementById('tvGlobe');
-            if (tvGlobe && tvGlobe.innerHTML === '') {
-                tvGlobe.innerHTML = '<p class="text-slate-500 text-center mt-20">En attente des performances...</p>';
-            }
+        if (tabName === 'tv') {
+            // On force le rendu immédiat
+            setTimeout(() => {
+                if (window.renderEscaladeTV) {
+                    window.renderEscaladeTV();
+                }
+            }, 100);
         }
 
         // On active le bouton correspondant

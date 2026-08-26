@@ -31,9 +31,9 @@ export function renderEscaladeTV() {
     // 3. Trier par score décroissant
     equipes.sort((a, b) => b.score - a.score);
 
-    // 4. Construire la montagne
+    // 4. Construire la montagne (CSS CORRIGÉ : min-h-[500px] au lieu de h-full)
     const maxScore = Math.max(...equipes.map(eq => eq.score), 1);
-    let html = `<div class="relative w-full h-full overflow-hidden rounded-2xl bg-gradient-to-t from-slate-900 to-slate-700 flex flex-col justify-end">`;
+    let html = `<div class="relative w-full min-h-[500px] overflow-hidden rounded-2xl bg-gradient-to-t from-slate-900 to-slate-700 flex flex-col justify-end">`;
 
     // Les niveaux de la montagne
     html += `<div class="absolute bottom-0 left-0 right-0 h-1/4 bg-slate-800 border-t-2 border-slate-600"></div>`;
@@ -55,8 +55,7 @@ export function renderEscaladeTV() {
     html += `</div></div>`;
 
     container.innerHTML = html;
-    
-    // ... fin de la fonction ...
-    console.log("Rendu TV exécuté, config:", config, "Montees:", Object.keys(montees).length);
-    container.innerHTML = html;
 }
+
+// Exposer la fonction pour permettre un appel direct depuis layout.js
+window.renderEscaladeTV = renderEscaladeTV;
