@@ -5,13 +5,14 @@ export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // 1. Préparer le conteneur (comme dans eleve.html)
+    // 1. Conteneur : hauteur fixe en pixels (responsive mais bornée)
+    const containerHeight = 600; // Hauteur en pixels du cadre
     container.style.display = 'block';
-    container.style.height = '80vh'; // Hauteur responsive (80% de l'écran)
+    container.style.height = containerHeight + 'px';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
-    container.style.position = 'relative'; // Crucial pour le positionnement absolu
+    container.style.position = 'relative';
 
     const config = getConfigData();
     const montees = getEscaladeData();
@@ -23,47 +24,50 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 2. Créer les équipes et calculer les scores
+    // 2. Créer les équipes DANS L'ORDRE ALPHABÉTIQUE (A, B, C...)
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
             equipes.push({ lettre: key, score: 0 });
         }
     });
+    equipes.sort((a, b) => a.lettre.localeCompare(b.lettre));
 
+    // 3. Calcul des scores
     const monteesList = Object.values(montees || {});
     for (const m of monteesList) {
         const equipe = equipes.find(eq => eq.lettre === m.groupe);
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 3. Garder uniquement les groupes avec un score > 0
+    // 4. Garder uniquement les groupes avec des points
     const equipesAvecScore = equipes.filter(eq => eq.score > 0);
     if (equipesAvecScore.length === 0) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente des performances...</p>';
         return;
     }
 
-    // 4. Trouver le score maximum (pour la hauteur) et trier
+    // 5. Score maximum pour définir la montée (gère les "maxScore" inattendus)
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
-    equipesAvecScore.sort((a, b) => b.score - a.score);
 
-    // 5. Construire le HTML (STRUCTURE IDENTIQUE À ELEVE.HTML)
-    let html = `<div style="position: relative; width: 100%; height: 100%;">`;
+    // 6. Paramètres de montée : maximum 500px pour ne jamais sortir du cadre de 600px
+    const maxRisePx = 500;
+    const minRisePx = 20;
 
-    // Bandes de montagne
-    html += `<div style="position: absolute; bottom: 0; left: 0; right: 0; height: 25%; background: #334155;"></div>`;
-    html += `<div style="position: absolute; bottom: 25%; left: 0; right: 0; height: 25%; background: #475569;"></div>`;
-    html += `<div style="position: absolute; bottom: 50%; left: 0; right: 0; height: 25%; background: #64748b;"></div>`;
-    html += `<div style="position: absolute; bottom: 75%; left: 0; right: 0; height: 25%; background: #94a3b8;"></div>`;
+    // 7. Disposition horizontale (ordre alphabétique)
+    const step = 100 / (equipesAvecScore.length + 1);
 
-    // Conteneur des grimpeurs (alignés en bas et répartis)
-    html += `<div style="position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; align-items: flex-end; padding-bottom: 20px;">`;
+    let html = '';
 
-    // 6. Boucle sur les équipes (triées par score)
-    for (const eq of equipesAvecScore) {
-        // Calcul de la hauteur (exactement comme eleve.html : maximum 75%, minimum 5%)
-        const height = Math.max((eq.score / maxScore) * 75, 5);
+    // 8. Boucle sur les équipes
+    for (let i = 0; i < equipesAvecScore.length; i++) {
+        const eq = equipesAvecScore[i];
+
+        // Position horizontale centrée
+        const leftPercent = step * (i + 1);
+
+        // Montée en pixels (le meilleur est à 500px, le pire à 20px)
+        const risePx = Math.max((eq.score / maxScore) * maxRisePx, minRisePx);
 
         // Récupérer les membres et leurs points
         const membresGroupes = {};
@@ -103,9 +107,9 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // Assembler le bloc (utilise translateY comme eleve.html)
+        // 9. Construction du bloc : ancré en bas, monté en pixels
         html += `
-        <div style="display: flex; flex-direction: column; align-items: center; transform: translateY(-${height}%); transition: transform 0.5s ease;">
+        <div style="position: absolute; bottom: 0; left: ${leftPercent}%; transform: translateX(-50%) translateY(-${risePx}px); transition: transform 0.5s ease; display: flex; flex-direction: column; align-items: center;">
             <div style="font-size: 60px;">🧗</div>
             <div style="background: #3b82f6; color: white; font-size: 30px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
             <div style="color: #facc15; font-size: 24px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
@@ -113,8 +117,6 @@ export async function renderEscaladeTV() {
         </div>`;
     }
 
-    html += `</div></div>`;
-    
     container.innerHTML = html;
 }
 
