@@ -12,14 +12,14 @@ export async function renderEscaladeTV() {
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
-    container.style.justifyContent = 'space-around'; // Espacement horizontal
-    container.style.alignItems = 'flex-end'; // Aligné en bas
+    container.style.justifyContent = 'space-around';
+    container.style.alignItems = 'flex-end';
     container.style.paddingBottom = '20px';
 
     const config = getConfigData();
     const montees = getEscaladeData();
     const localMapping = getLocalMapping();
-    const currentClasse = getCurrentClasse(); // 🔑 IMPORTANT pour les photos
+    const currentClasse = getCurrentClasse();
 
     if (!config) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente de la configuration du prof...</p>';
@@ -50,14 +50,13 @@ export async function renderEscaladeTV() {
 
     // 3. Définir la hauteur maximale (pour la montagne horizontale)
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
-    const maxHeight = 480; // Hauteur max des colonnes en pixels
-    const minHeight = 50;  // Hauteur min pour rester visible
+    const maxHeight = 480;
+    const minHeight = 50;
 
-    let html = ''; // On n'utilise plus de position absolute, on utilise directement le flex du parent
+    let html = '';
 
     // 4. Boucle sur les équipes
     for (const eq of equipesAvecScore) {
-        // Hauteur de la colonne (le meilleur est le plus haut)
         const height = Math.max((eq.score / maxScore) * maxHeight, minHeight);
 
         // 5. Récupérer les membres et leurs points
@@ -71,10 +70,10 @@ export async function renderEscaladeTV() {
 
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
-        // 6. Charger les photos avec la CORRECTE clé de mapping !
+        // 6. Charger les photos avec la BONNE clé
         let photosHtml = '<div style="display: flex; flex-direction: column; align-items: center; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
-            // 🔑 LA CLÉ EST : "504_A1" (classe + lettre + numéro)
+            // ✅ LA CLÉ EST : "504_A1" (classe + lettre + numéro)
             const cleMapping = `${currentClasse}_${eq.lettre}${role}`;
             const eleveId = localMapping[cleMapping];
 
@@ -93,7 +92,7 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // 7. Construire la colonne de l'équipe
+        // 7. Construire la colonne
         html += `
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: ${height}px; transition: height 0.5s ease;">
             <div style="font-size: 60px;">🧗</div>

@@ -194,7 +194,23 @@ export function importEscaladeConfig(event) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
+            
+            // 1. Sauvegarder les groupes
             localStorage.setItem(`eps_arena_escalade_assignments_${data.classe}`, JSON.stringify(data.groupes));
+            
+            // ✅ 2. RECONSTRUIRE LE MAPPING LOCAL (pour les photos) !
+            const localMapping = {};
+            const groupes = data.groupes;
+            Object.keys(groupes).forEach(lettre => {
+                if (lettre !== 'activite' && lettre !== 'reserve' && Array.isArray(groupes[lettre])) {
+                    groupes[lettre].forEach((id, index) => {
+                        localMapping[`${data.classe}_${lettre}${index + 1}`] = id;
+                    });
+                }
+            });
+            localStorage.setItem(`eps_arena_local_mapping_${data.classe}`, JSON.stringify(localMapping));
+
+            // 3. Changer de classe si nécessaire
             const select = document.getElementById('selectClasse');
             if (select.value !== data.classe) {
                 select.value = data.classe;
@@ -202,7 +218,7 @@ export function importEscaladeConfig(event) {
             } else {
                 await loadEscaladeAssignments();
             }
-            alert("✅ Configuration Escalade importée !");
+            alert("✅ Configuration Escalade importée (et mapping photos recréé) !");
         } catch (err) {
             alert("❌ Erreur import : " + err.message);
         }
