@@ -1,11 +1,10 @@
-import { getConfigData, getEscaladeData, getCurrentClasse, getEleveIdFromCode } from '../../core/live-engine.js';
+// src/js/modules/escalade/escalade-tv-ui.js
+import { getConfigData, getEscaladeData, getEleveIdFromCode } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
-
-    // NE PAS FORCER L'AFFICHAGE DE viewTV : c'est le travail de layout.js de gérer les onglets !
 
     const config = getConfigData();
     const montees = getEscaladeData();
