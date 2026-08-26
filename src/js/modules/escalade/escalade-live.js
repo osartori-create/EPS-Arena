@@ -1,4 +1,26 @@
-import { getCurrentClasse, getConfigData, getEscaladeData, getNomFromCode, getPhotoHtml, coeffToCotation } from '../../core/live-engine.js';
+import { getCurrentClasse, getConfigData, getEscaladeData, getNomFromCode, getPhotoHtml } from '../../core/live-engine.js';
+
+// Fonction spécifique à l'escalade
+function coeffToCotation(coeff) {
+    const echelle = [
+        { cotation: '4a', coeff: 1.0 },
+        { cotation: '4b', coeff: 1.1 },
+        { cotation: '4c', coeff: 1.2 },
+        { cotation: '5a', coeff: 1.3 },
+        { cotation: '5b', coeff: 1.4 },
+        { cotation: '5c', coeff: 1.5 },
+        { cotation: '6a', coeff: 1.6 },
+        { cotation: '6b', coeff: 1.8 },
+        { cotation: '6c', coeff: 2.0 }
+    ];
+    let closest = echelle[0];
+    let minDiff = Math.abs(coeff - echelle[0].coeff);
+    for (let i = 1; i < echelle.length; i++) {
+        const diff = Math.abs(coeff - echelle[i].coeff);
+        if (diff < minDiff) { minDiff = diff; closest = echelle[i]; }
+    }
+    return closest.cotation;
+}
 
 export function renderEscaladeLive(data) {
     const container = document.getElementById('live-content');
@@ -7,8 +29,6 @@ export function renderEscaladeLive(data) {
     const entries = Object.values(data).reverse();
     let html = `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade (Cliquez pour le bilan)</h3><div class="space-y-2">`;
     
-    // Nous devons charger les photos de manière asynchrone, donc nous utilisons une fonction async avec une boucle for
-    // Mais comme renderEscaladeLive n'est pas async, nous allons construire une promesse globale
     const promises = entries.map(async m => {
         const code = `${m.groupe}${m.role}`;
         const nom = getNomFromCode(code);
@@ -32,7 +52,6 @@ export function renderEscaladeLive(data) {
         container.innerHTML = html;
     });
 
-    // Expose openBilan globalement
     window.openBilan = function(code) {
         const nom = getNomFromCode(code);
         const toutesMontées = Object.values(getEscaladeData()).filter(m => `${m.groupe}${m.role}` === code);

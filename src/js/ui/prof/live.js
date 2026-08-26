@@ -10,16 +10,23 @@ export function initLiveUI() {
     // Écoute des mises à jour de données
     window.addEventListener('live-data-updated', (e) => {
         const { type, data } = e.detail;
-        if (type === 'escalade') renderEscaladeLive(data);
-        else if (type === 'co') renderCOLive(data);
-        else if (type === 'multi') renderMultiLive(data);
+        
+        // On vérifie l'activité actuellement configurée pour le Prof
+        const currentActivite = getConfigData().activite || 'multi';
+
+        // On n'affiche que les données de l'activité active, on ignore les autres
+        if (type === 'escalade' && currentActivite === 'escalade') {
+            renderEscaladeLive(data);
+        } else if (type === 'co' && currentActivite === 'co') {
+            renderCOLive(data);
+        } else if (type === 'multi' && currentActivite === 'multi') {
+            renderMultiLive(data);
+        }
     });
 
-    // Écoute des changements de config (pour réafficher si besoin)
+    // Écoute des changements de config (pour changer de rendu ou vider)
     window.addEventListener('live-config-updated', () => {
-        const config = getConfigData();
-        // On peut réinitialiser ou re-rendre selon l'activité active
-        // Pour l'instant, on ne fait rien de spécial, mais on pourrait vider l'affichage
+        // On vide le contenu pour repartir sur une base propre
         document.getElementById('live-content').innerHTML = '<p class="text-slate-500 text-center">En attente des données...</p>';
     });
 }
