@@ -29,21 +29,14 @@ export function initLayout() {
 
         // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
-            // Petite attente pour que le panneau soit rendu visible
+            // On utilise un délai pour laisser le DOM se stabiliser, puis on importe et on rend
             setTimeout(() => {
-                // Appel direct si la fonction est disponible
-                if (typeof window.renderEscaladeTV === 'function') {
-                    window.renderEscaladeTV();
-                } else {
-                    // Sinon, on l'importe dynamiquement
-                    import('../../modules/escalade/escalade-tv-ui.js').then(module => {
-                        module.renderEscaladeTV();
-                    }).catch(err => console.error("Erreur import TV:", err));
-                }
+                import('../../modules/escalade/escalade-tv-ui.js').then(module => {
+                    module.renderEscaladeTV();
+                }).catch(err => console.error("Erreur import TV:", err));
             }, 200);
         }
 
-        
         // On active le bouton correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) {
@@ -51,14 +44,6 @@ export function initLayout() {
         }
     }; // Fin de window.switchTab
 
-    window.toggleFullscreen = function() {
-    const el = document.documentElement; // ou document.getElementById('viewTV')
-    if (!document.fullscreenElement) {
-        el.requestFullscreen().catch(err => {});
-    } else {
-        document.exitFullscreen();
-    }
-};
     // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
         const select = document.getElementById('selectClasse');
