@@ -5,9 +5,9 @@ export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // Conteneur principal : position relative, hauteur fixe
+    // Conteneur principal : hauteur 100vh pour être responsive (iPad paysage)
     container.style.display = 'block';
-    container.style.height = '600px';
+    container.style.height = '100vh';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
@@ -23,7 +23,7 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 1. Créer les équipes et calculer les scores
+    // 1. Créer les équipes et calculer les scores (ordre alphabétique conservé)
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
@@ -37,7 +37,7 @@ export async function renderEscaladeTV() {
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 2. On garde uniquement les groupes avec un score > 0
+    // 2. Garder uniquement les groupes avec un score > 0
     const equipesAvecScore = equipes.filter(eq => eq.score > 0);
 
     if (equipesAvecScore.length === 0) {
@@ -45,28 +45,24 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 3. Calculer le score maximum pour déterminer la hauteur
+    // 3. Score max pour définir la hauteur
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
 
-    // 4. Paramètres de hauteur (le meilleur est presque en haut, le pire en bas)
-    const maxBottom = 550; // Hauteur en pixels du groupe en tête (sur 600px)
-    const minBottom = 50;  // Hauteur en pixels du groupe le plus faible
-
-    // 5. Disposition horizontale équitable (ordre alphabétique)
-    const totalEquipes = equipesAvecScore.length;
-    const espaceHorizontal = 100 / totalEquipes;
+    // 4. Réglages responsive : on limite la montée à 75% pour ne jamais sortir
+    const maxRise = 75; 
+    const minRise = 5;
 
     let html = '';
 
-    // 6. Boucle sur les équipes
+    // 5. Boucle sur les équipes (ordre alphabétique pour l'horizontal)
     for (let i = 0; i < equipesAvecScore.length; i++) {
         const eq = equipesAvecScore[i];
-        
-        // Calcul de la hauteur en pixels (proportionnelle au score)
-        const bottomOffset = Math.max((eq.score / maxScore) * maxBottom, minBottom);
 
-        // Position horizontale (centrée dans sa zone)
-        const leftPercent = (i + 0.5) * espaceHorizontal;
+        // Calcul de la montée en pourcentage (proportionnelle au score)
+        const risePercent = Math.max((eq.score / maxScore) * maxRise, minRise);
+
+        // Position horizontale
+        const leftPercent = (i + 0.5) * (100 / equipesAvecScore.length);
 
         // Récupérer les membres et leurs points
         const membresGroupes = {};
@@ -108,9 +104,9 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // 7. Construire le bloc absolument positionné
+        // 6. Construire le bloc : il est ancré en bas, puis remonté en % (jamais au-delà de 75%)
         html += `
-        <div style="position: absolute; bottom: ${bottomOffset}px; left: ${leftPercent}%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center;">
+        <div style="position: absolute; bottom: 0; left: ${leftPercent}%; transform: translateX(-50%) translateY(-${risePercent}%); display: flex; flex-direction: column; align-items: center;">
             <div style="font-size: 60px;">🧗</div>
             <div style="background: #3b82f6; color: white; font-size: 30px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
             <div style="color: #facc15; font-size: 26px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
