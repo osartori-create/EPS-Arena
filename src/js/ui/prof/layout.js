@@ -24,8 +24,14 @@ export function initLayout() {
         const targetView = document.getElementById(targetViewId);
         if (targetView) targetView.classList.remove('hidden');
 
-        // Cas spécifique pour l'onglet TV : import et appel direct du module spécialisé
+                // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
+            // Forcer l'affichage du parent (contre les conflits Tailwind)
+            const tvView = document.getElementById('viewTV');
+            if (tvView) {
+                tvView.style.display = 'block';
+            }
+            // Appeler le rendu
             setTimeout(() => {
                 import('../../modules/escalade/escalade-tv-ui.js')
                 .then(module => {
