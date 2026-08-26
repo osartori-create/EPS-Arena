@@ -43,6 +43,7 @@ export function initLayout() {
             }, 200);
         }
 
+        
         // On active le bouton correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) {
@@ -50,6 +51,14 @@ export function initLayout() {
         }
     }; // Fin de window.switchTab
 
+    window.toggleFullscreen = function() {
+    const el = document.documentElement; // ou document.getElementById('viewTV')
+    if (!document.fullscreenElement) {
+        el.requestFullscreen().catch(err => {});
+    } else {
+        document.exitFullscreen();
+    }
+};
     // 2. Gestion des classes (Init + Ajout)
     function initClassesSelect() {
         const select = document.getElementById('selectClasse');
