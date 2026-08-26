@@ -35,7 +35,6 @@ function startListening() {
     if (currentUnsub) currentUnsub();
     if (!currentClasse) return;
 
-    // On écoute les données d'escalade en gardant les données en mémoire
     currentUnsub = listenToActivityData(currentClasse, (type, data) => {
         if (type === 'escalade') allEscaladeData = data;
         renderLiveData(type, data);
@@ -79,9 +78,9 @@ async function getPhotoHtml(code) {
     const eleveId = getEleveIdFromCode(code);
     if (eleveId) {
         const url = await getPhotoUrl(eleveId);
-        if (url) return `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`;
+        if (url) return `<img src="${url}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-500">`;
     }
-    return `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+    return `<div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
 }
 
 async function renderLiveData(type, data) {
@@ -113,8 +112,40 @@ async function renderLiveData(type, data) {
         }
         html += `</div>`;
     }
-    else if (type === 'co') { /* ... (inchangé) */ }
-    else if (type === 'multi') { /* ... (inchangé) */ }
+    else if (type === 'co') {
+        const entries = Object.values(data).reverse();
+        html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧭 Validations CO</h3>`;
+        html += `<div class="space-y-2">`;
+        for (const v of entries) {
+            const nom = getNomFromCode(v.code);
+            const photoHtml = await getPhotoHtml(v.code);
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 justify-between">
+                <div class="flex items-center gap-3">
+                    ${photoHtml}
+                    <span class="font-bold text-white">${nom}</span>
+                </div>
+                <span class="text-blue-400 font-black">Balise ${v.balise}</span>
+            </div>`;
+        }
+        html += `</div>`;
+    }
+    else if (type === 'multi') {
+        const entries = Object.values(data).reverse();
+        html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">⏱️ Chronos Multi</h3>`;
+        html += `<div class="space-y-2">`;
+        for (const p of entries) {
+            const nom = getNomFromCode(p.code);
+            const photoHtml = await getPhotoHtml(p.code);
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 justify-between">
+                <div class="flex items-center gap-3">
+                    ${photoHtml}
+                    <span class="font-bold text-white">${nom}</span>
+                </div>
+                <span class="text-yellow-400 font-black">${p.temps}</span>
+            </div>`;
+        }
+        html += `</div>`;
+    }
 
     container.innerHTML = html;
 
@@ -122,7 +153,6 @@ async function renderLiveData(type, data) {
     window.openBilan = function(code) {
         const eleveId = getEleveIdFromCode(code);
         const nom = getNomFromCode(code);
-        const studentsMap = getStudentsMap();
         
         // Calculs statistiques
         const toutesMontées = Object.values(allEscaladeData).filter(m => `${m.groupe}${m.role}` === code);
@@ -130,6 +160,7 @@ async function renderLiveData(type, data) {
         const nbVoies = toutesMontées.length;
         const distanceTotale = toutesMontées.reduce((sum, m) => sum + (m.hauteur || 0), 0);
         const nbTops = toutesMontées.filter(m => m.hauteur >= 9).length;
+        const distanceMoyenne = nbVoies > 0 ? distanceTotale / nbVoies : 0;
         
         // Difficulté moyenne (pondérée par hauteur)
         const bareme = { "4a": 1, "4b": 1.1, "4c": 1.2, "5a": 1.3, "5b": 1.4, "5c": 1.5, "6a": 1.6, "6b": 1.8, "6c": 2 };
@@ -139,7 +170,10 @@ async function renderLiveData(type, data) {
             coeffTotal += coeff * (m.hauteur || 0);
             hauteurTotal += m.hauteur || 0;
         });
-        const difficulteMoyenne = hauteurTotal > 0 ? (coeffTotal / hauteurTotal) : 0;
+        const coeffMoyen = hauteurTotal > 0 ? (coeffTotal / hauteurTotal) : 0;
+        
+        // Conversion du coefficient en cotation
+        const difficulteMoyenne = coeffToCotation(coeffMoyen);
         
         // Plus grande difficulté validée (2 voies différentes)
         const validéDeuxVoies = {};
@@ -153,23 +187,57 @@ async function renderLiveData(type, data) {
             .filter(cot => validéDeuxVoies[cot].size >= 2)
             .sort((a, b) => (bareme[b] || 1) - (bareme[a] || 1))[0] || 'Aucune';
         
-        // Affichage de la modale
-        const modalHtml = `
-        <div class="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50" id="bilanModal">
-            <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-md">
-                <h3 class="text-2xl font-black text-white mb-4">📊 Bilan de ${nom}</h3>
-                <div class="space-y-3">
-                    <div class="flex justify-between"><span class="text-slate-400">Nombre de voies</span><span class="font-black text-white">${nbVoies}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Distance cumulée</span><span class="font-black text-emerald-400">${distanceTotale} m</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Nombre de Tops</span><span class="font-black text-yellow-400">${nbTops}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Difficulté moyenne</span><span class="font-black text-white">${difficulteMoyenne.toFixed(2)}</span></div>
-                    <div class="flex justify-between"><span class="text-slate-400">Plus grande difficulté validée (2 voies)</span><span class="font-black text-blue-400">${plusGrandeDifValidée}</span></div>
+        // Récupérer la photo
+        getPhotoHtml(code).then(photoHtml => {
+            // Affichage de la modale
+            const modalHtml = `
+            <div class="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50" id="bilanModal">
+                <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-md">
+                    <div class="flex flex-col items-center mb-4">
+                        ${photoHtml}
+                        <h3 class="text-2xl font-black text-white mt-3">${nom}</h3>
+                        <p class="text-slate-400">Code : ${code}</p>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex justify-between"><span class="text-slate-400">Nombre de voies</span><span class="font-black text-white">${nbVoies}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Distance cumulée</span><span class="font-black text-emerald-400">${distanceTotale} m</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Distance moyenne</span><span class="font-black text-white">${distanceMoyenne.toFixed(1)} m</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Nombre de Tops</span><span class="font-black text-yellow-400">${nbTops}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Difficulté moyenne</span><span class="font-black text-blue-400">${difficulteMoyenne}</span></div>
+                        <div class="flex justify-between"><span class="text-slate-400">Plus grande difficulté validée (2 voies)</span><span class="font-black text-blue-400">${plusGrandeDifValidée}</span></div>
+                    </div>
+                    <button onclick="document.getElementById('bilanModal').remove()" class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white">Fermer</button>
                 </div>
-                <button onclick="document.getElementById('bilanModal').remove()" class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white">Fermer</button>
-            </div>
-        </div>`;
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        });
     };
+    
+    // Fonction pour convertir un coefficient en cotation (échelle linéaire)
+    function coeffToCotation(coeff) {
+        const echelle = [
+            { cotation: '4a', coeff: 1.0 },
+            { cotation: '4b', coeff: 1.1 },
+            { cotation: '4c', coeff: 1.2 },
+            { cotation: '5a', coeff: 1.3 },
+            { cotation: '5b', coeff: 1.4 },
+            { cotation: '5c', coeff: 1.5 },
+            { cotation: '6a', coeff: 1.6 },
+            { cotation: '6b', coeff: 1.8 },
+            { cotation: '6c', coeff: 2.0 }
+        ];
+        
+        let closest = echelle[0];
+        let minDiff = Math.abs(coeff - echelle[0].coeff);
+        for (let i = 1; i < echelle.length; i++) {
+            const diff = Math.abs(coeff - echelle[i].coeff);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closest = echelle[i];
+            }
+        }
+        return closest.cotation;
+    }
 }
 
 // Export CSV
