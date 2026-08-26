@@ -5,7 +5,7 @@ export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // Conteneur principal en affichage HORIZONTAL (Flexbox)
+    // Conteneur principal (format iPad paysage)
     container.style.display = 'flex';
     container.style.height = '600px';
     container.style.width = '100%';
@@ -13,7 +13,7 @@ export async function renderEscaladeTV() {
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
     container.style.justifyContent = 'space-around';
-    container.style.alignItems = 'flex-end'; // Alignement en bas
+    container.style.alignItems = 'flex-end'; // Ancrage en bas
     container.style.paddingBottom = '20px';
 
     const config = getConfigData();
@@ -26,7 +26,7 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 1. Créer les équipes et calculer les scores (ordre alphabétique conservé)
+    // 1. Créer les équipes et calculer les scores
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
@@ -40,7 +40,7 @@ export async function renderEscaladeTV() {
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 2. Garder uniquement les groupes avec un score > 0
+    // 2. Garder uniquement les groupes avec des points
     const equipesAvecScore = equipes.filter(eq => eq.score > 0);
 
     if (equipesAvecScore.length === 0) {
@@ -48,18 +48,18 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 3. Déterminer le score maximum pour la hauteur
+    // 3. Score maximum pour définir la hauteur
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
 
-    // 4. Hauteur maximale en pixels (le meilleur groupe sera à cette hauteur)
-    const maxHeight = 480;
-    const minHeight = 80; // Un groupe qui a des points reste toujours visible
+    // 4. Réglages de hauteur (le meilleur monte TOUT EN HAUT !)
+    const maxHeight = 550; // On monte à 550px (sur un conteneur de 600px)
+    const minHeight = 60;  // Hauteur minimale pour un groupe qui a des points
 
     let html = '';
 
-    // 5. Boucle sur les équipes (dans l'ordre alphabétique A, B, C...)
+    // 5. Boucle sur les équipes (ordre alphabétique A, B, C...)
     for (const eq of equipesAvecScore) {
-        // Hauteur proportionnelle au score !
+        // Hauteur proportionnelle au score (le meilleur aura 550px, les autres descendront)
         const height = Math.max((eq.score / maxScore) * maxHeight, minHeight);
 
         // Récupérer les membres et leurs points
@@ -102,7 +102,7 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // Construire la colonne (ordre alphabétique horizontal + hauteur proportionnelle)
+        // Construire la colonne
         html += `
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: ${height}px; transition: height 0.5s ease;">
             <div style="font-size: 60px;">🧗</div>
