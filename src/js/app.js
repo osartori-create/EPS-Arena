@@ -11,7 +11,7 @@ export function initApp() {
     initLayout();
     initAdminUI();
     initActivities();
-    initLiveUI(); // NOUVEAU
+    // initLiveUI(); // <-- Commenté pour tester
     initTVUI();
     
     listenConfig((config) => {
