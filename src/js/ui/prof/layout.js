@@ -24,14 +24,14 @@ export function initLayout() {
         const targetView = document.getElementById(targetViewId);
         if (targetView) targetView.classList.remove('hidden');
 
-        // Si on clique sur TV, on appelle directement la fonction exposée par live.js
+        // Cas spécifique pour l'onglet TV : import et appel direct du module spécialisé
         if (tabName === 'tv') {
             setTimeout(() => {
-                if (typeof window.renderEscaladeTV === 'function') {
-                    window.renderEscaladeTV();
-                } else {
-                    console.error("La fonction window.renderEscaladeTV n'est pas disponible");
-                }
+                import('../../modules/escalade/escalade-tv-ui.js')
+                .then(module => {
+                    module.renderEscaladeTV();
+                })
+                .catch(err => console.error("Erreur import TV:", err));
             }, 200);
         }
 
