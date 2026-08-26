@@ -1,6 +1,5 @@
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { getConfigData, getEscaladeData } from '../../core/live-engine.js';
 
 export function initLayout() {
     
@@ -25,30 +24,14 @@ export function initLayout() {
         const targetView = document.getElementById(targetViewId);
         if (targetView) targetView.classList.remove('hidden');
 
-        // Cas spécifique pour l'onglet TV
+        // Si on clique sur TV, on appelle directement la fonction exposée par live.js
         if (tabName === 'tv') {
-            console.log("👉 Clic sur TV");
-            const globe = document.getElementById('tvGlobe');
-            console.log("--> Div tvGlobe trouvée ?", globe !== null);
-            console.log("--> Config actuelle :", getConfigData());
-            
-            // Test visuel direct
-            if (!globe) {
-                console.error("❌ La div tvGlobe est introuvable dans le HTML !");
-                return;
-            }
-
             setTimeout(() => {
-                // On force un rendu avec import dynamique
-                import('../../modules/escalade/escalade-tv-ui.js')
-                .then(module => {
-                    console.log("✅ Module TV chargé avec succès");
-                    module.renderEscaladeTV();
-                })
-                .catch(err => {
-                    console.error("❌ Erreur lors de l'import du module TV :", err);
-                    globe.innerHTML = "❌ Erreur de chargement du module TV (voir console)";
-                });
+                if (typeof window.renderEscaladeTV === 'function') {
+                    window.renderEscaladeTV();
+                } else {
+                    console.error("La fonction window.renderEscaladeTV n'est pas disponible");
+                }
             }, 200);
         }
 
