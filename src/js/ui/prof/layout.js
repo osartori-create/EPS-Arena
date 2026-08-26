@@ -7,7 +7,7 @@ export function initLayout() {
     // 1. Gestion des onglets (Sécurisé)
     window.switchTab = function(tabName) {
         // On cache toutes les vues
-        ['admin', 'activities', 'live'].forEach(t => {
+        ['admin', 'activities', 'live', 'tv'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
@@ -23,7 +23,7 @@ export function initLayout() {
         });
 
         // On affiche la vue ciblée
-        const map = { 'admin': '1', 'activities': '2', 'live': '3' };
+        const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4' };
         const targetViewId = 'view' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
         const targetView = document.getElementById(targetViewId);
         if (targetView) targetView.classList.remove('hidden');

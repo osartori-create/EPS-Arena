@@ -47,6 +47,7 @@
         <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
         <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
         <button id="btnTab3" onclick="switchTab('live')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📊 Résultats Live</button>
+        <button id="btnTab4" onclick="switchTab('tv')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📺 TV</button>
     </nav>
 
     <div class="space-y-6">
@@ -214,6 +215,16 @@
             </div>
         </div>
 
+                <!-- ONGLET 4 : TV -->
+        <div id="viewTV" class="hidden">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📺 Mode Diffusion (Montagne collective)</h3>
+                <div id="tvGlobe" class="bg-slate-900 p-5 rounded-2xl min-h-[500px]">
+                    <p class="text-slate-500 text-center mt-20">En attente des performances...</p>
+                </div>
+            </div>
+        </div>
+        
     </div> <!-- Fin space-y-6 -->
 
     <script type="module">
