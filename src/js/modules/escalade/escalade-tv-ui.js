@@ -5,14 +5,17 @@ export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // 1. Conteneur : hauteur fixe en pixels (responsive mais bornée)
-    const containerHeight = 600; // Hauteur en pixels du cadre
-    container.style.display = 'block';
-    container.style.height = containerHeight + 'px';
+    // 1. Conteneur : hauteur fixe (600px) pour ne jamais sortir du cadre
+    container.style.height = '600px';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
-    container.style.position = 'relative';
+    
+    // 2. Disposition horizontale (colonne A, B, C... côte à côte)
+    container.style.display = 'flex';
+    container.style.flexDirection = 'row';
+    container.style.justifyContent = 'space-around';
+    container.style.alignItems = 'flex-start'; // Ancrage en HAUT !
 
     const config = getConfigData();
     const montees = getEscaladeData();
@@ -24,50 +27,44 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 2. Créer les équipes DANS L'ORDRE ALPHABÉTIQUE (A, B, C...)
+    // 3. Créer les équipes DANS L'ORDRE ALPHABÉTIQUE (A, B, C...)
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
             equipes.push({ lettre: key, score: 0 });
         }
     });
-    equipes.sort((a, b) => a.lettre.localeCompare(b.lettre));
+    equipes.sort((a, b) => a.lettre.localeCompare(b.lettre)); // Ordre ABCDEFG
 
-    // 3. Calcul des scores
+    // 4. Calcul des scores
     const monteesList = Object.values(montees || {});
     for (const m of monteesList) {
         const equipe = equipes.find(eq => eq.lettre === m.groupe);
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 4. Garder uniquement les groupes avec des points
+    // 5. Garder uniquement les groupes avec des points
     const equipesAvecScore = equipes.filter(eq => eq.score > 0);
     if (equipesAvecScore.length === 0) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente des performances...</p>';
         return;
     }
 
-    // 5. Score maximum pour définir la montée (gère les "maxScore" inattendus)
+    // 6. Score maximum pour définir le classement vertical
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
 
-    // 6. Paramètres de montée : maximum 500px pour ne jamais sortir du cadre de 600px
-    const maxRisePx = 500;
-    const minRisePx = 20;
-
-    // 7. Disposition horizontale (ordre alphabétique)
-    const step = 100 / (equipesAvecScore.length + 1);
+    // Paramètres de position verticale (hauteur du bloc ~180px)
+    const topMax = 20;  // Meilleur groupe (haut de l'écran)
+    const topMin = 420; // Pire groupe (bas de l'écran)
 
     let html = '';
 
-    // 8. Boucle sur les équipes
-    for (let i = 0; i < equipesAvecScore.length; i++) {
-        const eq = equipesAvecScore[i];
-
-        // Position horizontale centrée
-        const leftPercent = step * (i + 1);
-
-        // Montée en pixels (le meilleur est à 500px, le pire à 20px)
-        const risePx = Math.max((eq.score / maxScore) * maxRisePx, minRisePx);
+    // 7. Boucle sur les équipes
+    for (const eq of equipesAvecScore) {
+        
+        // Calcul du "top" : Inversement proportionnel au score.
+        // Le meilleur aura top = 20px, le pire aura top = 420px.
+        const topPos = topMin - ((eq.score / maxScore) * (topMin - topMax));
 
         // Récupérer les membres et leurs points
         const membresGroupes = {};
@@ -78,10 +75,11 @@ export async function renderEscaladeTV() {
             }
         });
 
+        // Trier les membres par points décroissants (le meilleur en haut de la liste)
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
-        // Charger les photos
-        let photosHtml = '<div style="display: flex; flex-direction: row; gap: 5px; margin-top: 10px;">';
+        // Charger les photos (EMPILÉES VERTICALEMENT, le meilleur en haut !)
+        let photosHtml = '<div style="display: flex; flex-direction: column; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
             const index = parseInt(role) - 1;
             const mappingKey = `${currentClasse}_${eq.lettre}`;
@@ -107,9 +105,9 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // 9. Construction du bloc : ancré en bas, monté en pixels
+        // 8. Construction du bloc : ancré en HAUT avec "top"
         html += `
-        <div style="position: absolute; bottom: 0; left: ${leftPercent}%; transform: translateX(-50%) translateY(-${risePx}px); transition: transform 0.5s ease; display: flex; flex-direction: column; align-items: center;">
+        <div style="display: flex; flex-direction: column; align-items: center; position: relative; top: ${topPos}px; transition: top 0.5s ease;">
             <div style="font-size: 60px;">🧗</div>
             <div style="background: #3b82f6; color: white; font-size: 30px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
             <div style="color: #facc15; font-size: 24px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
