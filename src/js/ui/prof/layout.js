@@ -29,12 +29,18 @@ export function initLayout() {
 
         // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
-            // On force le rendu immédiat
+            // Petite attente pour que le panneau soit rendu visible
             setTimeout(() => {
-                if (window.renderEscaladeTV) {
+                // Appel direct si la fonction est disponible
+                if (typeof window.renderEscaladeTV === 'function') {
                     window.renderEscaladeTV();
+                } else {
+                    // Sinon, on l'importe dynamiquement
+                    import('../../modules/escalade/escalade-tv-ui.js').then(module => {
+                        module.renderEscaladeTV();
+                    }).catch(err => console.error("Erreur import TV:", err));
                 }
-            }, 100);
+            }, 200);
         }
 
         // On active le bouton correspondant

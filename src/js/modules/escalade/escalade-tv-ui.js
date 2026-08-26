@@ -1,10 +1,14 @@
-// src/js/modules/escalade/escalade-tv-ui.js
 import { getConfigData, getEscaladeData } from '../../core/live-engine.js';
 
-// Cette fonction est appelée quand on ouvre l'onglet TV ou quand les données changent
 export function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
+
+    // FORCER l'affichage du panneau parent au cas où il serait caché
+    const tvView = document.getElementById('viewTV');
+    if (tvView && tvView.classList.contains('hidden')) {
+        tvView.classList.remove('hidden');
+    }
 
     const config = getConfigData();
     const montees = getEscaladeData();
@@ -31,25 +35,27 @@ export function renderEscaladeTV() {
     // 3. Trier par score décroissant
     equipes.sort((a, b) => b.score - a.score);
 
-    // 4. Construire la montagne (CSS CORRIGÉ : min-h-[500px] au lieu de h-full)
+    // 4. Construire la montagne (CSS INLINE - FIABLE À 100%)
     const maxScore = Math.max(...equipes.map(eq => eq.score), 1);
-    let html = `<div class="relative w-full min-h-[500px] overflow-hidden rounded-2xl bg-gradient-to-t from-slate-900 to-slate-700 flex flex-col justify-end">`;
+    const baseHeight = 500; // Hauteur fixe du globe
 
-    // Les niveaux de la montagne
-    html += `<div class="absolute bottom-0 left-0 right-0 h-1/4 bg-slate-800 border-t-2 border-slate-600"></div>`;
-    html += `<div class="absolute bottom-1/4 left-0 right-0 h-1/4 bg-slate-700 border-t-2 border-slate-600"></div>`;
-    html += `<div class="absolute bottom-1/2 left-0 right-0 h-1/4 bg-slate-600 border-t-2 border-slate-500"></div>`;
-    html += `<div class="absolute bottom-3/4 left-0 right-0 h-1/4 bg-slate-500 border-t-2 border-slate-400"></div>`;
+    let html = `<div style="width: 100%; height: ${baseHeight}px; position: relative; background: #1e293b; border-radius: 16px; overflow: hidden;">`;
 
-    // Les grimpeurs
-    html += `<div class="relative z-10 flex justify-around items-end pb-4">`;
+    // Bandeaux de montagne (arrière-plan) - dimensions fixes en pourcentage
+    html += `<div style="position: absolute; bottom: 0; left: 0; right: 0; height: 25%; background: #334155;"></div>`;
+    html += `<div style="position: absolute; bottom: 25%; left: 0; right: 0; height: 25%; background: #475569;"></div>`;
+    html += `<div style="position: absolute; bottom: 50%; left: 0; right: 0; height: 25%; background: #64748b;"></div>`;
+    html += `<div style="position: absolute; bottom: 75%; left: 0; right: 0; height: 25%; background: #94a3b8;"></div>`;
+
+    // Grimpeurs (équipes) - basé sur des translations en pixels
+    html += `<div style="position: absolute; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; align-items: flex-end; padding-bottom: 20px;">`;
     equipes.forEach(eq => {
-        const height = Math.max((eq.score / maxScore) * 90, 5);
+        const height = Math.max((eq.score / maxScore) * (baseHeight - 100), 40); // Minimum 40px
         html += `
-        <div class="flex flex-col items-center justify-end transition-all duration-700" style="transform: translateY(-${height}%)">
-            <div class="text-6xl">🧗</div>
-            <div class="bg-blue-500 text-white text-4xl font-black px-6 py-2 rounded-xl mt-2 shadow-lg">${eq.lettre}</div>
-            <div class="text-yellow-400 text-3xl font-black mt-1">${eq.score.toFixed(0)} m</div>
+        <div style="display: flex; flex-direction: column; align-items: center; transform: translateY(-${height}px); transition: transform 1s ease;">
+            <div style="font-size: 70px;">🧗</div>
+            <div style="background: #3b82f6; color: white; font-size: 40px; font-weight: 900; padding: 8px 20px; border-radius: 12px; margin-top: 10px;">${eq.lettre}</div>
+            <div style="color: #facc15; font-size: 32px; font-weight: 900; margin-top: 6px;">${eq.score.toFixed(0)} m</div>
         </div>`;
     });
     html += `</div></div>`;
@@ -57,5 +63,5 @@ export function renderEscaladeTV() {
     container.innerHTML = html;
 }
 
-// Exposer la fonction pour permettre un appel direct depuis layout.js
+// Exposer globalement pour pouvoir être appelé directement
 window.renderEscaladeTV = renderEscaladeTV;
