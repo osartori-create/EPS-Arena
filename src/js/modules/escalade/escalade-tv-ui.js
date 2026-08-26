@@ -5,13 +5,16 @@ export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // 1. FORCER LES DIMENSIONS (En pixels, fiable à 100%)
-    container.style.display = 'block';
+    // Dimensions forcées et fiables
+    container.style.display = 'flex';
     container.style.height = '600px';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
+    container.style.justifyContent = 'space-around';
+    container.style.alignItems = 'flex-end';
+    container.style.paddingBottom = '20px';
 
     const config = getConfigData();
     const montees = getEscaladeData();
@@ -22,7 +25,7 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 2. Créer les équipes
+    // 1. Créer les équipes et calculer leurs scores
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
@@ -30,31 +33,36 @@ export async function renderEscaladeTV() {
         }
     });
 
-    // 3. Calculer les scores
     const monteesList = Object.values(montees || {});
     for (const m of monteesList) {
         const equipe = equipes.find(eq => eq.lettre === m.groupe);
         if (equipe) equipe.score += (m.points || 0);
     }
 
-    // 4. Trier par score décroissant
-    equipes.sort((a, b) => b.score - a.score);
+    // 2. On garde UNIQUEMENT les équipes qui ont des points (> 0)
+    const equipesAvecScore = equipes.filter(eq => eq.score > 0);
 
-    // 5. Construire le podium avec des positions TOP en PIXELS
-    let html = `<div style="position: absolute; top: 0; left: 0; right: 0; height: 100%;">`;
+    // 3. On trie par score décroissant
+    equipesAvecScore.sort((a, b) => b.score - a.score);
 
-    // Bande de fond simple
-    html += `<div style="position: absolute; bottom: 0; left: 0; right: 0; height: 100px; background: #334155; border-radius: 0 0 16px 16px;"></div>`;
+    // 4. Trouver le score maximum pour définir la hauteur des grimpeurs
+    const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
 
-    // 6. Disposition en colonne verticale (top: 50px, 200px, 350px...)
-    const positions = [50, 180, 310, 440, 570]; // on espace de 130px en 130px
+    // 5. Si aucune équipe n'a de score, on affiche un message
+    if (equipesAvecScore.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px; width: 100%;">En attente des performances des élèves...</p>';
+        return;
+    }
 
-    for (let i = 0; i < equipes.length; i++) {
-        const eq = equipes[i];
-        const topPos = positions[i] || 50 + (i * 130);
+    // 6. Vider et reconstruire le conteneur
+    container.innerHTML = '';
 
-        // Générer les photos des membres (triées par points)
-        let photosHtml = '';
+    // 7. Boucle sur chaque équipe pour construire leur "bloc" (côte à côte)
+    for (const eq of equipesAvecScore) {
+        // Hauteur du bloc en pixels (proportionnelle au score)
+        const height = Math.max((eq.score / maxScore) * 400, 80); // 400px max, 80px min
+
+        // 8. Récupérer et trier les membres de cette équipe par points
         const membresGroupes = {};
         monteesList.forEach(m => {
             if (m.groupe === eq.lettre) {
@@ -62,39 +70,44 @@ export async function renderEscaladeTV() {
                 membresGroupes[m.role] += (m.points || 0);
             }
         });
-
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
+        // 9. Construire les photos (de manière asynchrone)
+        let photosHtml = '<div style="display: flex; flex-direction: column; gap: 5px; align-items: center; margin-top: 10px;">';
         for (const role of rolesTries) {
-            if (membresGroupes[role] > 0) {
-                const index = parseInt(role) - 1;
-                const eleveId = localMapping[eq.lettre] ? localMapping[eq.lettre][index] : null;
-                if (eleveId) {
-                    try {
-                        const url = await getPhotoUrl(eleveId);
-                        if (url) {
-                            photosHtml += `<div style="width: 40px; height: 40px; border-radius: 50%; background-image: url('${url}'); background-size: cover; border: 2px solid #3b82f6; margin-bottom: 5px;"></div>`;
-                        }
-                    } catch (e) { /* ignore */ }
-                }
+            const index = parseInt(role) - 1;
+            const eleveId = localMapping[eq.lettre] ? localMapping[eq.lettre][index] : null;
+            if (eleveId) {
+                try {
+                    const url = await getPhotoUrl(eleveId);
+                    if (url) {
+                        photosHtml += `<div style="width: 45px; height: 45px; border-radius: 50%; background-image: url('${url}'); background-size: cover; border: 3px solid #3b82f6;"></div>`;
+                    }
+                } catch (e) { /* ignorer les erreurs de photos */ }
             }
         }
+        photosHtml += '</div>';
 
-        // Générer le bloc équipe
-        html += `
-        <div style="position: absolute; top: ${topPos}px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: top 0.5s ease;">
-            <div style="font-size: 50px;">🧗</div>
-            <div style="background: #3b82f6; color: white; font-size: 28px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
-            <div style="color: #facc15; font-size: 24px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
-            <div style="display: flex; flex-direction: column; align-items: center; margin-top: 10px; gap: 5px;">
-                ${photosHtml}
-            </div>
-        </div>`;
+        // 10. Construire le bloc équipe
+        const blocEquipe = document.createElement('div');
+        blocEquipe.style.display = 'flex';
+        blocEquipe.style.flexDirection = 'column';
+        blocEquipe.style.alignItems = 'center';
+        blocEquipe.style.justifyContent = 'flex-end';
+        blocEquipe.style.height = height + 'px';
+        blocEquipe.style.transition = 'height 0.5s ease';
+        
+        blocEquipe.innerHTML = `
+            <div style="font-size: 60px;">🧗</div>
+            <div style="background: #3b82f6; color: white; font-size: 30px; font-weight: 900; padding: 5px 15px; border-radius: 10px; margin-top: 5px;">${eq.lettre}</div>
+            <div style="color: #facc15; font-size: 26px; font-weight: 800; margin-top: 5px;">${eq.score.toFixed(0)} m</div>
+            ${photosHtml}
+        `;
+
+        // 11. Ajouter le bloc au conteneur principal
+        container.appendChild(blocEquipe);
     }
-
-    html += `</div>`;
-
-    container.innerHTML = html;
 }
 
+// Exposer pour appel global
 window.renderEscaladeTV = renderEscaladeTV;
