@@ -28,6 +28,11 @@ export function initLayout() {
         const targetView = document.getElementById(targetViewId);
         if (targetView) targetView.classList.remove('hidden');
 
+        if (tabName === 'tv') {
+            // Import dynamique pour récupérer le module et forcer le rendu
+            import('../../modules/escalade/escalade-tv-ui.js').then(module => {
+                module.renderEscaladeTV();
+
         // On active le bouton correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) {

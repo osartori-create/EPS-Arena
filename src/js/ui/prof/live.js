@@ -3,6 +3,7 @@ import { initLiveEngine, getConfigData } from '../../core/live-engine.js';
 import { renderEscaladeLive } from '../../modules/escalade/escalade-live.js';
 import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
+import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
 
 export function initLiveUI() {
     initLiveEngine();
@@ -22,6 +23,9 @@ export function initLiveUI() {
         } else if (type === 'multi' && currentActivite === 'multi') {
             renderMultiLive(data);
         }
+        // 🆕 Mise à jour du grand globe (TV) si on est en escalade
+        if (type === 'escalade' && currentActivite === 'escalade') {
+            renderEscaladeTV();
     });
 
     // Écoute des changements de config (pour changer de rendu ou vider)
