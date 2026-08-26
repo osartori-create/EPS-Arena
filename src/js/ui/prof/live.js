@@ -1,6 +1,7 @@
 // src/js/ui/prof/live.js
 import { listenToActivityData, ref, onValue } from '../../core/firebase-service.js';
 import { db } from '../../core/firebase-service.js';
+import { getPhotoUrl } from '../../services/admin-service.js'; // ✅ Import pour les photos
 
 let currentUnsub = null;
 let currentClasse = "";
@@ -25,7 +26,7 @@ async function loadConfig() {
     const configRef = ref(db, `${currentClasse}/config`);
     onValue(configRef, (snap) => {
         configData = snap.val() || {};
-        renderLiveData();
+        renderLiveData(); // Relance le rendu si la config change
     });
 }
 
@@ -50,9 +51,9 @@ function getLocalMapping() {
     return mapping;
 }
 
-function getNomFromCode(code) {
-    // Exemple : code = "E1" -> lettre = "E", index = 0
-    if (code.length < 2) return code;
+// Récupère l'ID de l'élève depuis un code (ex: "E1")
+function getEleveIdFromCode(code) {
+    if (code.length < 2) return null;
     const lettre = code.slice(0, 1);
     const index = parseInt(code.slice(1)) - 1; 
     
@@ -60,7 +61,15 @@ function getNomFromCode(code) {
     const key = `${currentClasse}_${lettre}`;
     
     if (localMap[key] && localMap[key][index]) {
-        const eleveId = localMap[key][index];
+        return localMap[key][index];
+    }
+    return null;
+}
+
+// Récupère le nom de l'élève depuis un code
+function getNomFromCode(code) {
+    const eleveId = getEleveIdFromCode(code);
+    if (eleveId) {
         const studentsMap = getStudentsMap();
         if (studentsMap[eleveId]) {
             return studentsMap[eleveId];
@@ -69,7 +78,20 @@ function getNomFromCode(code) {
     return code; // Si non trouvé, on affiche le code
 }
 
-function renderLiveData(type, data) {
+// ✅ Fonction pour obtenir le HTML de la photo (asynchrone)
+async function getPhotoHtml(code) {
+    const eleveId = getEleveIdFromCode(code);
+    if (eleveId) {
+        const url = await getPhotoUrl(eleveId);
+        if (url) {
+            return `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`;
+        }
+    }
+    return `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+}
+
+// ✅ Rendu asynchrone (on attend les photos avant d'afficher)
+async function renderLiveData(type, data) {
     const container = document.getElementById('live-content');
     if (!container) return;
 
@@ -79,49 +101,64 @@ function renderLiveData(type, data) {
         const entries = Object.values(data).reverse();
         html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade</h3>`;
         html += `<div class="space-y-2">`;
-        entries.forEach(m => {
-            const nom = getNomFromCode(`${m.groupe}${m.role}`);
+        for (const m of entries) {
+            const code = `${m.groupe}${m.role}`;
+            const nom = getNomFromCode(code);
+            const photoHtml = await getPhotoHtml(code); // Chargement de la photo
             const hauteur = m.hauteur ? `${m.hauteur}m` : 'Top';
-            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                <div>
-                    <span class="font-bold text-white">${nom}</span>
-                    <span class="text-xs text-slate-400 ml-2">Voie ${m.voie_num} - ${hauteur}</span>
+            
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 justify-between">
+                <div class="flex items-center gap-3">
+                    ${photoHtml}
+                    <div>
+                        <span class="font-bold text-white">${nom}</span>
+                        <span class="text-xs text-slate-400 ml-2 block">Voie ${m.voie_num} - ${hauteur}</span>
+                    </div>
                 </div>
                 <span class="text-emerald-400 font-black">${m.points}m</span>
             </div>`;
-        });
+        }
         html += `</div>`;
     }
     else if (type === 'co') {
         const entries = Object.values(data).reverse();
         html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧭 Validations CO</h3>`;
         html += `<div class="space-y-2">`;
-        entries.forEach(v => {
+        for (const v of entries) {
             const nom = getNomFromCode(v.code);
-            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                <span class="font-bold text-white">${nom}</span>
+            const photoHtml = await getPhotoHtml(v.code);
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 justify-between">
+                <div class="flex items-center gap-3">
+                    ${photoHtml}
+                    <span class="font-bold text-white">${nom}</span>
+                </div>
                 <span class="text-blue-400 font-black">Balise ${v.balise}</span>
             </div>`;
-        });
+        }
         html += `</div>`;
     }
     else if (type === 'multi') {
         const entries = Object.values(data).reverse();
         html += `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">⏱️ Chronos Multi</h3>`;
         html += `<div class="space-y-2">`;
-        entries.forEach(p => {
+        for (const p of entries) {
             const nom = getNomFromCode(p.code);
-            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
-                <span class="font-bold text-white">${nom}</span>
+            const photoHtml = await getPhotoHtml(p.code);
+            html += `<div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 justify-between">
+                <div class="flex items-center gap-3">
+                    ${photoHtml}
+                    <span class="font-bold text-white">${nom}</span>
+                </div>
                 <span class="text-yellow-400 font-black">${p.temps}</span>
             </div>`;
-        });
+        }
         html += `</div>`;
     }
 
     container.innerHTML = html;
 }
 
+// Export CSV
 window.exportResultsLive = function() {
     if (!currentClasse) return alert("Sélectionnez une classe.");
 
