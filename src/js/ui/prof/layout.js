@@ -1,5 +1,6 @@
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+import { getConfigData } from '../../core/live-engine.js'; // ✅ Import ajouté
 
 export function initLayout() {
     
@@ -28,18 +29,23 @@ export function initLayout() {
 
         // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
-    setTimeout(() => {
-        const currentActivite = getConfigData().activite; // Nécessite un import ou une récupération de l'état
-        if (currentActivite && window.tvRenderers[currentActivite]) {
-            window.tvRenderers[currentActivite]();
-        } else {
-            // Fallback : si on ne connaît pas l'activité, on attend que le module soit chargé
-            import('../../modules/escalade/escalade-tv-ui.js').then(() => {
-                if (window.tvRenderers[currentActivite]) window.tvRenderers[currentActivite]();
-            }).catch(err => console.error("Erreur import TV:", err));
+            setTimeout(() => {
+                const currentActivite = getConfigData().activite;
+                if (window.tvRenderers && window.tvRenderers[currentActivite]) {
+                    window.tvRenderers[currentActivite]();
+                } else {
+                    const tvGlobe = document.getElementById('tvGlobe');
+                    if (tvGlobe) {
+                        tvGlobe.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">Chargement de la montagne...</p>';
+                    }
+                    import('../../modules/escalade/escalade-tv-ui.js').then(() => {
+                        if (window.tvRenderers['escalade']) {
+                            window.tvRenderers['escalade']();
+                        }
+                    }).catch(err => console.error("Erreur import TV:", err));
+                }
+            }, 100);
         }
-    }, 100);
-}
     };
 
     // 2. Gestion des classes
