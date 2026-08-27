@@ -61,12 +61,23 @@ export function getLocalMapping() {
     return mapping;
 }
 
-// ✅ FONCTION ADAPTÉE À VOTRE STRUCTURE PLATE (504_A1)
 export function getEleveIdFromCode(code) {
-    // code = "A1" -> clé = "504_A1"
+    // Format 1 : Plat ("504_A1") -> recherche directe
     const cleComplete = `${currentClasse}_${code}`;
     const localMap = getLocalMapping();
     if (localMap[cleComplete]) return localMap[cleComplete];
+
+    // Format 2 : Imbriqué ("504_A" -> ["ID1", "ID2"])
+    const match = code.match(/^([A-Z]+)(\d+)$/);
+    if (match) {
+        const lettre = match[1];
+        const index = parseInt(match[2]) - 1;
+        const cleImbriquee = `${currentClasse}_${lettre}`;
+        if (localMap[cleImbriquee] && Array.isArray(localMap[cleImbriquee])) {
+            if (localMap[cleImbriquee][index]) return localMap[cleImbriquee][index];
+        }
+    }
+
     return null;
 }
 
