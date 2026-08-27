@@ -4,6 +4,15 @@ export function initEscaladeInterface(nbGroupes = 6) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
+    // 💡 SOLUTION : Lire la sauvegarde pour récupérer le bon nombre de groupes
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (activeClasse) {
+        const saved = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+        const savedGroupes = Object.keys(saved).filter(k => k !== 'reserve' && Array.isArray(saved[k])).length;
+        if (savedGroupes > 0) nbGroupes = savedGroupes;
+    }
+
+    // Création des colonnes A, B, C... selon nbGroupes
     let html = '';
     for (let i = 0; i < nbGroupes; i++) {
         const lettre = String.fromCharCode(65 + i);
@@ -17,10 +26,6 @@ export function initEscaladeInterface(nbGroupes = 6) {
         `;
     }
     container.innerHTML = html;
-
-    const reserve = document.getElementById('reserveListEscalade');
-    if (reserve) reserve.__sortable = false;
-    document.querySelectorAll('.groupe-members').forEach(el => el.__sortable = false);
 }
 
 export function initSortableEscalade() {
