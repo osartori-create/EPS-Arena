@@ -1,6 +1,5 @@
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { getConfigData } from '../../core/live-engine.js'; // ✅ Import ajouté
 
 export function initLayout() {
     
@@ -27,23 +26,18 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Cas spécifique pour l'onglet TV
+        // Cas spécifique pour l'onglet TV : on importe et on appelle DIRECTEMENT
         if (tabName === 'tv') {
             setTimeout(() => {
-                const currentActivite = getConfigData().activite;
-                if (window.tvRenderers && window.tvRenderers[currentActivite]) {
-                    window.tvRenderers[currentActivite]();
-                } else {
-                    const tvGlobe = document.getElementById('tvGlobe');
-                    if (tvGlobe) {
-                        tvGlobe.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">Chargement de la montagne...</p>';
+                import('../../modules/escalade/escalade-tv-ui.js')
+                .then(module => {
+                    if (typeof module.renderEscaladeTV === 'function') {
+                        module.renderEscaladeTV();
+                    } else {
+                        console.error("La fonction renderEscaladeTV n'est pas exportée dans le module.");
                     }
-                    import('../../modules/escalade/escalade-tv-ui.js').then(() => {
-                        if (window.tvRenderers['escalade']) {
-                            window.tvRenderers['escalade']();
-                        }
-                    }).catch(err => console.error("Erreur import TV:", err));
-                }
+                })
+                .catch(err => console.error("Erreur import TV:", err));
             }, 100);
         }
     };
