@@ -7,14 +7,19 @@ import { db, ref, set, remove } from '../../core/firebase-service.js';
 
 let currentDiscipline = 'multi';
 
+// ✅ Fonction locale pour construire le chemin hiérarchique
+function getBaseProf() {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    return `etablissements/0680013V/profs/${profCode}`;
+}
+
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
-    try { initEscaladeInterface(); } catch (e) {}
+    try { initEscaladeInterface(6); } catch (e) {}
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
 
-        // 1. Gestion des vues
         const multiView = document.getElementById('viewMultiSettings');
         const coView = document.getElementById('viewCOSettings');
         const escView = document.getElementById('viewEscaladeSettings');
@@ -22,33 +27,19 @@ export function initActivities() {
         if (coView) coView.classList.toggle('hidden', disc !== 'co');
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
 
-        // 2. Gestion des boutons (le bon reste bleu)
         const btnMulti = document.getElementById('btnDisc-multi');
         const btnCo = document.getElementById('btnDisc-co');
         const btnEsc = document.getElementById('btnDisc-escalade');
         
-        if (btnMulti) {
-            if (disc === 'multi') btnMulti.classList.add('border-blue-500', 'text-blue-400');
-            else btnMulti.classList.remove('border-blue-500', 'text-blue-400');
-        }
-        if (btnCo) {
-            if (disc === 'co') btnCo.classList.add('border-blue-500', 'text-blue-400');
-            else btnCo.classList.remove('border-blue-500', 'text-blue-400');
-        }
-        if (btnEsc) {
-            if (disc === 'escalade') btnEsc.classList.add('border-blue-500', 'text-blue-400');
-            else btnEsc.classList.remove('border-blue-500', 'text-blue-400');
-        }
+        if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
+        if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
+        if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
 
-        // 3. Actions spécifiques
         if (disc === 'co') {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
         if (disc === 'escalade') {
-    try {
-        initEscaladeInterface(); // Construit les colonnes
-        loadEscaladeAssignments(); // Remplit les groupes puis initialise Sortable via setTimeout
-    } catch (e) {}
+            try { initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
         }
     };
 
@@ -70,7 +61,7 @@ export function initActivities() {
             alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
             return;
         }
-        // Multi classique (code existant)
+
         const options = {
             mode: document.getElementById('modeRepartition')?.value || 'melange',
             mixite: document.getElementById('modeMixite')?.value || 'ignore',
@@ -82,6 +73,7 @@ export function initActivities() {
         };
         if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
+
         const teams = generateClassicTeams(eleves, options);
         const container = document.getElementById('teamsGrid');
         if (container) {
@@ -95,7 +87,7 @@ export function initActivities() {
         }
     };
 
-    // TRANSMISSION : UNIQUEMENT DES NOMBRES !
+    // ✅ TRANSMISSION (chemins hiérarchiques)
     window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe.");
@@ -107,8 +99,8 @@ export function initActivities() {
             configData.activite = 'co';
             Object.keys(configData).forEach(lettre => {
                 if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
-                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre]; // Mapping local
-                    configData[lettre] = configData[lettre].length; // Nombre uniquement !
+                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
+                    configData[lettre] = configData[lettre].length;
                 }
             });
         } else if (currentDiscipline === 'escalade') {
@@ -116,8 +108,8 @@ export function initActivities() {
             configData.activite = 'escalade';
             Object.keys(configData).forEach(lettre => {
                 if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
-                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre]; // Mapping local
-                    configData[lettre] = configData[lettre].length; // Nombre uniquement !
+                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
+                    configData[lettre] = configData[lettre].length;
                 }
             });
         } else {
@@ -127,28 +119,63 @@ export function initActivities() {
                 window.lastTeams.forEach((team, index) => {
                     const lettre = lettres[index] || `EQ${index+1}`;
                     localMapping[`${activeClasse}_${lettre}`] = team.members.map(m => m.id);
-                    configData[lettre] = team.members.length; // Nombre uniquement !
+                    configData[lettre] = team.members.length;
                 });
             } else {
                 return alert("Veuillez d'abord générer les équipes.");
             }
         }
-
-        // Sauvegarde locale du mapping
         localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
 
-        const profBase = `etablissements/0680013V/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}`;
+        const baseProf = getBaseProf();
         try {
-            await set(ref(db, `${profBase}/${activeClasse}/config`), configData);
-            await set(ref(db, `${profBase}/active_classes/${activeClasse}`), true);
-            alert("✅ Configuration transmise !");
+            await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+            await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+            alert("✅ Configuration transmise aux iPads !");
         } catch (e) { console.error("Erreur transmission :", e); alert("Erreur lors de la transmission."); }
     };
 
-    window.openPurgeModal = function() { /* (reste identique) */ };
-    window.addCircuit = function() { /* (reste identique) */ };
-    window.editCircuit = function(id) { /* (reste identique) */ };
-    window.delCircuit = function(id) { /* (reste identique) */ };
+    // ✅ PURGE (corrigée avec le bon chemin hiérarchique)
+    window.openPurgeModal = function() {
+        const choix = prompt("Purge Firebase\n1- Purger la classe active\n2- Purger TOUTE la base (code RNE)");
+        const baseProf = getBaseProf();
+
+        if (choix === "1") {
+            const activeClasse = document.getElementById('selectClasse').value;
+            if (activeClasse && confirm("Supprimer toutes les données de la classe " + activeClasse + " ?")) {
+                remove(ref(db, `${baseProf}/${activeClasse}`))
+                    .then(() => location.reload())
+                    .catch(err => alert("Erreur purge : " + err.message));
+            }
+        } else if (choix === "2") {
+            const code = prompt("Code RNE :");
+            if (code === "0680013V" && confirm("Supprimer TOUTE la base ?")) {
+                remove(ref(db))
+                    .then(() => location.reload())
+                    .catch(err => alert("Erreur purge : " + err.message));
+            }
+        }
+    };
+
+    window.addCircuit = function() {
+        const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
+        if(!cat) return;
+        const nom = prompt("Nom du circuit (ex: 1, Rouge) :");
+        if(!nom) return;
+        const b = prompt("Liste des balises (ex: 31, 34*, 42) :");
+        if(b) {
+            addCircuitCO(cat, nom, b);
+            renderCircuits('circuitList', "");
+        }
+    };
+    window.editCircuit = function(id) {
+        const circ = getCircuits().find(c => c.id === id);
+        const n = prompt("Modifier les balises :", circ.balises.join(', '));
+        if(n !== null) { editCircuitCO(id, n); renderCircuits('circuitList', ""); }
+    };
+    window.delCircuit = function(id) {
+        if(confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
+    };
 
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
