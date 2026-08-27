@@ -53,11 +53,14 @@ export function initActivities() {
         }
 
         if (disc === 'orientshow') {
-            try { 
-                initSortableOS(); 
-                loadOSAssignments(); // <- Ajoute cette ligne
-                setTimeout(() => ensureReserveLoaded(), 100);
-            } catch (e) {}
+    try { 
+        // 1. Générer la grille (les 6 lignes)
+        initOSInterface();
+        // 2. Charger les assignations existantes (si sauvegardées)
+        loadOSAssignments();
+        // 3. Si la réserve est vide, la remplir avec les élèves
+        setTimeout(() => ensureReserveLoaded(), 100);
+    } catch (e) {}
         }
     };
 

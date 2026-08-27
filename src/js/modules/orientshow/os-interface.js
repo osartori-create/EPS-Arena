@@ -7,11 +7,13 @@ const colorsInfo = [
     { id: "VERT", bg: "bg-green-600", text: "text-white" },
     { id: "JAUNE", bg: "bg-yellow-500", text: "text-black" }
 ];
-const NB_LIGNES = 6; // ✅ Modifié à 6 lignes !
-let osSortableInitialise = false;
+const NB_LIGNES = 6;
 
 export function initOSInterface() {
+    // 1. Générer la matrice des balises (en haut)
     renderMatrix();
+    
+    // 2. Générer la grille des postes (6x5) dans le conteneur
     const container = document.getElementById('os-postesGrid');
     if (!container) return;
 
@@ -30,10 +32,8 @@ export function initOSInterface() {
     }
     container.innerHTML = html;
     
-    if (!osSortableInitialise) {
-        initSortableOS();
-        osSortableInitialise = true;
-    }
+    // Sortable est initialisé APRÈS la création du HTML
+    setTimeout(() => initSortableOS(), 100);
 }
 
 export function initSortableOS() {
@@ -75,7 +75,7 @@ export function saveOSAssignments() {
     localStorage.setItem(getOSStorageKey(), JSON.stringify(assignments));
 }
 
-// ✅ NOUVELLE FONCTION : Remplit la réserve si elle est vide
+// Remplit la réserve automatiquement si elle est vide
 export function ensureReserveLoaded() {
     const activeClasse = document.getElementById('selectClasse')?.value;
     if (!activeClasse) return;
@@ -84,9 +84,8 @@ export function ensureReserveLoaded() {
     const reserve = document.getElementById('os-reserve');
     if (!reserve) return;
 
-    // Si la réserve est vide ET qu'il y a des élèves, on la remplit
     if (reserve.children.length === 0 && eleves.length > 0) {
-        populateReserveOS(); // Appel de la fonction existante
+        populateReserveOS(); // Appel global
     }
 }
 
@@ -130,48 +129,4 @@ export async function loadOSAssignments() {
     }
 
     setTimeout(() => initSortableOS(), 100);
-}
-
-// --- 4. EXPORT / IMPORT JSON ---
-export function exportOSConfig() {
-    saveOSAssignments();
-    const activeClasse = document.getElementById('selectClasse').value;
-    const assignments = JSON.parse(localStorage.getItem(getOSStorageKey()) || '{}');
-    const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-
-    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,"");
-    const data = { version: 1, classe: activeClasse, activite: 'orientshow', date: dateStr, groupes: assignments, matrice: matrix };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${activeClasse}_orientshow_${dateStr}.json`;
-    a.click();
-}
-
-export function importOSConfig(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
-            
-            localStorage.setItem(`eps_arena_os_assignments_${data.classe}`, JSON.stringify(data.groupes));
-            if (data.matrice) localStorage.setItem('eps_arena_os_matrix', JSON.stringify(data.matrice));
-            
-            const select = document.getElementById('selectClasse');
-            if (select.value !== data.classe) {
-                select.value = data.classe;
-                select.dispatchEvent(new Event('change'));
-            } else {
-                await loadOSAssignments();
-                renderMatrix();
-            }
-            alert("✅ Configuration OrientShow importée !");
-        } catch (err) { alert("❌ Erreur import : " + err.message); }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
 }
