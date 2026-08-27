@@ -34,13 +34,7 @@ export function listenToActivityData(classe, callback) {
     };
 }
 
-// Fonctions standard (listenConfig, listenPassages, sendPassage) restent inchangées...
-
-function getProfBasePath() {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `${DB_PATHS.ETAB}/profs/${profCode}`;
-}
-
+// ✅ Fonctions standard pour la config du prof et les passages
 export function listenConfig(callback) {
     const refConfig = ref(db, `${getProfBasePath()}/config`);
     return onValue(refConfig, (snapshot) => callback(snapshot.val() || {}));
