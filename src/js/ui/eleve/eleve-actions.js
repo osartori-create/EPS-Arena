@@ -1,4 +1,3 @@
-// src/js/ui/eleve/eleve-actions.js
 import { getDB, getSelectedClass, resetToLogin } from './eleve-app.js';
 import { getPerformancePath } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
@@ -13,7 +12,6 @@ export function showFeedback(message, delay = 5000) {
         <p class="text-sm text-slate-400 mb-8">Montagne d'équipe dans <span id="feedback-countdown">5</span>s</p>
     `;
     document.body.appendChild(feedbackDiv);
-
     let countdown = 5;
     const countdownEl = feedbackDiv.querySelector('#feedback-countdown');
     const interval = setInterval(() => {
@@ -37,7 +35,6 @@ export function showTeamMountain() {
         <div class="content mt-6"></div>
         <p class="text-sm text-slate-400 mt-4 mb-8">Retour au choix du code dans <span id="mountain-countdown">5</span>s</p>`;
     document.body.appendChild(mountainDiv);
-
     const monteesRef = ref(db, getPerformancePath(selectedClass, 'escalade'));
     onValue(monteesRef, (snap) => {
         const montees = snap.val() || {};
@@ -66,7 +63,6 @@ export function showTeamMountain() {
         html += `</div></div>`;
         mountainDiv.querySelector('.content').innerHTML = html;
     });
-
     let countdown = 5;
     const countdownEl = mountainDiv.querySelector('#mountain-countdown');
     const interval = setInterval(() => {

@@ -27,7 +27,6 @@ const multiModule = document.getElementById('multi-module');
 // Récupération des classes disponibles
 const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
 const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
-
 onValue(activeClassesRef, (snap) => {
     const data = snap.val() || {};
     classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
@@ -55,7 +54,6 @@ function showLogin() {
     waitingScreen.classList.add('hidden');
     activityScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
-    
     codeList.innerHTML = '';
     const config = currentConfig;
     activityTitle.innerText = "Choisis ton code";
@@ -87,7 +85,6 @@ function selectCode(code) {
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
-
     if (currentConfig.activite === 'escalade') {
         escaladeModule.classList.remove('hidden');
         initEscaladeKiosk(selectedClass, selectedCode);
@@ -98,17 +95,11 @@ function selectCode(code) {
     }
 }
 
-// ✅ Exposition des fonctions globales (SANS collision de déclaration)
+// ✅ Exposition globale des fonctions (SANS collision !)
 window.sendEscalade = sendEscaladeAction;
-window.sendBalise = () => {
-    console.log("Balise envoyée (temporaire)");
-};
-window.startChrono = () => {
-    console.log("Chrono démarré (temporaire)");
-};
-window.stopChrono = () => {
-    console.log("Chrono arrêté (temporaire)");
-};
+window.sendBalise = () => { console.log("Balise envoyée"); };
+window.startChrono = () => { console.log("Chrono démarré"); };
+window.stopChrono = () => { console.log("Chrono arrêté"); };
 
 export function getSelectedClass() { return selectedClass; }
 export function getSelectedCode() { return selectedCode; }
@@ -116,5 +107,4 @@ export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
 export function resetToLogin() { showLogin(); }
 
-// Initialisation
 showWaiting();
