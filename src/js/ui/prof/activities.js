@@ -51,7 +51,7 @@ export function initActivities() {
         loadEscaladeAssignments();
     } catch (e) {}
     if (disc === 'orientshow') {
-            try { initSortableOS(); }
+            try { initSortableOS(); } catch (e) {}
 }
     };
 
