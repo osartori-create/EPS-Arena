@@ -17,9 +17,10 @@ export function initOSInterface() {
     couleurs.forEach(c => { html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`; });
     html += `</div>`;
 
-    for (let ligne = 1; ligne <= 6; ligne++) {
+        for (let ligne = 1; ligne <= 6; ligne++) {
+        // ✅ NOUVELLE CASE : Plus petite, avec un chiffre géant en jaune doré
         html += `<div class="grid grid-cols-6 gap-2 mb-2">
-            <div class="flex items-center justify-center font-black text-slate-500 text-xl bg-slate-800/50 rounded-lg">${ligne}</div>`;
+            <div class="flex items-center justify-center font-black text-yellow-400 text-5xl bg-slate-900 w-12 h-12 rounded-lg shadow-inner border border-yellow-500/30">${ligne}</div>`;
         couleurs.forEach(c => {
             const code = `${c.id}_${ligne}`;
             html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 rounded-lg" data-code="${code}"></div>`;
