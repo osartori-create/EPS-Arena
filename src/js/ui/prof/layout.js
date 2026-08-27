@@ -28,14 +28,18 @@ export function initLayout() {
 
         // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
-            setTimeout(() => {
-                if (typeof window.renderEscaladeTV === 'function') {
-                    window.renderEscaladeTV(); // Appel direct
-                } else {
-                    console.error("window.renderEscaladeTV n'est pas disponible");
-                }
-            }, 100);
+    setTimeout(() => {
+        const currentActivite = getConfigData().activite; // Nécessite un import ou une récupération de l'état
+        if (currentActivite && window.tvRenderers[currentActivite]) {
+            window.tvRenderers[currentActivite]();
+        } else {
+            // Fallback : si on ne connaît pas l'activité, on attend que le module soit chargé
+            import('../../modules/escalade/escalade-tv-ui.js').then(() => {
+                if (window.tvRenderers[currentActivite]) window.tvRenderers[currentActivite]();
+            }).catch(err => console.error("Erreur import TV:", err));
         }
+    }, 100);
+}
     };
 
     // 2. Gestion des classes

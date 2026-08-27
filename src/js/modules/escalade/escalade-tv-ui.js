@@ -1,17 +1,15 @@
 import { getConfigData, getEscaladeData, getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
+// Fonction de rendu spécifique à l'escalade
 export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // 1. Conteneur : hauteur fixe (600px)
     container.style.height = '600px';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
-    
-    // 2. Disposition horizontale
     container.style.display = 'flex';
     container.style.flexDirection = 'row';
     container.style.justifyContent = 'space-around';
@@ -27,7 +25,6 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 3. Créer les équipes DANS L'ORDRE ALPHABÉTIQUE
     const equipes = [];
     Object.keys(config).forEach(key => {
         if (key !== 'activite' && (typeof config[key] === 'number' || Array.isArray(config[key]))) {
@@ -36,30 +33,23 @@ export async function renderEscaladeTV() {
     });
     equipes.sort((a, b) => a.lettre.localeCompare(b.lettre));
 
-    // 4. Calcul des scores
     const monteesList = Object.values(montees || {});
     for (const m of monteesList) {
         const equipe = equipes.find(eq => eq.lettre === m.groupe);
         if (equipe) equipe.score += Number(m.points) || 0;
     }
 
-    // 5. Garder uniquement les groupes avec des points
     const equipesAvecScore = equipes.filter(eq => eq.score > 0);
     if (equipesAvecScore.length === 0) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente des performances...</p>';
         return;
     }
 
-    // 6. Score maximum pour définir la hauteur (le meilleur est tout en haut)
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
-
-    // Paramètres : topMax = 20px (tout en haut), topMin = 420px (visible en bas)
     const topMax = 20;
     const topMin = 420;
 
     let html = '';
-
-    // 7. Boucle sur les équipes
     for (const eq of equipesAvecScore) {
         const topPos = topMin - ((eq.score / maxScore) * (topMin - topMax));
 
@@ -111,4 +101,6 @@ export async function renderEscaladeTV() {
     container.innerHTML = html;
 }
 
-window.renderEscaladeTV = renderEscaladeTV;
+// Enregistrement du module dans le registre global TV
+if (!window.tvRenderers) window.tvRenderers = {};
+window.tvRenderers['escalade'] = renderEscaladeTV;
