@@ -39,8 +39,12 @@ export function initActivities() {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
         if (disc === 'escalade') {
-            try { initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
-        }
+    try {
+        initEscaladeInterface(); // Va lire la sauvegarde OU le nombre d'élèves
+        initSortableEscalade();
+        loadEscaladeAssignments();
+    } catch (e) {}
+}
     };
 
     window.generateTeams = async function() {

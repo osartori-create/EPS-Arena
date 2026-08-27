@@ -5,25 +5,30 @@ export function initEscaladeInterface(nbGroupes = 6) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
-    // Détruire les anciennes instances réelles de Sortable
-    document.querySelectorAll('.groupe-members').forEach(el => {
-        if (el.__sortable && typeof el.__sortable.destroy === 'function') {
-            el.__sortable.destroy();
-        }
-        delete el.__sortable;
-    });
-
-    // Lire la sauvegarde pour récupérer le bon nombre de groupes (10, 11, etc.)
+    // 1. Lire la sauvegarde (si elle existe déjà, on conserve ce nombre)
     const activeClasse = document.getElementById('selectClasse').value;
+    let nbGroupesCalcule = nbGroupes; // Valeur par défaut (6)
+    
     if (activeClasse) {
+        // A. Lire la sauvegarde locale des groupes (si vous avez déjà préparé un JSON)
         const saved = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
         const savedGroupes = Object.keys(saved).filter(k => k !== 'reserve' && Array.isArray(saved[k])).length;
-        if (savedGroupes > 0) nbGroupes = savedGroupes;
+        if (savedGroupes > 0) {
+            nbGroupesCalcule = savedGroupes;
+        }
+        
+        // B. Sinon, lire le nombre d'élèves pour calculer le nombre de groupes
+        else {
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+            if (eleves.length > 0) {
+                nbGroupesCalcule = Math.ceil(eleves.length / 3); // 3 élèves par groupe max
+            }
+        }
     }
 
-    // Construire les colonnes
+    // 2. Construire le HTML avec le bon nombre de groupes
     let html = '';
-    for (let i = 0; i < nbGroupes; i++) {
+    for (let i = 0; i < nbGroupesCalcule; i++) {
         const lettre = String.fromCharCode(65 + i);
         html += `
             <div class="flex flex-col">
@@ -35,6 +40,9 @@ export function initEscaladeInterface(nbGroupes = 6) {
         `;
     }
     container.innerHTML = html;
+
+    // 3. On met à jour la variable globale pour les affichages suivants
+    window.currentEscaladeGroupes = nbGroupesCalcule;
 }
 
 // 2. Initialisation du glisser-déposer (avec instances réelles stockées)
