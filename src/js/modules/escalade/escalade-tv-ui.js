@@ -50,23 +50,19 @@ export async function renderEscaladeTV() {
         return;
     }
 
-    // 6. Score maximum
+    // 6. Score maximum pour définir la hauteur (le meilleur est tout en haut)
     const maxScore = Math.max(...equipesAvecScore.map(eq => eq.score), 1);
 
-    // ✅ RÉGLAGE CRUCIAL : On fixe la position la plus basse à 320px.
-    // Cela garantit que le bloc le plus bas (environ 180px de haut) reste visible.
-    const topMax = 20;  // Meilleur groupe
-    const topMin = 320; // Pire groupe (ajusté pour ne plus couper les photos)
+    // Paramètres : topMax = 20px (tout en haut), topMin = 420px (visible en bas)
+    const topMax = 20;
+    const topMin = 420;
 
     let html = '';
 
     // 7. Boucle sur les équipes
     for (const eq of equipesAvecScore) {
-        
-        // Position verticale inversée par rapport au score
         const topPos = topMin - ((eq.score / maxScore) * (topMin - topMax));
 
-        // Récupérer les membres et leurs points
         const membresGroupes = {};
         monteesList.forEach(m => {
             if (m.groupe === eq.lettre) {
@@ -75,10 +71,8 @@ export async function renderEscaladeTV() {
             }
         });
 
-        // Trier les membres par points décroissants
         const rolesTries = Object.keys(membresGroupes).sort((a, b) => membresGroupes[b] - membresGroupes[a]);
 
-        // Charger les photos (empilées verticalement)
         let photosHtml = '<div style="display: flex; flex-direction: column; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
             const index = parseInt(role) - 1;
@@ -105,7 +99,6 @@ export async function renderEscaladeTV() {
         }
         photosHtml += '</div>';
 
-        // 8. Construction du bloc
         html += `
         <div style="display: flex; flex-direction: column; align-items: center; position: relative; top: ${topPos}px; transition: top 0.5s ease;">
             <div style="font-size: 60px;">🧗</div>

@@ -3,16 +3,16 @@ import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-
 
 export function initLayout() {
     
-    // 1. Gestion des onglets (Sécurisé et SANS forçage)
+    // 1. Gestion des onglets (Contrôleur principal)
     window.switchTab = function(tabName) {
-        // On cache TOUTES les vues
+        // 1.1 On cache TOUS les onglets (y compris TV)
         ['admin', 'activities', 'live', 'tv'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
             if (el) el.classList.add('hidden');
         });
 
-        // On désactive TOUS les boutons
+        // 1.2 On retire le style actif de tous les boutons
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
@@ -21,27 +21,33 @@ export function initLayout() {
             }
         });
 
-        // On affiche uniquement la vue ciblée
+        // 1.3 On affiche uniquement l'onglet demandé
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4' };
-        const targetViewId = 'view' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
-        const targetView = document.getElementById(targetViewId);
-        if (targetView) targetView.classList.remove('hidden');
-
-        // Cas spécifique pour l'onglet TV : on charge les données uniquement si le panneau est visible
-        if (tabName === 'tv') {
-            setTimeout(() => {
-                import('../../modules/escalade/escalade-tv-ui.js').then(module => {
-                    module.renderEscaladeTV();
-                }).catch(err => console.error("Erreur import TV:", err));
-            }, 200);
+        const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+        if (targetView) {
+            targetView.classList.remove('hidden');
         }
 
-        // On active le bouton correspondant
+        // 1.4 On active le bouton correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
-        if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
+        if (targetBtn) {
+            targetBtn.classList.add('tab-active', 'text-blue-500');
+        }
+
+        // 1.5 Cas spécifique pour l'onglet TV : on déclenche le rendu après l'affichage
+        if (tabName === 'tv') {
+            setTimeout(() => {
+                // On importe le module et on appelle le rendu
+                import('../../modules/escalade/escalade-tv-ui.js')
+                .then(module => {
+                    module.renderEscaladeTV();
+                })
+                .catch(err => console.error("Erreur import TV:", err));
+            }, 100); // Petit délai pour laisser le DOM s'afficher
+        }
     };
 
-    // 2. Gestion des classes
+    // ... (Le reste des fonctions : initClassesSelect, addClasse, profInput, connexion reste identique)
     function initClassesSelect() {
         const select = document.getElementById('selectClasse');
         if (!select) return; 
