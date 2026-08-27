@@ -4,7 +4,15 @@ export function initEscaladeInterface(nbGroupes = 6) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
-    // 💡 SOLUTION : Lire la sauvegarde pour récupérer le bon nombre de groupes
+    // Détruire les anciens Sortable pour éviter les conflits
+    document.querySelectorAll('.groupe-members').forEach(el => {
+        if (el.__sortable) {
+            el.__sortable.destroy();
+            delete el.__sortable;
+        }
+    });
+
+    // Lecture de la sauvegarde pour le bon nombre de groupes
     const activeClasse = document.getElementById('selectClasse').value;
     if (activeClasse) {
         const saved = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
@@ -12,7 +20,7 @@ export function initEscaladeInterface(nbGroupes = 6) {
         if (savedGroupes > 0) nbGroupes = savedGroupes;
     }
 
-    // Création des colonnes A, B, C... selon nbGroupes
+    // Créer les colonnes
     let html = '';
     for (let i = 0; i < nbGroupes; i++) {
         const lettre = String.fromCharCode(65 + i);
@@ -172,59 +180,6 @@ export async function loadEscaladeAssignments() {
 
     updateRanks();
     saveEscaladeAssignments();
-    setTimeout(() => initSortableEscalade(), 100);
-}
-
-export function exportEscaladeConfig() {
-    saveEscaladeAssignments();
-    const activeClasse = document.getElementById('selectClasse').value;
-    const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
-
-    const date = new Date();
-    const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-    
-    const data = { version: 1, classe: activeClasse, activite: 'escalade', date: dateStr, groupes: assignments };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${activeClasse}_escalade_${dateStr}.json`;
-    a.click();
-}
-
-export function importEscaladeConfig(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
-            
-            // 1. Supprimer les anciennes colonnes et recréer dynamiquement
-            const nbGroupes = Object.keys(data.groupes).filter(k => k !== 'activite' && k !== 'reserve').length;
-            initEscaladeInterface(nbGroupes); // Crée le bon nombre de colonnes
-            
-            // 2. Sauvegarder les groupes
-            localStorage.setItem(`eps_arena_escalade_assignments_${data.classe}`, JSON.stringify(data.groupes));
-            
-            // 3. Reconstruire le mapping local
-            let localMapping = {};
-            Object.keys(data.groupes).forEach(lettre => {
-                if (lettre !== 'activite' && lettre !== 'reserve' && Array.isArray(data.groupes[lettre])) {
-                    data.groupes[lettre].forEach((id, idx) => {
-                        localMapping[`${data.classe}_${lettre}${idx+1}`] = id;
-                    });
-                }
-            });
-            localStorage.setItem(`eps_arena_local_mapping_${data.classe}`, JSON.stringify(localMapping));
-            
-            // 4. Changer la classe si nécessaire
-            const select = document.getElementById('selectClasse');
-            if (select.value !== data.classe) {
-                select.value = data.classe;
-                select.dispatchEvent(new Event('change'));
-            } else {
-                await loadEscaladeAssignments();
             }
             alert("✅ Configuration Escalade importée (colonnes adaptées) !");
         } catch (err) {

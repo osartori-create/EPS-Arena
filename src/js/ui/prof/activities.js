@@ -46,9 +46,8 @@ export function initActivities() {
         }
         if (disc === 'escalade') {
     try {
-        initEscaladeInterface(); // Lira le nombre de groupes depuis la sauvegarde
-        initSortableEscalade();
-        loadEscaladeAssignments();
+        initEscaladeInterface(); // Construit les colonnes
+        loadEscaladeAssignments(); // Remplit les groupes puis initialise Sortable via setTimeout
     } catch (e) {}
         }
     };
