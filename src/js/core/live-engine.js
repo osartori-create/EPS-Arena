@@ -11,6 +11,14 @@ let allEscaladeData = {};
 
 export function initLiveEngine() {
     const select = document.getElementById('selectClasse');
+
+    // Initialisation au chargement avec la classe actuelle
+    if (select && select.value) {
+        currentClasse = select.value;
+        startListening();
+        loadConfig();
+    }
+
     if (select) {
         select.addEventListener('change', () => {
             const newClasse = select.value;
@@ -27,9 +35,11 @@ async function loadConfig() {
     if (currentConfigUnsub) currentConfigUnsub();
     if (!currentClasse) return;
     configData = {};
-    const configRef = ref(db, `${currentClasse}/config`);
+    const configRef = ref(db, `${currentClasse}/config`); // Chemin pour la config
     currentConfigUnsub = onValue(configRef, (snap) => {
         configData = snap.val() || {};
+        // Debug : Vérifie quelle config est reçue
+        console.log("📡 Config reçue dans live-engine :", configData);
         window.dispatchEvent(new CustomEvent('live-config-updated', { detail: configData }));
     });
 }
@@ -39,6 +49,8 @@ function startListening() {
     allEscaladeData = {};
     if (!currentClasse) return;
     currentUnsub = listenToActivityData(currentClasse, (type, data) => {
+        // Debug : Vérifie quelles données arrivent
+        console.log(`📡 Données reçues pour ${type} :`, Object.keys(data).length, "performances");
         if (type === 'escalade') allEscaladeData = data;
         window.dispatchEvent(new CustomEvent('live-data-updated', { detail: { type, data } }));
     });
