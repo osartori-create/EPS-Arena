@@ -2,11 +2,19 @@ import { getConfigData, getEscaladeData, getLocalMapping, getCurrentClasse } fro
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 export async function renderEscaladeTV() {
-    console.log("🛠️ Rendu TV appelé...");
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    container.style.height = '600px';
+    // FORCER la visibilité et la hauteur du parent (viewTV)
+    const tvView = document.getElementById('viewTV');
+    if (tvView) {
+        tvView.style.display = 'block';
+        tvView.style.height = '100vh';
+        tvView.style.padding = '10px';
+    }
+
+    // Configurer le conteneur principal (tvGlobe)
+    container.style.height = '90vh'; // Prend presque tout l'écran
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
@@ -20,7 +28,6 @@ export async function renderEscaladeTV() {
     const localMapping = getLocalMapping() || {};
     const currentClasse = getCurrentClasse();
 
-    // Vérification de la config
     if (!config || Object.keys(config).length === 0) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente de la configuration du prof...</p>';
         return;
@@ -79,10 +86,9 @@ export async function renderEscaladeTV() {
             if (eleveId) {
                 try {
                     photoUrl = await getPhotoUrl(eleveId);
-                } catch (e) { /* Ignorer les erreurs de photo */ }
+                } catch (e) { /* Ignorer les erreurs */ }
             }
 
-            // ✅ SI PAS DE PHOTO, ON AFFICHE UN VISAGE PAR DÉFAUT (AU LIEU DE NE RIEN METTRE)
             if (photoUrl) {
                 photosHtml += `<div style="width: 40px; height: 40px; border-radius: 50%; background-image: url('${photoUrl}'); background-size: cover; border: 2px solid #3b82f6;"></div>`;
             } else {
@@ -101,7 +107,6 @@ export async function renderEscaladeTV() {
     }
 
     container.innerHTML = html;
-    console.log("✅ TV rendue avec succès !");
 }
 
 // Exposer pour appel direct

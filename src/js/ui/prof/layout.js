@@ -1,16 +1,28 @@
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
 
 export function initLayout() {
     
-    // 1. Gestion des onglets
+    // 1. Gestion des onglets (sans Tailwind pour la TV)
     window.switchTab = function(tabName) {
-        ['admin', 'activities', 'live', 'tv'].forEach(t => {
+        ['admin', 'activities', 'live'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
-            if (el) el.classList.add('hidden');
+            if (el) {
+                el.classList.add('hidden');
+                el.style.display = ''; // Reset
+            }
         });
+
+        // Cas spécial pour TV : on utilise style.display
+        const tvView = document.getElementById('viewTV');
+        if (tvView) {
+            if (tabName === 'tv') {
+                tvView.style.display = 'block'; // On affiche
+            } else {
+                tvView.style.display = 'none'; // On cache
+            }
+        }
 
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4'].forEach(id => {
             const btn = document.getElementById(id);
@@ -21,16 +33,22 @@ export function initLayout() {
         });
 
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4' };
-        const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-        if (targetView) targetView.classList.remove('hidden');
+        if (tabName !== 'tv') {
+            const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            if (targetView) targetView.classList.remove('hidden');
+        }
 
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Cas spécifique pour l'onglet TV : appel direct à la fonction intégrée
+        // Appel direct pour la TV
         if (tabName === 'tv') {
             setTimeout(() => {
-                renderEscaladeTV();
+                import('../../modules/escalade/escalade-tv-ui.js')
+                .then(module => {
+                    module.renderEscaladeTV();
+                })
+                .catch(err => console.error("Erreur import TV:", err));
             }, 100);
         }
     };
