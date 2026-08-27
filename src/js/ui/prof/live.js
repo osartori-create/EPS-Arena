@@ -1,4 +1,4 @@
-import { initLiveEngine, getConfigData, getEscaladeData, getStudentsMap, getLocalMapping } from '../../core/live-engine.js';
+import { initLiveEngine, getConfigData, getEscaladeData, getStudentsMap, getLocalMapping, getCurrentClasse } from '../../core/live-engine.js'; // AJOUT DE getCurrentClasse
 import { renderEscaladeLive } from '../../modules/escalade/escalade-live.js';
 import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
@@ -23,7 +23,9 @@ async function renderTV() {
     const config = getConfigData();
     const montees = getEscaladeData();
     const localMapping = getLocalMapping();
-    const currentClasse = getCurrentClasse ? getCurrentClasse() : ""; // Fallback
+    
+    // ✅ Correction : on utilise la fonction importée getCurrentClasse()
+    const currentClasse = getCurrentClasse();
 
     if (!config) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente de la configuration du prof...</p>';
