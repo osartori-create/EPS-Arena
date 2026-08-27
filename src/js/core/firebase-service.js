@@ -6,12 +6,18 @@ const app = initializeApp(FIREBASE_CONFIG);
 export const db = getDatabase(app);
 export { ref, onValue, push, set, update, remove };
 
-// ✅ FONCTION UNIFIÉE : le Prof et l'Élève utilisent LE MÊME chemin !
-export function getPerformancePath(classe, activite) {
-    return `${classe}/${activite}/montees`;
+// ✅ Récupère le chemin de base du professeur (ex: etablissements/0680013V/profs/MARTIN)
+function getProfBasePath() {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    return `${DB_PATHS.ETAB}/profs/${profCode}`;
 }
 
-// Mise à jour de l'écouteur pour utiliser ce chemin unifié
+// ✅ Chemin unifié pour les activités (ex: .../profs/MARTIN/504/escalade/montees)
+export function getPerformancePath(classe, activite) {
+    return `${getProfBasePath()}/${classe}/${activite}/montees`;
+}
+
+// ✅ Mise à jour de l'écouteur pour utiliser la structure prof/classe
 export function listenToActivityData(classe, callback) {
     const refEscalade = ref(db, getPerformancePath(classe, 'escalade'));
     const refCO = ref(db, getPerformancePath(classe, 'co'));
@@ -27,6 +33,8 @@ export function listenToActivityData(classe, callback) {
         unsubMulti();
     };
 }
+
+// Fonctions standard (listenConfig, listenPassages, sendPassage) restent inchangées...
 
 function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
