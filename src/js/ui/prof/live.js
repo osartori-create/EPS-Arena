@@ -10,22 +10,24 @@ let currentClasse = "";
 async function renderTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
+    console.log("1. renderTV appelé, tvGlobe trouvé ?", container !== null);
+
+    // Forcer l'affichage de l'onglet parent
+    const tvView = document.getElementById('viewTV');
+    if (tvView && tvView.classList.contains('hidden')) {
+        console.log("2. viewTV était hidden, on le force à visible");
+        tvView.classList.remove('hidden');
+    }
 
     container.style.height = '600px';
     container.style.width = '100%';
     container.style.backgroundColor = '#1e293b';
     container.style.overflow = 'hidden';
-    container.style.display = 'flex';
-    container.style.flexDirection = 'row';
-    container.style.justifyContent = 'space-around';
-    container.style.alignItems = 'flex-start';
 
     const config = getConfigData();
     const montees = getEscaladeData();
-    const localMapping = getLocalMapping();
-    
-    // ✅ Correction : on utilise la fonction importée getCurrentClasse()
-    const currentClasse = getCurrentClasse();
+    console.log("3. Config reçue :", config);
+    console.log("4. Nombre de montees :", Object.keys(montees || {}).length);
 
     if (!config) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente de la configuration du prof...</p>';
