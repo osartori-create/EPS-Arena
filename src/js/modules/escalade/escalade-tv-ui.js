@@ -40,7 +40,7 @@ export async function renderEscaladeTV() {
     const monteesList = Object.values(montees || {});
     for (const m of monteesList) {
         const equipe = equipes.find(eq => eq.lettre === m.groupe);
-        if (equipe) equipe.score += (m.points || 0);
+        if (equipe) equipe.score += Number(m.points) || 0;
     }
 
     // 5. Garder uniquement les groupes avec des points
@@ -67,7 +67,7 @@ export async function renderEscaladeTV() {
         monteesList.forEach(m => {
             if (m.groupe === eq.lettre) {
                 if (!membresGroupes[m.role]) membresGroupes[m.role] = 0;
-                membresGroupes[m.role] += (m.points || 0);
+                membresGroupes[m.role] += Number(m.points) || 0;
             }
         });
 

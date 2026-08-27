@@ -5,6 +5,7 @@ import { getPhotoUrl } from '../services/admin-service.js';
 
 let currentClasse = "";
 let currentUnsub = null;
+let currentConfigUnsub = null;
 let configData = {};
 let allEscaladeData = {};
 
@@ -23,9 +24,10 @@ export function initLiveEngine() {
 }
 
 async function loadConfig() {
+    if (currentConfigUnsub) currentConfigUnsub();
     if (!currentClasse) return;
     const configRef = ref(db, `${currentClasse}/config`);
-    onValue(configRef, (snap) => {
+    currentConfigUnsub = onValue(configRef, (snap) => {
         configData = snap.val() || {};
         // On notifie les modules que la config a changé
         window.dispatchEvent(new CustomEvent('live-config-updated', { detail: configData }));
@@ -34,6 +36,7 @@ async function loadConfig() {
 
 function startListening() {
     if (currentUnsub) currentUnsub();
+    allEscaladeData = {};
     if (!currentClasse) return;
 
     currentUnsub = listenToActivityData(currentClasse, (type, data) => {

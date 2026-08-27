@@ -2,11 +2,11 @@ import { initLiveEngine, getConfigData, getEscaladeData, getStudentsMap, getLoca
 import { renderEscaladeLive } from '../../modules/escalade/escalade-live.js';
 import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
+import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 let currentClasse = "";
 
-// Fonction pour rendre la TV (directement accessible globalement)
 async function renderTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
@@ -107,7 +107,7 @@ async function renderTV() {
 }
 
 // Exposer globalement pour que layout.js puisse l'appeler
-window.renderEscaladeTV = renderTV;
+window.renderEscaladeTV = renderEscaladeTV;
 
 export function initLiveUI() {
     initLiveEngine();
