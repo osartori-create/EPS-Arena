@@ -1,54 +1,19 @@
-export function initEscaladeInterface(nbGroupes = 6) {
-    const container = document.getElementById('postesGridEscalade');
-    if (!container) return;
-
-    // Détruire les anciens Sortable pour éviter les conflits
-    document.querySelectorAll('.groupe-members').forEach(el => {
-        if (el.__sortable && typeof el.__sortable.destroy === 'function') {
-            el.__sortable.destroy();
-        }
-        // Supprimer la propriété dans tous les cas
-        delete el.__sortable;
-    });
-    
-    // ... le reste de la fonction
-}
-Ensuite, dans initSortableEscalade, nous devons être cohérents : nous stockons l'instance dans el.__sortable, et non un booléen. Actuellement nous faisons :
-
-javascript
-if (!el.__sortable) {
-    new Sortable(el, {...});
-    el.__sortable = true;
-}
-Il faut corriger cela pour stocker l'instance réelle :
-
-javascript
-if (!el.__sortable) {
-    const sortable = new Sortable(el, {...});
-    el.__sortable = sortable;
-}
-Appliquez ces deux corrections dans src/js/modules/escalade/escalade-interface.js et rechargez la page. Le glisser-déposer fonctionnera à nouveau et la génération des équipes ne provoquera plus d'erreur.
-
-Le problème est que el.__sortable contient un booléen (true) et non l'instance de Sortable. On a utilisé true comme indicateur pour ne pas réinitialiser, mais destroy() n'existe pas sur un booléen.
-
-Voici la correction complète pour src/js/modules/escalade/escalade-interface.js. Remplacez tout le fichier par ceci :
-
-javascript
 import { getPhotoUrl } from '../../services/admin-service.js';
 
+// 1. Génération de la grille (avec lecture de la sauvegarde pour le bon nombre de groupes)
 export function initEscaladeInterface(nbGroupes = 6) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
-    // 1. Détruire les anciennes instances de Sortable (si ce sont de vraies instances)
+    // Détruire les anciennes instances réelles de Sortable
     document.querySelectorAll('.groupe-members').forEach(el => {
         if (el.__sortable && typeof el.__sortable.destroy === 'function') {
             el.__sortable.destroy();
         }
-        delete el.__sortable; // On supprime toujours la propriété
+        delete el.__sortable;
     });
 
-    // 2. Lire la sauvegarde pour le bon nombre de groupes
+    // Lire la sauvegarde pour récupérer le bon nombre de groupes (10, 11, etc.)
     const activeClasse = document.getElementById('selectClasse').value;
     if (activeClasse) {
         const saved = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
@@ -56,7 +21,7 @@ export function initEscaladeInterface(nbGroupes = 6) {
         if (savedGroupes > 0) nbGroupes = savedGroupes;
     }
 
-    // 3. Construire le HTML des colonnes
+    // Construire les colonnes
     let html = '';
     for (let i = 0; i < nbGroupes; i++) {
         const lettre = String.fromCharCode(65 + i);
@@ -72,21 +37,22 @@ export function initEscaladeInterface(nbGroupes = 6) {
     container.innerHTML = html;
 }
 
+// 2. Initialisation du glisser-déposer (avec instances réelles stockées)
 export function initSortableEscalade() {
     const reserveContainer = document.getElementById('reserveListEscalade');
     if (!reserveContainer) return;
 
-    // Initialisation de la réserve
+    // Réserve
     if (!reserveContainer.__sortable) {
         const sortableReserve = new Sortable(reserveContainer, {
             group: 'escalade',
             animation: 150,
             onEnd: saveEscaladeAssignments
         });
-        reserveContainer.__sortable = sortableReserve; // ✅ On stocke l'instance, pas un booléen
+        reserveContainer.__sortable = sortableReserve; // ✅ Instance réelle
     }
 
-    // Initialisation des groupes
+    // Groupes
     document.querySelectorAll('.groupe-members').forEach(el => {
         if (!el.__sortable) {
             const sortable = new Sortable(el, {
@@ -94,12 +60,12 @@ export function initSortableEscalade() {
                 animation: 150,
                 onEnd: saveEscaladeAssignments
             });
-            el.__sortable = sortable; // ✅ On stocke l'instance
+            el.__sortable = sortable; // ✅ Instance réelle
         }
-        });
-    } catch (e) { console.error("Erreur Sortable Escalade :", e); }
+    });
 }
 
+// 3. Création d'une carte élève (avec photo)
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
     let bgClass = 'bg-slate-200 border-slate-400';
@@ -123,6 +89,7 @@ async function createEleveCard(eleve) {
     return div;
 }
 
+// 4. Remplissage de la réserve
 export async function populateReserveEscalade(eleves) {
     const reserveContainer = document.getElementById('reserveListEscalade');
     if (!reserveContainer) return;
@@ -138,11 +105,13 @@ export async function populateReserveEscalade(eleves) {
     setTimeout(() => initSortableEscalade(), 100);
 }
 
+// 5. Clé de stockage
 function getStorageKey() {
     const activeClasse = document.getElementById('selectClasse').value;
     return `eps_arena_escalade_assignments_${activeClasse}`;
 }
 
+// 6. Sauvegarde des affectations
 export function saveEscaladeAssignments() {
     const reserveContainer = document.getElementById('reserveListEscalade');
     if (!reserveContainer) return;
@@ -165,6 +134,7 @@ export function saveEscaladeAssignments() {
     localStorage.setItem(getStorageKey(), JSON.stringify(assignments));
 }
 
+// 7. Chargement des affectations
 export async function loadEscaladeAssignments() {
     const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${document.getElementById('selectClasse').value}`) || '[]');
@@ -204,10 +174,11 @@ export async function loadEscaladeAssignments() {
     updateRanks();
     saveEscaladeAssignments();
     
-    // Réinitialise le tri APRÈS avoir rempli les groupes
+    // ✅ Réinitialise le tri APRÈS remplissage
     setTimeout(() => initSortableEscalade(), 100);
 }
 
+// 8. Mise à jour des numéros de rang
 export function updateRanks() {
     document.querySelectorAll('[data-groupe]').forEach(colDiv => {
         const membersDiv = colDiv.querySelector('.groupe-members');
@@ -224,6 +195,7 @@ export function updateRanks() {
     });
 }
 
+// 9. Export JSON
 export function exportEscaladeConfig() {
     saveEscaladeAssignments();
     const activeClasse = document.getElementById('selectClasse').value;
@@ -240,6 +212,7 @@ export function exportEscaladeConfig() {
     a.click();
 }
 
+// 10. Import JSON
 export function importEscaladeConfig(event) {
     const file = event.target.files[0];
     if (!file) return;
