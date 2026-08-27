@@ -26,19 +26,18 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Cas spécifique pour l'onglet TV : appel direct à la fonction globale
+        // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
-            // Attendre que le DOM soit prêt, puis appeler la fonction globale
+            console.log("ÉTAPE 1 : on entre dans le if (tabName === 'tv')");
+            
             setTimeout(() => {
-                if (typeof window.renderEscaladeTV === 'function') {
-                    window.renderEscaladeTV();
+                console.log("ÉTAPE 2 : le setTimeout est bien exécuté");
+                const tvGlobe = document.getElementById('tvGlobe');
+                if (tvGlobe) {
+                    console.log("ÉTAPE 3 : tvGlobe est trouvé");
+                    tvGlobe.innerHTML = '<h1 style="color:white; text-align:center; margin-top:50px;">TEST DIRECT</h1>';
                 } else {
-                    // Si la fonction n'existe pas, on affiche un message d'erreur clair à l'écran
-                    const tvGlobe = document.getElementById('tvGlobe');
-                    if (tvGlobe) {
-                        tvGlobe.innerHTML = '<p style="color: red; font-size: 24px; text-align: center; margin-top: 80px;">❌ Erreur : La fonction TV n\'est pas encore chargée.</p>';
-                    }
-                    console.error("La fonction window.renderEscaladeTV n'est pas disponible.");
+                    console.log("ÉTAPE 3 bis : tvGlobe INTROUVABLE");
                 }
             }, 100);
         }
