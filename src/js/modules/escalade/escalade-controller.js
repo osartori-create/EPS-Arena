@@ -1,22 +1,15 @@
 // src/js/modules/escalade/escalade-controller.js
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 import { BAREME_ESCALADE } from '../../config/constants.js';
+import { calculateClimbingPoints } from './escalade-calculations.js';
 
 export const BAREME = BAREME_ESCALADE;
 
 const LONGUEUR_VOIE = 9;
 export const OBJECTIF_METRES = 1000;
 
-export function calculerPoints(cotation, couleur, essai = 1) {
-    const coeff = BAREME[cotation] || 1;
-    let bonusEssai = 1;
-    if (essai === 1) bonusEssai = 1.2;
-    else if (essai === 2) bonusEssai = 1;
-    else bonusEssai = 0.8;
-    
-    let bonusCouleur = (couleur === 'tc') ? 0.9 : 1;
-    
-    return Math.round(LONGUEUR_VOIE * coeff * bonusEssai * bonusCouleur * 10) / 10;
+export function calculerPoints(hauteur, cotation, couleur, essai = 1) {
+    return calculateClimbingPoints({ hauteur, cotation, couleur, essai });
 }
 
 export function exportIDoceo(students, montees, assignments, className) {
@@ -63,7 +56,9 @@ export function calculerStatsGlobales(montees) {
 }
 
 export function initEscaladeListener(className, callback) {
-    const refMontees = ref(db, `escalade/${className}/montees`);
+    import { getPerformancePath } from '../../core/firebase-service.js';
+const path = getPerformancePath(className, 'escalade');
+const refMontees = ref(db, path);
     return onValue(refMontees, (snap) => callback(snap.val() || {}));
 }
 
