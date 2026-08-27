@@ -3,14 +3,16 @@ import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-
 
 export function initLayout() {
     
-    // 1. Gestion des onglets
+    // 1. Gestion des onglets (Sécurisé et SANS forçage)
     window.switchTab = function(tabName) {
-    ['admin', 'activities', 'live', 'tv'].forEach(t => {
-        const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
-        const el = document.getElementById(viewId);
-        if (el) el.classList.add('hidden');
-    });
+        // On cache TOUTES les vues
+        ['admin', 'activities', 'live', 'tv'].forEach(t => {
+            const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
+            const el = document.getElementById(viewId);
+            if (el) el.classList.add('hidden');
+        });
 
+        // On désactive TOUS les boutons
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
@@ -19,28 +21,22 @@ export function initLayout() {
             }
         });
 
+        // On affiche uniquement la vue ciblée
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4' };
         const targetViewId = 'view' + tabName.charAt(0).toUpperCase() + tabName.slice(1);
         const targetView = document.getElementById(targetViewId);
         if (targetView) targetView.classList.remove('hidden');
 
-                // Cas spécifique pour l'onglet TV
+        // Cas spécifique pour l'onglet TV : on charge les données uniquement si le panneau est visible
         if (tabName === 'tv') {
-            // Forcer l'affichage du parent (contre les conflits Tailwind)
-            const tvView = document.getElementById('viewTV');
-            if (tvView) {
-                tvView.style.display = 'block';
-            }
-            // Appeler le rendu
             setTimeout(() => {
-                import('../../modules/escalade/escalade-tv-ui.js')
-                .then(module => {
+                import('../../modules/escalade/escalade-tv-ui.js').then(module => {
                     module.renderEscaladeTV();
-                })
-                .catch(err => console.error("Erreur import TV:", err));
+                }).catch(err => console.error("Erreur import TV:", err));
             }, 200);
         }
 
+        // On active le bouton correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
     };
