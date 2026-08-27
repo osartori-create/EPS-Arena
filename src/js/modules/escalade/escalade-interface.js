@@ -1,18 +1,54 @@
-import { getPhotoUrl } from '../../services/admin-service.js';
-
 export function initEscaladeInterface(nbGroupes = 6) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
     // Détruire les anciens Sortable pour éviter les conflits
     document.querySelectorAll('.groupe-members').forEach(el => {
-        if (el.__sortable) {
+        if (el.__sortable && typeof el.__sortable.destroy === 'function') {
             el.__sortable.destroy();
-            delete el.__sortable;
         }
+        // Supprimer la propriété dans tous les cas
+        delete el.__sortable;
+    });
+    
+    // ... le reste de la fonction
+}
+Ensuite, dans initSortableEscalade, nous devons être cohérents : nous stockons l'instance dans el.__sortable, et non un booléen. Actuellement nous faisons :
+
+javascript
+if (!el.__sortable) {
+    new Sortable(el, {...});
+    el.__sortable = true;
+}
+Il faut corriger cela pour stocker l'instance réelle :
+
+javascript
+if (!el.__sortable) {
+    const sortable = new Sortable(el, {...});
+    el.__sortable = sortable;
+}
+Appliquez ces deux corrections dans src/js/modules/escalade/escalade-interface.js et rechargez la page. Le glisser-déposer fonctionnera à nouveau et la génération des équipes ne provoquera plus d'erreur.
+
+Le problème est que el.__sortable contient un booléen (true) et non l'instance de Sortable. On a utilisé true comme indicateur pour ne pas réinitialiser, mais destroy() n'existe pas sur un booléen.
+
+Voici la correction complète pour src/js/modules/escalade/escalade-interface.js. Remplacez tout le fichier par ceci :
+
+javascript
+import { getPhotoUrl } from '../../services/admin-service.js';
+
+export function initEscaladeInterface(nbGroupes = 6) {
+    const container = document.getElementById('postesGridEscalade');
+    if (!container) return;
+
+    // 1. Détruire les anciennes instances de Sortable (si ce sont de vraies instances)
+    document.querySelectorAll('.groupe-members').forEach(el => {
+        if (el.__sortable && typeof el.__sortable.destroy === 'function') {
+            el.__sortable.destroy();
+        }
+        delete el.__sortable; // On supprime toujours la propriété
     });
 
-    // Lecture de la sauvegarde pour le bon nombre de groupes
+    // 2. Lire la sauvegarde pour le bon nombre de groupes
     const activeClasse = document.getElementById('selectClasse').value;
     if (activeClasse) {
         const saved = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
@@ -20,7 +56,7 @@ export function initEscaladeInterface(nbGroupes = 6) {
         if (savedGroupes > 0) nbGroupes = savedGroupes;
     }
 
-    // Créer les colonnes A, B, C... selon nbGroupes
+    // 3. Construire le HTML des colonnes
     let html = '';
     for (let i = 0; i < nbGroupes; i++) {
         const lettre = String.fromCharCode(65 + i);
@@ -38,25 +74,28 @@ export function initEscaladeInterface(nbGroupes = 6) {
 
 export function initSortableEscalade() {
     const reserveContainer = document.getElementById('reserveListEscalade');
-    if (!reserveContainer || reserveContainer.__sortable) return;
+    if (!reserveContainer) return;
 
-    try {
-        new Sortable(reserveContainer, {
+    // Initialisation de la réserve
+    if (!reserveContainer.__sortable) {
+        const sortableReserve = new Sortable(reserveContainer, {
             group: 'escalade',
             animation: 150,
             onEnd: saveEscaladeAssignments
         });
-        reserveContainer.__sortable = true;
+        reserveContainer.__sortable = sortableReserve; // ✅ On stocke l'instance, pas un booléen
+    }
 
-        document.querySelectorAll('.groupe-members').forEach(el => {
-            if (!el.__sortable) {
-                new Sortable(el, {
-                    group: 'escalade',
-                    animation: 150,
-                    onEnd: saveEscaladeAssignments
-                });
-                el.__sortable = true;
-            }
+    // Initialisation des groupes
+    document.querySelectorAll('.groupe-members').forEach(el => {
+        if (!el.__sortable) {
+            const sortable = new Sortable(el, {
+                group: 'escalade',
+                animation: 150,
+                onEnd: saveEscaladeAssignments
+            });
+            el.__sortable = sortable; // ✅ On stocke l'instance
+        }
         });
     } catch (e) { console.error("Erreur Sortable Escalade :", e); }
 }
