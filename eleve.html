@@ -34,12 +34,15 @@
         const escaladeModule = document.getElementById('escalade-module');
         const coModule = document.getElementById('co-module');
         const multiModule = document.getElementById('multi-module');
+        // Récupération des classes disponibles (nouvelle structure)
+const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
 
-        onValue(ref(db, 'active_classes'), (snap) => {
-            const data = snap.val() || {};
-            classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
-                Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
-        });
+onValue(activeClassesRef, (snap) => {
+    const data = snap.val() || {};
+    classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
+        Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
+});
 
         classSelect.addEventListener('change', () => {
             selectedClass = classSelect.value;
