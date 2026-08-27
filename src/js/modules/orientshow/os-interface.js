@@ -8,7 +8,7 @@ const couleurs = [
     { id: "JAUNE", bg: "bg-yellow-500", text: "text-black" }
 ];
 
-// ✅ MATRICE PAR DÉFAUT (codes fournis)
+// ✅ MATRICE PAR DÉFAUT (codes de l'utilisateur, forcés)
 const DEFAULT_MATRIX = {
     1:{NOIR:["D","O"],ROUGE:["Y","E"],BLEU:["N","K"],VERT:["",""],JAUNE:["",""]},
     2:{NOIR:["E","X"],ROUGE:["T","R"],BLEU:["A","L"],VERT:["",""],JAUNE:["",""]},
@@ -24,12 +24,12 @@ const DEFAULT_MATRIX = {
     12:{NOIR:["U","L"],ROUGE:["N","A"],BLEU:["H","T"],VERT:["",""],JAUNE:["",""]}
 };
 
-// Vérifie si la matrice existe, sinon insère celle par défaut
-if(!localStorage.getItem('eps_arena_os_matrix')) {
+// On vérifie et on force la matrice
+let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || 'null');
+if (!matrix || Object.keys(matrix).length === 0) {
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(DEFAULT_MATRIX));
 }
 
-// Fonctions exposées globalement
 window.exportOSConfig = exportOSConfig;
 window.importOSConfig = importOSConfig;
 
@@ -37,7 +37,7 @@ export function initOSInterface() {
     const container = document.getElementById('os-postesGrid');
     if (!container) return;
 
-    // Génération de la grille (5x6)
+    // Génération de la grille (5x6) - plus de largeur minimale fixe, on utilise 100% de la place
     let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
     couleurs.forEach(c => { html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`; });
     html += `</div>`;
@@ -77,15 +77,16 @@ export function initSortableOS() {
     });
 }
 
+// ✅ CARTES ÉLÈVES AGRANDIES POUR IPAD (photos et textes plus lisibles)
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
     let bgClass = eleve.sexe === 'M' ? 'bg-blue-200 border-blue-400' : (eleve.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400');
-    const photoHtml = url ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">` : `<div class="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-sm">👤</div>`;
+    const photoHtml = url ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">` : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-lg">👤</div>`;
 
     const div = document.createElement('div');
-    div.className = `p-1 rounded border-2 cursor-grab active:cursor-grabbing flex items-center gap-2 ${bgClass}`;
+    div.className = `p-2 rounded border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 w-full ${bgClass}`;
     div.dataset.id = eleve.id;
-    div.innerHTML = `${photoHtml}<div class="flex flex-col leading-none"><span class="font-black text-slate-900 text-[10px] truncate max-w-[80px]">${eleve.prenom}</span><span class="text-[9px] font-bold text-slate-600 uppercase truncate max-w-[80px]">${eleve.nom}</span></div>`;
+    div.innerHTML = `${photoHtml}<div class="flex flex-col leading-tight overflow-hidden"><span class="font-black text-slate-900 text-sm truncate">${eleve.prenom}</span><span class="text-xs font-bold text-slate-600 uppercase truncate">${eleve.nom}</span></div>`;
     return div;
 }
 
@@ -110,10 +111,8 @@ export function ensureReserveLoaded() {
     const reserve = document.getElementById('os-reserve');
     if (!reserve) return;
     
-    // D'abord on charge les groupes
     loadOSAssignments();
     
-    // Ensuite, si la réserve est vide, on la remplit avec les non-affectés (une seule fois)
     if (reserve.children.length === 0 && eleves.length > 0) populateReserveOS();
 }
 
@@ -124,23 +123,19 @@ window.populateReserveOS = async function() {
     const reserve = document.getElementById('os-reserve');
     if (!reserve) return;
     
-    // Ne vider la réserve que si on vient de cliquer volontairement
-    // Évite de re-vider si on a déjà chargé la page
     if (reserve.dataset.loaded !== "true") {
         reserve.innerHTML = "";
     }
 
-    // On récupère les élèves déjà placés dans les cases pour éviter les doublons
     const placedIds = new Set();
     document.querySelectorAll('.os-dropzone').forEach(zone => {
         zone.querySelectorAll('[data-id]').forEach(el => placedIds.add(el.dataset.id));
     });
 
-    // On ne met dans la réserve que les élèves NON placés
     for (const eleve of eleves) {
         if (!placedIds.has(eleve.id)) reserve.appendChild(await createEleveCard(eleve));
     }
-    reserve.dataset.loaded = "true"; // Marqueur pour ne pas re-vider au prochain chargement
+    reserve.dataset.loaded = "true";
     setTimeout(() => initSortableOS(), 100);
 };
 
@@ -170,7 +165,6 @@ export async function loadOSAssignments() {
         for (const eleve of eleves) {
             if (!affectedIds.has(eleve.id)) reserve.appendChild(await createEleveCard(eleve));
         }
-        // On oublie le marqueur pour que le prochain clic sur "Charger" re-vide et re-remplisse tout proprement
         delete reserve.dataset.loaded;
     }
 
@@ -201,7 +195,6 @@ export function importOSConfig(event) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
-            
             localStorage.setItem(`eps_arena_os_assignments_${data.classe}`, JSON.stringify(data.groupes));
             if (data.matrice) localStorage.setItem('eps_arena_os_matrix', JSON.stringify(data.matrice));
             
@@ -220,7 +213,7 @@ export function importOSConfig(event) {
 }
 
 window.openOSMatrixModal = function() {
-    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || {});
+    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
     let html = `<div class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4">
         <div class="bg-slate-800 w-full max-w-3xl rounded-3xl p-6 border border-slate-700 relative">
             <button onclick="document.getElementById('osMatrixModal').remove()" class="absolute top-4 right-4 text-3xl text-slate-400 hover:text-white">&times;</button>
