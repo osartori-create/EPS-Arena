@@ -26,19 +26,12 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Cas spécifique pour l'onglet TV : on importe et on appelle DIRECTEMENT
+                // Cas spécifique pour l'onglet TV
         if (tabName === 'tv') {
-            setTimeout(() => {
-                import('../../modules/escalade/escalade-tv-ui.js')
-                .then(module => {
-                    if (typeof module.renderEscaladeTV === 'function') {
-                        module.renderEscaladeTV();
-                    } else {
-                        console.error("La fonction renderEscaladeTV n'est pas exportée dans le module.");
-                    }
-                })
-                .catch(err => console.error("Erreur import TV:", err));
-            }, 100);
+            const tvGlobe = document.getElementById('tvGlobe');
+            if (tvGlobe) {
+                tvGlobe.innerHTML = '<p style="color: white; font-size: 40px; text-align: center; margin-top: 100px;">TEST OK ✔️ (La TV est bien visible)</p>';
+            }
         }
     };
 
