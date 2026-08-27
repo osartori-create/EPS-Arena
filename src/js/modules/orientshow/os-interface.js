@@ -8,7 +8,28 @@ const couleurs = [
     { id: "JAUNE", bg: "bg-yellow-500", text: "text-black" }
 ];
 
-// Fonction pour exposer globalement
+// ✅ MATRICE PAR DÉFAUT (codes fournis)
+const DEFAULT_MATRIX = {
+    1:{NOIR:["D","O"],ROUGE:["Y","E"],BLEU:["N","K"],VERT:["",""],JAUNE:["",""]},
+    2:{NOIR:["E","X"],ROUGE:["T","R"],BLEU:["A","L"],VERT:["",""],JAUNE:["",""]},
+    3:{NOIR:["C","H"],ROUGE:["I","O"],BLEU:["T","E"],VERT:["",""],JAUNE:["",""]},
+    4:{NOIR:["R","E"],ROUGE:["C","N"],BLEU:["O","I"],VERT:["",""],JAUNE:["",""]},
+    5:{NOIR:["A","J"],ROUGE:["O","E"],BLEU:["S","C"],VERT:["",""],JAUNE:["",""]},
+    6:{NOIR:["F","I"],ROUGE:["C","S"],BLEU:["U","U"],VERT:["",""],JAUNE:["",""]},
+    7:{NOIR:["G","U"],ROUGE:["E","H"],BLEU:["E","C"],VERT:["",""],JAUNE:["",""]},
+    8:{NOIR:["I","V"],ROUGE:["R","N"],BLEU:["S","C"],VERT:["",""],JAUNE:["",""]},
+    9:{NOIR:["K","R"],ROUGE:["A","T"],BLEU:["N","C"],VERT:["",""],JAUNE:["",""]},
+    10:{NOIR:["O","C"],ROUGE:["I","Z"],BLEU:["E","C"],VERT:["",""],JAUNE:["",""]},
+    11:{NOIR:["P","A"],ROUGE:["L","D"],BLEU:["U","U"],VERT:["",""],JAUNE:["",""]},
+    12:{NOIR:["U","L"],ROUGE:["N","A"],BLEU:["H","T"],VERT:["",""],JAUNE:["",""]}
+};
+
+// Vérifie si la matrice existe, sinon insère celle par défaut
+if(!localStorage.getItem('eps_arena_os_matrix')) {
+    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(DEFAULT_MATRIX));
+}
+
+// Fonctions exposées globalement
 window.exportOSConfig = exportOSConfig;
 window.importOSConfig = importOSConfig;
 
@@ -16,7 +37,7 @@ export function initOSInterface() {
     const container = document.getElementById('os-postesGrid');
     if (!container) return;
 
-    // 1. Générer la grille (5 colonnes x 6 lignes)
+    // Génération de la grille (5x6)
     let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
     couleurs.forEach(c => { html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`; });
     html += `</div>`;
@@ -32,7 +53,6 @@ export function initOSInterface() {
     }
     container.innerHTML = html;
 
-    // 2. Initialiser Sortable (après le DOM)
     setTimeout(() => initSortableOS(), 100);
 }
 
@@ -89,6 +109,11 @@ export function ensureReserveLoaded() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     const reserve = document.getElementById('os-reserve');
     if (!reserve) return;
+    
+    // D'abord on charge les groupes
+    loadOSAssignments();
+    
+    // Ensuite, si la réserve est vide, on la remplit avec les non-affectés (une seule fois)
     if (reserve.children.length === 0 && eleves.length > 0) populateReserveOS();
 }
 
@@ -98,8 +123,24 @@ window.populateReserveOS = async function() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     const reserve = document.getElementById('os-reserve');
     if (!reserve) return;
-    reserve.innerHTML = "";
-    for (const eleve of eleves) reserve.appendChild(await createEleveCard(eleve));
+    
+    // Ne vider la réserve que si on vient de cliquer volontairement
+    // Évite de re-vider si on a déjà chargé la page
+    if (reserve.dataset.loaded !== "true") {
+        reserve.innerHTML = "";
+    }
+
+    // On récupère les élèves déjà placés dans les cases pour éviter les doublons
+    const placedIds = new Set();
+    document.querySelectorAll('.os-dropzone').forEach(zone => {
+        zone.querySelectorAll('[data-id]').forEach(el => placedIds.add(el.dataset.id));
+    });
+
+    // On ne met dans la réserve que les élèves NON placés
+    for (const eleve of eleves) {
+        if (!placedIds.has(eleve.id)) reserve.appendChild(await createEleveCard(eleve));
+    }
+    reserve.dataset.loaded = "true"; // Marqueur pour ne pas re-vider au prochain chargement
     setTimeout(() => initSortableOS(), 100);
 };
 
@@ -129,12 +170,13 @@ export async function loadOSAssignments() {
         for (const eleve of eleves) {
             if (!affectedIds.has(eleve.id)) reserve.appendChild(await createEleveCard(eleve));
         }
+        // On oublie le marqueur pour que le prochain clic sur "Charger" re-vide et re-remplisse tout proprement
+        delete reserve.dataset.loaded;
     }
 
     setTimeout(() => initSortableOS(), 100);
 }
 
-// ✅ EXPORT JSON (corrigé et exposé)
 export function exportOSConfig() {
     saveOSAssignments();
     const activeClasse = document.getElementById('selectClasse').value;
@@ -151,7 +193,6 @@ export function exportOSConfig() {
     a.click();
 }
 
-// ✅ IMPORT JSON (corrigé et exposé)
 export function importOSConfig(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -178,7 +219,6 @@ export function importOSConfig(event) {
     event.target.value = '';
 }
 
-// ✅ POP-UP MATRICE (fonction exposée)
 window.openOSMatrixModal = function() {
     let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || {});
     let html = `<div class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4">

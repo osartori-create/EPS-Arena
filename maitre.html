@@ -167,30 +167,40 @@
                 </div>
             </div>
 
-                                    <!-- VUE PARAMÈTRES ORIENT'SHOW -->
+                                                <!-- VUE PARAMÈTRES ORIENT'SHOW -->
             <div id="viewOrientShowSettings" class="hidden space-y-4">
-                <!-- Bouton Matrice en haut à droite -->
-                <div class="flex justify-end">
-                    <button onclick="openOSMatrixModal()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400">📝 Matrice</button>
-                </div>
-
-                <!-- Grille des groupes -->
-                <div class="bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
-                    <h3 class="text-sm font-black text-slate-400 uppercase mb-2">Groupes par numéro</h3>
-                    <div id="os-postesGrid" class="min-w-[600px]"></div>
-                </div>
-
-                <!-- Réserve + Actions -->
-                <div class="bg-slate-800 p-4 border border-slate-700 rounded-xl">
-                    <h3 class="text-sm font-black text-slate-400 uppercase mb-2">Réserve</h3>
-                    <div id="os-reserve" class="flex flex-col gap-2 min-h-[100px] border-2 border-dashed border-slate-600 p-2 rounded-lg">
-                        <!-- Les élèves seront ajoutés ici -->
-                    </div>
-                    <div class="flex flex-wrap gap-2 mt-4">
-                        <button onclick="populateReserveOS()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400">⬇️ Charger</button>
-                        <button onclick="exportOSConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
-                        <button onclick="document.getElementById('importOSFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
+                
+                <!-- Boutons en haut -->
+                <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                    <h3 class="font-black text-blue-400 uppercase text-sm">Configuration Orient'Show</h3>
+                    <div class="flex gap-2">
+                        <button onclick="openOSMatrixModal()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400">📝 Matrice</button>
+                        <button onclick="exportOSConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Export</button>
+                        <button onclick="document.getElementById('importOSFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Import</button>
                         <input type="file" id="importOSFile" class="hidden" onchange="importOSConfig(event)">
+                    </div>
+                </div>
+
+                <!-- Zone Réserve à gauche + Grille à droite -->
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                    
+                    <!-- Colonne Gauche : Réserve -->
+                    <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
+                            <button onclick="populateReserveOS()" class="bg-blue-600 px-3 py-1 rounded-xl font-black text-[10px] uppercase text-white">⬇️ Charger</button>
+                        </div>
+                        <div id="os-reserve" class="os-dropzone flex flex-col gap-2 min-h-[200px]">
+                            <!-- Les élèves non affectés apparaissent ici -->
+                        </div>
+                    </div>
+
+                    <!-- Colonne Droite : Grille des groupes -->
+                    <div class="xl:col-span-2 bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
+                        <h3 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par numéro</h3>
+                        <div id="os-postesGrid" class="min-w-[600px]">
+                            <!-- La grille 5 couleurs x 6 lignes est générée ici -->
+                        </div>
                     </div>
                 </div>
             </div>
