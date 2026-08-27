@@ -171,20 +171,26 @@
 <div id="viewOrientShowSettings" class="hidden space-y-6">
     
     <!-- 1. La Matrice des codes -->
-    <div class="bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
-        <h3 class="text-sm font-black text-slate-400 uppercase mb-2">Matrice des Balises</h3>
-        <table class="w-full text-center font-bold text-[10px]" id="osMatrixTable">
+    <!div class="bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
+        <!h3 class="text-sm font-black text-slate-400 uppercase mb-2">Matrice des Balises</h3>
+        <!table class="w-full text-center font-bold text-[10px]" id="osMatrixTable">
             <!-- Généré par le JS -->
-        </table>
-    </div>
+        <!/table>
+    <!/div>
 
-    <!-- 2. Les groupes par couleur -->
-    <div class="grid grid-cols-5 gap-2">
-        <div class="bg-slate-800 rounded-xl border-t-4 border-black p-2"><h3 class="text-center font-black uppercase text-xs text-white">Noir</h3><div id="os-col-NOIR" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
-        <div class="bg-slate-800 rounded-xl border-t-4 border-red-600 p-2"><h3 class="text-center font-black uppercase text-xs text-red-400">Rouge</h3><div id="os-col-ROUGE" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
-        <div class="bg-slate-800 rounded-xl border-t-4 border-blue-600 p-2"><h3 class="text-center font-black uppercase text-xs text-blue-400">Bleu</h3><div id="os-col-BLEU" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
-        <div class="bg-slate-800 rounded-xl border-t-4 border-green-600 p-2"><h3 class="text-center font-black uppercase text-xs text-green-400">Vert</h3><div id="os-col-VERT" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
-        <div class="bg-slate-800 rounded-xl border-t-4 border-yellow-500 p-2"><h3 class="text-center font-black uppercase text-xs text-yellow-500">Jaune</h3><div id="os-col-JAUNE" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
+    <!-- 2. Les groupes par couleur (Façon Escalade) -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+            <div class="flex justify-between items-center mb-3">
+                <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
+                <button onclick="window.populateReserveOS()" class="bg-blue-600 text-[10px] px-3 py-1 rounded font-bold">⬇️ Charger</button>
+            </div>
+            <div id="os-reserve" class="flex flex-col gap-2 min-h-[200px]"></div>
+        </div>
+        <div class="lg:col-span-2">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Couleurs (Glissez les élèves)</h4>
+            <div id="os-postesGrid" class="grid grid-cols-2 md:grid-cols-5 gap-2"></div>
+        </div>
     </div>
 
     <!-- 3. La Réserve d'élèves -->

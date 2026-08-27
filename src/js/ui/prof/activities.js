@@ -53,7 +53,10 @@ export function initActivities() {
         }
 
         if (disc === 'orientshow') {
-            try { initSortableOS(); } catch (e) {}
+            try { 
+                initSortableOS(); 
+                loadOSAssignments(); // <- Ajoute cette ligne
+            } catch (e) {}
         }
     };
 
