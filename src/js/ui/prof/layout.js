@@ -5,6 +5,7 @@ export function initLayout() {
     
     // 1. Gestion des onglets
     window.switchTab = function(tabName) {
+        console.log("switchTab appelé avec :", tabName); // AJOUT DIAGNOSTIC
         ['admin', 'activities', 'live', 'tv'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
