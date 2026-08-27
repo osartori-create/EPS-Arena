@@ -45,14 +45,16 @@ export function initActivities() {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
         if (disc === 'escalade') {
-    try {
-        initEscaladeInterface(); // Va lire la sauvegarde OU le nombre d'élèves
-        initSortableEscalade();
-        loadEscaladeAssignments();
-    } catch (e) {}
-    if (disc === 'orientshow') {
+            try {
+                initEscaladeInterface(); // Va lire la sauvegarde OU le nombre d'élèves
+                initSortableEscalade();
+                loadEscaladeAssignments();
+            } catch (e) {}
+        }
+
+        if (disc === 'orientshow') {
             try { initSortableOS(); } catch (e) {}
-}
+        }
     };
 
     window.generateTeams = async function() {
