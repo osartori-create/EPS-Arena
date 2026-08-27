@@ -26,6 +26,7 @@ export function initLiveEngine() {
 async function loadConfig() {
     if (currentConfigUnsub) currentConfigUnsub();
     if (!currentClasse) return;
+        configData = {};
     const configRef = ref(db, `${currentClasse}/config`);
     currentConfigUnsub = onValue(configRef, (snap) => {
         configData = snap.val() || {};
