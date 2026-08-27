@@ -2,6 +2,7 @@ import { getConfigData, getEscaladeData, getLocalMapping, getCurrentClasse } fro
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 export async function renderEscaladeTV() {
+    console.log("🛠️ Rendu TV appelé...");
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
@@ -16,10 +17,11 @@ export async function renderEscaladeTV() {
 
     const config = getConfigData();
     const montees = getEscaladeData();
-    const localMapping = getLocalMapping();
+    const localMapping = getLocalMapping() || {};
     const currentClasse = getCurrentClasse();
 
-    if (!config) {
+    // Vérification de la config
+    if (!config || Object.keys(config).length === 0) {
         container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente de la configuration du prof...</p>';
         return;
     }
@@ -77,9 +79,10 @@ export async function renderEscaladeTV() {
             if (eleveId) {
                 try {
                     photoUrl = await getPhotoUrl(eleveId);
-                } catch (e) { /* ignore */ }
+                } catch (e) { /* Ignorer les erreurs de photo */ }
             }
 
+            // ✅ SI PAS DE PHOTO, ON AFFICHE UN VISAGE PAR DÉFAUT (AU LIEU DE NE RIEN METTRE)
             if (photoUrl) {
                 photosHtml += `<div style="width: 40px; height: 40px; border-radius: 50%; background-image: url('${photoUrl}'); background-size: cover; border: 2px solid #3b82f6;"></div>`;
             } else {
@@ -98,7 +101,8 @@ export async function renderEscaladeTV() {
     }
 
     container.innerHTML = html;
+    console.log("✅ TV rendue avec succès !");
 }
 
-// ✅ UNIQUEMENT ICI on expose la fonction
+// Exposer pour appel direct
 window.renderEscaladeTV = renderEscaladeTV;
