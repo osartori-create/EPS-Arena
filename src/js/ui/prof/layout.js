@@ -5,7 +5,6 @@ export function initLayout() {
     
     // 1. Gestion des onglets
     window.switchTab = function(tabName) {
-        console.log("switchTab appelé avec :", tabName); // AJOUT DIAGNOSTIC
         ['admin', 'activities', 'live', 'tv'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
@@ -27,12 +26,21 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-                // Cas spécifique pour l'onglet TV
+        // Cas spécifique pour l'onglet TV : appel direct à la fonction globale
         if (tabName === 'tv') {
-            const tvGlobe = document.getElementById('tvGlobe');
-            if (tvGlobe) {
-                tvGlobe.innerHTML = '<p style="color: white; font-size: 40px; text-align: center; margin-top: 100px;">TEST OK ✔️ (La TV est bien visible)</p>';
-            }
+            // Attendre que le DOM soit prêt, puis appeler la fonction globale
+            setTimeout(() => {
+                if (typeof window.renderEscaladeTV === 'function') {
+                    window.renderEscaladeTV();
+                } else {
+                    // Si la fonction n'existe pas, on affiche un message d'erreur clair à l'écran
+                    const tvGlobe = document.getElementById('tvGlobe');
+                    if (tvGlobe) {
+                        tvGlobe.innerHTML = '<p style="color: red; font-size: 24px; text-align: center; margin-top: 80px;">❌ Erreur : La fonction TV n\'est pas encore chargée.</p>';
+                    }
+                    console.error("La fonction window.renderEscaladeTV n'est pas disponible.");
+                }
+            }, 100);
         }
     };
 

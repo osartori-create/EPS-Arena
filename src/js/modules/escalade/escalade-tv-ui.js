@@ -102,5 +102,4 @@ export async function renderEscaladeTV() {
 }
 
 // Enregistrement du module dans le registre global TV
-if (!window.tvRenderers) window.tvRenderers = {};
-window.tvRenderers['escalade'] = renderEscaladeTV;
+window.renderEscaladeTV = renderEscaladeTV;
