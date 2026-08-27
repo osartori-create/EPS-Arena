@@ -76,13 +76,13 @@
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Quelle activité ?</h3>
                 <div id="disciplineSelector" class="grid grid-cols-2 md:grid-cols-5 gap-4">
-    <button onclick="switchDiscipline('multi')" id="btnDisc-multi" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏋️ Multi-activités</button>
-    <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🧭 CO</button>
-    <!-- NOUVEAU BOUTON ORIENTSHOW -->
-    <button onclick="switchDiscipline('orientshow')" id="btnDisc-orientshow" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏃‍♂️ OrientShow</button>
-    <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🎯 Arcathlon</button>
-    <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button>
-</div>
+                    <button onclick="switchDiscipline('multi')" id="btnDisc-multi" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏋️ Multi-activités</button>
+                    <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🧭 CO</button>
+                    <!-- NOUVEAU BOUTON ORIENTSHOW -->
+                    <button onclick="switchDiscipline('orientshow')" id="btnDisc-orientshow" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏃‍♂️ OrientShow</button>
+                    <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🎯 Arcathlon</button>
+                    <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button>
+                </div>
             </div>
 
             <!-- PARAMÈTRES MULTI-ACTIVITÉS -->
@@ -167,41 +167,42 @@
                 </div>
             </div>
 
-<!-- VUE PARAMÈTRES ORIENT'SHOW -->
-<div id="viewOrientShowSettings" class="hidden space-y-6">
-    
-    <!-- 1. La Matrice des codes -->
-    <!div class="bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
-        <!h3 class="text-sm font-black text-slate-400 uppercase mb-2">Matrice des Balises</h3>
-        <!table class="w-full text-center font-bold text-[10px]" id="osMatrixTable">
-            <!-- Généré par le JS -->
-        <!/table>
-    <!/div>
+            <!-- VUE PARAMÈTRES ORIENT'SHOW -->
+            <div id="viewOrientShowSettings" class="hidden space-y-6">
+                
+                <!-- 1. La Matrice des codes -->
+                <div class="bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
+                    <h3 class="text-sm font-black text-slate-400 uppercase mb-2">Matrice des Balises</h3>
+                    <table class="w-full text-center font-bold text-[10px]" id="osMatrixTable">
+                        <!-- Généré par le JS -->
+                    </table>
+                </div>
 
-    <!-- 2. Les groupes par couleur (Façon Escalade) -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
-            <div class="flex justify-between items-center mb-3">
-                <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
-                <button onclick="window.populateReserveOS()" class="bg-blue-600 text-[10px] px-3 py-1 rounded font-bold">⬇️ Charger</button>
+                <!-- Boutons d'action OrientShow -->
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <button onclick="exportOSConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Exporter JSON</button>
+                    <button onclick="document.getElementById('importOSFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Importer JSON</button>
+                    <input type="file" id="importOSFile" class="hidden" onchange="importOSConfig(event)">
+                </div>
+
+                <!-- 2. Grille des affectations (Façon Escalade) -->
+                <div class="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                    <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
+                            <button onclick="window.populateReserveOS()" class="bg-blue-600 text-[10px] px-3 py-1 rounded font-bold">⬇️ Charger</button>
+                        </div>
+                        <div id="os-reserve" class="os-dropzone flex flex-col gap-2 min-h-[200px]" data-code="reserve"></div>
+                    </div>
+                    
+                    <div class="xl:col-span-3 overflow-x-auto">
+                        <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par numéro</h4>
+                        <div id="os-postesGrid" class="min-w-[600px]">
+                            <!-- La grille 8 lignes x 5 colonnes sera générée ici par le JS -->
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div id="os-reserve" class="flex flex-col gap-2 min-h-[200px]"></div>
-        </div>
-        <div class="lg:col-span-2">
-            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Couleurs (Glissez les élèves)</h4>
-            <div id="os-postesGrid" class="grid grid-cols-2 md:grid-cols-5 gap-2"></div>
-        </div>
-    </div>
-
-    <!-- 3. La Réserve d'élèves -->
-    <div class="bg-slate-800 p-4 border border-slate-700 rounded-xl">
-        <div class="flex justify-between items-center mb-2">
-            <h3 class="font-black text-slate-400 text-xs uppercase">Réserve</h3>
-            <button onclick="window.populateReserveOS()" class="bg-blue-600 text-[10px] px-3 py-1 rounded font-bold">⬇️ Charger la classe</button>
-        </div>
-        <div id="os-reserve" class="flex flex-wrap gap-1 min-h-[50px] p-2 bg-slate-900 rounded border border-slate-700"></div>
-    </div>
-</div>
 
             <!-- PARAMÈTRES ARCATHLON -->
             <div id="viewArcathlonSettings" class="hidden space-y-4">
@@ -253,15 +254,15 @@
             </div>
         </div>
 
-                <!-- ONGLET 4 : TV -->
-<div id="viewTV" style="display: none;">
-    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📺 Mode Diffusion (Montagne collective)</h3>
-        <div id="tvGlobe" style="width: 100%; height: 600px; background: #1e293b; border-radius: 16px; overflow: hidden; position: relative;">
-            <p class="text-slate-500 text-center mt-20">En attente des performances...</p>
+        <!-- ONGLET 4 : TV -->
+        <div id="viewTV" style="display: none;">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📺 Mode Diffusion (Montagne collective)</h3>
+                <div id="tvGlobe" style="width: 100%; height: 600px; background: #1e293b; border-radius: 16px; overflow: hidden; position: relative;">
+                    <p class="text-slate-500 text-center mt-20">En attente des performances...</p>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
 
     </div> <!-- Fin space-y-6 -->
 

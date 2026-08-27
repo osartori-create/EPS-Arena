@@ -1,4 +1,3 @@
-// src/js/modules/orientshow/os-interface.js
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 const colorsInfo = [
@@ -8,24 +7,33 @@ const colorsInfo = [
     { id: "VERT", bg: "bg-green-600", text: "text-white" },
     { id: "JAUNE", bg: "bg-yellow-500", text: "text-black" }
 ];
+const NB_LIGNES = 8; // Tu peux augmenter ce nombre si besoin
 
 export function initOSInterface() {
     renderMatrix();
     
     const container = document.getElementById('os-postesGrid');
-    if (container) {
-        let html = '';
+    if (!container) return;
+
+    // Entête des couleurs
+    let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
+    colorsInfo.forEach(c => {
+        html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`;
+    });
+    html += `</div>`;
+
+    // Génération des 8 lignes
+    for (let ligne = 1; ligne <= NB_LIGNES; ligne++) {
+        html += `<div class="grid grid-cols-6 gap-2 mb-2">
+            <div class="flex items-center justify-center font-black text-slate-500 text-xl bg-slate-800/50 rounded-lg">${ligne}</div>`;
+        
         colorsInfo.forEach(c => {
-            html += `
-            <div class="flex flex-col">
-                <div class="${c.bg} ${c.text} font-black text-center p-2 rounded-t-lg uppercase text-[10px]">${c.id}</div>
-                <div class="os-col bg-slate-800 border border-slate-700 rounded-b-lg min-h-[150px] flex flex-col p-2" data-couleur="${c.id}">
-                    <div class="groupe-members flex flex-col gap-2 min-h-[50px]"></div>
-                </div>
-            </div>`;
+            const code = `${c.id}_${ligne}`;
+            html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 rounded-lg" data-code="${code}"></div>`;
         });
-        container.innerHTML = html;
+        html += `</div>`;
     }
+    container.innerHTML = html;
 }
 
 // --- 1. MATRICE ---
@@ -57,87 +65,39 @@ window.saveOSMatrix = function(circuit, color, index, val) {
 // --- 2. DRAG & DROP & CARTES ---
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
-    let bgClass = 'bg-slate-200 border-slate-400';
-    if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
-    else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-    
-    const photoHtml = url 
-        ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">`
-        : `<div class="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-sm">👤</div>`;
+    let bgClass = eleve.sexe === 'M' ? 'bg-blue-200 border-blue-400' : (eleve.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400');
+    const photoHtml = url ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">` : `<div class="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-sm">👤</div>`;
 
     const div = document.createElement('div');
-    div.className = `p-1.5 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-2 ${bgClass}`;
+    div.className = `p-1 rounded border-2 cursor-grab active:cursor-grabbing flex items-center gap-2 ${bgClass}`;
     div.dataset.id = eleve.id;
-    div.innerHTML = `
-        ${photoHtml}
-        <div class="flex flex-col leading-none">
-            <span class="font-black text-slate-900 text-xs">${eleve.prenom}</span>
-            <span class="text-[10px] font-bold text-slate-600 uppercase">${eleve.nom}</span>
-        </div>
-    `;
+    div.innerHTML = `${photoHtml}<div class="flex flex-col leading-none"><span class="font-black text-slate-900 text-[10px] truncate max-w-[80px]">${eleve.prenom}</span><span class="text-[9px] font-bold text-slate-600 uppercase truncate max-w-[80px]">${eleve.nom}</span></div>`;
     return div;
 }
 
 export function initSortableOS() {
     if (typeof Sortable === 'undefined') return;
-    
-    const reserveContainer = document.getElementById('os-reserve');
-    if (reserveContainer && !reserveContainer.__sortable) {
-        reserveContainer.__sortable = new Sortable(reserveContainer, {
+    document.querySelectorAll('.os-dropzone').forEach(el => {
+        if (el.__sortable) el.__sortable.destroy(); // Nettoie l'ancienne instance
+        el.__sortable = new Sortable(el, {
             group: 'orientshow',
             animation: 150,
-            onEnd: () => { saveOSAssignments(); updateOSRanks(); }
-        });
-    }
-
-    document.querySelectorAll('.os-col .groupe-members').forEach(el => {
-        if (!el.__sortable) {
-            el.__sortable = new Sortable(el, {
-                group: 'orientshow',
-                animation: 150,
-                onEnd: () => { saveOSAssignments(); updateOSRanks(); }
-            });
-        }
-    });
-}
-
-function updateOSRanks() {
-    document.querySelectorAll('.os-col').forEach(colDiv => {
-        const membersDiv = colDiv.querySelector('.groupe-members');
-        if (!membersDiv) return;
-        const children = membersDiv.querySelectorAll('[data-id]');
-        children.forEach((child, index) => {
-            let rankSpan = child.querySelector('.rank-badge');
-            if (!rankSpan) {
-                rankSpan = document.createElement('span');
-                rankSpan.className = 'rank-badge bg-blue-900 text-white text-sm font-black px-2 py-0.5 rounded-lg ml-auto';
-                child.appendChild(rankSpan);
-            }
-            rankSpan.textContent = index + 1;
+            onEnd: () => saveOSAssignments()
         });
     });
 }
 
 // --- 3. SAUVEGARDE & CHARGEMENT ---
 function getOSStorageKey() {
-    const activeClasse = document.getElementById('selectClasse').value;
-    return `eps_arena_os_assignments_${activeClasse}`;
+    return `eps_arena_os_assignments_${document.getElementById('selectClasse')?.value}`;
 }
 
 export function saveOSAssignments() {
     const assignments = {};
-    const reserveIds = [];
-    
-    document.getElementById('os-reserve')?.querySelectorAll('[data-id]').forEach(el => reserveIds.push(el.dataset.id));
-    if (reserveIds.length > 0) assignments.reserve = reserveIds;
-
-    document.querySelectorAll('.os-col').forEach(colDiv => {
-        const couleur = colDiv.dataset.couleur;
-        const membersDiv = colDiv.querySelector('.groupe-members');
-        if (membersDiv) {
-            const ids = Array.from(membersDiv.querySelectorAll('[data-id]')).map(el => el.dataset.id);
-            if (ids.length > 0) assignments[couleur] = ids;
-        }
+    document.querySelectorAll('.os-dropzone').forEach(zone => {
+        const code = zone.dataset.code;
+        const ids = Array.from(zone.querySelectorAll('[data-id]')).map(el => el.dataset.id);
+        if (ids.length > 0) assignments[code] = ids;
     });
     localStorage.setItem(getOSStorageKey(), JSON.stringify(assignments));
 }
@@ -147,13 +107,10 @@ window.populateReserveOS = async function() {
     if (!activeClasse) return alert("Sélectionnez une classe.");
     
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-    const reserve = document.getElementById('os-reserve');
-    reserve.innerHTML = "";
-    document.querySelectorAll('.os-col .groupe-members').forEach(el => el.innerHTML = "");
+    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = ""); // Vide tout
 
-    for (const eleve of eleves) {
-        reserve.appendChild(await createEleveCard(eleve));
-    }
+    const reserve = document.getElementById('os-reserve');
+    for (const eleve of eleves) reserve.appendChild(await createEleveCard(eleve));
     
     saveOSAssignments();
     setTimeout(() => initSortableOS(), 100);
@@ -161,39 +118,73 @@ window.populateReserveOS = async function() {
 
 export async function loadOSAssignments() {
     const assignments = JSON.parse(localStorage.getItem(getOSStorageKey()) || '{}');
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${document.getElementById('selectClasse').value}`) || '[]');
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${document.getElementById('selectClasse')?.value}`) || '[]');
+    
+    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = ''); // Reset visuel
 
-    document.getElementById('os-reserve').innerHTML = '';
-    document.querySelectorAll('.os-col .groupe-members').forEach(el => el.innerHTML = '');
-
-    const colonnes = document.querySelectorAll('.os-col');
-    for (const colDiv of colonnes) {
-        const couleur = colDiv.dataset.couleur;
-        const membersDiv = colDiv.querySelector('.groupe-members');
-        if (membersDiv && assignments[couleur]) {
-            for (const id of assignments[couleur]) {
+    const affectedIds = new Set();
+    for (const zone of document.querySelectorAll('.os-dropzone')) {
+        const code = zone.dataset.code;
+        if (assignments[code]) {
+            for (const id of assignments[code]) {
                 const eleve = eleves.find(e => e.id === id);
-                if (eleve) membersDiv.appendChild(await createEleveCard(eleve));
+                if (eleve) {
+                    zone.appendChild(await createEleveCard(eleve));
+                    affectedIds.add(id);
+                }
             }
         }
     }
 
-    const affectedIds = new Set();
-    colonnes.forEach(colDiv => {
-        colDiv.querySelectorAll('[data-id]').forEach(el => affectedIds.add(el.dataset.id));
-    });
-
-    let reserveIds = assignments.reserve || [];
-    eleves.forEach(eleve => {
-        if (!affectedIds.has(eleve.id) && !reserveIds.includes(eleve.id)) reserveIds.push(eleve.id);
-    });
-
-    const reserveContainer = document.getElementById('os-reserve');
-    for (const id of reserveIds) {
-        const eleve = eleves.find(e => e.id === id);
-        if (eleve) reserveContainer.appendChild(await createEleveCard(eleve));
+    // Gérer les élèves qui n'ont pas de groupe (dans la réserve)
+    const reserve = document.getElementById('os-reserve');
+    for (const eleve of eleves) {
+        if (!affectedIds.has(eleve.id)) reserve.appendChild(await createEleveCard(eleve));
     }
 
-    updateOSRanks();
     setTimeout(() => initSortableOS(), 100);
+}
+
+// --- 4. EXPORT / IMPORT JSON ---
+export function exportOSConfig() {
+    saveOSAssignments();
+    const activeClasse = document.getElementById('selectClasse').value;
+    const assignments = JSON.parse(localStorage.getItem(getOSStorageKey()) || '{}');
+    const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+
+    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    const data = { version: 1, classe: activeClasse, activite: 'orientshow', date: dateStr, groupes: assignments, matrice: matrix };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${activeClasse}_orientshow_${dateStr}.json`;
+    a.click();
+}
+
+export function importOSConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
+            
+            localStorage.setItem(`eps_arena_os_assignments_${data.classe}`, JSON.stringify(data.groupes));
+            if (data.matrice) localStorage.setItem('eps_arena_os_matrix', JSON.stringify(data.matrice));
+            
+            const select = document.getElementById('selectClasse');
+            if (select.value !== data.classe) {
+                select.value = data.classe;
+                select.dispatchEvent(new Event('change'));
+            } else {
+                await loadOSAssignments();
+                renderMatrix();
+            }
+            alert("✅ Configuration OrientShow importée !");
+        } catch (err) { alert("❌ Erreur import : " + err.message); }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
 }
