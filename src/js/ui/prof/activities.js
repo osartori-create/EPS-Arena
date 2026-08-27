@@ -1,5 +1,6 @@
 // src/js/ui/prof/activities.js
 import { initCOInterface, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
+import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
@@ -8,19 +9,27 @@ let currentDiscipline = 'multi';
 
 export function initActivities() {
     
-    // Initialisation de l'interface CO (postes + réserves)
+    // Initialisation des interfaces (CO + Escalade)
     try {
         initCOInterface();
     } catch (e) {
         console.error("Erreur init CO :", e);
+    }
+    
+    try {
+        initEscaladeInterface();
+    } catch (e) {
+        console.error("Erreur init Escalade :", e);
     }
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         console.log("Discipline changée :", disc);
 
-        // Affichage du panneau CO si nécessaire
+        // Affichage des panneaux
         const coView = document.getElementById('viewCOSettings');
+        const escView = document.getElementById('viewEscaladeSettings');
+        
         if (coView) {
             if (disc === 'co') {
                 coView.classList.remove('hidden');
@@ -29,7 +38,20 @@ export function initActivities() {
             }
         }
         
-        // Rechargement des affectations CO si on clique sur CO
+        if (escView) {
+            if (disc === 'escalade') {
+                escView.classList.remove('hidden');
+                try {
+                    initSortableEscalade();
+                    loadEscaladeAssignments();
+                } catch (e) {
+                    console.error("Erreur init Escalade :", e);
+                }
+            } else {
+                escView.classList.add('hidden');
+            }
+        }
+        
         if (disc === 'co') {
             try {
                 initSortableCO();
@@ -42,21 +64,25 @@ export function initActivities() {
         }
     };
 
-    // Génération des équipes (gère la CO et le Multi)
+    // Génération des équipes
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // Cas spécial CO : on met les élèves dans la réserve
         if (currentDiscipline === 'co') {
             await populateReserveWithStudents(eleves);
             alert("Tous les élèves sont dans la réserve CO. Glissez-les dans les postes !");
             return;
         }
 
-        // Cas Multi-activités : génération classique
+        if (currentDiscipline === 'escalade') {
+            await populateReserveEscalade(eleves);
+            alert("Tous les élèves sont dans la réserve Escalade. Glissez-les dans les groupes !");
+            return;
+        }
+
         const options = {
             mode: document.getElementById('modeRepartition')?.value || 'melange',
             mixite: document.getElementById('modeMixite')?.value || 'ignore',
@@ -85,7 +111,7 @@ export function initActivities() {
         }
     };
 
-    // Fonctions CO (boutons HTML)
+    // Fonctions CO
     window.addCircuit = function() {
         const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
         if(!cat) return;
@@ -114,14 +140,24 @@ export function initActivities() {
         }
     };
 
+    // Fonctions Escalade
+    window.exportEscaladeConfig = exportEscaladeConfig;
+    window.importEscaladeConfig = importEscaladeConfig;
+
     // Export / Import CO
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
 
-    // Initialisation au chargement
+    // Initialisation Sortable
     try {
         initSortableCO();
     } catch (e) {
         console.error("Erreur init Sortable CO :", e);
+    }
+    
+    try {
+        initSortableEscalade();
+    } catch (e) {
+        console.error("Erreur init Sortable Escalade :", e);
     }
 }
