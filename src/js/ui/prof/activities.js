@@ -9,7 +9,7 @@ let currentDiscipline = 'multi';
 
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
-    try { initEscaladeInterface(6); } catch (e) {}
+    try { initEscaladeInterface(); } catch (e) {}
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
@@ -45,7 +45,11 @@ export function initActivities() {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
         if (disc === 'escalade') {
-            try { initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
+    try {
+        initEscaladeInterface(); // Lira le nombre de groupes depuis la sauvegarde
+        initSortableEscalade();
+        loadEscaladeAssignments();
+    } catch (e) {}
         }
     };
 
