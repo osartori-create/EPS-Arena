@@ -8,17 +8,20 @@ const couleurs = [
     { id: "JAUNE", bg: "bg-yellow-500", text: "text-black" }
 ];
 
+// Fonction pour exposer globalement
+window.exportOSConfig = exportOSConfig;
+window.importOSConfig = importOSConfig;
+
 export function initOSInterface() {
     const container = document.getElementById('os-postesGrid');
     if (!container) return;
 
-    // 1. Construire la grille (5 colonnes x 6 lignes)
+    // 1. Générer la grille (5 colonnes x 6 lignes)
     let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
     couleurs.forEach(c => { html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`; });
     html += `</div>`;
 
-        for (let ligne = 1; ligne <= 6; ligne++) {
-        // ✅ NOUVELLE CASE : Plus petite, avec un chiffre géant en jaune doré
+    for (let ligne = 1; ligne <= 6; ligne++) {
         html += `<div class="grid grid-cols-6 gap-2 mb-2">
             <div class="flex items-center justify-center font-black text-yellow-400 text-5xl bg-slate-900 w-12 h-12 rounded-lg shadow-inner border border-yellow-500/30">${ligne}</div>`;
         couleurs.forEach(c => {
@@ -29,10 +32,7 @@ export function initOSInterface() {
     }
     container.innerHTML = html;
 
-    // 2. Générer la matrice en bas
-    renderMatrix();
-
-    // 3. Initialiser Sortable après génération du DOM
+    // 2. Initialiser Sortable (après le DOM)
     setTimeout(() => initSortableOS(), 100);
 }
 
@@ -57,7 +57,6 @@ export function initSortableOS() {
     });
 }
 
-// Création des fiches élèves SANS numéro individuel
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
     let bgClass = eleve.sexe === 'M' ? 'bg-blue-200 border-blue-400' : (eleve.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400');
@@ -135,10 +134,62 @@ export async function loadOSAssignments() {
     setTimeout(() => initSortableOS(), 100);
 }
 
-// Matrice en bas (déplacée ici)
-function renderMatrix() {
-    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix')) || {};
-    let html = `<tr class="bg-slate-900 text-white"><th>#</th><th colspan="2" class="bg-black">NOIR</th><th colspan="2" class="bg-red-600">ROUGE</th><th colspan="2" class="bg-blue-600">BLEU</th><th colspan="2" class="bg-green-600">VERT</th><th colspan="2" class="bg-yellow-500 text-black">JAUNE</th></tr>`;
+// ✅ EXPORT JSON (corrigé et exposé)
+export function exportOSConfig() {
+    saveOSAssignments();
+    const activeClasse = document.getElementById('selectClasse').value;
+    const assignments = JSON.parse(localStorage.getItem(getOSStorageKey()) || '{}');
+    const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+
+    const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    const data = { version: 1, classe: activeClasse, activite: 'orientshow', date: dateStr, groupes: assignments, matrice: matrix };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${activeClasse}_orientshow_${dateStr}.json`;
+    a.click();
+}
+
+// ✅ IMPORT JSON (corrigé et exposé)
+export function importOSConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
+            
+            localStorage.setItem(`eps_arena_os_assignments_${data.classe}`, JSON.stringify(data.groupes));
+            if (data.matrice) localStorage.setItem('eps_arena_os_matrix', JSON.stringify(data.matrice));
+            
+            const select = document.getElementById('selectClasse');
+            if (select.value !== data.classe) {
+                select.value = data.classe;
+                select.dispatchEvent(new Event('change'));
+            } else {
+                await loadOSAssignments();
+            }
+            alert("✅ Configuration OrientShow importée !");
+        } catch (err) { alert("❌ Erreur import : " + err.message); }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// ✅ POP-UP MATRICE (fonction exposée)
+window.openOSMatrixModal = function() {
+    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || {});
+    let html = `<div class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4">
+        <div class="bg-slate-800 w-full max-w-3xl rounded-3xl p-6 border border-slate-700 relative">
+            <button onclick="document.getElementById('osMatrixModal').remove()" class="absolute top-4 right-4 text-3xl text-slate-400 hover:text-white">&times;</button>
+            <h3 class="font-black text-blue-400 text-lg mb-4">Matrice des Balises</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-center font-bold text-[10px]">`;
+
+    html += `<tr class="bg-slate-900 text-white"><th>#</th><th colspan="2" class="bg-black">NOIR</th><th colspan="2" class="bg-red-600">ROUGE</th><th colspan="2" class="bg-blue-600">BLEU</th><th colspan="2" class="bg-green-600">VERT</th><th colspan="2" class="bg-yellow-500 text-black">JAUNE</th></tr>`;
+
     for(let c=1; c<=12; c++) {
         html += `<tr class="border-b border-slate-700"><td class="font-black text-slate-500 py-1">C${c}</td>`;
         ['NOIR','ROUGE','BLEU','VERT','JAUNE'].forEach(col => {
@@ -149,9 +200,13 @@ function renderMatrix() {
         });
         html += `</tr>`;
     }
-    const table = document.getElementById('osMatrixTable');
-    if (table) table.innerHTML = html;
-}
+    html += `</table></div></div></div>`;
+
+    const modal = document.createElement('div');
+    modal.id = 'osMatrixModal';
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+};
 
 window.saveOSMatrix = function(circuit, color, index, val) {
     let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix')) || {};
@@ -160,5 +215,3 @@ window.saveOSMatrix = function(circuit, color, index, val) {
     matrix[circuit][color][index] = val.toUpperCase();
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
 };
-
-export { createEleveCard };
