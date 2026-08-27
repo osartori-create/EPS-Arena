@@ -23,3 +23,25 @@ export function calculateClimbingPoints({ hauteur, cotation, couleur = '', essai
     const points = Number(hauteur) * coeff * bonusEssai * bonusCouleur;
     return Math.round(points * 10) / 10;
 }
+
+// ✅ FONCTION DÉPLACÉE ICI (Logique spécifique Escalade)
+export function coeffToCotation(coeff) {
+    const echelle = [
+        { cotation: '4a', coeff: 1.0 },
+        { cotation: '4b', coeff: 1.1 },
+        { cotation: '4c', coeff: 1.2 },
+        { cotation: '5a', coeff: 1.3 },
+        { cotation: '5b', coeff: 1.4 },
+        { cotation: '5c', coeff: 1.5 },
+        { cotation: '6a', coeff: 1.6 },
+        { cotation: '6b', coeff: 1.8 },
+        { cotation: '6c', coeff: 2.0 }
+    ];
+    let closest = echelle[0];
+    let minDiff = Math.abs(coeff - echelle[0].coeff);
+    for (let i = 1; i < echelle.length; i++) {
+        const diff = Math.abs(coeff - echelle[i].coeff);
+        if (diff < minDiff) { minDiff = diff; closest = echelle[i]; }
+    }
+    return closest.cotation;
+}
