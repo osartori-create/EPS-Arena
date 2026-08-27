@@ -8,14 +8,16 @@ const colorsInfo = [
     { id: "JAUNE", bg: "bg-yellow-500", text: "text-black" }
 ];
 const NB_LIGNES = 6;
+let osSortableInitialise = false;
 
 export function initOSInterface() {
-    // 1. Générer la matrice des balises (en haut)
+    console.log("🛠️ initOSInterface appelé...");
     renderMatrix();
-    
-    // 2. Générer la grille des postes (6x5) dans le conteneur
     const container = document.getElementById('os-postesGrid');
-    if (!container) return;
+    if (!container) {
+        console.error("❌ os-postesGrid introuvable !");
+        return;
+    }
 
     let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
     colorsInfo.forEach(c => { html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`; });
@@ -31,9 +33,10 @@ export function initOSInterface() {
         html += `</div>`;
     }
     container.innerHTML = html;
+    console.log("✅ Grille OrientShow générée !");
     
-    // Sortable est initialisé APRÈS la création du HTML
-    setTimeout(() => initSortableOS(), 100);
+    // Init Sortable après la génération du DOM
+    setTimeout(() => initSortableOS(), 50);
 }
 
 export function initSortableOS() {
@@ -75,14 +78,13 @@ export function saveOSAssignments() {
     localStorage.setItem(getOSStorageKey(), JSON.stringify(assignments));
 }
 
-// Remplit la réserve automatiquement si elle est vide
 export function ensureReserveLoaded() {
     const activeClasse = document.getElementById('selectClasse')?.value;
     if (!activeClasse) return;
-    
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     const reserve = document.getElementById('os-reserve');
     if (!reserve) return;
+    console.log("🛠️ ensureReserveLoaded, réserve vide ?", reserve.children.length === 0, "| élèves :", eleves.length);
 
     if (reserve.children.length === 0 && eleves.length > 0) {
         populateReserveOS(); // Appel global
@@ -92,14 +94,17 @@ export function ensureReserveLoaded() {
 window.populateReserveOS = async function() {
     const activeClasse = document.getElementById('selectClasse')?.value;
     if (!activeClasse) return alert("Sélectionnez une classe.");
-    
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = "");
-
     const reserve = document.getElementById('os-reserve');
+    if (!reserve) return;
+
+    // ✅ NE PLUS JAMAIS VIDER LA GRILLE ICI
+    reserve.innerHTML = ""; // On vide seulement la réserve
+
     for (const eleve of eleves) reserve.appendChild(await createEleveCard(eleve));
+    console.log("✅ Réserve remplie avec", eleves.length, "élèves");
     
-    saveOSAssignments();
+    // L'initialisation Sortable est déjà faite, on ne la refait pas ici pour ne pas écraser la grille
     setTimeout(() => initSortableOS(), 100);
 };
 

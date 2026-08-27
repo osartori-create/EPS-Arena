@@ -54,13 +54,14 @@ export function initActivities() {
 
         if (disc === 'orientshow') {
     try { 
-        // 1. Générer la grille (les 6 lignes)
-        initOSInterface();
-        // 2. Charger les assignations existantes (si sauvegardées)
-        loadOSAssignments();
-        // 3. Si la réserve est vide, la remplir avec les élèves
-        setTimeout(() => ensureReserveLoaded(), 100);
-    } catch (e) {}
+        // On attend que le DOM de la div soit rendu
+        setTimeout(() => {
+            initOSInterface();      // Génère la grille
+            loadOSAssignments();    // Charge les assignations existantes
+            setTimeout(() => ensureReserveLoaded(), 100); // Remplit la réserve si vide
+        }, 100);
+    } catch (e) {
+        console.error("Erreur lors de l'initialisation OrientShow :", e);
         }
     };
 
