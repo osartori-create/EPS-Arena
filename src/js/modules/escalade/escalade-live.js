@@ -1,6 +1,5 @@
-import { getNomFromCode, getPhotoHtml, getEscaladeData, getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
+import { getNomFromCode, getPhotoHtml, getEscaladeData, getEleveIdFromCode } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
-// ✅ Import depuis le module Escalade, plus depuis live-engine
 import { BAREME, coeffToCotation } from './escalade-calculations.js';
 
 export function renderEscaladeLive(data) {
@@ -32,14 +31,12 @@ export function renderEscaladeLive(data) {
 
     window.openBilan = async function(code) {
         const allEscaladeData = getEscaladeData();
-        const localMapping = getLocalMapping();
-        const currentClasse = getCurrentClasse();
-        
         const mesMontees = Object.values(allEscaladeData).filter(m => `${m.groupe}${m.role}` === code);
         const nom = getNomFromCode(code);
         
+        // ✅ Récupération de la photo via la méthode robuste
         let photoUrl = null;
-        const eleveId = localMapping[`${currentClasse}_${code.slice(0, 1)}`] ? localMapping[`${currentClasse}_${code.slice(0, 1)}`][parseInt(code.slice(1)) - 1] : null;
+        const eleveId = getEleveIdFromCode(code);
         if (eleveId) photoUrl = await getPhotoUrl(eleveId);
         
         const photoHtml = photoUrl 
@@ -56,11 +53,9 @@ export function renderEscaladeLive(data) {
             hauteurTotal += m.hauteur || 0;
         });
         const coeffMoyen = hauteurTotal > 0 ? (coeffTotal / hauteurTotal) : 0;
-        
         const difficultMoyenne = coeffToCotation(coeffMoyen);
         
         const nbTops = mesMontees.filter(m => m.hauteur >= 9).length;
-
         const validations = {};
         mesMontees.forEach(m => {
             if (!validations[m.cotation]) validations[m.cotation] = new Set();
