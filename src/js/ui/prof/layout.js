@@ -26,18 +26,13 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Cas spécifique pour l'onglet TV
+        // Appel direct à la fonction globale UNIQUE
         if (tabName === 'tv') {
-            console.log("ÉTAPE 1 : on entre dans le if (tabName === 'tv')");
-            
             setTimeout(() => {
-                console.log("ÉTAPE 2 : le setTimeout est bien exécuté");
-                const tvGlobe = document.getElementById('tvGlobe');
-                if (tvGlobe) {
-                    console.log("ÉTAPE 3 : tvGlobe est trouvé");
-                    tvGlobe.innerHTML = '<h1 style="color:white; text-align:center; margin-top:50px;">TEST DIRECT</h1>';
+                if (typeof window.renderEscaladeTV === 'function') {
+                    window.renderEscaladeTV();
                 } else {
-                    console.log("ÉTAPE 3 bis : tvGlobe INTROUVABLE");
+                    document.getElementById('tvGlobe').innerHTML = '<p style="color: red; text-align: center; margin-top: 50px;">Erreur : module TV non chargé</p>';
                 }
             }, 100);
         }

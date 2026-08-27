@@ -1,7 +1,6 @@
 import { getConfigData, getEscaladeData, getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
-// Fonction de rendu spécifique à l'escalade
 export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
@@ -101,5 +100,5 @@ export async function renderEscaladeTV() {
     container.innerHTML = html;
 }
 
-// Enregistrement du module dans le registre global TV
+// ✅ UNIQUEMENT ICI on expose la fonction
 window.renderEscaladeTV = renderEscaladeTV;
