@@ -4,7 +4,7 @@ import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
-import { initOSInterface, initSortableOS } from '../../modules/orientshow/os-interface.js';
+import { initOSInterface, initSortableOS, loadOSAssignments, ensureReserveLoaded } from '../../modules/orientshow/os-interface.js';
 
 let currentDiscipline = 'multi';
 
@@ -56,6 +56,7 @@ export function initActivities() {
             try { 
                 initSortableOS(); 
                 loadOSAssignments(); // <- Ajoute cette ligne
+                setTimeout(() => ensureReserveLoaded(), 100);
             } catch (e) {}
         }
     };
@@ -130,26 +131,27 @@ export function initActivities() {
                 }
             });
         } else if (currentDiscipline === 'orientshow') {
-            // 1. Récupération des affectations (sauvegardées par ta future UI Prof)
-            const osAssignments = JSON.parse(localStorage.getItem(`eps_arena_os_assignments_${activeClasse}`) || '{}');
-            configData.activite = 'orientshow';
+    // 1. Récupérer les affectations (la structure est "NOIR_1": [ids] ou "ROUGE_3": [ids])
+    const osAssignments = JSON.parse(localStorage.getItem(`eps_arena_os_assignments_${activeClasse}`) || '{}');
+    configData.activite = 'orientshow';
+    
+    // 2. Construire le mapping RGPD (Code élève -> ID élève)
+    Object.keys(osAssignments).forEach(code => {
+        if (Array.isArray(osAssignments[code])) {
+            // Config Firebase : envoyer le NOMBRE d'élèves par code
+            configData[code] = osAssignments[code].length;
             
-            // 2. Création du mapping RGPD plat et comptage
-            Object.keys(osAssignments).forEach(couleur => {
-                if (Array.isArray(osAssignments[couleur])) {
-                    // On compte le nombre d'élèves pour cette couleur (ex: ROUGE: 5)
-                    configData[couleur] = osAssignments[couleur].length; 
-                    
-                    // On associe l'ID de l'élève à son code (ex: "504_ROUGE_1": "ID_ELEVE")
-                    osAssignments[couleur].forEach((eleveId, index) => {
-                        const code = `${couleur}_${index + 1}`; 
-                        localMapping[`${activeClasse}_${code}`] = eleveId;
-                    });
-                }
+            // Mapping local : associer l'ID à son code complet
+            osAssignments[code].forEach((eleveId, index) => {
+                // Attention : le code est déjà "NOIR_1", "NOIR_2", etc.
+                localMapping[`${activeClasse}_${code}`] = eleveId;
             });
-            // 3. Ajout de la matrice de contrôle (les lettres) pour Firebase
-            const osMatrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-            configData.matrice = osMatrix;
+        }
+    });
+    
+    // 3. Ajouter la matrice (les codes secrets) pour que l'élève puisse valider
+    const osMatrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+    configData.matrice = osMatrix; 
             
         } else {
             configData.activite = 'multi';

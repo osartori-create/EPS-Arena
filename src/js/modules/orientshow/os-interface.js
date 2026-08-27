@@ -7,26 +7,21 @@ const colorsInfo = [
     { id: "VERT", bg: "bg-green-600", text: "text-white" },
     { id: "JAUNE", bg: "bg-yellow-500", text: "text-black" }
 ];
-const NB_LIGNES = 8; // Tu peux augmenter ce nombre si besoin
+const NB_LIGNES = 6; // ✅ Modifié à 6 lignes !
+let osSortableInitialise = false;
 
 export function initOSInterface() {
     renderMatrix();
-    
     const container = document.getElementById('os-postesGrid');
     if (!container) return;
 
-    // Entête des couleurs
     let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
-    colorsInfo.forEach(c => {
-        html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`;
-    });
+    colorsInfo.forEach(c => { html += `<div class="${c.bg} ${c.text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c.id}</div>`; });
     html += `</div>`;
 
-    // Génération des 8 lignes
     for (let ligne = 1; ligne <= NB_LIGNES; ligne++) {
         html += `<div class="grid grid-cols-6 gap-2 mb-2">
             <div class="flex items-center justify-center font-black text-slate-500 text-xl bg-slate-800/50 rounded-lg">${ligne}</div>`;
-        
         colorsInfo.forEach(c => {
             const code = `${c.id}_${ligne}`;
             html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 rounded-lg" data-code="${code}"></div>`;
@@ -34,35 +29,26 @@ export function initOSInterface() {
         html += `</div>`;
     }
     container.innerHTML = html;
-}
-
-// --- 1. MATRICE ---
-function renderMatrix() {
-    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix')) || {};
-    let html = `<tr class="bg-slate-900 text-white"><th>#</th><th colspan="2" class="bg-black">NOIR</th><th colspan="2" class="bg-red-600">ROUGE</th><th colspan="2" class="bg-blue-600">BLEU</th><th colspan="2" class="bg-green-600">VERT</th><th colspan="2" class="bg-yellow-500 text-black">JAUNE</th></tr>`;
-    for(let c=1; c<=12; c++) {
-        html += `<tr class="border-b border-slate-700"><td class="font-black text-slate-500 py-1">C${c}</td>`;
-        colorsInfo.forEach(col => {
-            const l = matrix[c]?.[col.id] || ["",""];
-            html += `
-                <td><input class="w-8 h-8 bg-slate-900 text-center font-bold text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${l[0]}" maxlength="1" onchange="window.saveOSMatrix(${c}, '${col.id}', 0, this.value)"></td>
-                <td class="border-r border-slate-700/50"><input class="w-8 h-8 bg-slate-900 text-center font-bold text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${l[1]}" maxlength="1" onchange="window.saveOSMatrix(${c}, '${col.id}', 1, this.value)"></td>`;
-        });
-        html += `</tr>`;
+    
+    if (!osSortableInitialise) {
+        initSortableOS();
+        osSortableInitialise = true;
     }
-    const table = document.getElementById('osMatrixTable');
-    if (table) table.innerHTML = html;
 }
 
-window.saveOSMatrix = function(circuit, color, index, val) {
-    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix')) || {};
-    if(!matrix[circuit]) matrix[circuit] = {};
-    if(!matrix[circuit][color]) matrix[circuit][color] = ["",""];
-    matrix[circuit][color][index] = val.toUpperCase();
-    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-};
+export function initSortableOS() {
+    if (typeof Sortable === 'undefined') return;
+    document.querySelectorAll('.os-dropzone').forEach(el => {
+        if (!el.__sortable) {
+            el.__sortable = new Sortable(el, {
+                group: 'orientshow',
+                animation: 150,
+                onEnd: () => saveOSAssignments()
+            });
+        }
+    });
+}
 
-// --- 2. DRAG & DROP & CARTES ---
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
     let bgClass = eleve.sexe === 'M' ? 'bg-blue-200 border-blue-400' : (eleve.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400');
@@ -75,19 +61,6 @@ async function createEleveCard(eleve) {
     return div;
 }
 
-export function initSortableOS() {
-    if (typeof Sortable === 'undefined') return;
-    document.querySelectorAll('.os-dropzone').forEach(el => {
-        if (el.__sortable) el.__sortable.destroy(); // Nettoie l'ancienne instance
-        el.__sortable = new Sortable(el, {
-            group: 'orientshow',
-            animation: 150,
-            onEnd: () => saveOSAssignments()
-        });
-    });
-}
-
-// --- 3. SAUVEGARDE & CHARGEMENT ---
 function getOSStorageKey() {
     return `eps_arena_os_assignments_${document.getElementById('selectClasse')?.value}`;
 }
@@ -102,12 +75,27 @@ export function saveOSAssignments() {
     localStorage.setItem(getOSStorageKey(), JSON.stringify(assignments));
 }
 
+// ✅ NOUVELLE FONCTION : Remplit la réserve si elle est vide
+export function ensureReserveLoaded() {
+    const activeClasse = document.getElementById('selectClasse')?.value;
+    if (!activeClasse) return;
+    
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+    const reserve = document.getElementById('os-reserve');
+    if (!reserve) return;
+
+    // Si la réserve est vide ET qu'il y a des élèves, on la remplit
+    if (reserve.children.length === 0 && eleves.length > 0) {
+        populateReserveOS(); // Appel de la fonction existante
+    }
+}
+
 window.populateReserveOS = async function() {
     const activeClasse = document.getElementById('selectClasse')?.value;
     if (!activeClasse) return alert("Sélectionnez une classe.");
     
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = ""); // Vide tout
+    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = "");
 
     const reserve = document.getElementById('os-reserve');
     for (const eleve of eleves) reserve.appendChild(await createEleveCard(eleve));
@@ -120,7 +108,7 @@ export async function loadOSAssignments() {
     const assignments = JSON.parse(localStorage.getItem(getOSStorageKey()) || '{}');
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${document.getElementById('selectClasse')?.value}`) || '[]');
     
-    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = ''); // Reset visuel
+    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
 
     const affectedIds = new Set();
     for (const zone of document.querySelectorAll('.os-dropzone')) {
@@ -136,7 +124,6 @@ export async function loadOSAssignments() {
         }
     }
 
-    // Gérer les élèves qui n'ont pas de groupe (dans la réserve)
     const reserve = document.getElementById('os-reserve');
     for (const eleve of eleves) {
         if (!affectedIds.has(eleve.id)) reserve.appendChild(await createEleveCard(eleve));
