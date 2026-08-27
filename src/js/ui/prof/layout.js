@@ -5,11 +5,11 @@ export function initLayout() {
     
     // 1. Gestion des onglets
     window.switchTab = function(tabName) {
-        ['admin', 'activities', 'live', 'tv'].forEach(t => {
-            const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
-            const el = document.getElementById(viewId);
-            if (el) el.classList.add('hidden');
-        });
+    ['admin', 'activities', 'live', 'tv'].forEach(t => {
+        const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
+        const el = document.getElementById(viewId);
+        if (el) el.classList.add('hidden');
+    });
 
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4'].forEach(id => {
             const btn = document.getElementById(id);
