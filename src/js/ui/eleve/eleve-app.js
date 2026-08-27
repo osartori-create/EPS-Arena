@@ -1,13 +1,10 @@
-// src/js/ui/eleve/eleve-app.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
 import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 import { getPerformancePath } from '../../core/firebase-service.js';
 import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade-calculations.js';
 import { BAREME_ESCALADE } from '../../config/constants.js';
-import { initEscaladeKiosk, sendEscalade } from '../../modules/eleve/escalade-kiosk.js';
+import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
-import { sendEscalade } from '../../modules/eleve/escalade-kiosk.js';
-import { showFeedback } from './eleve-actions.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -17,7 +14,6 @@ let selectedClass = "";
 let selectedCode = "";
 let currentConfig = null;
 
-// Éléments du DOM (créés en dur dans eleve.html)
 const classSelect = document.getElementById('class-select');
 const waitingScreen = document.getElementById('waiting-screen');
 const loginScreen = document.getElementById('login-screen');
@@ -102,7 +98,18 @@ function selectCode(code) {
     }
 }
 
-// Export des fonctions nécessaires aux modules
+// ✅ Exposition des fonctions globales (SANS collision de déclaration)
+window.sendEscalade = sendEscaladeAction;
+window.sendBalise = () => {
+    console.log("Balise envoyée (temporaire)");
+};
+window.startChrono = () => {
+    console.log("Chrono démarré (temporaire)");
+};
+window.stopChrono = () => {
+    console.log("Chrono arrêté (temporaire)");
+};
+
 export function getSelectedClass() { return selectedClass; }
 export function getSelectedCode() { return selectedCode; }
 export function getDB() { return db; }
@@ -111,9 +118,3 @@ export function resetToLogin() { showLogin(); }
 
 // Initialisation
 showWaiting();
-
-// Fonctions CO (à déplacer plus tard)
-window.sendEscalade = sendEscalade;
-window.sendBalise = () => { /* TODO */ };
-window.startChrono = () => { /* TODO */ };
-window.stopChrono = () => { /* TODO */ };
