@@ -48,15 +48,19 @@ onValue(activeClassesRef, (snap) => {
             selectedClass = classSelect.value;
             if (!selectedClass) return;
             
-            const configRef = ref(db, `${selectedClass}/config`);
-            onValue(configRef, (snap) => {
-                currentConfig = snap.val();
-                if (currentConfig) {
-                    showLogin();
-                } else {
-                    showWaiting();
-                }
-            });
+            // ✅ Nouvelle structure hiérarchique
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/config`);
+
+    onValue(configRef, (snap) => {
+        currentConfig = snap.val();
+        console.log("📡 Config reçue par l'élève :", currentConfig); // Diagnostic
+        if (currentConfig) {
+            showLogin();
+        } else {
+            showWaiting();
+        }
+    });
         });
 
         function showWaiting() {
