@@ -9,23 +9,42 @@ let currentDiscipline = 'multi';
 
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
-    try { initEscaladeInterface(6); } catch (e) {} // Valeur par défaut, sera mise à jour
+    try { initEscaladeInterface(6); } catch (e) {}
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
+
+        // 1. Gestion des vues
+        const multiView = document.getElementById('viewMultiSettings');
         const coView = document.getElementById('viewCOSettings');
         const escView = document.getElementById('viewEscaladeSettings');
+        if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
         if (coView) coView.classList.toggle('hidden', disc !== 'co');
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
 
+        // 2. Gestion des boutons (le bon reste bleu)
+        const btnMulti = document.getElementById('btnDisc-multi');
+        const btnCo = document.getElementById('btnDisc-co');
+        const btnEsc = document.getElementById('btnDisc-escalade');
+        
+        if (btnMulti) {
+            if (disc === 'multi') btnMulti.classList.add('border-blue-500', 'text-blue-400');
+            else btnMulti.classList.remove('border-blue-500', 'text-blue-400');
+        }
+        if (btnCo) {
+            if (disc === 'co') btnCo.classList.add('border-blue-500', 'text-blue-400');
+            else btnCo.classList.remove('border-blue-500', 'text-blue-400');
+        }
+        if (btnEsc) {
+            if (disc === 'escalade') btnEsc.classList.add('border-blue-500', 'text-blue-400');
+            else btnEsc.classList.remove('border-blue-500', 'text-blue-400');
+        }
+
+        // 3. Actions spécifiques
         if (disc === 'co') {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
         if (disc === 'escalade') {
-            const activeClasse = document.getElementById('selectClasse').value;
-            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-            const nbGroupes = Math.max(Math.ceil(eleves.length / 3), 1);
-            initEscaladeInterface(nbGroupes);
             try { initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
         }
     };
