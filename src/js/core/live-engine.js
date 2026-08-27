@@ -26,9 +26,12 @@ async function loadConfig() {
     if (currentConfigUnsub) currentConfigUnsub();
     if (!currentClasse) return;
     configData = {};
-    const configRef = ref(db, `etablissements/0680013V/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}/${currentClasse}/config`);
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
+    
     currentConfigUnsub = onValue(configRef, (snap) => {
         configData = snap.val() || {};
+        console.log("📡 Config reçue dans live-engine :", configData);
         window.dispatchEvent(new CustomEvent('live-config-updated', { detail: configData }));
     });
 }
@@ -38,6 +41,7 @@ function startListening() {
     allEscaladeData = {};
     if (!currentClasse) return;
     currentUnsub = listenToActivityData(currentClasse, (type, data) => {
+        console.log(`📡 Données reçues pour ${type} :`, Object.keys(data).length, "performances");
         if (type === 'escalade') allEscaladeData = data;
         window.dispatchEvent(new CustomEvent('live-data-updated', { detail: { type, data } }));
     });
@@ -60,9 +64,12 @@ export function getLocalMapping() {
 }
 
 export function getEleveIdFromCode(code) {
-    if (code.length < 2) return null;
-    const lettre = code.slice(0, 1);
-    const index = parseInt(code.slice(1)) - 1; 
+    // ✅ Parsing robuste pour les codes à 2 chiffres (A10, B12...)
+    const match = code.match(/^([A-Z]+)(\d+)$/);
+    if (!match) return null;
+    const lettre = match[1];
+    const index = parseInt(match[2]) - 1;
+
     const localMap = getLocalMapping();
     const key = `${currentClasse}_${lettre}`;
     if (localMap[key] && localMap[key][index]) return localMap[key][index];

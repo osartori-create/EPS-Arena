@@ -73,14 +73,15 @@ export async function renderEscaladeTV() {
 
         let photosHtml = '<div style="display: flex; flex-direction: column; gap: 5px; margin-top: 10px;">';
         for (const role of rolesTries) {
-            const index = parseInt(role) - 1;
-            const mappingKey = `${currentClasse}_${eq.lettre}`;
-            let eleveId = null;
-            if (localMapping[mappingKey] && Array.isArray(localMapping[mappingKey])) {
-                eleveId = localMapping[mappingKey][index];
-            } else if (localMapping[`${currentClasse}_${eq.lettre}${role}`]) {
-                eleveId = localMapping[`${currentClasse}_${eq.lettre}${role}`];
-            }
+    // ✅ Utilisation de la regex pour les codes à 2 chiffres
+    const index = parseInt(role) - 1; // Le rôle est un numéro (ex: "1", "2"...)
+    const mappingKey = `${currentClasse}_${eq.lettre}`;
+    let eleveId = null;
+    if (localMapping[mappingKey] && Array.isArray(localMapping[mappingKey])) {
+        eleveId = localMapping[mappingKey][index];
+    } else if (localMapping[`${currentClasse}_${eq.lettre}${role}`]) {
+        eleveId = localMapping[`${currentClasse}_${eq.lettre}${role}`];
+    }
 
             let photoUrl = null;
             if (eleveId) {
