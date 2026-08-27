@@ -1,3 +1,4 @@
+// src/js/core/live-engine.js
 import { listenToActivityData, ref, onValue } from './firebase-service.js';
 import { db } from './firebase-service.js';
 import { getPhotoUrl } from '../services/admin-service.js';
@@ -28,10 +29,8 @@ async function loadConfig() {
     configData = {};
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
-    
     currentConfigUnsub = onValue(configRef, (snap) => {
         configData = snap.val() || {};
-        console.log("📡 Config reçue dans live-engine :", configData);
         window.dispatchEvent(new CustomEvent('live-config-updated', { detail: configData }));
     });
 }
@@ -41,7 +40,6 @@ function startListening() {
     allEscaladeData = {};
     if (!currentClasse) return;
     currentUnsub = listenToActivityData(currentClasse, (type, data) => {
-        console.log(`📡 Données reçues pour ${type} :`, Object.keys(data).length, "performances");
         if (type === 'escalade') allEscaladeData = data;
         window.dispatchEvent(new CustomEvent('live-data-updated', { detail: { type, data } }));
     });
@@ -63,16 +61,12 @@ export function getLocalMapping() {
     return mapping;
 }
 
+// ✅ FONCTION ADAPTÉE À VOTRE STRUCTURE PLATE (504_A1)
 export function getEleveIdFromCode(code) {
-    // ✅ Parsing robuste pour les codes à 2 chiffres (A10, B12...)
-    const match = code.match(/^([A-Z]+)(\d+)$/);
-    if (!match) return null;
-    const lettre = match[1];
-    const index = parseInt(match[2]) - 1;
-
+    // code = "A1" -> clé = "504_A1"
+    const cleComplete = `${currentClasse}_${code}`;
     const localMap = getLocalMapping();
-    const key = `${currentClasse}_${lettre}`;
-    if (localMap[key] && localMap[key][index]) return localMap[key][index];
+    if (localMap[cleComplete]) return localMap[cleComplete];
     return null;
 }
 
@@ -88,8 +82,10 @@ export function getNomFromCode(code) {
 export async function getPhotoHtml(code) {
     const eleveId = getEleveIdFromCode(code);
     if (eleveId) {
-        const url = await getPhotoUrl(eleveId);
-        if (url) return `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`;
+        try {
+            const url = await getPhotoUrl(eleveId);
+            if (url) return `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`;
+        } catch (e) { /* Ignorer les erreurs de photo */ }
     }
     return `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
 }
