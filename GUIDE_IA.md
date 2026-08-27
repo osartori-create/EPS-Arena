@@ -1,4 +1,7 @@
-# GUIDE_IA.md - EPS-Arena (Contexte complet pour l'IA)
+Si vous ouvrez une nouvelle discussion, il suffira de dire :
+> *"Bonjour, je travaille sur EPS-Arena. Voici le contenu de mon GUIDE_IA.md : [collez le contenu]. Je veux ajouter [votre demande]."*
+
+
 
 ## 1. Description du projet
 Application web EPS (Éducation Physique et Sportive) pour gérer des activités sportives en classe via des iPads. Deux interfaces principales : le Professeur (`maitre.html`) et l'Élève (`eleve.html`). L'application est **100% RGPD** : aucun nom ou photo d'élève ne doit être présent dans Firebase.
@@ -151,13 +154,5 @@ Photos manquantes dans le Live : Vérifier que le localMapping est bien au forma
 
 Glisser-déposer cassé : Vérifier que initEscaladeInterface détruit bien les anciennes instances el.__sortable (avec destroy()) avant de recréer les colonnes.
 
-text
 
----
 
-**Copiez ce contenu dans votre fichier `GUIDE_IA.md` à la racine du projet.**
-
-Si vous ouvrez une nouvelle discussion, il suffira de dire :
-> *"Bonjour, je travaille sur EPS-Arena. Voici le contenu de mon GUIDE_IA.md : [collez le contenu]. Je veux ajouter [votre demande]."*
-
-Cela permettra à n'importe quelle IA de comprendre instantanément l'architecture, les règles RGPD, les conventions et les fichiers critiques à éviter. **Vous gagnerez un temps considérable !** 🚀

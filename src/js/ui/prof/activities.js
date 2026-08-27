@@ -4,6 +4,7 @@ import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
+import { initOSInterface, initSortableOS } from '../../modules/orientshow/os-interface.js';
 
 let currentDiscipline = 'multi';
 
@@ -16,23 +17,28 @@ function getBaseProf() {
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
     try { initEscaladeInterface(6); } catch (e) {}
+    try { initOSInterface(); } catch (e) {}
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
 
         const multiView = document.getElementById('viewMultiSettings');
         const coView = document.getElementById('viewCOSettings');
+        const osView = document.getElementById('viewOrientShowSettings');
         const escView = document.getElementById('viewEscaladeSettings');
         if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
         if (coView) coView.classList.toggle('hidden', disc !== 'co');
+        if (osView) osView.classList.toggle('hidden', disc !== 'orientshow');
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
 
         const btnMulti = document.getElementById('btnDisc-multi');
         const btnCo = document.getElementById('btnDisc-co');
+        const btnOs = document.getElementById('btnDisc-orientshow');
         const btnEsc = document.getElementById('btnDisc-escalade');
         
         if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
         if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
+        if (btnOs) btnOs.classList.toggle('border-blue-500', disc === 'orientshow');
         if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
 
         if (disc === 'co') {
@@ -44,6 +50,8 @@ export function initActivities() {
         initSortableEscalade();
         loadEscaladeAssignments();
     } catch (e) {}
+    if (disc === 'orientshow') {
+            try { initSortableOS(); }
 }
     };
 
@@ -116,6 +124,28 @@ export function initActivities() {
                     configData[lettre] = configData[lettre].length;
                 }
             });
+        } else if (currentDiscipline === 'orientshow') {
+            // 1. Récupération des affectations (sauvegardées par ta future UI Prof)
+            const osAssignments = JSON.parse(localStorage.getItem(`eps_arena_os_assignments_${activeClasse}`) || '{}');
+            configData.activite = 'orientshow';
+            
+            // 2. Création du mapping RGPD plat et comptage
+            Object.keys(osAssignments).forEach(couleur => {
+                if (Array.isArray(osAssignments[couleur])) {
+                    // On compte le nombre d'élèves pour cette couleur (ex: ROUGE: 5)
+                    configData[couleur] = osAssignments[couleur].length; 
+                    
+                    // On associe l'ID de l'élève à son code (ex: "504_ROUGE_1": "ID_ELEVE")
+                    osAssignments[couleur].forEach((eleveId, index) => {
+                        const code = `${couleur}_${index + 1}`; 
+                        localMapping[`${activeClasse}_${code}`] = eleveId;
+                    });
+                }
+            });
+            // 3. Ajout de la matrice de contrôle (les lettres) pour Firebase
+            const osMatrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+            configData.matrice = osMatrix;
+            
         } else {
             configData.activite = 'multi';
             if (window.lastTeams) {

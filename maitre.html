@@ -165,6 +165,36 @@
                 </div>
             </div>
 
+<!-- VUE PARAMÈTRES ORIENT'SHOW -->
+<div id="viewOrientShowSettings" class="hidden space-y-6">
+    
+    <!-- 1. La Matrice des codes -->
+    <div class="bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
+        <h3 class="text-sm font-black text-slate-400 uppercase mb-2">Matrice des Balises</h3>
+        <table class="w-full text-center font-bold text-[10px]" id="osMatrixTable">
+            <!-- Généré par le JS -->
+        </table>
+    </div>
+
+    <!-- 2. Les groupes par couleur -->
+    <div class="grid grid-cols-5 gap-2">
+        <div class="bg-slate-800 rounded-xl border-t-4 border-black p-2"><h3 class="text-center font-black uppercase text-xs text-white">Noir</h3><div id="os-col-NOIR" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
+        <div class="bg-slate-800 rounded-xl border-t-4 border-red-600 p-2"><h3 class="text-center font-black uppercase text-xs text-red-400">Rouge</h3><div id="os-col-ROUGE" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
+        <div class="bg-slate-800 rounded-xl border-t-4 border-blue-600 p-2"><h3 class="text-center font-black uppercase text-xs text-blue-400">Bleu</h3><div id="os-col-BLEU" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
+        <div class="bg-slate-800 rounded-xl border-t-4 border-green-600 p-2"><h3 class="text-center font-black uppercase text-xs text-green-400">Vert</h3><div id="os-col-VERT" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
+        <div class="bg-slate-800 rounded-xl border-t-4 border-yellow-500 p-2"><h3 class="text-center font-black uppercase text-xs text-yellow-500">Jaune</h3><div id="os-col-JAUNE" class="min-h-[100px] bg-slate-900/50 rounded p-1 mt-2 space-y-1"></div></div>
+    </div>
+
+    <!-- 3. La Réserve d'élèves -->
+    <div class="bg-slate-800 p-4 border border-slate-700 rounded-xl">
+        <div class="flex justify-between items-center mb-2">
+            <h3 class="font-black text-slate-400 text-xs uppercase">Réserve</h3>
+            <button onclick="window.populateReserveOS()" class="bg-blue-600 text-[10px] px-3 py-1 rounded font-bold">⬇️ Charger la classe</button>
+        </div>
+        <div id="os-reserve" class="flex flex-wrap gap-1 min-h-[50px] p-2 bg-slate-900 rounded border border-slate-700"></div>
+    </div>
+</div>
+
             <!-- PARAMÈTRES ARCATHLON -->
             <div id="viewArcathlonSettings" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
