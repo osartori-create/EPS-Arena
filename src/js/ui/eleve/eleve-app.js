@@ -1,3 +1,4 @@
+// src/js/ui/eleve/eleve-app.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
 import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 import { getPerformancePath } from '../../core/firebase-service.js';
@@ -24,25 +25,30 @@ const escaladeModule = document.getElementById('escalade-module');
 const coModule = document.getElementById('co-module');
 const multiModule = document.getElementById('multi-module');
 
-// Récupération des classes disponibles
-const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
-onValue(activeClassesRef, (snap) => {
-    const data = snap.val() || {};
-    classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
-        Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
-});
-
-classSelect.addEventListener('change', () => {
-    selectedClass = classSelect.value;
-    if (!selectedClass) return;
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/config`);
-    onValue(configRef, (snap) => {
-        currentConfig = snap.val();
-        if (currentConfig) showLogin();
-        else showWaiting();
+// ✅ FONCTION D'INITIALISATION (EXPORTÉE)
+export function initApp() {
+    // Récupération des classes disponibles
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
+    onValue(activeClassesRef, (snap) => {
+        const data = snap.val() || {};
+        classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
+            Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
     });
-});
+
+    classSelect.addEventListener('change', () => {
+        selectedClass = classSelect.value;
+        if (!selectedClass) return;
+        const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/config`);
+        onValue(configRef, (snap) => {
+            currentConfig = snap.val();
+            if (currentConfig) showLogin();
+            else showWaiting();
+        });
+    });
+
+    showWaiting();
+}
 
 function showWaiting() {
     loginScreen.classList.add('hidden');
@@ -95,7 +101,7 @@ function selectCode(code) {
     }
 }
 
-// ✅ Exposition globale des fonctions (SANS collision !)
+// ✅ Exposition globale des fonctions
 window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
 window.startChrono = () => { console.log("Chrono démarré"); };
@@ -106,5 +112,3 @@ export function getSelectedCode() { return selectedCode; }
 export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
 export function resetToLogin() { showLogin(); }
-
-showWaiting();
