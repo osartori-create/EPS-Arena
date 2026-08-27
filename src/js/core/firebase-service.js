@@ -6,18 +6,17 @@ const app = initializeApp(FIREBASE_CONFIG);
 export const db = getDatabase(app);
 export { ref, onValue, push, set, update, remove };
 
-// ✅ Récupère le chemin de base du professeur (ex: etablissements/0680013V/profs/MARTIN)
 function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     return `${DB_PATHS.ETAB}/profs/${profCode}`;
 }
 
-// ✅ Chemin unifié pour les activités (ex: .../profs/MARTIN/504/escalade/montees)
+// ✅ Chemin unifié HIÉRARCHIQUE
 export function getPerformancePath(classe, activite) {
     return `${getProfBasePath()}/${classe}/${activite}/montees`;
 }
 
-// ✅ Mise à jour de l'écouteur pour utiliser la structure prof/classe
+// ✅ Écoute sur le chemin HIÉRARCHIQUE
 export function listenToActivityData(classe, callback) {
     const refEscalade = ref(db, getPerformancePath(classe, 'escalade'));
     const refCO = ref(db, getPerformancePath(classe, 'co'));
