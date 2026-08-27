@@ -8,7 +8,7 @@ import { initOSInterface, initSortableOS, loadOSAssignments, ensureReserveLoaded
 
 let currentDiscipline = 'multi';
 
-// ✅ Fonction locale pour construire le chemin hiérarchique
+// Fonction locale pour construire le chemin hiérarchique
 function getBaseProf() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     return `etablissements/0680013V/profs/${profCode}`;
@@ -46,22 +46,20 @@ export function initActivities() {
         }
         if (disc === 'escalade') {
             try {
-                initEscaladeInterface(); // Va lire la sauvegarde OU le nombre d'élèves
+                initEscaladeInterface();
                 initSortableEscalade();
                 loadEscaladeAssignments();
             } catch (e) {}
         }
 
         if (disc === 'orientshow') {
-    try { 
-        // On attend que le DOM de la div soit rendu
-        setTimeout(() => {
-            initOSInterface();      // Génère la grille
-            loadOSAssignments();    // Charge les assignations existantes
-            setTimeout(() => ensureReserveLoaded(), 100); // Remplit la réserve si vide
-        }, 100);
-    } catch (e) {
-        console.error("Erreur lors de l'initialisation OrientShow :", e);
+            try {
+                setTimeout(() => {
+                    initOSInterface();
+                    loadOSAssignments();
+                    setTimeout(() => ensureReserveLoaded(), 100);
+                }, 100);
+            } catch (e) {}
         }
     };
 
@@ -135,28 +133,20 @@ export function initActivities() {
                 }
             });
         } else if (currentDiscipline === 'orientshow') {
-    // 1. Récupérer les affectations (la structure est "NOIR_1": [ids] ou "ROUGE_3": [ids])
-    const osAssignments = JSON.parse(localStorage.getItem(`eps_arena_os_assignments_${activeClasse}`) || '{}');
-    configData.activite = 'orientshow';
-    
-    // 2. Construire le mapping RGPD (Code élève -> ID élève)
-    Object.keys(osAssignments).forEach(code => {
-        if (Array.isArray(osAssignments[code])) {
-            // Config Firebase : envoyer le NOMBRE d'élèves par code
-            configData[code] = osAssignments[code].length;
+            const osAssignments = JSON.parse(localStorage.getItem(`eps_arena_os_assignments_${activeClasse}`) || '{}');
+            configData.activite = 'orientshow';
             
-            // Mapping local : associer l'ID à son code complet
-            osAssignments[code].forEach((eleveId, index) => {
-                // Attention : le code est déjà "NOIR_1", "NOIR_2", etc.
-                localMapping[`${activeClasse}_${code}`] = eleveId;
+            Object.keys(osAssignments).forEach(code => {
+                if (Array.isArray(osAssignments[code])) {
+                    configData[code] = osAssignments[code].length;
+                    osAssignments[code].forEach((eleveId, index) => {
+                        localMapping[`${activeClasse}_${code}`] = eleveId;
+                    });
+                }
             });
-        }
-    });
-    
-    // 3. Ajouter la matrice (les codes secrets) pour que l'élève puisse valider
-    const osMatrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-    configData.matrice = osMatrix; 
             
+            const osMatrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+            configData.matrice = osMatrix;
         } else {
             configData.activite = 'multi';
             if (window.lastTeams) {
@@ -180,7 +170,7 @@ export function initActivities() {
         } catch (e) { console.error("Erreur transmission :", e); alert("Erreur lors de la transmission."); }
     };
 
-    // ✅ PURGE (corrigée avec le bon chemin hiérarchique)
+    // ✅ PURGE
     window.openPurgeModal = function() {
         const choix = prompt("Purge Firebase\n1- Purger la classe active\n2- Purger TOUTE la base (code RNE)");
         const baseProf = getBaseProf();
