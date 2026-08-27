@@ -40,8 +40,8 @@ export function renderEscaladeLive(data) {
         if (eleveId) photoUrl = await getPhotoUrl(eleveId);
         
         const photoHtml = photoUrl 
-            ? `<img src="${photoUrl}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-500">` 
-            : `<div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+            ? `<img src="${photoUrl}" class="w-32 h-32 rounded-full object-cover border-4 border-slate-500">` 
+            : `<div class="w-32 h-32 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
 
         const nbMontees = mesMontees.length;
         const distanceTotale = mesMontees.reduce((sum, m) => sum + (m.hauteur || 0), 0);
