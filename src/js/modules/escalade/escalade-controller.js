@@ -56,15 +56,15 @@ export function calculerStatsGlobales(montees) {
 }
 
 export function initEscaladeListener(className, callback) {
-    import { getPerformancePath } from '../../core/firebase-service.js';
-const path = getPerformancePath(className, 'escalade');
-const refMontees = ref(db, path);
+    const refMontees = ref(db, getPerformancePath(className, 'escalade'));
     return onValue(refMontees, (snap) => callback(snap.val() || {}));
 }
 
 export async function envoyerMontee(className, groupe, role, voieNum, couleur, cotation, essai = 1) {
-    const points = calculerPoints(cotation, couleur, essai);
-    await push(ref(db, `escalade/${className}/montees`), {
+    // Calcul unifié
+    const points = calculateClimbingPoints({ hauteur: 9, cotation, couleur, essai }); 
+    // Note : ici on garde une hauteur de 9 par défaut car c'est la longueur de voie fixe
+    await push(ref(db, getPerformancePath(className, 'escalade')), {
         groupe: groupe, role: role, voie_num: voieNum,
         couleur: couleur, cotation: cotation, points: points, timestamp: Date.now()
     });
