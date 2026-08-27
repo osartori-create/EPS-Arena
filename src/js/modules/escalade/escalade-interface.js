@@ -1,11 +1,11 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 
-export function initEscaladeInterface(nbColonnes = 6) {
+export function initEscaladeInterface(nbGroupes = 6) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
     let html = '';
-    for (let i = 0; i < nbColonnes; i++) {
+    for (let i = 0; i < nbGroupes; i++) {
         const lettre = String.fromCharCode(65 + i);
         html += `
             <div class="flex flex-col">
