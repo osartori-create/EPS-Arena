@@ -1,13 +1,17 @@
 // src/js/core/firebase-service.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
 import { getDatabase, ref, onValue, push, set, update, remove } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { FIREBASE_CONFIG, DB_PATHS } from "../config/firebase-config.js"; // ✅ CORRIGÉ (un seul ../)
+import { FIREBASE_CONFIG, DB_PATHS } from "../config/firebase-config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
 export const db = getDatabase(app);
 
-// Exportation des fonctions utilitaires pour les modules
 export { ref, onValue, push, set, update, remove };
+
+// ✅ Ajoutez cette fonction si elle n'y est pas déjà :
+export function getPerformancePath(classe, activite) {
+    return `${classe}/${activite}/performances`;
+}
 
 // 🔑 Fonction pour construire le chemin de base du professeur (dynamique)
 function getProfBasePath() {
