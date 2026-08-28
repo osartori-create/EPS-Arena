@@ -10,36 +10,39 @@ let selectedColor = '';
 let selectedNum = null;
 let selectedCircuit = null;
 let lastSend = 0;
-const COOLDOWN = 30000; // 30s
+const COOLDOWN = 30000;
 
-export function initOrientShowKiosk() {
-    // Sélection de la classe (via le select existant)
-    const classSelect = document.getElementById('class-select');
-    if (!classSelect) return;
-
-    classSelect.addEventListener('change', () => {
-        currentClasse = classSelect.value;
-        if (currentClasse) {
-            listenOrientShowConfig(currentClasse, (config) => {
-                if (config) {
-                    matrix = config.matrix || {};
-                    startTime = config.startTime || null;
-                    endTime = config.endTime || null;
-                    updateUIState();
-                }
-            });
-            // Afficher les boutons de sélection de couleur/numéro
-            renderIdentitySelection();
+export function initOrientShowKiosk(classe, code) {
+    currentClasse = classe;
+    // code est le code identité (ex: "NOIR_1")
+    const parts = code.split('_');
+    if (parts.length === 2) {
+        selectedColor = parts[0];
+        selectedNum = parseInt(parts[1]);
+        // Mettre en surbrillance les boutons correspondants
+        document.querySelector(`.os-color-btn[data-color="${selectedColor}"]`)?.classList.add('border-blue-500');
+        document.querySelector(`.os-num-btn[data-num="${selectedNum}"]`)?.classList.add('border-blue-500');
+    }
+    // Écouter la config
+    listenOrientShowConfig(classe, (config) => {
+        if (config) {
+            matrix = config.matrix || {};
+            startTime = config.startTime || null;
+            endTime = config.endTime || null;
+            updateUIState();
+            // Afficher les circuits
+            renderCircuits();
         }
     });
-
-    // Écouter l'activité pour afficher le module (déclenché par le prof)
-    // Dans eleve.html, on utilise un écouteur sur la config de l'activité.
+    // Rendre les boutons de sélection (couleur + numéro) si pas déjà fait
+    renderIdentitySelection();
 }
 
 function renderIdentitySelection() {
     const container = document.getElementById('os-identity-selector');
     if (!container) return;
+    // On ne refait pas le rendu si déjà fait
+    if (container.children.length > 0) return;
     let html = `<div class="grid grid-cols-5 gap-2">`;
     ['NOIR','ROUGE','BLEU','VERT','JAUNE'].forEach(col => {
         html += `<button class="os-color-btn bg-slate-700 p-4 rounded-xl font-black text-xs uppercase border-2 border-transparent" data-color="${col}" onclick="window.selectOSColor('${col}')">${col}</button>`;
@@ -50,25 +53,29 @@ function renderIdentitySelection() {
     }
     html += `</div>`;
     container.innerHTML = html;
+
+    // Pré-sélection si code déjà connu
+    if (selectedColor) {
+        document.querySelector(`.os-color-btn[data-color="${selectedColor}"]`)?.classList.add('border-blue-500');
+    }
+    if (selectedNum) {
+        document.querySelector(`.os-num-btn[data-num="${selectedNum}"]`)?.classList.add('border-blue-500');
+    }
 }
 
 window.selectOSColor = function(color) {
     selectedColor = color;
     document.querySelectorAll('.os-color-btn').forEach(b => b.classList.remove('border-blue-500'));
     document.querySelector(`.os-color-btn[data-color="${color}"]`)?.classList.add('border-blue-500');
-    updateCircuitDisplay();
 };
 
 window.selectOSNum = function(num) {
     selectedNum = num;
     document.querySelectorAll('.os-num-btn').forEach(b => b.classList.remove('border-blue-500'));
     document.querySelector(`.os-num-btn[data-num="${num}"]`)?.classList.add('border-blue-500');
-    updateCircuitDisplay();
 };
 
-function updateCircuitDisplay() {
-    if (!selectedColor || !selectedNum) return;
-    // Afficher les circuits (C1 à C12) avec leur état (déjà fait ?)
+function renderCircuits() {
     const container = document.getElementById('os-circuit-grid');
     if (!container) return;
     let html = `<div class="grid grid-cols-4 gap-2">`;
@@ -83,11 +90,9 @@ window.selectOSCircuit = function(circuit) {
     selectedCircuit = circuit;
     document.querySelectorAll('.os-circuit-btn').forEach(b => b.classList.remove('border-blue-500'));
     document.querySelector(`.os-circuit-btn[data-circuit="${circuit}"]`)?.classList.add('border-blue-500');
-    // Afficher les champs de saisie des lettres
     document.getElementById('os-letters-input').classList.remove('hidden');
 };
 
-// Validation
 window.validateOSPassage = function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     if (!selectedColor || !selectedNum) return alert('Choisissez votre identité (couleur + numéro).');
@@ -98,7 +103,6 @@ window.validateOSPassage = function() {
     const l2 = document.getElementById('os-l2').value.toUpperCase();
     if (!l1 && !l2) return alert('Saisissez au moins une lettre.');
 
-    // Anti-flood
     const now = Date.now();
     if (now - lastSend < COOLDOWN) {
         const wait = Math.ceil((COOLDOWN - (now - lastSend)) / 1000);
@@ -113,7 +117,6 @@ window.validateOSPassage = function() {
     if (l2 && truthCopy.includes(l2)) { score += 2.5; truthCopy = truthCopy.filter(l => l !== l2); }
     score = Math.floor(score === 5 ? 5 : (score > 0 ? 2 : 0));
 
-    // Envoyer
     const code = `${selectedColor}_${selectedNum}`;
     sendOrientShowPassage(currentClasse, {
         code,
@@ -127,21 +130,19 @@ window.validateOSPassage = function() {
         // Réinitialiser les champs
         document.getElementById('os-l1').value = '';
         document.getElementById('os-l2').value = '';
-        // Désélectionner le circuit ? On peut laisser.
     }).catch(err => alert('Erreur envoi : ' + err.message));
 };
 
 function showFeedback(score) {
-    // Implémenter un feedback visuel (modal) comme dans l'original
     const icon = score === 5 ? '🏆' : (score === 2 ? '🆗' : '❌');
     const color = score === 5 ? '#065f46' : (score === 2 ? '#9a3412' : '#991b1b');
-    // Afficher une notification toast (ou utiliser le service toast existant)
-    // Pour simplifier, on utilise alert pour l'instant.
+    // Utiliser un toast ou une alerte
     alert(`${icon} Score : +${score} pts`);
 }
 
 function updateUIState() {
     const state = document.getElementById('courseState');
+    if (!state) return;
     if (!startTime) {
         state.innerText = '⏳ En attente du départ...';
     } else if (!endTime) {

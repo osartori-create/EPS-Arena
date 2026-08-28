@@ -44,24 +44,19 @@ export function initLayout() {
 
         // Appel pour la TV selon la discipline courante
         if (tabName === 'tv') {
-            setTimeout(() => {
-                const currentDiscipline = localStorage.getItem('eps_arena_current_discipline') || 'escalade';
-                if (currentDiscipline === 'orientshow') {
-                    import('../../modules/orientshow/orientshow-tv.js')
-                        .then(module => {
-                            module.renderOrientShowTV();
-                        })
-                        .catch(err => console.error("Erreur import TV OrientShow:", err));
-                } else {
-                    // Par défaut, escalade (ou autre)
-                    import('../../modules/escalade/escalade-tv-ui.js')
-                        .then(module => {
-                            module.renderEscaladeTV();
-                        })
-                        .catch(err => console.error("Erreur import TV escalade:", err));
-                }
-            }, 100);
+    setTimeout(() => {
+        const currentDiscipline = localStorage.getItem('eps_arena_current_discipline') || 'escalade';
+        if (currentDiscipline === 'orientshow') {
+            import('../../modules/orientshow/orientshow-tv.js')
+                .then(module => module.renderOrientShowTV())
+                .catch(err => console.error("Erreur TV OrientShow:", err));
+        } else {
+            import('../../modules/escalade/escalade-tv-ui.js')
+                .then(module => module.renderEscaladeTV())
+                .catch(err => console.error("Erreur TV escalade:", err));
         }
+    }, 100);
+}
 
         // Appel pour le Live si onglet live
         if (tabName === 'live') {

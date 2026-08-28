@@ -6,15 +6,15 @@ import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase
 
 const COULEURS = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
 const NB_COULEURS = 5;
-const NB_NUMEROS = 10; // de 1 à 10
+const NB_NUMEROS = 10;
 const NB_CIRCUITS = 12;
 
 let currentClasse = '';
-let matrix = {}; // stockée localement pour l'édition
+let matrix = {};
 let startTime = null;
 let endTime = null;
 
-// Initialisation de l'interface
+// Initialisation
 export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
@@ -25,14 +25,14 @@ export function initOrientShowInterface() {
         return;
     }
 
-    // Charger la config depuis Firebase (pour matrix, start/end)
+    // Charger la config depuis Firebase (ou localStorage)
     listenOrientShowConfig(currentClasse, (config) => {
-        if (config) {
-            matrix = config.matrix || {};
+        if (config && config.matrix) {
+            matrix = config.matrix;
             startTime = config.startTime || null;
             endTime = config.endTime || null;
         } else {
-            // Initialiser avec une matrice vide
+            // Initialiser une matrice vide
             matrix = {};
             for (let c = 1; c <= NB_CIRCUITS; c++) {
                 matrix[c] = {};
@@ -40,13 +40,20 @@ export function initOrientShowInterface() {
                     matrix[c][col] = ['', ''];
                 });
             }
+            startTime = null;
+            endTime = null;
         }
+        // Sauvegarder dans localStorage pour persistance locale
+        localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+        localStorage.setItem('eps_arena_os_startTime', startTime);
+        localStorage.setItem('eps_arena_os_endTime', endTime);
+        
         renderMatrix();
         renderReserveAndGroups();
         updateChronoButtons();
     });
 
-    // Écouter les changements de classe pour rafraîchir
+    // Écouter les changements de classe
     document.getElementById('selectClasse').addEventListener('change', () => {
         currentClasse = getCurrentClasse();
         initOrientShowInterface();
@@ -84,7 +91,8 @@ window.updateOSMatrixCell = function(input) {
     if (!matrix[circuit]) matrix[circuit] = {};
     if (!matrix[circuit][color]) matrix[circuit][color] = ['', ''];
     matrix[circuit][color][index] = input.value.toUpperCase();
-    // Sauvegarde automatique dans Firebase (mais on peut aussi attendre un bouton "Enregistrer")
+    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+    // Sauvegarde automatique (on pourrait attendre un bouton "Enregistrer")
     saveMatrixToFirebase();
 };
 
@@ -94,30 +102,32 @@ function saveMatrixToFirebase() {
     setOrientShowConfig(currentClasse, configData);
 }
 
-// Gestion des groupes : réserve + grille des codes (couleur + numéro)
+// Gestion des groupes : réserve + grille des codes
 function renderReserveAndGroups() {
     const reserveContainer = document.getElementById('os-reserve');
     const gridContainer = document.getElementById('os-postesGrid');
     if (!reserveContainer || !gridContainer) return;
 
-    // Récupérer la liste des élèves de la classe (depuis localStorage)
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    const mapping = getLocalMapping() || {};
+    const mapping = getLocalMapping(currentClasse) || {};
 
-    // Construire la réserve : élèves non encore affectés à un code
-    const assignedCodes = new Set(Object.keys(mapping).filter(k => k.startsWith(currentClasse + '_')));
+    // Réserve : élèves non affectés
+    const assignedCodes = new Set();
+    Object.keys(mapping).forEach(key => {
+        if (key.startsWith(currentClasse + '_')) {
+            assignedCodes.add(key);
+        }
+    });
     const reserveEleves = eleves.filter(e => !assignedCodes.has(`${currentClasse}_${e.id}`));
 
-    // Afficher la réserve (avec photos)
     reserveContainer.innerHTML = '';
     reserveEleves.forEach(eleve => {
         const card = createEleveCard(eleve);
         reserveContainer.appendChild(card);
     });
 
-    // Générer la grille des codes (5 couleurs × 10 numéros)
+    // Grille des codes (5x10)
     let html = `<div class="grid grid-cols-${NB_COULEURS + 1} gap-2">`;
-    // En-tête
     html += `<div></div>`;
     COULEURS.forEach(col => {
         html += `<div class="font-black text-center p-1 text-[10px] uppercase">${col}</div>`;
@@ -129,7 +139,8 @@ function renderReserveAndGroups() {
         html += `<div class="flex items-center justify-center font-black text-yellow-400 text-2xl">${num}</div>`;
         COULEURS.forEach(col => {
             const code = `${col}_${num}`;
-            const eleveId = mapping[`${currentClasse}_${code}`] || null;
+            const mappingKey = `${currentClasse}_${code}`;
+            const eleveId = mapping[mappingKey] || null;
             const eleve = eleves.find(e => e.id === eleveId);
             html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 rounded-lg" data-code="${code}">`;
             if (eleve) {
@@ -141,19 +152,14 @@ function renderReserveAndGroups() {
     }
     gridContainer.innerHTML = html;
 
-    // Initialiser Sortable
-    initSortableOS();
-
-    // Sauvegarder le mapping à chaque modification
-    // (on utilise onEnd de Sortable pour appeler saveOSAssignments)
+    // Initialiser Sortable après rendu
+    setTimeout(() => initSortableOS(), 100);
 }
 
-// Création d'une carte élève (pour la réserve)
 function createEleveCard(eleve) {
     const div = document.createElement('div');
     div.className = 'p-2 rounded border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 w-full bg-slate-200 border-slate-400';
     div.dataset.id = eleve.id;
-    // On pourrait charger la photo via getPhotoUrl, mais pour simplifier on utilise un placeholder
     div.innerHTML = `<div class="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-sm">👤</div>
                      <div class="flex flex-col leading-tight overflow-hidden">
                          <span class="font-black text-slate-900 text-sm truncate">${eleve.prenom}</span>
@@ -168,7 +174,7 @@ function createEleveCardHTML(eleve) {
             </div>`;
 }
 
-// Initialisation de Sortable pour la réserve et les dropzones
+// Sortable
 function initSortableOS() {
     if (typeof Sortable === 'undefined') return;
     const reserve = document.getElementById('os-reserve');
@@ -190,7 +196,6 @@ function initSortableOS() {
     });
 }
 
-// Sauvegarde des affectations dans le mapping local
 function saveOSAssignments() {
     const mapping = {};
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
@@ -202,14 +207,14 @@ function saveOSAssignments() {
             mapping[`${currentClasse}_${code}`] = eleveId;
         }
     });
-    // Ajouter les élèves en réserve (non affectés) : on les laisse dans la réserve, pas besoin de les mapper
-    // Mais pour le mapping final, on ne garde que ceux qui sont dans une dropzone.
-    setLocalMapping(mapping);
-    // Recharger l'affichage pour mettre à jour les cartes ?
-    // On pourrait simplement rafraîchir la réserve.
+    // On conserve les élèves en réserve (non affectés) dans le mapping ? Non, ils ne sont pas dans le mapping.
+    // On écrase le mapping avec les seules affectations.
+    setLocalMapping(currentClasse, mapping);
+    // Recharger l'affichage pour synchroniser
+    renderReserveAndGroups();
 }
 
-// Chronomètre : boutons Top départ / Arrêt
+// Chrono
 function updateChronoButtons() {
     const btnStart = document.getElementById('os-start-btn');
     const btnStop = document.getElementById('os-stop-btn');
@@ -235,6 +240,8 @@ window.startOrientShow = function() {
     if (!currentClasse) return alert('Choisissez une classe.');
     startTime = Date.now();
     endTime = null;
+    localStorage.setItem('eps_arena_os_startTime', startTime);
+    localStorage.setItem('eps_arena_os_endTime', null);
     saveMatrixToFirebase();
     updateChronoButtons();
 };
@@ -242,11 +249,12 @@ window.startOrientShow = function() {
 window.stopOrientShow = function() {
     if (!startTime) return;
     endTime = Date.now();
+    localStorage.setItem('eps_arena_os_endTime', endTime);
     saveMatrixToFirebase();
     updateChronoButtons();
 };
 
-// Export/Import JSON (comme pour escalade)
+// Export/Import
 window.exportOSConfig = function() {
     saveMatrixToFirebase();
     const data = {
@@ -278,6 +286,9 @@ window.importOSConfig = function(event) {
             matrix = data.matrix;
             startTime = data.startTime || null;
             endTime = data.endTime || null;
+            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+            localStorage.setItem('eps_arena_os_startTime', startTime);
+            localStorage.setItem('eps_arena_os_endTime', endTime);
             setOrientShowConfig(currentClasse, { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS });
             renderMatrix();
             updateChronoButtons();
@@ -289,8 +300,3 @@ window.importOSConfig = function(event) {
     reader.readAsText(file);
     event.target.value = '';
 };
-
-// Exposer au global pour les onclick
-window.initOrientShowInterface = initOrientShowInterface;
-window.startOrientShow = startOrientShow;
-window.stopOrientShow = stopOrientShow;

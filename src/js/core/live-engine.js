@@ -100,3 +100,17 @@ export async function getPhotoHtml(code) {
     }
     return `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
 }
+export function getLocalMapping(classe) {
+    const key = `eps_arena_local_mapping_${classe}`;
+    return JSON.parse(localStorage.getItem(key) || '{}');
+}
+
+export function setLocalMapping(classe, mapping) {
+    const key = `eps_arena_local_mapping_${classe}`;
+    localStorage.setItem(key, JSON.stringify(mapping));
+}
+
+export function getCurrentClasse() {
+    const select = document.getElementById('selectClasse');
+    return select ? select.value : '';
+}

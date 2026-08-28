@@ -14,14 +14,12 @@ export function renderOrientShowTV() {
     }
 
     listenOrientShowPassages(classe, (data) => {
-        // Calculer le score total par code
         const scores = {};
         Object.values(data).forEach(p => {
             if (!scores[p.code]) scores[p.code] = 0;
             scores[p.code] += p.score;
         });
 
-        // Trier par score décroissant
         const sorted = Object.entries(scores).sort((a,b) => b[1] - a[1]);
         if (sorted.length === 0) {
             container.innerHTML = '<p class="text-slate-500">En attente de résultats...</p>';
