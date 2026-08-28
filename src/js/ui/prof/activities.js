@@ -127,13 +127,15 @@ export function initActivities() {
 
     // TRANSMISSION (chemins hiérarchiques)
     window.transmettreConfig = async function() {
-        const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-console.log('[transmettre] profCode :', profCode);
-console.log('[transmettre] chemin actif :', `etablissements/0680013V/profs/${profCode}/active_classes/${activeClasse}`);
-        const activeClasse = document.getElementById('selectClasse').value;
-        if (!activeClasse) return alert("Sélectionnez une classe.");
-        let configData = {};
-        let localMapping = {};
+    // Récupérer la classe en TOUT PREMIER
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe.");
+
+    // Ensuite, le reste du code
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    let configData = {};
+    let localMapping = {};
 
         if (currentDiscipline === 'co') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
