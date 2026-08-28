@@ -30,16 +30,28 @@ const osModule = document.getElementById('orientshow-module'); // Nouveau
 
 // FONCTION D'INITIALISATION (EXPORTÉE)
 export function initApp() {
-    const profCodeInput = document.getElementById('profCodeElève');
-const profCode = profCodeInput ? profCodeInput.value.trim() || localStorage.getItem('eps_arena_profCode') || 'DEFAULT' : localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-localStorage.setItem('eps_arena_profCode', profCode); // pour persister
-    // Récupération des classes disponibles
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const profCode = '1'; // ← MODIFIER ICI
+    console.log('[eleve] profCode utilisé :', profCode);
+
     const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
     onValue(activeClassesRef, (snap) => {
         const data = snap.val() || {};
+        console.log('[eleve] Données active_classes reçues :', data);
         classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
             Object.keys(data).map(c => `<option value="${c}">${c}</option>`).join('');
+    });
+
+    classSelect.addEventListener('change', () => {
+        selectedClass = classSelect.value;
+        console.log('[eleve] Classe sélectionnée :', selectedClass);
+        if (!selectedClass) return;
+        const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/config`);
+        onValue(configRef, (snap) => {
+            currentConfig = snap.val();
+            console.log('[eleve] Config reçue :', currentConfig);
+            if (currentConfig) showLogin();
+            else showWaiting();
+        });
     });
 
     classSelect.addEventListener('change', () => {
