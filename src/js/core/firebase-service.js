@@ -52,3 +52,40 @@ export function sendPassage(passageData) {
     const refPassages = ref(db, `${getProfBasePath()}/live/passages`);
     return push(refPassages, passageData);
 }
+
+// src/js/core/firebase-service.js
+
+// ... (existants)
+
+// Chemins pour OrientShow
+export function getOrientShowConfigPath(classe) {
+    return `${getProfBasePath()}/${classe}/orientshow/config`;
+}
+
+export function getOrientShowPassagesPath(classe) {
+    return `${getProfBasePath()}/${classe}/orientshow/passages`;
+}
+
+// Envoi d'un passage OrientShow
+export function sendOrientShowPassage(classe, passageData) {
+    const refPassages = ref(db, getOrientShowPassagesPath(classe));
+    return push(refPassages, passageData);
+}
+
+// Écoute des passages OrientShow
+export function listenOrientShowPassages(classe, callback) {
+    const refPassages = ref(db, getOrientShowPassagesPath(classe));
+    return onValue(refPassages, (snapshot) => callback(snapshot.val() || {}));
+}
+
+// Écoute de la config OrientShow
+export function listenOrientShowConfig(classe, callback) {
+    const refConfig = ref(db, getOrientShowConfigPath(classe));
+    return onValue(refConfig, (snapshot) => callback(snapshot.val() || {}));
+}
+
+// Mise à jour de la config (pour la transmission)
+export function setOrientShowConfig(classe, configData) {
+    const refConfig = ref(db, getOrientShowConfigPath(classe));
+    return set(refConfig, configData);
+}

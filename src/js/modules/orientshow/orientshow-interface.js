@@ -1,0 +1,296 @@
+// src/js/modules/orientshow/orientshow-interface.js
+
+import { getPhotoUrl } from '../../services/admin-service.js';
+import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../core/live-engine.js';
+import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase-service.js';
+
+const COULEURS = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
+const NB_COULEURS = 5;
+const NB_NUMEROS = 10; // de 1 à 10
+const NB_CIRCUITS = 12;
+
+let currentClasse = '';
+let matrix = {}; // stockée localement pour l'édition
+let startTime = null;
+let endTime = null;
+
+// Initialisation de l'interface
+export function initOrientShowInterface() {
+    const container = document.getElementById('viewOrientShowSettings');
+    if (!container) return;
+
+    currentClasse = getCurrentClasse();
+    if (!currentClasse) {
+        container.innerHTML = '<p class="text-slate-500">Veuillez sélectionner une classe.</p>';
+        return;
+    }
+
+    // Charger la config depuis Firebase (pour matrix, start/end)
+    listenOrientShowConfig(currentClasse, (config) => {
+        if (config) {
+            matrix = config.matrix || {};
+            startTime = config.startTime || null;
+            endTime = config.endTime || null;
+        } else {
+            // Initialiser avec une matrice vide
+            matrix = {};
+            for (let c = 1; c <= NB_CIRCUITS; c++) {
+                matrix[c] = {};
+                COULEURS.forEach(col => {
+                    matrix[c][col] = ['', ''];
+                });
+            }
+        }
+        renderMatrix();
+        renderReserveAndGroups();
+        updateChronoButtons();
+    });
+
+    // Écouter les changements de classe pour rafraîchir
+    document.getElementById('selectClasse').addEventListener('change', () => {
+        currentClasse = getCurrentClasse();
+        initOrientShowInterface();
+    });
+}
+
+// Rendu de la matrice modifiable
+function renderMatrix() {
+    const container = document.getElementById('os-matrix-container');
+    if (!container) return;
+    let html = `<table class="w-full text-center font-bold text-[10px]">
+        <thead><tr class="bg-slate-900 text-white">
+            <th>#</th>`;
+    COULEURS.forEach(col => {
+        html += `<th colspan="2" class="py-2 ${col === 'NOIR' ? 'bg-black' : col === 'ROUGE' ? 'bg-red-600' : col === 'BLEU' ? 'bg-blue-600' : col === 'VERT' ? 'bg-green-600' : 'bg-yellow-500 text-black'}">${col}</th>`;
+    });
+    html += `</tr></thead><tbody>`;
+    for (let c = 1; c <= NB_CIRCUITS; c++) {
+        html += `<tr class="border-b border-slate-700"><td class="font-black text-slate-500 py-2">C${c}</td>`;
+        COULEURS.forEach(col => {
+            const val = matrix[c]?.[col] || ['', ''];
+            html += `<td><input class="w-10 h-10 bg-slate-900 text-center font-black text-xl text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${val[0]}" maxlength="1" data-circuit="${c}" data-color="${col}" data-index="0" onchange="window.updateOSMatrixCell(this)"></td>
+                     <td><input class="w-10 h-10 bg-slate-900 text-center font-black text-xl text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${val[1]}" maxlength="1" data-circuit="${c}" data-color="${col}" data-index="1" onchange="window.updateOSMatrixCell(this)"></td>`;
+        });
+        html += `</tr>`;
+    }
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+}
+
+window.updateOSMatrixCell = function(input) {
+    const circuit = parseInt(input.dataset.circuit);
+    const color = input.dataset.color;
+    const index = parseInt(input.dataset.index);
+    if (!matrix[circuit]) matrix[circuit] = {};
+    if (!matrix[circuit][color]) matrix[circuit][color] = ['', ''];
+    matrix[circuit][color][index] = input.value.toUpperCase();
+    // Sauvegarde automatique dans Firebase (mais on peut aussi attendre un bouton "Enregistrer")
+    saveMatrixToFirebase();
+};
+
+function saveMatrixToFirebase() {
+    if (!currentClasse) return;
+    const configData = { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS };
+    setOrientShowConfig(currentClasse, configData);
+}
+
+// Gestion des groupes : réserve + grille des codes (couleur + numéro)
+function renderReserveAndGroups() {
+    const reserveContainer = document.getElementById('os-reserve');
+    const gridContainer = document.getElementById('os-postesGrid');
+    if (!reserveContainer || !gridContainer) return;
+
+    // Récupérer la liste des élèves de la classe (depuis localStorage)
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+    const mapping = getLocalMapping() || {};
+
+    // Construire la réserve : élèves non encore affectés à un code
+    const assignedCodes = new Set(Object.keys(mapping).filter(k => k.startsWith(currentClasse + '_')));
+    const reserveEleves = eleves.filter(e => !assignedCodes.has(`${currentClasse}_${e.id}`));
+
+    // Afficher la réserve (avec photos)
+    reserveContainer.innerHTML = '';
+    reserveEleves.forEach(eleve => {
+        const card = createEleveCard(eleve);
+        reserveContainer.appendChild(card);
+    });
+
+    // Générer la grille des codes (5 couleurs × 10 numéros)
+    let html = `<div class="grid grid-cols-${NB_COULEURS + 1} gap-2">`;
+    // En-tête
+    html += `<div></div>`;
+    COULEURS.forEach(col => {
+        html += `<div class="font-black text-center p-1 text-[10px] uppercase">${col}</div>`;
+    });
+    html += `</div>`;
+
+    for (let num = 1; num <= NB_NUMEROS; num++) {
+        html += `<div class="grid grid-cols-${NB_COULEURS + 1} gap-2 mb-2">`;
+        html += `<div class="flex items-center justify-center font-black text-yellow-400 text-2xl">${num}</div>`;
+        COULEURS.forEach(col => {
+            const code = `${col}_${num}`;
+            const eleveId = mapping[`${currentClasse}_${code}`] || null;
+            const eleve = eleves.find(e => e.id === eleveId);
+            html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 rounded-lg" data-code="${code}">`;
+            if (eleve) {
+                html += createEleveCardHTML(eleve);
+            }
+            html += `</div>`;
+        });
+        html += `</div>`;
+    }
+    gridContainer.innerHTML = html;
+
+    // Initialiser Sortable
+    initSortableOS();
+
+    // Sauvegarder le mapping à chaque modification
+    // (on utilise onEnd de Sortable pour appeler saveOSAssignments)
+}
+
+// Création d'une carte élève (pour la réserve)
+function createEleveCard(eleve) {
+    const div = document.createElement('div');
+    div.className = 'p-2 rounded border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 w-full bg-slate-200 border-slate-400';
+    div.dataset.id = eleve.id;
+    // On pourrait charger la photo via getPhotoUrl, mais pour simplifier on utilise un placeholder
+    div.innerHTML = `<div class="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-sm">👤</div>
+                     <div class="flex flex-col leading-tight overflow-hidden">
+                         <span class="font-black text-slate-900 text-sm truncate">${eleve.prenom}</span>
+                         <span class="text-xs font-bold text-slate-600 uppercase truncate">${eleve.nom}</span>
+                     </div>`;
+    return div;
+}
+
+function createEleveCardHTML(eleve) {
+    return `<div class="p-1 rounded bg-slate-700 text-white flex items-center gap-1" data-id="${eleve.id}">
+                <span class="text-xs font-bold">${eleve.prenom} ${eleve.nom}</span>
+            </div>`;
+}
+
+// Initialisation de Sortable pour la réserve et les dropzones
+function initSortableOS() {
+    if (typeof Sortable === 'undefined') return;
+    const reserve = document.getElementById('os-reserve');
+    if (reserve && !reserve.__sortable) {
+        reserve.__sortable = new Sortable(reserve, {
+            group: 'os',
+            animation: 150,
+            onEnd: saveOSAssignments
+        });
+    }
+    document.querySelectorAll('.os-dropzone').forEach(el => {
+        if (!el.__sortable) {
+            el.__sortable = new Sortable(el, {
+                group: 'os',
+                animation: 150,
+                onEnd: saveOSAssignments
+            });
+        }
+    });
+}
+
+// Sauvegarde des affectations dans le mapping local
+function saveOSAssignments() {
+    const mapping = {};
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+    document.querySelectorAll('.os-dropzone').forEach(zone => {
+        const code = zone.dataset.code;
+        const card = zone.querySelector('[data-id]');
+        if (card) {
+            const eleveId = card.dataset.id;
+            mapping[`${currentClasse}_${code}`] = eleveId;
+        }
+    });
+    // Ajouter les élèves en réserve (non affectés) : on les laisse dans la réserve, pas besoin de les mapper
+    // Mais pour le mapping final, on ne garde que ceux qui sont dans une dropzone.
+    setLocalMapping(mapping);
+    // Recharger l'affichage pour mettre à jour les cartes ?
+    // On pourrait simplement rafraîchir la réserve.
+}
+
+// Chronomètre : boutons Top départ / Arrêt
+function updateChronoButtons() {
+    const btnStart = document.getElementById('os-start-btn');
+    const btnStop = document.getElementById('os-stop-btn');
+    if (!btnStart || !btnStop) return;
+    if (!startTime) {
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        btnStart.innerText = '🚀 TOP DÉPART';
+    } else if (!endTime) {
+        btnStart.disabled = true;
+        btnStop.disabled = false;
+        btnStart.innerText = '⏳ Course en cours';
+        btnStop.innerText = '🛑 ARRÊTER';
+    } else {
+        btnStart.disabled = true;
+        btnStop.disabled = true;
+        btnStart.innerText = '✅ Terminée';
+        btnStop.innerText = '⏱️ Arrêtée';
+    }
+}
+
+window.startOrientShow = function() {
+    if (!currentClasse) return alert('Choisissez une classe.');
+    startTime = Date.now();
+    endTime = null;
+    saveMatrixToFirebase();
+    updateChronoButtons();
+};
+
+window.stopOrientShow = function() {
+    if (!startTime) return;
+    endTime = Date.now();
+    saveMatrixToFirebase();
+    updateChronoButtons();
+};
+
+// Export/Import JSON (comme pour escalade)
+window.exportOSConfig = function() {
+    saveMatrixToFirebase();
+    const data = {
+        version: 1,
+        classe: currentClasse,
+        activite: 'orientshow',
+        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
+        matrix: matrix,
+        startTime,
+        endTime,
+        nbCircuits: NB_CIRCUITS,
+        nbCouleurs: NB_COULEURS
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentClasse}_orientshow_${data.date}.json`;
+    a.click();
+};
+
+window.importOSConfig = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.matrix) throw new Error('Format invalide');
+            matrix = data.matrix;
+            startTime = data.startTime || null;
+            endTime = data.endTime || null;
+            setOrientShowConfig(currentClasse, { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS });
+            renderMatrix();
+            updateChronoButtons();
+            alert('✅ Configuration OrientShow importée !');
+        } catch (err) {
+            alert('❌ Erreur : ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+};
+
+// Exposer au global pour les onclick
+window.initOrientShowInterface = initOrientShowInterface;
+window.startOrientShow = startOrientShow;
+window.stopOrientShow = stopOrientShow;

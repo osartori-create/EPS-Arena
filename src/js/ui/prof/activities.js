@@ -1,10 +1,19 @@
+// src/js/ui/prof/activities.js
 import { initCOInterface, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
 import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
-import { initOSInterface, initSortableOS, loadOSAssignments, ensureReserveLoaded } from '../../modules/orientshow/os-interface.js';
+// Nouvel import pour OrientShow
+import { 
+    initOrientShowInterface,
+    loadOrientShowAssignments,
+    exportOrientShowConfig,
+    importOrientShowConfig,
+    startOrientShow,
+    stopOrientShow
+} from '../../modules/orientshow/orientshow-interface.js';
 
 let currentDiscipline = 'multi';
 
@@ -17,10 +26,12 @@ function getBaseProf() {
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
     try { initEscaladeInterface(6); } catch (e) {}
-    try { initOSInterface(); } catch (e) {}
+    try { initOrientShowInterface(); } catch (e) {}
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
+        // Sauvegarder la discipline courante pour le layout (TV)
+        localStorage.setItem('eps_arena_current_discipline', disc);
 
         const multiView = document.getElementById('viewMultiSettings');
         const coView = document.getElementById('viewCOSettings');
@@ -51,13 +62,13 @@ export function initActivities() {
                 loadEscaladeAssignments();
             } catch (e) {}
         }
-
         if (disc === 'orientshow') {
             try {
                 setTimeout(() => {
-                    initOSInterface();
-                    loadOSAssignments();
-                    setTimeout(() => ensureReserveLoaded(), 100);
+                    initOrientShowInterface();
+                    loadOrientShowAssignments();
+                    // Optionnel : ensureReserveLoaded si vous l'avez
+                    // ensureReserveLoaded();
                 }, 100);
             } catch (e) {}
         }
@@ -81,6 +92,11 @@ export function initActivities() {
             alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
             return;
         }
+        if (currentDiscipline === 'orientshow') {
+            // Pour OrientShow, on ne génère pas automatiquement, on laisse le prof glisser-déposer
+            alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
+            return;
+        }
 
         const options = {
             mode: document.getElementById('modeRepartition')?.value || 'melange',
@@ -95,6 +111,8 @@ export function initActivities() {
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
         const teams = generateClassicTeams(eleves, options);
+        // Stocker les équipes pour transmission
+        window.lastTeams = teams;
         const container = document.getElementById('teamsGrid');
         if (container) {
             container.innerHTML = teams.map(team => `
@@ -107,7 +125,7 @@ export function initActivities() {
         }
     };
 
-    // ✅ TRANSMISSION (chemins hiérarchiques)
+    // TRANSMISSION (chemins hiérarchiques)
     window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe.");
@@ -133,20 +151,28 @@ export function initActivities() {
                 }
             });
         } else if (currentDiscipline === 'orientshow') {
-            const osAssignments = JSON.parse(localStorage.getItem(`eps_arena_os_assignments_${activeClasse}`) || '{}');
-            configData.activite = 'orientshow';
-            
-            Object.keys(osAssignments).forEach(code => {
-                if (Array.isArray(osAssignments[code])) {
-                    configData[code] = osAssignments[code].length;
-                    osAssignments[code].forEach((eleveId, index) => {
-                        localMapping[`${activeClasse}_${code}`] = eleveId;
-                    });
+            // Utiliser le mapping local unifié
+            const localMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+            // Compter les élèves par code
+            const codeCounts = {};
+            Object.keys(localMapping).forEach(key => {
+                if (key.startsWith(activeClasse + '_')) {
+                    const code = key.replace(activeClasse + '_', '');
+                    if (!codeCounts[code]) codeCounts[code] = 0;
+                    codeCounts[code]++;
                 }
             });
-            
-            const osMatrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-            configData.matrice = osMatrix;
+            configData = { activite: 'orientshow' };
+            Object.keys(codeCounts).forEach(code => {
+                configData[code] = codeCounts[code];
+            });
+            // Ajouter la matrice et les timers
+            const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+            configData.matrice = matrix;
+            const startTime = localStorage.getItem('eps_arena_os_startTime');
+            const endTime = localStorage.getItem('eps_arena_os_endTime');
+            if (startTime) configData.startTime = parseInt(startTime);
+            if (endTime) configData.endTime = parseInt(endTime);
         } else {
             configData.activite = 'multi';
             if (window.lastTeams) {
@@ -160,6 +186,7 @@ export function initActivities() {
                 return alert("Veuillez d'abord générer les équipes.");
             }
         }
+        // Sauvegarder le mapping local (pour toutes les disciplines)
         localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
 
         const baseProf = getBaseProf();
@@ -170,7 +197,7 @@ export function initActivities() {
         } catch (e) { console.error("Erreur transmission :", e); alert("Erreur lors de la transmission."); }
     };
 
-    // ✅ PURGE
+    // PURGE
     window.openPurgeModal = function() {
         const choix = prompt("Purge Firebase\n1- Purger la classe active\n2- Purger TOUTE la base (code RNE)");
         const baseProf = getBaseProf();
@@ -192,6 +219,7 @@ export function initActivities() {
         }
     };
 
+    // CO specific
     window.addCircuit = function() {
         const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
         if(!cat) return;
@@ -212,10 +240,15 @@ export function initActivities() {
         if(confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
     };
 
+    // Exporter les fonctions pour les boutons
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
     window.exportEscaladeConfig = exportEscaladeConfig;
     window.importEscaladeConfig = importEscaladeConfig;
+    window.exportOrientShowConfig = exportOrientShowConfig;
+    window.importOrientShowConfig = importOrientShowConfig;
+    window.startOrientShow = startOrientShow;
+    window.stopOrientShow = stopOrientShow;
 
     try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}

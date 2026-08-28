@@ -6,6 +6,8 @@ import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade
 import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
+// Nouvel import pour OrientShow
+import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -24,8 +26,9 @@ const activityTitle = document.getElementById('activity-title');
 const escaladeModule = document.getElementById('escalade-module');
 const coModule = document.getElementById('co-module');
 const multiModule = document.getElementById('multi-module');
+const osModule = document.getElementById('orientshow-module'); // Nouveau
 
-// ✅ FONCTION D'INITIALISATION (EXPORTÉE)
+// FONCTION D'INITIALISATION (EXPORTÉE)
 export function initApp() {
     // Récupération des classes disponibles
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -68,7 +71,7 @@ function showLogin() {
         return;
     }
     Object.keys(config).forEach(key => {
-        if (key === 'activite') return;
+        if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
         let count = 0;
         if (typeof config[key] === 'number') count = config[key];
         else if (Array.isArray(config[key])) count = config[key].length;
@@ -91,21 +94,33 @@ function selectCode(code) {
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+
     if (currentConfig.activite === 'escalade') {
         escaladeModule.classList.remove('hidden');
         initEscaladeKiosk(selectedClass, selectedCode);
     } else if (currentConfig.activite === 'co') {
         coModule.classList.remove('hidden');
+        // initCOKiosk(selectedClass, selectedCode); // si créé
+    } else if (currentConfig.activite === 'orientshow') {
+        if (osModule) {
+            osModule.classList.remove('hidden');
+            // Initialiser le kiosque avec la classe et le code
+            initOrientShowKiosk(selectedClass, selectedCode);
+        } else {
+            console.warn("Module OrientShow non trouvé dans le DOM");
+        }
     } else {
         multiModule.classList.remove('hidden');
     }
 }
 
-// ✅ Exposition globale des fonctions
+// Exposition globale des fonctions
 window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
 window.startChrono = () => { console.log("Chrono démarré"); };
 window.stopChrono = () => { console.log("Chrono arrêté"); };
+window.validateOSPassage = validateOSPassage; // Pour le bouton de validation
 
 export function getSelectedClass() { return selectedClass; }
 export function getSelectedCode() { return selectedCode; }

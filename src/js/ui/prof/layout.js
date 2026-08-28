@@ -1,3 +1,4 @@
+// src/js/ui/prof/layout.js
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 
@@ -41,14 +42,38 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Appel direct pour la TV
+        // Appel pour la TV selon la discipline courante
         if (tabName === 'tv') {
             setTimeout(() => {
-                import('../../modules/escalade/escalade-tv-ui.js')
-                .then(module => {
-                    module.renderEscaladeTV();
-                })
-                .catch(err => console.error("Erreur import TV:", err));
+                const currentDiscipline = localStorage.getItem('eps_arena_current_discipline') || 'escalade';
+                if (currentDiscipline === 'orientshow') {
+                    import('../../modules/orientshow/orientshow-tv.js')
+                        .then(module => {
+                            module.renderOrientShowTV();
+                        })
+                        .catch(err => console.error("Erreur import TV OrientShow:", err));
+                } else {
+                    // Par défaut, escalade (ou autre)
+                    import('../../modules/escalade/escalade-tv-ui.js')
+                        .then(module => {
+                            module.renderEscaladeTV();
+                        })
+                        .catch(err => console.error("Erreur import TV escalade:", err));
+                }
+            }, 100);
+        }
+
+        // Appel pour le Live si onglet live
+        if (tabName === 'live') {
+            setTimeout(() => {
+                // Recharger le live selon la discipline
+                import('../../ui/prof/live.js')
+                    .then(module => {
+                        if (typeof module.renderLive === 'function') {
+                            module.renderLive();
+                        }
+                    })
+                    .catch(err => console.error("Erreur import Live:", err));
             }, 100);
         }
     };
