@@ -132,8 +132,6 @@ export function initActivities() {
     if (!activeClasse) return alert("Sélectionnez une classe.");
 
     // Ensuite, le reste du code
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
     let configData = {};
     let localMapping = {};
 
