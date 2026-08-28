@@ -64,49 +64,61 @@ export function getStudentsMap() {
 }
 
 export function getLocalMapping(classe) {
-    const key = `eps_arena_local_mapping_${classe}`;
+    const cls = classe || getCurrentClasse();
+    if (!cls) return {};
+    const key = `eps_arena_local_mapping_${cls}`;
     return JSON.parse(localStorage.getItem(key) || '{}');
-}
 
-export function getEleveIdFromCode(code) {
-    // Format 1 : Plat ("504_A1") -> recherche directe
-    const cleComplete = `${currentClasse}_${code}`;
-    const localMap = getLocalMapping();
+export function getEleveIdFromCode(code, classe) {
+    const cls = classe || getCurrentClasse();
+    if (!cls) return null;
+    const localMap = getLocalMapping(cls);
+    // Format 1 : plat (ex: "504_A1")
+    const cleComplete = `${cls}_${code}`;
     if (localMap[cleComplete]) return localMap[cleComplete];
 
-    // Format 2 : Imbriqué ("504_A" -> ["ID1", "ID2"])
+    // Format 2 : imbriqué (ex: "504_A" -> ["ID1","ID2"])
     const match = code.match(/^([A-Z]+)(\d+)$/);
     if (match) {
         const lettre = match[1];
         const index = parseInt(match[2]) - 1;
-        const cleImbriquee = `${currentClasse}_${lettre}`;
+        const cleImbriquee = `${cls}_${lettre}`;
         if (localMap[cleImbriquee] && Array.isArray(localMap[cleImbriquee])) {
             if (localMap[cleImbriquee][index]) return localMap[cleImbriquee][index];
         }
     }
-
     return null;
 }
 
-export function getNomFromCode(code) {
-    const eleveId = getEleveIdFromCode(code);
+export function getNomFromCode(code, classe) {
+    const eleveId = getEleveIdFromCode(code, classe);
     if (eleveId) {
-        const studentsMap = getStudentsMap();
+        const studentsMap = getStudentsMap(classe);
         if (studentsMap[eleveId]) return studentsMap[eleveId];
     }
     return code;
 }
 
-export async function getPhotoHtml(code) {
-    const eleveId = getEleveIdFromCode(code);
+export function getStudentsMap(classe) {
+    const cls = classe || getCurrentClasse();
+    if (!cls) return {};
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${cls}`) || '[]');
+    const map = {};
+    eleves.forEach(e => { map[e.id] = `${e.prenom} ${e.nom}`; });
+    return map;
+}
+
+export async function getPhotoHtml(code, classe) {
+    const eleveId = getEleveIdFromCode(code, classe);
     if (eleveId) {
         try {
             const url = await getPhotoUrl(eleveId);
             if (url) return `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`;
-        } catch (e) { /* Ignorer les erreurs de photo */ }
+        } catch (e) { /* ignorer */ }
     }
     return `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
 }
+
 export function setLocalMapping(classe, mapping) {
     const key = `eps_arena_local_mapping_${classe}`;
     localStorage.setItem(key, JSON.stringify(mapping));

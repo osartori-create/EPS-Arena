@@ -21,6 +21,18 @@ export function initOrientShowInterface() {
 
     currentClasse = getCurrentClasse();
     if (!currentClasse) {
+        // Au lieu d'afficher un message, on écoute le changement de classe
+        const select = document.getElementById('selectClasse');
+        if (select) {
+            select.addEventListener('change', function onClassChange() {
+                currentClasse = this.value;
+                if (currentClasse) {
+                    select.removeEventListener('change', onClassChange);
+                    initOrientShowInterface(); // recharger
+                }
+            });
+        }
+        // On affiche un message temporaire
         container.innerHTML = '<p class="text-slate-500">Veuillez sélectionner une classe.</p>';
         return;
     }
