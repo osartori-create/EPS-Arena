@@ -30,6 +30,9 @@ const osModule = document.getElementById('orientshow-module'); // Nouveau
 
 // FONCTION D'INITIALISATION (EXPORTÉE)
 export function initApp() {
+    const profCodeInput = document.getElementById('profCodeElève');
+const profCode = profCodeInput ? profCodeInput.value.trim() || localStorage.getItem('eps_arena_profCode') || 'DEFAULT' : localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+localStorage.setItem('eps_arena_profCode', profCode); // pour persister
     // Récupération des classes disponibles
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
