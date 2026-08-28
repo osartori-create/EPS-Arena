@@ -3,6 +3,7 @@ import { renderEscaladeLive } from '../../modules/escalade/escalade-live.js';
 import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
 import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
+import { renderOrientShowLive } from '../../modules/orientshow/orientshow-live.js';
 
 let currentClasse = "";
 
@@ -20,12 +21,14 @@ export function initLiveUI() {
             renderCOLive(data);
         } else if (type === 'multi' && currentActivite === 'multi') {
             renderMultiLive(data);
+        } else if (type === 'orientshow' && currentActivite === 'orientshow') {
+            renderOrientShowLive();
         }
     });
 
     window.addEventListener('live-config-updated', () => {
         document.getElementById('live-content').innerHTML = '<p class="text-slate-500 text-center">En attente des données...</p>';
-        if (isTVVisible()) renderEscaladeTV();
+        if (isTVVisible() && getConfigData().activite === 'escalade') renderEscaladeTV();
     });
 }
 

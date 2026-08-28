@@ -34,29 +34,24 @@ export function initLayout() {
         });
 
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4' };
-        if (tabName !== 'tv') {
-            const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-            if (targetView) targetView.classList.remove('hidden');
-        }
-
+            if (tabName !== 'tv') {
+                const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+                if (targetView) targetView.classList.remove('hidden');
+            }
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Appel pour la TV selon la discipline courante
         if (tabName === 'tv') {
-    setTimeout(() => {
-        const currentDiscipline = localStorage.getItem('eps_arena_current_discipline') || 'escalade';
-        if (currentDiscipline === 'orientshow') {
-            import('../../modules/orientshow/orientshow-tv.js')
-                .then(module => module.renderOrientShowTV())
-                .catch(err => console.error("Erreur TV OrientShow:", err));
-        } else {
-            import('../../modules/escalade/escalade-tv-ui.js')
-                .then(module => module.renderEscaladeTV())
-                .catch(err => console.error("Erreur TV escalade:", err));
+            const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
+            setTimeout(() => {
+                const renderer = discipline === 'orientshow'
+                    ? import('../../modules/orientshow/orientshow-tv.js')
+                    : import('../../modules/escalade/escalade-tv-ui.js');
+                renderer
+                    .then(module => module[discipline === 'orientshow' ? 'renderOrientShowTV' : 'renderEscaladeTV']())
+                    .catch(err => console.error('Erreur TV:', err));
+            }, 100);
         }
-    }, 100);
-}
 
         // Appel pour le Live si onglet live
         if (tabName === 'live') {
