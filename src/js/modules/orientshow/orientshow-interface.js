@@ -139,8 +139,30 @@ export function stopOrientShow() {
 
 // ---------- Fonctions internes ----------
 function renderMatrix() {
-    const container = document.getElementById('os-matrix-container');
-    if (!container) return;
+    // 1. Chercher ou créer le conteneur
+    let container = document.getElementById('os-matrix-container');
+    if (!container) {
+        // Créer le conteneur s'il n'existe pas
+        container = document.createElement('div');
+        container.id = 'os-matrix-container';
+        container.className = 'bg-slate-900 p-4 rounded-2xl border border-slate-700 overflow-x-auto mb-4';
+        // L'insérer dans viewOrientShowSettings avant la zone Réserve/Grille
+        const parent = document.getElementById('viewOrientShowSettings');
+        if (parent) {
+            // Insérer juste avant le premier élément qui a la classe "flex gap-4" (la zone Réserve)
+            const nextSibling = parent.querySelector('.flex.gap-4');
+            if (nextSibling) {
+                parent.insertBefore(container, nextSibling);
+            } else {
+                parent.appendChild(container);
+            }
+        } else {
+            console.error('viewOrientShowSettings introuvable');
+            return;
+        }
+    }
+
+    // 2. Générer le HTML de la matrice (le code existant)
     let html = `<table class="w-full text-center font-bold text-[10px]">
         <thead><tr class="bg-slate-900 text-white">
             <th>#</th>`;
