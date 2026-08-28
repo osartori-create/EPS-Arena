@@ -5,7 +5,6 @@ import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
-// Nouvel import pour OrientShow
 import { 
     initOrientShowInterface,
     loadOrientShowAssignments,
@@ -30,7 +29,6 @@ export function initActivities() {
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
-        // Sauvegarder la discipline courante pour le layout (TV)
         localStorage.setItem('eps_arena_current_discipline', disc);
 
         const multiView = document.getElementById('viewMultiSettings');
@@ -67,8 +65,6 @@ export function initActivities() {
                 setTimeout(() => {
                     initOrientShowInterface();
                     loadOrientShowAssignments();
-                    // Optionnel : ensureReserveLoaded si vous l'avez
-                    // ensureReserveLoaded();
                 }, 100);
             } catch (e) {}
         }
@@ -93,11 +89,11 @@ export function initActivities() {
             return;
         }
         if (currentDiscipline === 'orientshow') {
-            // Pour OrientShow, on ne génère pas automatiquement, on laisse le prof glisser-déposer
             alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
             return;
         }
 
+        // ---- Multi-activités ----
         const options = {
             mode: document.getElementById('modeRepartition')?.value || 'melange',
             mixite: document.getElementById('modeMixite')?.value || 'ignore',
@@ -111,46 +107,42 @@ export function initActivities() {
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
         const teams = generateClassicTeams(eleves, options);
-        // Stocker les équipes pour transmission
         window.lastTeams = teams;
+
         const container = document.getElementById('teamsGrid');
         if (container) {
-            const container = document.getElementById('teamsGrid');
-if (container) {
-    // Générer le HTML pour chaque équipe en utilisant des cartes avec photo
-    const teamsHTML = await Promise.all(teams.map(async (team) => {
-        const membersHTML = await Promise.all(team.members.map(async (m) => {
-            const url = await getPhotoUrl(m.id);
-            const photoHtml = url 
-                ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
-                : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-            return `<div class="bg-slate-800 p-2 rounded-lg flex items-center gap-3 text-sm font-bold text-white">
-                        ${photoHtml}
-                        <span>${m.prenom} ${m.nom}</span>
-                    </div>`;
-        }));
-        return `<div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
-                    </div>
-                    <div class="team-members flex flex-col gap-2">
-                        ${membersHTML.join('')}
-                    </div>
-                </div>`;
-    }));
-    container.innerHTML = teamsHTML.join('');
-}
+            // Génération asynchrone des cartes avec photos
+            const teamsHTML = await Promise.all(teams.map(async (team) => {
+                const membersHTML = await Promise.all(team.members.map(async (m) => {
+                    const url = await getPhotoUrl(m.id);
+                    const photoHtml = url 
+                        ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+                        : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+                    return `<div class="bg-slate-800 p-2 rounded-lg flex items-center gap-3 text-sm font-bold text-white">
+                                ${photoHtml}
+                                <span>${m.prenom} ${m.nom}</span>
+                            </div>`;
+                }));
+                return `<div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
+                            </div>
+                            <div class="team-members flex flex-col gap-2">
+                                ${membersHTML.join('')}
+                            </div>
+                        </div>`;
+            }));
+            container.innerHTML = teamsHTML.join('');
+        }
     };
 
-    // TRANSMISSION (chemins hiérarchiques)
     window.transmettreConfig = async function() {
-    // Récupérer la classe en TOUT PREMIER
-    const activeClasse = document.getElementById('selectClasse').value;
-    if (!activeClasse) return alert("Sélectionnez une classe.");
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (!activeClasse) return alert("Sélectionnez une classe.");
 
-    // Ensuite, le reste du code
-    let configData = {};
-    let localMapping = {};
+        const baseProf = getBaseProf();
+        let configData = {};
+        let localMapping = {};
 
         if (currentDiscipline === 'co') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
@@ -171,25 +163,22 @@ if (container) {
                 }
             });
         } else if (currentDiscipline === 'orientshow') {
-            // Utiliser le mapping local unifié
-                const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
-            // Compter les élèves par code
+            const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
             const codeCounts = {};
-                Object.keys(orientShowMapping).forEach(key => {
+            Object.keys(orientShowMapping).forEach(key => {
                 if (key.startsWith(activeClasse + '_')) {
                     const code = key.replace(activeClasse + '_', '');
-                        const match = code.match(/^([A-Z]+)_(\d+)$/);
-                        if (match) {
-                            const couleur = match[1];
-                            codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
-                        }
+                    const match = code.match(/^([A-Z]+)_(\d+)$/);
+                    if (match) {
+                        const couleur = match[1];
+                        codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+                    }
                 }
             });
             configData = { activite: 'orientshow' };
-                Object.keys(codeCounts).forEach(couleur => {
-                    configData[couleur] = codeCounts[couleur];
+            Object.keys(codeCounts).forEach(couleur => {
+                configData[couleur] = codeCounts[couleur];
             });
-            // Ajouter la matrice et les timers
             const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
             configData.matrix = matrix;
             const startTime = localStorage.getItem('eps_arena_os_startTime');
@@ -197,6 +186,7 @@ if (container) {
             if (startTime) configData.startTime = parseInt(startTime);
             if (endTime) configData.endTime = parseInt(endTime);
         } else {
+            // Multi-activités
             configData.activite = 'multi';
             if (window.lastTeams) {
                 const lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -209,18 +199,19 @@ if (container) {
                 return alert("Veuillez d'abord générer les équipes.");
             }
         }
-        // Sauvegarder le mapping local (pour toutes les disciplines)
+
         localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
 
-        const baseProf = getBaseProf();
         try {
             await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
             await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
             alert("✅ Configuration transmise aux iPads !");
-        } catch (e) { console.error("Erreur transmission :", e); alert("Erreur lors de la transmission."); }
+        } catch (e) {
+            console.error("Erreur transmission :", e);
+            alert("Erreur lors de la transmission.");
+        }
     };
 
-    // PURGE
     window.openPurgeModal = function() {
         const choix = prompt("Purge Firebase\n1- Purger la classe active\n2- Purger TOUTE la base (code RNE)");
         const baseProf = getBaseProf();
@@ -263,7 +254,7 @@ if (container) {
         if(confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
     };
 
-    // Exporter les fonctions pour les boutons
+    // Exports globaux
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
     window.exportEscaladeConfig = exportEscaladeConfig;
