@@ -45,19 +45,24 @@ function startListening() {
     });
 }
 
+// ----- Fonctions exportées (correctes) -----
+
 export function getCurrentClasse() {
-    // Recherche dans les deux IDs possibles
     let select = document.getElementById('selectClasse');
     if (!select) {
         select = document.getElementById('class-select');
     }
     return select ? select.value : '';
 }
+
 export function getConfigData() { return configData; }
+
 export function getEscaladeData() { return allEscaladeData; }
 
-export function getStudentsMap() {
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+export function getStudentsMap(classe) {
+    const cls = classe || getCurrentClasse();
+    if (!cls) return {};
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${cls}`) || '[]');
     const map = {};
     eleves.forEach(e => { map[e.id] = `${e.prenom} ${e.nom}`; });
     return map;
@@ -68,6 +73,12 @@ export function getLocalMapping(classe) {
     if (!cls) return {};
     const key = `eps_arena_local_mapping_${cls}`;
     return JSON.parse(localStorage.getItem(key) || '{}');
+}
+
+export function setLocalMapping(classe, mapping) {
+    const key = `eps_arena_local_mapping_${classe}`;
+    localStorage.setItem(key, JSON.stringify(mapping));
+}
 
 export function getEleveIdFromCode(code, classe) {
     const cls = classe || getCurrentClasse();
@@ -76,7 +87,6 @@ export function getEleveIdFromCode(code, classe) {
     // Format 1 : plat (ex: "504_A1")
     const cleComplete = `${cls}_${code}`;
     if (localMap[cleComplete]) return localMap[cleComplete];
-
     // Format 2 : imbriqué (ex: "504_A" -> ["ID1","ID2"])
     const match = code.match(/^([A-Z]+)(\d+)$/);
     if (match) {
@@ -99,15 +109,6 @@ export function getNomFromCode(code, classe) {
     return code;
 }
 
-export function getStudentsMap(classe) {
-    const cls = classe || getCurrentClasse();
-    if (!cls) return {};
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${cls}`) || '[]');
-    const map = {};
-    eleves.forEach(e => { map[e.id] = `${e.prenom} ${e.nom}`; });
-    return map;
-}
-
 export async function getPhotoHtml(code, classe) {
     const eleveId = getEleveIdFromCode(code, classe);
     if (eleveId) {
@@ -117,9 +118,4 @@ export async function getPhotoHtml(code, classe) {
         } catch (e) { /* ignorer */ }
     }
     return `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
-}
-
-export function setLocalMapping(classe, mapping) {
-    const key = `eps_arena_local_mapping_${classe}`;
-    localStorage.setItem(key, JSON.stringify(mapping));
 }
