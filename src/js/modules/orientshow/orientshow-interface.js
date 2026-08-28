@@ -14,7 +14,7 @@ let matrix = {};
 let startTime = null;
 let endTime = null;
 
-// Initialisation
+// ---------- EXPORTS pour activities.js ----------
 export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
@@ -25,14 +25,12 @@ export function initOrientShowInterface() {
         return;
     }
 
-    // Charger la config depuis Firebase (ou localStorage)
     listenOrientShowConfig(currentClasse, (config) => {
         if (config && config.matrix) {
             matrix = config.matrix;
             startTime = config.startTime || null;
             endTime = config.endTime || null;
         } else {
-            // Initialiser une matrice vide
             matrix = {};
             for (let c = 1; c <= NB_CIRCUITS; c++) {
                 matrix[c] = {};
@@ -43,7 +41,6 @@ export function initOrientShowInterface() {
             startTime = null;
             endTime = null;
         }
-        // Sauvegarder dans localStorage pour persistance locale
         localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
         localStorage.setItem('eps_arena_os_startTime', startTime);
         localStorage.setItem('eps_arena_os_endTime', endTime);
@@ -53,14 +50,82 @@ export function initOrientShowInterface() {
         updateChronoButtons();
     });
 
-    // Écouter les changements de classe
     document.getElementById('selectClasse').addEventListener('change', () => {
         currentClasse = getCurrentClasse();
         initOrientShowInterface();
     });
 }
 
-// Rendu de la matrice modifiable
+export function loadOrientShowAssignments() {
+    // Cette fonction recharge l'affichage (appelée dans switchDiscipline)
+    renderReserveAndGroups();
+}
+
+export function exportOrientShowConfig() {
+    saveMatrixToFirebase();
+    const data = {
+        version: 1,
+        classe: currentClasse,
+        activite: 'orientshow',
+        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
+        matrix: matrix,
+        startTime,
+        endTime,
+        nbCircuits: NB_CIRCUITS,
+        nbCouleurs: NB_COULEURS
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${currentClasse}_orientshow_${data.date}.json`;
+    a.click();
+}
+
+export function importOrientShowConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.matrix) throw new Error('Format invalide');
+            matrix = data.matrix;
+            startTime = data.startTime || null;
+            endTime = data.endTime || null;
+            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+            localStorage.setItem('eps_arena_os_startTime', startTime);
+            localStorage.setItem('eps_arena_os_endTime', endTime);
+            setOrientShowConfig(currentClasse, { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS });
+            renderMatrix();
+            updateChronoButtons();
+            alert('✅ Configuration OrientShow importée !');
+        } catch (err) {
+            alert('❌ Erreur : ' + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+export function startOrientShow() {
+    if (!currentClasse) return alert('Choisissez une classe.');
+    startTime = Date.now();
+    endTime = null;
+    localStorage.setItem('eps_arena_os_startTime', startTime);
+    localStorage.setItem('eps_arena_os_endTime', null);
+    saveMatrixToFirebase();
+    updateChronoButtons();
+}
+
+export function stopOrientShow() {
+    if (!startTime) return;
+    endTime = Date.now();
+    localStorage.setItem('eps_arena_os_endTime', endTime);
+    saveMatrixToFirebase();
+    updateChronoButtons();
+}
+
+// ---------- Fonctions internes ----------
 function renderMatrix() {
     const container = document.getElementById('os-matrix-container');
     if (!container) return;
@@ -92,7 +157,6 @@ window.updateOSMatrixCell = function(input) {
     if (!matrix[circuit][color]) matrix[circuit][color] = ['', ''];
     matrix[circuit][color][index] = input.value.toUpperCase();
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    // Sauvegarde automatique (on pourrait attendre un bouton "Enregistrer")
     saveMatrixToFirebase();
 };
 
@@ -102,7 +166,6 @@ function saveMatrixToFirebase() {
     setOrientShowConfig(currentClasse, configData);
 }
 
-// Gestion des groupes : réserve + grille des codes
 function renderReserveAndGroups() {
     const reserveContainer = document.getElementById('os-reserve');
     const gridContainer = document.getElementById('os-postesGrid');
@@ -111,7 +174,6 @@ function renderReserveAndGroups() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     const mapping = getLocalMapping(currentClasse) || {};
 
-    // Réserve : élèves non affectés
     const assignedCodes = new Set();
     Object.keys(mapping).forEach(key => {
         if (key.startsWith(currentClasse + '_')) {
@@ -126,7 +188,6 @@ function renderReserveAndGroups() {
         reserveContainer.appendChild(card);
     });
 
-    // Grille des codes (5x10)
     let html = `<div class="grid grid-cols-${NB_COULEURS + 1} gap-2">`;
     html += `<div></div>`;
     COULEURS.forEach(col => {
@@ -152,7 +213,6 @@ function renderReserveAndGroups() {
     }
     gridContainer.innerHTML = html;
 
-    // Initialiser Sortable après rendu
     setTimeout(() => initSortableOS(), 100);
 }
 
@@ -174,7 +234,6 @@ function createEleveCardHTML(eleve) {
             </div>`;
 }
 
-// Sortable
 function initSortableOS() {
     if (typeof Sortable === 'undefined') return;
     const reserve = document.getElementById('os-reserve');
@@ -198,7 +257,6 @@ function initSortableOS() {
 
 function saveOSAssignments() {
     const mapping = {};
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     document.querySelectorAll('.os-dropzone').forEach(zone => {
         const code = zone.dataset.code;
         const card = zone.querySelector('[data-id]');
@@ -207,14 +265,10 @@ function saveOSAssignments() {
             mapping[`${currentClasse}_${code}`] = eleveId;
         }
     });
-    // On conserve les élèves en réserve (non affectés) dans le mapping ? Non, ils ne sont pas dans le mapping.
-    // On écrase le mapping avec les seules affectations.
     setLocalMapping(currentClasse, mapping);
-    // Recharger l'affichage pour synchroniser
     renderReserveAndGroups();
 }
 
-// Chrono
 function updateChronoButtons() {
     const btnStart = document.getElementById('os-start-btn');
     const btnStop = document.getElementById('os-stop-btn');
@@ -236,67 +290,10 @@ function updateChronoButtons() {
     }
 }
 
-window.startOrientShow = function() {
-    if (!currentClasse) return alert('Choisissez une classe.');
-    startTime = Date.now();
-    endTime = null;
-    localStorage.setItem('eps_arena_os_startTime', startTime);
-    localStorage.setItem('eps_arena_os_endTime', null);
-    saveMatrixToFirebase();
-    updateChronoButtons();
-};
-
-window.stopOrientShow = function() {
-    if (!startTime) return;
-    endTime = Date.now();
-    localStorage.setItem('eps_arena_os_endTime', endTime);
-    saveMatrixToFirebase();
-    updateChronoButtons();
-};
-
-// Export/Import
-window.exportOSConfig = function() {
-    saveMatrixToFirebase();
-    const data = {
-        version: 1,
-        classe: currentClasse,
-        activite: 'orientshow',
-        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
-        matrix: matrix,
-        startTime,
-        endTime,
-        nbCircuits: NB_CIRCUITS,
-        nbCouleurs: NB_COULEURS
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${currentClasse}_orientshow_${data.date}.json`;
-    a.click();
-};
-
-window.importOSConfig = function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (!data.classe || !data.matrix) throw new Error('Format invalide');
-            matrix = data.matrix;
-            startTime = data.startTime || null;
-            endTime = data.endTime || null;
-            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-            localStorage.setItem('eps_arena_os_startTime', startTime);
-            localStorage.setItem('eps_arena_os_endTime', endTime);
-            setOrientShowConfig(currentClasse, { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS });
-            renderMatrix();
-            updateChronoButtons();
-            alert('✅ Configuration OrientShow importée !');
-        } catch (err) {
-            alert('❌ Erreur : ' + err.message);
-        }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
-};
+// Exposer les fonctions globales pour les boutons HTML (si besoin)
+window.initOrientShowInterface = initOrientShowInterface;
+window.loadOrientShowAssignments = loadOrientShowAssignments;
+window.exportOrientShowConfig = exportOrientShowConfig;
+window.importOrientShowConfig = importOrientShowConfig;
+window.startOrientShow = startOrientShow;
+window.stopOrientShow = stopOrientShow;
