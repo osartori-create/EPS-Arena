@@ -115,14 +115,31 @@ export function initActivities() {
         window.lastTeams = teams;
         const container = document.getElementById('teamsGrid');
         if (container) {
-            container.innerHTML = teams.map(team => `
-                <div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
-                    <div class="flex justify-between items-center mb-3"><h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3></div>
-                    <div class="team-members flex flex-col gap-2">
-                        ${team.members.map(m => `<div class="bg-slate-800 p-2 rounded-lg text-sm font-bold text-white">${m.prenom} ${m.nom}</div>`).join('')}
+            const container = document.getElementById('teamsGrid');
+if (container) {
+    // Générer le HTML pour chaque équipe en utilisant des cartes avec photo
+    const teamsHTML = await Promise.all(teams.map(async (team) => {
+        const membersHTML = await Promise.all(team.members.map(async (m) => {
+            const url = await getPhotoUrl(m.id);
+            const photoHtml = url 
+                ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+                : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+            return `<div class="bg-slate-800 p-2 rounded-lg flex items-center gap-3 text-sm font-bold text-white">
+                        ${photoHtml}
+                        <span>${m.prenom} ${m.nom}</span>
+                    </div>`;
+        }));
+        return `<div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
                     </div>
-                </div>`).join('');
-        }
+                    <div class="team-members flex flex-col gap-2">
+                        ${membersHTML.join('')}
+                    </div>
+                </div>`;
+    }));
+    container.innerHTML = teamsHTML.join('');
+}
     };
 
     // TRANSMISSION (chemins hiérarchiques)
