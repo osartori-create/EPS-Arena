@@ -45,7 +45,14 @@ function startListening() {
     });
 }
 
-export function getCurrentClasse() { return currentClasse; }
+export function getCurrentClasse() {
+    // Recherche dans les deux IDs possibles
+    let select = document.getElementById('selectClasse');
+    if (!select) {
+        select = document.getElementById('class-select');
+    }
+    return select ? select.value : '';
+}
 export function getConfigData() { return configData; }
 export function getEscaladeData() { return allEscaladeData; }
 
@@ -56,9 +63,9 @@ export function getStudentsMap() {
     return map;
 }
 
-export function getLocalMapping(classe = currentClasse) {
-    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
-    return mapping;
+export function getLocalMapping(classe) {
+    const key = `eps_arena_local_mapping_${classe}`;
+    return JSON.parse(localStorage.getItem(key) || '{}');
 }
 
 export function getEleveIdFromCode(code) {
