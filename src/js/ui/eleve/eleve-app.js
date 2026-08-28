@@ -30,7 +30,17 @@ const osModule = document.getElementById('orientshow-module'); // Nouveau
 
 // FONCTION D'INITIALISATION (EXPORTÉE)
 export function initApp() {
-    const profCode = '1'; // ← MODIFIER ICI
+    const profCodeInput = document.getElementById('profCodeInput');
+    let profCode = profCodeInput ? profCodeInput.value.trim() : '';
+    if (!profCode) profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    if (profCodeInput) {
+        profCodeInput.value = profCode;
+        profCodeInput.addEventListener('change', () => {
+            localStorage.setItem('eps_arena_profCode', profCodeInput.value.trim());
+            location.reload();
+        });
+    }
+    localStorage.setItem('eps_arena_profCode', profCode);
     console.log('[eleve] profCode utilisé :', profCode);
 
     const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
@@ -49,17 +59,6 @@ export function initApp() {
         onValue(configRef, (snap) => {
             currentConfig = snap.val();
             console.log('[eleve] Config reçue :', currentConfig);
-            if (currentConfig) showLogin();
-            else showWaiting();
-        });
-    });
-
-    classSelect.addEventListener('change', () => {
-        selectedClass = classSelect.value;
-        if (!selectedClass) return;
-        const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/config`);
-        onValue(configRef, (snap) => {
-            currentConfig = snap.val();
             if (currentConfig) showLogin();
             else showWaiting();
         });

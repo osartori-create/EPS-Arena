@@ -21,7 +21,7 @@ export function listenToActivityData(classe, callback) {
     const refEscalade = ref(db, getPerformancePath(classe, 'escalade'));
     const refCO = ref(db, getPerformancePath(classe, 'co'));
     const refMulti = ref(db, getPerformancePath(classe, 'multi'));
-    const refOrientShow = ref(db, getPerformancePath(classe, 'orientshow'));
+    const refOrientShow = ref(db, getOrientShowPassagesPath(classe));
 
     const unsubEscalade = onValue(refEscalade, (snap) => callback('escalade', snap.val() || {}));
     const unsubCO = onValue(refCO, (snap) => callback('co', snap.val() || {}));

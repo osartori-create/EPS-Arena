@@ -157,23 +157,26 @@ export function initActivities() {
             });
         } else if (currentDiscipline === 'orientshow') {
             // Utiliser le mapping local unifié
-            const localMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+                const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
             // Compter les élèves par code
             const codeCounts = {};
-            Object.keys(localMapping).forEach(key => {
+                Object.keys(orientShowMapping).forEach(key => {
                 if (key.startsWith(activeClasse + '_')) {
                     const code = key.replace(activeClasse + '_', '');
-                    if (!codeCounts[code]) codeCounts[code] = 0;
-                    codeCounts[code]++;
+                        const match = code.match(/^([A-Z]+)_(\d+)$/);
+                        if (match) {
+                            const couleur = match[1];
+                            codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+                        }
                 }
             });
             configData = { activite: 'orientshow' };
-            Object.keys(codeCounts).forEach(code => {
-                configData[code] = codeCounts[code];
+                Object.keys(codeCounts).forEach(couleur => {
+                    configData[couleur] = codeCounts[couleur];
             });
             // Ajouter la matrice et les timers
             const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-            configData.matrice = matrix;
+            configData.matrix = matrix;
             const startTime = localStorage.getItem('eps_arena_os_startTime');
             const endTime = localStorage.getItem('eps_arena_os_endTime');
             if (startTime) configData.startTime = parseInt(startTime);

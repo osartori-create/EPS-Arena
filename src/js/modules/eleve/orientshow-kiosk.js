@@ -93,7 +93,7 @@ window.selectOSCircuit = function(circuit) {
     document.getElementById('os-letters-input').classList.remove('hidden');
 };
 
-window.validateOSPassage = function() {
+export function validateOSPassage() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     if (!selectedColor || !selectedNum) return alert('Choisissez votre identité (couleur + numéro).');
     if (!selectedCircuit) return alert('Choisissez un circuit.');
@@ -132,6 +132,8 @@ window.validateOSPassage = function() {
         document.getElementById('os-l2').value = '';
     }).catch(err => alert('Erreur envoi : ' + err.message));
 };
+
+window.validateOSPassage = validateOSPassage;
 
 function showFeedback(score) {
     const icon = score === 5 ? '🏆' : (score === 2 ? '🆗' : '❌');
