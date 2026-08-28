@@ -6,50 +6,60 @@ import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase
 
 const COULEURS = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
 const NB_COULEURS = 5;
-const NB_NUMEROS = 10;
+const NB_NUMEROS = 6; // 6 numéros (1 à 6)
 const NB_CIRCUITS = 12;
+
+// Matrice par défaut (identique à l'ancien)
+const DEFAULT_MATRIX = {
+    1:{NOIR:["D","O"],ROUGE:["Y","E"],BLEU:["N","K"],VERT:["",""],JAUNE:["",""]},
+    2:{NOIR:["E","X"],ROUGE:["T","R"],BLEU:["A","L"],VERT:["",""],JAUNE:["",""]},
+    3:{NOIR:["C","H"],ROUGE:["I","O"],BLEU:["T","E"],VERT:["",""],JAUNE:["",""]},
+    4:{NOIR:["R","E"],ROUGE:["C","N"],BLEU:["O","I"],VERT:["",""],JAUNE:["",""]},
+    5:{NOIR:["A","J"],ROUGE:["O","E"],BLEU:["S","C"],VERT:["",""],JAUNE:["",""]},
+    6:{NOIR:["F","I"],ROUGE:["C","S"],BLEU:["U","U"],VERT:["",""],JAUNE:["",""]},
+    7:{NOIR:["G","U"],ROUGE:["E","H"],BLEU:["E","C"],VERT:["",""],JAUNE:["",""]},
+    8:{NOIR:["I","V"],ROUGE:["R","N"],BLEU:["S","C"],VERT:["",""],JAUNE:["",""]},
+    9:{NOIR:["K","R"],ROUGE:["A","T"],BLEU:["N","C"],VERT:["",""],JAUNE:["",""]},
+    10:{NOIR:["O","C"],ROUGE:["I","Z"],BLEU:["E","C"],VERT:["",""],JAUNE:["",""]},
+    11:{NOIR:["P","A"],ROUGE:["L","D"],BLEU:["U","U"],VERT:["",""],JAUNE:["",""]},
+    12:{NOIR:["U","L"],ROUGE:["N","A"],BLEU:["H","T"],VERT:["",""],JAUNE:["",""]}
+};
 
 let currentClasse = '';
 let matrix = {};
 let startTime = null;
 let endTime = null;
 
-// ---------- EXPORTS pour activities.js ----------
+// ---------- EXPORTS ----------
 export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
 
     currentClasse = getCurrentClasse();
     if (!currentClasse) {
-        // Au lieu d'afficher un message, on écoute le changement de classe
         const select = document.getElementById('selectClasse');
         if (select) {
             select.addEventListener('change', function onClassChange() {
                 currentClasse = this.value;
                 if (currentClasse) {
                     select.removeEventListener('change', onClassChange);
-                    initOrientShowInterface(); // recharger
+                    initOrientShowInterface();
                 }
             });
         }
-        // On affiche un message temporaire
         container.innerHTML = '<p class="text-slate-500">Veuillez sélectionner une classe.</p>';
         return;
     }
 
+    // Charger la config Firebase
     listenOrientShowConfig(currentClasse, (config) => {
         if (config && config.matrix) {
             matrix = config.matrix;
             startTime = config.startTime || null;
             endTime = config.endTime || null;
         } else {
-            matrix = {};
-            for (let c = 1; c <= NB_CIRCUITS; c++) {
-                matrix[c] = {};
-                COULEURS.forEach(col => {
-                    matrix[c][col] = ['', ''];
-                });
-            }
+            // Utiliser la matrice par défaut
+            matrix = JSON.parse(JSON.stringify(DEFAULT_MATRIX));
             startTime = null;
             endTime = null;
         }
@@ -57,7 +67,7 @@ export function initOrientShowInterface() {
         localStorage.setItem('eps_arena_os_startTime', startTime);
         localStorage.setItem('eps_arena_os_endTime', endTime);
         
-        renderMatrix();
+        // Rendu de la grille (réserve + dropzones)
         renderReserveAndGroups();
         updateChronoButtons();
     });
@@ -69,7 +79,6 @@ export function initOrientShowInterface() {
 }
 
 export function loadOrientShowAssignments() {
-    // Cette fonction recharge l'affichage (appelée dans switchDiscipline)
     renderReserveAndGroups();
 }
 
@@ -108,7 +117,7 @@ export function importOrientShowConfig(event) {
             localStorage.setItem('eps_arena_os_startTime', startTime);
             localStorage.setItem('eps_arena_os_endTime', endTime);
             setOrientShowConfig(currentClasse, { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS });
-            renderMatrix();
+            renderReserveAndGroups();
             updateChronoButtons();
             alert('✅ Configuration OrientShow importée !');
         } catch (err) {
@@ -138,61 +147,6 @@ export function stopOrientShow() {
 }
 
 // ---------- Fonctions internes ----------
-function renderMatrix() {
-    // 1. Chercher ou créer le conteneur
-    let container = document.getElementById('os-matrix-container');
-    if (!container) {
-        // Créer le conteneur s'il n'existe pas
-        container = document.createElement('div');
-        container.id = 'os-matrix-container';
-        container.className = 'bg-slate-900 p-4 rounded-2xl border border-slate-700 overflow-x-auto mb-4';
-        // L'insérer dans viewOrientShowSettings avant la zone Réserve/Grille
-        const parent = document.getElementById('viewOrientShowSettings');
-        if (parent) {
-            // Insérer juste avant le premier élément qui a la classe "flex gap-4" (la zone Réserve)
-            const nextSibling = parent.querySelector('.flex.gap-4');
-            if (nextSibling) {
-                parent.insertBefore(container, nextSibling);
-            } else {
-                parent.appendChild(container);
-            }
-        } else {
-            console.error('viewOrientShowSettings introuvable');
-            return;
-        }
-    }
-
-    // 2. Générer le HTML de la matrice (le code existant)
-    let html = `<table class="w-full text-center font-bold text-[10px]">
-        <thead><tr class="bg-slate-900 text-white">
-            <th>#</th>`;
-    COULEURS.forEach(col => {
-        html += `<th colspan="2" class="py-2 ${col === 'NOIR' ? 'bg-black' : col === 'ROUGE' ? 'bg-red-600' : col === 'BLEU' ? 'bg-blue-600' : col === 'VERT' ? 'bg-green-600' : 'bg-yellow-500 text-black'}">${col}</th>`;
-    });
-    html += `</tr></thead><tbody>`;
-    for (let c = 1; c <= NB_CIRCUITS; c++) {
-        html += `<tr class="border-b border-slate-700"><td class="font-black text-slate-500 py-2">C${c}</td>`;
-        COULEURS.forEach(col => {
-            const val = matrix[c]?.[col] || ['', ''];
-            html += `<td><input class="w-10 h-10 bg-slate-900 text-center font-black text-xl text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${val[0]}" maxlength="1" data-circuit="${c}" data-color="${col}" data-index="0" onchange="window.updateOSMatrixCell(this)"></td>
-                     <td><input class="w-10 h-10 bg-slate-900 text-center font-black text-xl text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${val[1]}" maxlength="1" data-circuit="${c}" data-color="${col}" data-index="1" onchange="window.updateOSMatrixCell(this)"></td>`;
-        });
-        html += `</tr>`;
-    }
-    html += `</tbody></table>`;
-    container.innerHTML = html;
-}
-
-window.updateOSMatrixCell = function(input) {
-    const circuit = parseInt(input.dataset.circuit);
-    const color = input.dataset.color;
-    const index = parseInt(input.dataset.index);
-    if (!matrix[circuit]) matrix[circuit] = {};
-    if (!matrix[circuit][color]) matrix[circuit][color] = ['', ''];
-    matrix[circuit][color][index] = input.value.toUpperCase();
-    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    saveMatrixToFirebase();
-};
 
 function saveMatrixToFirebase() {
     if (!currentClasse) return;
@@ -200,6 +154,45 @@ function saveMatrixToFirebase() {
     setOrientShowConfig(currentClasse, configData);
 }
 
+// Ouvre la modal de la matrice (bouton "Matrice")
+window.openOSMatrixModal = function() {
+    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || JSON.stringify(DEFAULT_MATRIX));
+    let html = `<div class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4">
+        <div class="bg-slate-800 w-full max-w-3xl rounded-3xl p-6 border border-slate-700 relative">
+            <button onclick="document.getElementById('osMatrixModal').remove()" class="absolute top-4 right-4 text-3xl text-slate-400 hover:text-white">&times;</button>
+            <h3 class="font-black text-blue-400 text-lg mb-4">Matrice des Balises</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-center font-bold text-[10px]">`;
+    html += `<tr class="bg-slate-900 text-white"><th>#</th><th colspan="2" class="bg-black">NOIR</th><th colspan="2" class="bg-red-600">ROUGE</th><th colspan="2" class="bg-blue-600">BLEU</th><th colspan="2" class="bg-green-600">VERT</th><th colspan="2" class="bg-yellow-500 text-black">JAUNE</th></tr>`;
+    for(let c=1; c<=NB_CIRCUITS; c++) {
+        html += `<tr class="border-b border-slate-700"><td class="font-black text-slate-500 py-1">C${c}</td>`;
+        COULEURS.forEach(col => {
+            const l = matrix[c]?.[col] || ["",""];
+            html += `
+                <td><input class="w-8 h-8 bg-slate-900 text-center font-bold text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${l[0]}" maxlength="1" onchange="window.saveOSMatrix(${c}, '${col}', 0, this.value)"></td>
+                <td class="border-r border-slate-700/50"><input class="w-8 h-8 bg-slate-900 text-center font-bold text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${l[1]}" maxlength="1" onchange="window.saveOSMatrix(${c}, '${col}', 1, this.value)"></td>`;
+        });
+        html += `</tr>`;
+    }
+    html += `</table></div></div></div>`;
+    const modal = document.createElement('div');
+    modal.id = 'osMatrixModal';
+    modal.innerHTML = html;
+    document.body.appendChild(modal);
+};
+
+window.saveOSMatrix = function(circuit, color, index, val) {
+    let matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix')) || {};
+    if(!matrix[circuit]) matrix[circuit] = {};
+    if(!matrix[circuit][color]) matrix[circuit][color] = ["",""];
+    matrix[circuit][color][index] = val.toUpperCase();
+    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+    // Sauvegarder dans Firebase
+    const configData = { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS };
+    setOrientShowConfig(currentClasse, configData);
+};
+
+// Rendu de la réserve et de la grille (avec 6 numéros)
 function renderReserveAndGroups() {
     const reserveContainer = document.getElementById('os-reserve');
     const gridContainer = document.getElementById('os-postesGrid');
@@ -208,6 +201,7 @@ function renderReserveAndGroups() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     const mapping = getLocalMapping(currentClasse) || {};
 
+    // Réserve : élèves non affectés
     const assignedCodes = new Set();
     Object.keys(mapping).forEach(key => {
         if (key.startsWith(currentClasse + '_')) {
@@ -222,16 +216,18 @@ function renderReserveAndGroups() {
         reserveContainer.appendChild(card);
     });
 
-    let html = `<div class="grid grid-cols-${NB_COULEURS + 1} gap-2">`;
-    html += `<div></div>`;
+    // Grille : 6 numéros x 5 couleurs
+    let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
     COULEURS.forEach(col => {
-        html += `<div class="font-black text-center p-1 text-[10px] uppercase">${col}</div>`;
+        const colorClass = col === 'NOIR' ? 'bg-black' : col === 'ROUGE' ? 'bg-red-600' : col === 'BLEU' ? 'bg-blue-600' : col === 'VERT' ? 'bg-green-600' : 'bg-yellow-500';
+        const textClass = col === 'JAUNE' ? 'text-black' : 'text-white';
+        html += `<div class="${colorClass} ${textClass} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${col}</div>`;
     });
     html += `</div>`;
 
     for (let num = 1; num <= NB_NUMEROS; num++) {
-        html += `<div class="grid grid-cols-${NB_COULEURS + 1} gap-2 mb-2">`;
-        html += `<div class="flex items-center justify-center font-black text-yellow-400 text-2xl">${num}</div>`;
+        html += `<div class="grid grid-cols-6 gap-2 mb-2">
+            <div class="flex items-center justify-center font-black text-yellow-400 text-5xl bg-slate-900 w-12 h-12 rounded-lg shadow-inner border border-yellow-500/30">${num}</div>`;
         COULEURS.forEach(col => {
             const code = `${col}_${num}`;
             const mappingKey = `${currentClasse}_${code}`;
@@ -300,7 +296,33 @@ function saveOSAssignments() {
         }
     });
     setLocalMapping(currentClasse, mapping);
-    renderReserveAndGroups();
+    // Ne pas rappeler renderReserveAndGroups pour éviter la boucle
+    // On peut juste recharger la réserve pour mettre à jour
+    // Mais on va juste laisser le mapping à jour
+    // L'affichage sera mis à jour au prochain chargement
+    // Pour un rafraîchissement immédiat, on pourrait re-rendre, mais attention aux boucles
+    // On peut juste mettre à jour la réserve en retirant les élèves affectés
+    // On va simplement re-render la réserve (pas la grille) pour retirer les élèves placés
+    renderReserveOnly();
+}
+
+function renderReserveOnly() {
+    const reserveContainer = document.getElementById('os-reserve');
+    if (!reserveContainer) return;
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+    const mapping = getLocalMapping(currentClasse) || {};
+    const assignedCodes = new Set();
+    Object.keys(mapping).forEach(key => {
+        if (key.startsWith(currentClasse + '_')) {
+            assignedCodes.add(key);
+        }
+    });
+    const reserveEleves = eleves.filter(e => !assignedCodes.has(`${currentClasse}_${e.id}`));
+    reserveContainer.innerHTML = '';
+    reserveEleves.forEach(eleve => {
+        const card = createEleveCard(eleve);
+        reserveContainer.appendChild(card);
+    });
 }
 
 function updateChronoButtons() {
@@ -324,10 +346,12 @@ function updateChronoButtons() {
     }
 }
 
-// Exposer les fonctions globales pour les boutons HTML (si besoin)
+// Fonctions globales pour les boutons
 window.initOrientShowInterface = initOrientShowInterface;
 window.loadOrientShowAssignments = loadOrientShowAssignments;
 window.exportOrientShowConfig = exportOrientShowConfig;
 window.importOrientShowConfig = importOrientShowConfig;
 window.startOrientShow = startOrientShow;
 window.stopOrientShow = stopOrientShow;
+window.openOSMatrixModal = openOSMatrixModal;
+window.saveOSMatrix = saveOSMatrix;
