@@ -1,8 +1,17 @@
 // src/js/ui/prof/layout.js
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { initIntervalTimer } from '../../modules/commun/timer.js';
-import { initCalculateur } from '../../modules/commun/calculateur.js'; // ✅ Le bon nom !
+import { 
+    initIntervalTimer, 
+    startTimer, 
+    stopTimer, 
+    resetTimer, 
+    backToSettings, 
+    savePreset, 
+    loadPreset, 
+    deletePreset 
+} from '../../modules/commun/timer.js'; // ✅ On importe TOUTES les fonctions
+import { initCalculateur } from '../../modules/commun/calculateur.js';
 
 export function initLayout() {
 
@@ -25,7 +34,7 @@ export function initLayout() {
             initIntervalTimer();
         } else if (toolName === 'calculateur') {
             document.getElementById('tools-calculator').classList.remove('hidden');
-            initCalculateur(); // ✅ Initialise le calculateur
+            initCalculateur();
         }
     };
 
@@ -38,7 +47,6 @@ export function initLayout() {
     // 1. Gestion des onglets
     window.switchTab = function(tabName) {
         
-        // Cacher toutes les vues standard
         ['admin', 'activities', 'live', 'tools'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
@@ -74,7 +82,6 @@ export function initLayout() {
 
         // Logique spéciale lors de l'ouverture de l'onglet OUTILS
         if (tabName === 'tools') {
-            // On remet le menu principal au premier plan
             document.getElementById('tools-menu').classList.remove('hidden');
             document.getElementById('tools-timer').classList.add('hidden');
             document.getElementById('tools-calculator').classList.add('hidden');
