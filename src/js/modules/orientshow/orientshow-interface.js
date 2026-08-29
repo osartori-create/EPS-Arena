@@ -33,38 +33,47 @@ export function initOrientShowInterface() {
     const matrixContainer = createMatrixContainer();
     container.appendChild(matrixContainer);
 
-    attachClassChangeListener();
+    // IMPORTANT : on initialise la matrice avec les valeurs par défaut
+    resetMatrix();
 
+    // On tente de charger la config Firebase pour écraser les valeurs par défaut
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-    if (config && config.matrix) {
-        // Fusionner avec les valeurs par défaut pour combler les trous
-        matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-        const configMatrix = config.matrix;
-        // Pour chaque circuit, si configMatrix a des valeurs, on les copie
-        for (const circuit of Object.keys(DEFAULT_OS_MATRIX)) {
-            if (configMatrix[circuit]) {
-                for (const color of ['NOIR','ROUGE','BLEU','VERT','JAUNE']) {
-                    if (configMatrix[circuit][color] && configMatrix[circuit][color].length === 2) {
-                        matrix[circuit][color] = [...configMatrix[circuit][color]];
+            // Fusion : on part des valeurs par défaut, on écrase avec la config Firebase
+            const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+            if (config && config.matrix) {
+                for (const circuit of Object.keys(defaultMatrix)) {
+                    if (config.matrix[circuit]) {
+                        for (const color of COULEURS) {
+                            if (config.matrix[circuit][color] && config.matrix[circuit][color].length === 2) {
+                                defaultMatrix[circuit][color] = [...config.matrix[circuit][color]];
+                            }
+                        }
                     }
                 }
             }
-        }
+            matrix = defaultMatrix;
+            startTime = config?.startTime || null;
+            endTime = config?.endTime || null;
+            
+            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+            localStorage.setItem('eps_arena_os_startTime', startTime);
+            localStorage.setItem('eps_arena_os_endTime', endTime);
+            
+            // On affiche la matrice si visible
+            if (matrixVisible) renderMatrix();
+            updateChronoButtons();
+        });
     } else {
-        resetMatrix();
-    }
-    startTime = config?.startTime || null;
-    endTime = config?.endTime || null;
-    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    localStorage.setItem('eps_arena_os_startTime', startTime);
-    localStorage.setItem('eps_arena_os_endTime', endTime);
-    if (matrixVisible) renderMatrix();
-    updateChronoButtons();
-});
+        // Pas de classe : on affiche quand même la matrice par défaut
+        matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+        localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+        if (matrixVisible) renderMatrix();
     }
 
+    // Charger les affectations
+    attachClassChangeListener();
     loadOrientShowAssignments();
 }
 
@@ -227,32 +236,36 @@ function attachClassChangeListener() {
 function onClassChange() {
     const classe = getCurrentClasse();
     if (classe) {
+        // On réinitialise avec les valeurs par défaut
+        const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
         listenOrientShowConfig(classe, (config) => {
-    if (config && config.matrix) {
-        // Fusionner avec les valeurs par défaut pour combler les trous
-        matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-        const configMatrix = config.matrix;
-        // Pour chaque circuit, si configMatrix a des valeurs, on les copie
-        for (const circuit of Object.keys(DEFAULT_OS_MATRIX)) {
-            if (configMatrix[circuit]) {
-                for (const color of ['NOIR','ROUGE','BLEU','VERT','JAUNE']) {
-                    if (configMatrix[circuit][color] && configMatrix[circuit][color].length === 2) {
-                        matrix[circuit][color] = [...configMatrix[circuit][color]];
+            if (config && config.matrix) {
+                for (const circuit of Object.keys(defaultMatrix)) {
+                    if (config.matrix[circuit]) {
+                        for (const color of COULEURS) {
+                            if (config.matrix[circuit][color] && config.matrix[circuit][color].length === 2) {
+                                defaultMatrix[circuit][color] = [...config.matrix[circuit][color]];
+                            }
+                        }
                     }
                 }
             }
-        }
+            matrix = defaultMatrix;
+            startTime = config?.startTime || null;
+            endTime = config?.endTime || null;
+            
+            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+            localStorage.setItem('eps_arena_os_startTime', startTime);
+            localStorage.setItem('eps_arena_os_endTime', endTime);
+            
+            if (matrixVisible) renderMatrix();
+            updateChronoButtons();
+        });
     } else {
-        resetMatrix();
-    }
-    startTime = config?.startTime || null;
-    endTime = config?.endTime || null;
-    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    localStorage.setItem('eps_arena_os_startTime', startTime);
-    localStorage.setItem('eps_arena_os_endTime', endTime);
-    if (matrixVisible) renderMatrix();
-    updateChronoButtons();
-});
+        // Pas de classe : on utilise les valeurs par défaut
+        matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+        localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+        if (matrixVisible) renderMatrix();
     }
     loadOrientShowAssignments();
 }
@@ -275,21 +288,17 @@ export async function loadOrientShowAssignments() {
         return;
     }
 
-    // Le mapping est maintenant une liste d'IDs par code
     const mapping = getLocalMapping(classe) || {};
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
 
-    // Vider tout
     document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
     const garconsContainer = document.getElementById('os-reserve-garcons');
     const fillesContainer = document.getElementById('os-reserve-filles');
     garconsContainer.innerHTML = '';
     fillesContainer.innerHTML = '';
 
-    // Placer selon le mapping (chaque code peut avoir plusieurs IDs)
     const placedIds = new Set();
     for (const [key, eleveIds] of Object.entries(mapping)) {
-        // Si ce n'est pas une liste, on la convertit (compatibilité ancien format)
         const ids = Array.isArray(eleveIds) ? eleveIds : [eleveIds];
         const codePart = key.replace(`${classe}_`, '');
         const match = codePart.match(/^([A-Z]+)_(\d+)$/);
@@ -310,7 +319,6 @@ export async function loadOrientShowAssignments() {
         }
     }
 
-    // Répartition des non placés par sexe
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
     const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
     const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
@@ -366,7 +374,6 @@ export async function resetAllToReserve() {
     if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
     if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
 
-    // Supprimer le mapping
     setLocalMapping(classe, {});
     initSortableOS();
 }
@@ -400,10 +407,7 @@ async function refreshReserve() {
     const classe = getCurrentClasse();
     if (!classe) return;
 
-    const mapping = getLocalMapping(classe) || {};
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-
-    // Collecter tous les IDs placés dans les dropzones
     const placedIds = new Set();
     document.querySelectorAll('.os-dropzone [data-id]').forEach(el => placedIds.add(el.dataset.id));
 
@@ -423,7 +427,7 @@ async function refreshReserve() {
     for (const eleve of filles) {
         fillesContainer.appendChild(await createEleveCard(eleve));
     }
-    for (const eleve of autres) {
+    for (const eleve de autres) {
         garconsContainer.appendChild(await createEleveCard(eleve));
     }
 
@@ -498,7 +502,6 @@ function initSortableOS() {
 // 12. MATRICE DE CORRECTION
 // --------------------------------------------------------------
 function resetMatrix() {
-    // Clone profond de la matrice par défaut
     matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
 }
 
@@ -626,7 +629,18 @@ export function importOrientShowConfig(event) {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.matrix) throw new Error('Format invalide');
             const classe = data.classe;
-            matrix = data.matrix;
+            // On fusionne avec les valeurs par défaut pour combler les trous
+            const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+            for (const circuit of Object.keys(defaultMatrix)) {
+                if (data.matrix[circuit]) {
+                    for (const color of COULEURS) {
+                        if (data.matrix[circuit][color] && data.matrix[circuit][color].length === 2) {
+                            defaultMatrix[circuit][color] = [...data.matrix[circuit][color]];
+                        }
+                    }
+                }
+            }
+            matrix = defaultMatrix;
             startTime = data.startTime || null;
             endTime = data.endTime || null;
             localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
