@@ -296,90 +296,88 @@
             </div>
         </div>
 
-                <!-- ONGLET 5 : OUTILS (MENU) -->
-<div id="viewTools" class="hidden w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
-    
-    <!-- MENU PRINCIPAL DES OUTILS -->
-    <div id="tools-menu" class="w-full max-w-2xl p-6 text-center">
-        <h2 class="text-4xl font-black text-blue-400 mb-10 uppercase tracking-widest">🧰 Outils</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <button onclick="openTool('timer')" class="bg-slate-800 p-8 rounded-3xl border-2 border-slate-600 hover:border-blue-500 active:scale-95 transition-all text-left shadow-2xl">
-                <div class="text-5xl mb-4">⏱️</div>
-                <h3 class="text-2xl font-black text-white">Interval Timer</h3>
-                <p class="text-slate-400 text-sm mt-2">Séries, repos, sons et préréglages</p>
-            </button>
-            <button onclick="openTool('calculateur')" class="bg-slate-800 p-8 rounded-3xl border-2 border-slate-600 hover:border-blue-500 active:scale-95 transition-all text-left shadow-2xl">
-                <div class="text-5xl mb-4">🧮</div>
-                <h3 class="text-2xl font-black text-white">Vitesse / Temps</h3>
-                <p class="text-slate-400 text-sm mt-2">Sliders interdépendants & passages</p>
-            </button>
-        </div>
-    </div>
-
-    <!-- VUE TIMER (l'ancien contenu, juste caché au départ) -->
-    <div id="tools-timer" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
-        <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
+                                <!-- ONGLET 5 : OUTILS (MENU) -->
+        <div id="viewTools" class="hidden w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
             
-            <!-- Écran de configuration (visible au démarrage) -->
-            <div id="tools-settings" class="w-full max-w-lg p-6">
-                <h3 class="font-black text-blue-400 uppercase text-sm mb-6 text-center">⏱️ Interval Timer</h3>
+            <!-- MENU PRINCIPAL DES OUTILS -->
+            <div id="tools-menu" class="w-full max-w-2xl p-6 text-center">
+                <h2 class="text-4xl font-black text-blue-400 mb-10 uppercase tracking-widest">🧰 Outils</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <button onclick="openTool('timer')" class="bg-slate-800 p-8 rounded-3xl border-2 border-slate-600 hover:border-blue-500 active:scale-95 transition-all text-left shadow-2xl">
+                        <div class="text-5xl mb-4">⏱️</div>
+                        <h3 class="text-2xl font-black text-white">Interval Timer</h3>
+                        <p class="text-slate-400 text-sm mt-2">Séries, repos, sons et préréglages</p>
+                    </button>
+                    <button onclick="openTool('calculateur')" class="bg-slate-800 p-8 rounded-3xl border-2 border-slate-600 hover:border-blue-500 active:scale-95 transition-all text-left shadow-2xl">
+                        <div class="text-5xl mb-4">🧮</div>
+                        <h3 class="text-2xl font-black text-white">Vitesse / Temps</h3>
+                        <p class="text-slate-400 text-sm mt-2">Sliders interdépendants & passages</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- VUE TIMER (Conteneur : config + chrono + fin) -->
+            <div id="tools-timer-container" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
+                <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
                 
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
-                        <label class="text-xs font-bold text-slate-400 uppercase">Séries (n)</label>
-                        <input type="number" id="timer-series" value="4" min="1" class="w-full bg-transparent text-4xl font-black text-white text-center outline-none">
-                        <p class="text-[10px] text-slate-500">Travail = n, Repos = n-1</p>
-                    </div>
-                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
-                        <label class="text-xs font-bold text-slate-400 uppercase">Travail (s)</label>
-                        <input type="number" id="timer-work" value="30" min="1" class="w-full bg-transparent text-4xl font-black text-emerald-400 text-center outline-none">
-                    </div>
-                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
-                        <label class="text-xs font-bold text-slate-400 uppercase">Repos (s)</label>
-                        <input type="number" id="timer-rest" value="15" min="1" class="w-full bg-transparent text-4xl font-black text-amber-400 text-center outline-none">
-                    </div>
-                    
-                    <!-- Banque de chronos -->
-                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
-                        <label class="text-xs font-bold text-slate-400 uppercase">Banque de chronos</label>
-                        <select id="timer-presets" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold text-sm mt-2">
-                            <option value="">-- Préréglages --</option>
-                        </select>
-                        <div class="flex gap-2 mt-2">
-                            <button onclick="savePreset()" class="flex-1 bg-blue-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">💾 Sauver</button>
-                            <button onclick="loadPreset()" class="flex-1 bg-emerald-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">📂 Charger</button>
-                            <button onclick="deletePreset()" class="flex-1 bg-red-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">🗑️ Suppr.</button>
+                <div id="tools-settings" class="w-full max-w-lg p-6">
+                    <h3 class="font-black text-blue-400 uppercase text-sm mb-6 text-center">⏱️ Interval Timer</h3>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Séries (n)</label>
+                            <input type="number" id="timer-series" value="4" min="1" class="w-full bg-transparent text-4xl font-black text-white text-center outline-none">
+                            <p class="text-[10px] text-slate-500">Travail = n, Repos = n-1</p>
+                        </div>
+                        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Travail (s)</label>
+                            <input type="number" id="timer-work" value="30" min="1" class="w-full bg-transparent text-4xl font-black text-emerald-400 text-center outline-none">
+                        </div>
+                        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Repos (s)</label>
+                            <input type="number" id="timer-rest" value="15" min="1" class="w-full bg-transparent text-4xl font-black text-amber-400 text-center outline-none">
+                        </div>
+                        
+                        <!-- Banque de chronos -->
+                        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                            <label class="text-xs font-bold text-slate-400 uppercase">Banque de chronos</label>
+                            <select id="timer-presets" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold text-sm mt-2">
+                                <option value="">-- Préréglages --</option>
+                            </select>
+                            <div class="flex gap-2 mt-2">
+                                <button onclick="savePreset()" class="flex-1 bg-blue-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">💾 Sauver</button>
+                                <button onclick="loadPreset()" class="flex-1 bg-emerald-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">📂 Charger</button>
+                                <button onclick="deletePreset()" class="flex-1 bg-red-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">🗑️ Suppr.</button>
+                            </div>
                         </div>
                     </div>
+                    <button id="timer-start-btn" onclick="startTimer()" class="w-full bg-emerald-600 py-10 rounded-3xl text-4xl font-black uppercase shadow-xl active:scale-95 transition-all">🚀 Démarrer</button>
                 </div>
 
-                <button id="timer-start-btn" onclick="startTimer()" class="w-full bg-emerald-600 py-10 rounded-3xl text-4xl font-black uppercase shadow-xl active:scale-95 transition-all">🚀 Démarrer</button>
-            </div>
-
-            <!-- Écran du chrono (prend toute la place) -->
-            <div id="tools-timer" class="hidden w-full h-full flex flex-col items-center justify-center p-8">
-                <div id="timer-phase" class="text-4xl font-black uppercase tracking-widest mb-4 text-slate-400"></div>
-                <div id="timer-display" class="text-[25vh] leading-none font-black tabular-nums text-white drop-shadow-2xl">00:00</div>
-                <div id="timer-series-display" class="text-2xl font-black text-slate-500 mt-4"></div>
-                <button onclick="stopTimer()" class="mt-12 bg-red-600 px-12 py-6 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95">🛑 Arrêter</button>
-            </div>
-
-            <!-- Écran de FIN (Terminé) -->
-            <div id="tools-finished" class="hidden w-full h-full flex flex-col items-center justify-center">
-                <div class="text-9xl mb-8">🏆</div>
-                <h1 class="text-8xl font-black text-emerald-400 mb-8">TERMINÉ !</h1>
-                <div class="text-2xl text-slate-400 mb-12">Bravo, toutes les séries sont effectuées.</div>
-                <div class="flex gap-4">
-                    <button onclick="resetTimer()" class="bg-blue-600 px-8 py-4 rounded-3xl text-xl font-black uppercase">↩ Recommencer</button>
-                    <button onclick="backToSettings()" class="bg-slate-700 px-8 py-4 rounded-3xl text-xl font-black uppercase">⚙️ Réglages</button>
+                <div id="tools-timer" class="hidden w-full h-full flex flex-col items-center justify-center p-8">
+                    <div id="timer-phase" class="text-4xl font-black uppercase tracking-widest mb-4 text-slate-400"></div>
+                    <div id="timer-display" class="text-[25vh] leading-none font-black tabular-nums text-white drop-shadow-2xl">00:00</div>
+                    <div id="timer-series-display" class="text-2xl font-black text-slate-500 mt-4"></div>
+                    <button onclick="stopTimer()" class="mt-12 bg-red-600 px-12 py-6 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95">🛑 Arrêter</button>
                 </div>
-            <!-- VUE CALCULATEUR (Nouveau) -->
-    <div id="tools-calculator" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
-        <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
-        <div id="calculateur-module" class="w-full max-w-xl"></div>
-    </div>
 
-</div>
+                <div id="tools-finished" class="hidden w-full h-full flex flex-col items-center justify-center">
+                    <div class="text-9xl mb-8">🏆</div>
+                    <h1 class="text-8xl font-black text-emerald-400 mb-8">TERMINÉ !</h1>
+                    <div class="text-2xl text-slate-400 mb-12">Bravo, toutes les séries sont effectuées.</div>
+                    <div class="flex gap-4">
+                        <button onclick="resetTimer()" class="bg-blue-600 px-8 py-4 rounded-3xl text-xl font-black uppercase">↩ Recommencer</button>
+                        <button onclick="backToSettings()" class="bg-slate-700 px-8 py-4 rounded-3xl text-xl font-black uppercase">⚙️ Réglages</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VUE CALCULATEUR -->
+            <div id="tools-calculator" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
+                <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
+                <div id="calculateur-module" class="w-full max-w-xl"></div>
+            </div>
+
+        </div> <!-- Fin viewTools -->
     </div> <!-- Fin space-y-6 -->
 
     <script type="module">
