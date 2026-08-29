@@ -557,16 +557,12 @@ function initSortableOS() {
 // --------------------------------------------------------------
 // 12. MATRICE DE CORRECTION (rendu)
 // --------------------------------------------------------------
-function resetMatrix() {
-    matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-}
-
 function renderMatrix() {
     const container = document.getElementById('os-matrix-container');
     if (!container) return;
 
-    // Fallback : si matrix est vide, on utilise DEFAULT_OS_MATRIX
-    const sourceMatrix = (matrix && Object.keys(matrix).length > 0) ? matrix : DEFAULT_OS_MATRIX;
+    // On utilise DIRECTEMENT les codes en dur
+    const sourceMatrix = DEFAULT_OS_MATRIX;
 
     let html = `<table class="w-full text-center font-bold text-[10px]"><thead><tr class="bg-slate-900 text-white"><th>#</th>`;
     COULEURS.forEach(col => {
