@@ -5,32 +5,29 @@ import { initIntervalTimer, startTimer, stopTimer, resetTimer, backToSettings, s
 
 export function initLayout() {
 
-    if (tabName === 'tools') {
-        const viewTools = document.getElementById('viewTools');
-        viewTools.classList.remove('hidden');
-        initIntervalTimer(); // Remet le chrono à zéro à chaque ouverture de l'onglet
-    }
-    };
+    // Exposer les fonctions du Timer pour le HTML (onclick)
     window.startTimer = startTimer;
-window.stopTimer = stopTimer;
-window.resetTimer = resetTimer;
-window.backToSettings = backToSettings;
-window.savePreset = savePreset;
-window.loadPreset = loadPreset;
-window.deletePreset = deletePreset;
-    
+    window.stopTimer = stopTimer;
+    window.resetTimer = resetTimer;
+    window.backToSettings = backToSettings;
+    window.savePreset = savePreset;
+    window.loadPreset = loadPreset;
+    window.deletePreset = deletePreset;
+
     // 1. Gestion des onglets (sans Tailwind pour la TV)
     window.switchTab = function(tabName) {
-        ['admin', 'activities', 'live'].forEach(t => {
+        
+        // Cacher toutes les vues standard (Admin, Activités, Live, Outils)
+        ['admin', 'activities', 'live', 'tools'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
             if (el) {
                 el.classList.add('hidden');
-                el.style.display = ''; // Reset
+                el.style.display = ''; // Reset pour éviter les conflits
             }
         });
 
-        // Cas spécial pour TV : on utilise style.display
+        // Cas spécial pour TV : on utilise style.display (car elle gère le plein écran)
         const tvView = document.getElementById('viewTV');
         if (tvView) {
             if (tabName === 'tv') {
@@ -40,7 +37,8 @@ window.deletePreset = deletePreset;
             }
         }
 
-        ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4'].forEach(id => {
+        // Mettre à jour les boutons d'onglets (Admin, Activités, Live, TV, Outils)
+        ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
                 btn.classList.remove('tab-active', 'text-blue-500');
@@ -48,14 +46,28 @@ window.deletePreset = deletePreset;
             }
         });
 
-        const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4' };
-            if (tabName !== 'tv') {
-                const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-                if (targetView) targetView.classList.remove('hidden');
-            }
+        // Mapping des onglets vers les boutons
+        const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
+
+        // Afficher la vue correspondante
+        if (tabName !== 'tv') {
+            const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            if (targetView) targetView.classList.remove('hidden');
+        }
+
+        // Activer le bouton d'onglet correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
+        // Logique spéciale lors de l'ouverture de l'onglet OUTILS
+        if (tabName === 'tools') {
+            // Initialise le chrono (retour à l'écran de réglages)
+            setTimeout(() => {
+                initIntervalTimer();
+            }, 100);
+        }
+
+        // Logique spéciale pour l'onglet TV
         if (tabName === 'tv') {
             const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
             setTimeout(() => {
