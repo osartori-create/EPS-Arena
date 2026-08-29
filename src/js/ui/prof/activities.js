@@ -70,7 +70,7 @@ export function initActivities() {
         }
     };
 
-    window.generateTeams = async function() {
+        window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
@@ -82,13 +82,12 @@ export function initActivities() {
             return;
         }
         if (currentDiscipline === 'escalade') {
-    const nbGroupes = Math.ceil(eleves.length / 3);
-    // On force la recréation de la grille en ignorant la sauvegarde
-    initEscaladeInterface(nbGroupes, true);
-    await populateReserveEscalade(eleves);
-    alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
-    return;
-}
+            const nbGroupes = Math.ceil(eleves.length / 3);
+            initEscaladeInterface(nbGroupes, true);
+            await populateReserveEscalade(eleves);
+            alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
+            return;
+        }
         if (currentDiscipline === 'orientshow') {
             alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
             return;
@@ -119,9 +118,32 @@ export function initActivities() {
                     const photoHtml = url 
                         ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
                         : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-                    return `<div class="bg-slate-800 p-2 rounded-lg flex items-center gap-3 text-sm font-bold text-white">
+                    
+                    // Couleur selon le sexe (exactement comme dans les modules CO/Escalade)
+                    let bgClass = 'bg-slate-200 border-slate-400';
+                    if (m.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+                    else if (m.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+
+                    // Affichage du critère sélectionné
+                    let criteriaHtml = '';
+                    if (options.critere === 'vma') {
+                        criteriaHtml = `<span class="text-emerald-700">VMA: ${m.vma || '--'}</span>`;
+                    } else if (options.critere === 'force') {
+                        let stars = '';
+                        for (let i = 1; i <= 5; i++) {
+                            stars += (m.force >= i) ? '★' : '☆';
+                        }
+                        criteriaHtml = `<span class="text-yellow-600 font-black">${stars}</span>`;
+                    } else { // Polyvalent
+                        criteriaHtml = `<span class="text-purple-700">V: ${m.vma || '--'} | L: ${m.longueur || '--'} | 30m: ${m.sprint30 || '--'}</span>`;
+                    }
+
+                    return `<div class="p-2 rounded-lg border-2 ${bgClass} flex items-center gap-3 text-sm font-bold text-slate-900">
                                 ${photoHtml}
-                                <span>${m.prenom} ${m.nom}</span>
+                                <div class="flex flex-col leading-tight">
+                                    <span>${m.prenom} ${m.nom}</span>
+                                    <span class="text-[10px] font-bold">${criteriaHtml}</span>
+                                </div>
                             </div>`;
                 }));
                 return `<div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
