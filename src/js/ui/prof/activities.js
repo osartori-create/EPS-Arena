@@ -165,7 +165,7 @@ export function initActivities() {
             }
         });
     } 
-    } else if (currentDiscipline === 'orientshow') {
+    else if (currentDiscipline === 'orientshow') {
     // Importer la fonction getMatrix depuis orientshow-interface
     // (en haut du fichier, ajouter : import { getMatrix } from '../../modules/orientshow/orientshow-interface.js';)
     const matrix = getMatrix(); // récupère la matrice (avec fallback par défaut)
