@@ -22,6 +22,141 @@ function getBaseProf() {
     return `etablissements/0680013V/profs/${profCode}`;
 }
 
+// ==========================================
+// LISTE DES COULEURS ET FONCTIONS DE PALETTE
+// ==========================================
+const colorOptions = [
+    { name: "Rouge", hex: "#ef4444" },
+    { name: "Bleu", hex: "#3b82f6" },
+    { name: "Vert", hex: "#22c55e" },
+    { name: "Jaune", hex: "#eab308" },
+    { name: "Orange", hex: "#f97316" },
+    { name: "Violet", hex: "#a855f7" },
+    { name: "Rose", hex: "#ec4899" },
+    { name: "Cyan", hex: "#06b6d4" },
+    { name: "Blanc", hex: "#ffffff" },
+    { name: "Noir", hex: "#000000" }
+];
+
+// Fonction pour calculer la couleur du texte en fonction du fond
+function getContrastColor(hex) {
+    const r = parseInt(hex.substr(1,2), 16);
+    const g = parseInt(hex.substr(3,2), 16);
+    const b = parseInt(hex.substr(5,2), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+}
+
+// Fonction globale pour ouvrir la palette (appelée par le clic sur "Couleur")
+window.openColorPicker = function(teamId) {
+    const team = window.lastTeams.find(t => t.id === teamId);
+    if (!team) return;
+
+    // Récupérer les couleurs déjà choisies par les autres équipes
+    const usedColors = window.lastTeams
+        .filter(t => t.id !== teamId && t.color !== '#e2e8f0')
+        .map(t => t.color);
+    
+    // Créer la modale
+    const modal = document.createElement('div');
+    modal.id = 'colorPickerModal';
+    modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-sm">
+            <h3 class="text-xl font-black text-blue-400 uppercase mb-4 text-center">Choisir la couleur</h3>
+            <div class="grid grid-cols-2 gap-3">
+                ${colorOptions.map(color => {
+                    const isUsed = usedColors.includes(color.hex);
+                    return `
+                    <button onclick="applyColor('${teamId}', '${color.name}', '${color.hex}')"
+                            class="p-4 rounded-2xl font-bold text-lg border-2 transition-all flex items-center justify-center gap-2 ${isUsed ? 'opacity-30 cursor-not-allowed border-slate-700' : 'border-slate-600 hover:border-white'}"
+                            style="background-color: ${color.hex}; color: ${getContrastColor(color.hex)}"
+                            ${isUsed ? 'disabled' : ''}>
+                        <span class="w-4 h-4 rounded-full border border-slate-500" style="background-color: ${color.hex}"></span>
+                        ${color.name}
+                        ${isUsed ? '<span class="text-red-400 font-black ml-1">✖</span>' : ''}
+                    </button>`;
+                }).join('')}
+            </div>
+            <button onclick="document.getElementById('colorPickerModal').remove()" 
+                    class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white text-sm uppercase">
+                Fermer
+            </button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+// Fonction pour appliquer la couleur choisie
+window.applyColor = function(teamId, colorName, colorHex) {
+    const team = window.lastTeams.find(t => t.id === teamId);
+    if (team) {
+        team.label = colorName;
+        team.color = colorHex;
+        team.textColor = getContrastColor(colorHex);
+    }
+
+    // Fermer la modale
+    document.getElementById('colorPickerModal').remove();
+
+    // Régénérer l'affichage avec le nouveau label
+    window.renderTeams();
+};
+
+// Fonction pour régénérer l'affichage (utilisée après un changement de couleur)
+window.renderTeams = async function() {
+    const container = document.getElementById('teamsGrid');
+    if (!container || !window.lastTeams) return;
+
+    const teamsHTML = await Promise.all(window.lastTeams.map(async (team) => {
+        const membersHTML = await Promise.all(team.members.map(async (m) => {
+            const url = await getPhotoUrl(m.id);
+            const photoHtml = url 
+                ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+                : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+            
+            let bgClass = 'bg-slate-200 border-slate-400';
+            if (m.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+            else if (m.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+
+            let criteriaHtml = '';
+            if (options.critere === 'vma') {
+                criteriaHtml = `<span class="text-emerald-700">VMA: ${m.vma || '--'}</span>`;
+            } else if (options.critere === 'force') {
+                let stars = '';
+                for (let i = 1; i <= (m.force || 0); i++) stars += '★';
+                criteriaHtml = `<span class="text-yellow-600 font-black">${stars}</span>`;
+            } else {
+                criteriaHtml = `<span class="text-purple-700">V: ${m.vma || '--'} | L: ${m.longueur || '--'} | 30m: ${m.sprint30 || '--'}</span>`;
+            }
+
+            return `<div class="p-2 rounded-lg border-2 ${bgClass} flex items-center gap-3 text-sm font-bold text-slate-900">
+                        ${photoHtml}
+                        <div class="flex flex-col leading-tight">
+                            <span>${m.prenom} ${m.nom}</span>
+                            <span class="text-[10px] font-bold">${criteriaHtml}</span>
+                        </div>
+                    </div>`;
+        }));
+
+        return `<div class="bg-slate-900 rounded-2xl p-4 border-2 relative" style="border-color: ${team.color}">
+                    <div class="flex justify-between items-center mb-3">
+                        <button onclick="openColorPicker('${team.id}')" 
+                                class="font-black text-xl px-4 py-2 rounded-lg border-2 border-dashed border-slate-500 hover:border-white transition-colors"
+                                style="background-color: ${team.color}; color: ${team.textColor}">
+                            ${team.label}
+                        </button>
+                        <span class="text-xs text-slate-500">${team.members.length} joueurs</span>
+                    </div>
+                    <div class="team-members flex flex-col gap-2">
+                        ${membersHTML.join('')}
+                    </div>
+                </div>`;
+    }));
+    container.innerHTML = teamsHTML.join('');
+};
+
+
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
     try { initEscaladeInterface(6); } catch (e) {}
@@ -70,7 +205,7 @@ export function initActivities() {
         }
     };
 
-            window.generateTeams = async function() {
+    window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
@@ -106,149 +241,21 @@ export function initActivities() {
         if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
-         // Liste des couleurs disponibles (nom + code hexadécimal)
-    const colorOptions = [
-        { name: "Rouge", hex: "#ef4444" },
-        { name: "Bleu", hex: "#3b82f6" },
-        { name: "Vert", hex: "#22c55e" },
-        { name: "Jaune", hex: "#eab308" },
-        { name: "Orange", hex: "#f97316" },
-        { name: "Violet", hex: "#a855f7" },
-        { name: "Rose", hex: "#ec4899" },
-        { name: "Cyan", hex: "#06b6d4" },
-        { name: "Blanc", hex: "#ffffff" },
-        { name: "Noir", hex: "#000000" }
-    ];
-
-    // Fonction pour calculer la couleur du texte en fonction du fond
-    function getContrastColor(hex) {
-        const r = parseInt(hex.substr(1,2), 16);
-        const g = parseInt(hex.substr(3,2), 16);
-        const b = parseInt(hex.substr(5,2), 16);
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return luminance > 0.5 ? '#000000' : '#ffffff';
-    }
-
-    // Fonction globale pour ouvrir la palette (appelée par le clic sur "Couleur")
-    window.openColorPicker = function(teamId) {
-        const team = window.lastTeams.find(t => t.id === teamId);
-        if (!team) return;
-
-        // Récupérer les couleurs déjà choisies par les autres équipes
-        const usedColors = window.lastTeams
-            .filter(t => t.id !== teamId && t.color !== '#e2e8f0')
-            .map(t => t.color);
+        const teams = generateClassicTeams(eleves, options);
         
-        // Créer la modale
-        const modal = document.createElement('div');
-        modal.id = 'colorPickerModal';
-        modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50';
-        modal.innerHTML = `
-            <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-sm">
-                <h3 class="text-xl font-black text-blue-400 uppercase mb-4 text-center">Choisir la couleur</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    ${colorOptions.map(color => {
-                        // Si la couleur est déjà utilisée par une autre équipe, on la grise
-                        const isUsed = usedColors.includes(color.hex);
-                        return `
-                        <button onclick="applyColor('${teamId}', '${color.name}', '${color.hex}')"
-                                class="p-4 rounded-2xl font-bold text-lg border-2 transition-all flex items-center justify-center gap-2 ${isUsed ? 'opacity-30 cursor-not-allowed border-slate-700' : 'border-slate-600 hover:border-white'}"
-                                style="background-color: ${color.hex}; color: ${getContrastColor(color.hex)}"
-                                ${isUsed ? 'disabled' : ''}>
-                            <span class="w-4 h-4 rounded-full border border-slate-500" style="background-color: ${color.hex}"></span>
-                            ${color.name}
-                            ${isUsed ? '<span class="text-red-400 font-black ml-1">✖</span>' : ''}
-                        </button>`;
-                    }).join('')}
-                </div>
-                <button onclick="document.getElementById('colorPickerModal').remove()" 
-                        class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white text-sm uppercase">
-                    Fermer
-                </button>
-            </div>
-        `;
-        document.body.appendChild(modal);
-    };
-
-    // Fonction pour appliquer la couleur choisie
-    window.applyColor = function(teamId, colorName, colorHex) {
-        const team = window.lastTeams.find(t => t.id === teamId);
-        if (team) {
-            team.label = colorName;
-            team.color = colorHex;
-            team.textColor = getContrastColor(colorHex);
-        }
-
-        // Fermer la modale
-        document.getElementById('colorPickerModal').remove();
-
-        // Régénérer l'affichage avec le nouveau label
-        window.renderTeams();
-    };
+        // Personnalisation : On remplace les couleurs par défaut par le libellé "Couleur"
+        teams.forEach(team => {
+            team.label = "Couleur";
+            team.color = "#e2e8f0"; // Gris clair
+            team.textColor = "#334155"; // Gris foncé
+        });
 
         window.lastTeams = teams;
         
-        // Appel direct de votre fonction de rendu (celle avec les fiches élèves)
+        // Appel direct de la fonction de rendu (celle avec les fiches élèves)
         window.renderTeams();
-
-        const container = document.getElementById('teamsGrid');
-        if (container) {
-            // Génération asynchrone des cartes avec photos
-            const teamsHTML = await Promise.all(teams.map(async (team) => {
-                const membersHTML = await Promise.all(team.members.map(async (m) => {
-                    const url = await getPhotoUrl(m.id);
-                    const photoHtml = url 
-                        ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
-                        : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-                    
-                    // Couleur selon le sexe (exactement comme dans les modules CO/Escalade)
-                    let bgClass = 'bg-slate-200 border-slate-400';
-                    if (m.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
-                    else if (m.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-
-                    // Affichage du critère sélectionné
-                    let criteriaHtml = '';
-                    if (options.critere === 'vma') {
-                        criteriaHtml = `<span class="text-emerald-700">VMA: ${m.vma || '--'}</span>`;
-                    } else if (options.critere === 'force') {
-                        // N'affiche que les étoiles remplies (pas de "☆" vide)
-                        let stars = '';
-                        for (let i = 1; i <= (m.force || 0); i++) {
-                            stars += '★';
-                        }
-                        criteriaHtml = `<span class="text-yellow-600 font-black">${stars}</span>`;
-                    } else { // Polyvalent
-                        criteriaHtml = `<span class="text-purple-700">V: ${m.vma || '--'} | L: ${m.longueur || '--'} | 30m: ${m.sprint30 || '--'}</span>`;
-                    }
-
-                    return `<div class="p-2 rounded-lg border-2 ${bgClass} flex items-center gap-3 text-sm font-bold text-slate-900">
-                                ${photoHtml}
-                                <div class="flex flex-col leading-tight">
-                                    <span>${m.prenom} ${m.nom}</span>
-                                    <span class="text-[10px] font-bold">${criteriaHtml}</span>
-                                </div>
-                            </div>`;
-                }));
-
-                // Modification du rendu de l'équipe
-                return `<div class="bg-slate-900 rounded-2xl p-4 border-2 relative" style="border-color: ${team.color}">
-                            <div class="flex justify-between items-center mb-3">
-                                <button onclick="openColorPicker('${team.id}')" 
-                                        class="font-black text-xl px-3 py-1 rounded-lg border-2 border-slate-600 hover:border-white transition-colors"
-                                        style="background-color: ${team.color}; color: ${team.textColor}">
-                                    ${team.label}
-                                </button>
-                                <span class="text-xs text-slate-500">${team.members.length} joueurs</span>
-                            </div>
-                            <div class="team-members flex flex-col gap-2">
-                                ${membersHTML.join('')}
-                            </div>
-                        </div>`;
-            }));
-            container.innerHTML = teamsHTML.join('');
-        }
     };
-
+    
     window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe.");
@@ -278,7 +285,7 @@ export function initActivities() {
             });
         } 
         else if (currentDiscipline === 'orientshow') {
-            // Codes par défaut pour la matrice (intégrés en dur)
+            // ... (Votre code existant pour OrientShow reste identique)
             const DEFAULT_OS_MATRIX = {
                 1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
                 2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
@@ -311,10 +318,8 @@ export function initActivities() {
                 configData[couleur] = codeCounts[couleur];
             });
             
-            // Utiliser la matrice en dur (garantie complète)
             configData.matrix = DEFAULT_OS_MATRIX;
             
-            // Récupération des temps (version robuste)
             const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
             const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
             const parseTime = (value) => {
@@ -332,11 +337,11 @@ export function initActivities() {
             // Multi-activités (par défaut)
             configData.activite = 'multi';
             if (window.lastTeams) {
-                const lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-                window.lastTeams.forEach((team, index) => {
-                    const lettre = lettres[index] || `EQ${index+1}`;
-                    localMapping[`${activeClasse}_${lettre}`] = team.members.map(m => m.id);
-                    configData[lettre] = team.members.length;
+                // Utilisation de team.label pour envoyer la couleur choisie aux iPads !
+                window.lastTeams.forEach((team) => {
+                    const key = team.label; // ex: "Rouge", "Bleu", etc.
+                    localMapping[`${activeClasse}_${key}`] = team.members.map(m => m.id);
+                    configData[key] = team.members.length;
                 });
             } else {
                 return alert("Veuillez d'abord générer les équipes.");
@@ -359,46 +364,38 @@ export function initActivities() {
     };
 
     window.openPurgeModal = function() {
-    const choix = prompt("Purge Firebase\n1- Purger la classe active (sauf OrientShow)\n2- Purger TOUTE la base (code RNE)");
-    const baseProf = getBaseProf();
+        const choix = prompt("Purge Firebase\n1- Purger la classe active (sauf OrientShow)\n2- Purger TOUTE la base (code RNE)");
+        const baseProf = getBaseProf();
 
-    if (choix === "1") {
-        const activeClasse = document.getElementById('selectClasse').value;
-        if (activeClasse && confirm("Supprimer toutes les données de la classe " + activeClasse + " (sauf la matrice OrientShow) ?")) {
-            // Supprimer la classe en préservant le chemin orientshow/config
-            const classePath = `${baseProf}/${activeClasse}`;
-            // On pourrait ici faire un update pour supprimer tous les champs sauf orientshow/config
-            // Mais pour simplifier, on peut sauvegarder la matrice avant la purge
-            const matrixBackup = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-            remove(ref(db, classePath))
-                .then(() => {
-                    // Restaurer la matrice sauvegardée
-                    if (Object.keys(matrixBackup).length > 0) {
-                        const configData = {
-                            activite: 'orientshow',
-                            matrix: matrixBackup,
-                            nbCircuits: 12,
-                            nbCouleurs: 5
-                        };
-                        set(ref(db, `${classePath}/orientshow/config`), configData);
-                    }
-                    location.reload();
-                })
-                .catch(err => alert("Erreur purge : " + err.message));
+        if (choix === "1") {
+            const activeClasse = document.getElementById('selectClasse').value;
+            if (activeClasse && confirm("Supprimer toutes les données de la classe " + activeClasse + " (sauf la matrice OrientShow) ?")) {
+                const classePath = `${baseProf}/${activeClasse}`;
+                const matrixBackup = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+                remove(ref(db, classePath))
+                    .then(() => {
+                        if (Object.keys(matrixBackup).length > 0) {
+                            const configData = {
+                                activite: 'orientshow',
+                                matrix: matrixBackup,
+                                nbCircuits: 12,
+                                nbCouleurs: 5
+                            };
+                            set(ref(db, `${classePath}/orientshow/config`), configData);
+                        }
+                        location.reload();
+                    })
+                    .catch(err => alert("Erreur purge : " + err.message));
+            }
+        } else if (choix === "2") {
+            const code = prompt("Code RNE :");
+            if (code === "0680013V" && confirm("Supprimer TOUTE la base ?")) {
+                remove(ref(db))
+                    .then(() => location.reload())
+                    .catch(err => alert("Erreur purge : " + err.message));
+            }
         }
-    } else if (choix === "2") {
-        const code = prompt("Code RNE :");
-        if (code === "0680013V" && confirm("Supprimer TOUTE la base ?")) {
-            // Avant de purger, exporter la matrice dans localStorage
-            const allMatrices = {};
-            // Ici, on pourrait parcourir toutes les classes pour sauvegarder leurs matrices
-            // Mais c'est plus complexe. L'export manuel reste la meilleure solution.
-            remove(ref(db))
-                .then(() => location.reload())
-                .catch(err => alert("Erreur purge : " + err.message));
-        }
-    }
-};
+    };
 
     // CO specific
     window.addCircuit = function() {
