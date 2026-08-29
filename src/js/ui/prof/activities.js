@@ -213,7 +213,7 @@ export function initActivities() {
     const endTime = parseTime(endTimeStr);
     if (startTime !== null) configData.startTime = startTime;
     if (endTime !== null) configData.endTime = endTime;
-} 
+ 
     else {
         // Multi-activités (par défaut)
         configData.activite = 'multi';
