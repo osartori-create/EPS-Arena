@@ -11,7 +11,7 @@ import {
     exportOrientShowConfig,
     importOrientShowConfig,
     startOrientShow,
-    stopOrientShow
+    stopOrientShow,
     getMatrix
 } from '../../modules/orientshow/orientshow-interface.js';
 
