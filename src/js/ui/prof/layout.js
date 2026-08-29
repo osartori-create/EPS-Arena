@@ -2,6 +2,7 @@
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 import { initIntervalTimer, startTimer, stopTimer, resetTimer, backToSettings, savePreset, loadPreset, deletePreset } from '../../modules/commun/timer.js';
+import { initConvertisseur } from '../../modules/commun/convertisseur.js';
 
 export function initLayout() {
 
@@ -61,10 +62,10 @@ export function initLayout() {
 
         // Logique spéciale lors de l'ouverture de l'onglet OUTILS
         if (tabName === 'tools') {
-            // Initialise le chrono (retour à l'écran de réglages)
-            setTimeout(() => {
-                initIntervalTimer();
-            }, 100);
+            const viewTools = document.getElementById('viewTools');
+    viewTools.classList.remove('hidden');
+    initIntervalTimer(); // Remet le chrono à zéro
+    initConvertisseur(); // Initialise le convertisseur
         }
 
         // Logique spéciale pour l'onglet TV
