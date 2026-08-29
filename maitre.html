@@ -41,12 +41,7 @@
             <button onclick="transmettreConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">📡 Transmettre aux iPads</button>
             <button onclick="openPurgeModal()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400 ml-2">🗑️ Purge</button>
             
-            <!-- NOUVEAU BOUTON : Cliquez pour ouvrir l'Interval Timer -->
-            <button onclick="openTimerModal()" class="bg-slate-700 px-3 py-2 rounded-xl border-2 border-blue-500 flex items-center gap-2 active:scale-95">
-                <img src="hub-icon.svg" class="w-8 h-8">
-                <span class="text-xs font-black text-blue-400 uppercase">Timer</span>
-            </button>
-        </div>
+            
     </header>
 
     <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
@@ -301,21 +296,70 @@
             </div>
         </div>
 
+                <!-- ONGLET 5 : OUTILS (TIMER PLEIN ECRAN) -->
+        <div id="viewTools" class="hidden w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
+            
+            <!-- Écran de configuration (visible au démarrage) -->
+            <div id="tools-settings" class="w-full max-w-lg p-6">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-6 text-center">⏱️ Interval Timer</h3>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Séries (n)</label>
+                        <input type="number" id="timer-series" value="4" min="1" class="w-full bg-transparent text-4xl font-black text-white text-center outline-none">
+                        <p class="text-[10px] text-slate-500">Travail = n, Repos = n-1</p>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Travail (s)</label>
+                        <input type="number" id="timer-work" value="30" min="1" class="w-full bg-transparent text-4xl font-black text-emerald-400 text-center outline-none">
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Repos (s)</label>
+                        <input type="number" id="timer-rest" value="15" min="1" class="w-full bg-transparent text-4xl font-black text-amber-400 text-center outline-none">
+                    </div>
+                    
+                    <!-- Banque de chronos -->
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Banque de chronos</label>
+                        <select id="timer-presets" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold text-sm mt-2">
+                            <option value="">-- Préréglages --</option>
+                        </select>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="savePreset()" class="flex-1 bg-blue-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">💾 Sauver</button>
+                            <button onclick="loadPreset()" class="flex-1 bg-emerald-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">📂 Charger</button>
+                            <button onclick="deletePreset()" class="flex-1 bg-red-600 px-2 py-2 rounded-xl font-black text-[10px] uppercase text-white">🗑️ Suppr.</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="timer-start-btn" onclick="startTimer()" class="w-full bg-emerald-600 py-10 rounded-3xl text-4xl font-black uppercase shadow-xl active:scale-95 transition-all">🚀 Démarrer</button>
+            </div>
+
+            <!-- Écran du chrono (prend toute la place) -->
+            <div id="tools-timer" class="hidden w-full h-full flex flex-col items-center justify-center p-8">
+                <div id="timer-phase" class="text-4xl font-black uppercase tracking-widest mb-4 text-slate-400"></div>
+                <div id="timer-display" class="text-[25vh] leading-none font-black tabular-nums text-white drop-shadow-2xl">00:00</div>
+                <div id="timer-series-display" class="text-2xl font-black text-slate-500 mt-4"></div>
+                <button onclick="stopTimer()" class="mt-12 bg-red-600 px-12 py-6 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95">🛑 Arrêter</button>
+            </div>
+
+            <!-- Écran de FIN (Terminé) -->
+            <div id="tools-finished" class="hidden w-full h-full flex flex-col items-center justify-center">
+                <div class="text-9xl mb-8">🏆</div>
+                <h1 class="text-8xl font-black text-emerald-400 mb-8">TERMINÉ !</h1>
+                <div class="text-2xl text-slate-400 mb-12">Bravo, toutes les séries sont effectuées.</div>
+                <div class="flex gap-4">
+                    <button onclick="resetTimer()" class="bg-blue-600 px-8 py-4 rounded-3xl text-xl font-black uppercase">↩ Recommencer</button>
+                    <button onclick="backToSettings()" class="bg-slate-700 px-8 py-4 rounded-3xl text-xl font-black uppercase">⚙️ Réglages</button>
+                </div>
+            </div>
+        </div>
     </div> <!-- Fin space-y-6 -->
 
     <script type="module">
         import { initApp } from './src/js/app.js';
         initApp();
     </script>
-        <!-- MODALE INTERVAL TIMER -->
-    <div id="timer-modal" class="fixed inset-0 bg-black/90 hidden items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-md">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-black text-blue-400 uppercase text-sm">⏱️ Interval Timer</h3>
-                <button onclick="closeTimerModal()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">✖ Fermer</button>
-            </div>
-            <div id="interval-timer-module"></div>
-        </div>
-    </div>
+        
 </body>
 </html>

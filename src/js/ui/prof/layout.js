@@ -1,22 +1,23 @@
 // src/js/ui/prof/layout.js
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { initIntervalTimer } from '../../modules/commun/timer.js';
+import { initIntervalTimer, startTimer, stopTimer, resetTimer, backToSettings, savePreset, loadPreset, deletePreset } from '../../modules/commun/timer.js';
 
 export function initLayout() {
 
-    window.openTimerModal = function() {
-    const modal = document.getElementById('timer-modal');
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-    initIntervalTimer(); // Lance le chrono
-};
-
-window.closeTimerModal = function() {
-    const modal = document.getElementById('timer-modal');
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-};
+    if (tabName === 'tools') {
+        const viewTools = document.getElementById('viewTools');
+        viewTools.classList.remove('hidden');
+        initIntervalTimer(); // Remet le chrono à zéro à chaque ouverture de l'onglet
+    }
+    };
+    window.startTimer = startTimer;
+window.stopTimer = stopTimer;
+window.resetTimer = resetTimer;
+window.backToSettings = backToSettings;
+window.savePreset = savePreset;
+window.loadPreset = loadPreset;
+window.deletePreset = deletePreset;
     
     // 1. Gestion des onglets (sans Tailwind pour la TV)
     window.switchTab = function(tabName) {
