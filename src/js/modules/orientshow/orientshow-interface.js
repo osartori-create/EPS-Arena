@@ -4,74 +4,87 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../core/live-engine.js';
 import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase-service.js';
 
+// Constantes (modifiables)
 const COULEURS = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
 const NB_COULEURS = 5;
-const NB_NUMEROS = 10;
+const NB_NUMEROS = 6;   // 6 lignes (tu avais 10, mais tu as dit 6)
 const NB_CIRCUITS = 12;
 
-let currentClasse = '';
+// État local (pour la matrice et les temps)
 let matrix = {};
 let startTime = null;
 let endTime = null;
 
-// ---------- EXPORTS pour activities.js ----------
+// --------------------------------------------------------------
+// 1. INITIALISATION – crée la grille et la réserve une seule fois
+// --------------------------------------------------------------
 export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
 
-    currentClasse = getCurrentClasse();
-    if (!currentClasse) {
-        const select = document.getElementById('selectClasse');
-        if (select) {
-            select.addEventListener('change', function onClassChange() {
-                currentClasse = this.value;
-                if (currentClasse) {
-                    select.removeEventListener('change', onClassChange);
-                    initOrientShowInterface();
-                }
-            });
-        }
-        container.innerHTML = '<p class="text-slate-500">Veuillez sélectionner une classe.</p>';
-        return;
+    // Si la grille n'existe pas encore, on la construit
+    if (!document.getElementById('os-postesGrid')) {
+        buildGridAndReserve();
+        initSortableOS();
+        attachClassChangeListener();
     }
 
-    // 1. Générer la grille (postes) et la réserve en utilisant l’ancienne méthode
-    renderGridAndReserve();
-
-    // 2. Écouter la config Firebase pour la matrice
-    listenOrientShowConfig(currentClasse, (config) => {
-        if (config && config.matrix) {
-            matrix = config.matrix;
-            startTime = config.startTime || null;
-            endTime = config.endTime || null;
-        } else {
-            matrix = {};
-            for (let c = 1; c <= NB_CIRCUITS; c++) {
-                matrix[c] = {};
-                COULEURS.forEach(col => {
-                    matrix[c][col] = ['', ''];
-                });
+    // Écoute la config Firebase (matrice + temps)
+    const classe = getCurrentClasse();
+    if (classe) {
+        listenOrientShowConfig(classe, (config) => {
+            if (config && config.matrix) {
+                matrix = config.matrix;
+                startTime = config.startTime || null;
+                endTime = config.endTime || null;
+            } else {
+                resetMatrix();
+                startTime = null;
+                endTime = null;
             }
-            startTime = null;
-            endTime = null;
-        }
-        localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-        localStorage.setItem('eps_arena_os_startTime', startTime);
-        localStorage.setItem('eps_arena_os_endTime', endTime);
+            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+            localStorage.setItem('eps_arena_os_startTime', startTime);
+            localStorage.setItem('eps_arena_os_endTime', endTime);
+            renderMatrix(); // met à jour la matrice affichée (si visible)
+            updateChronoButtons();
+        });
+    }
 
-        renderMatrix();
-        updateChronoButtons();
-    });
-
-    document.getElementById('selectClasse').addEventListener('change', () => {
-        currentClasse = getCurrentClasse();
-        initOrientShowInterface();
-    });
+    // Charge les affectations si une classe est déjà sélectionnée
+    loadOrientShowAssignments();
 }
 
-// ---------- GRID ET RESERVE (reprise de l'ancien os-interface.js) ----------
-function renderGridAndReserve() {
-    // Grille (os-postesGrid) - identique à l'ancien
+// --------------------------------------------------------------
+// 2. CONSTRUCTION DU DOM (postes + réserve)
+// --------------------------------------------------------------
+function buildGridAndReserve() {
+    const container = document.getElementById('viewOrientShowSettings');
+    if (!container) return;
+
+    // ---- Grille des postes (5 couleurs × NB_NUMEROS) ----
+    const gridHtml = `
+        <div class="flex gap-4">
+            <!-- Colonne réserve (étroite) -->
+            <div class="w-1/4 shrink-0 bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
+                    <button onclick="window.populateReserveOS()" class="bg-blue-600 px-3 py-1 rounded-xl font-black text-[10px] uppercase text-white">⬇️ Charger</button>
+                </div>
+                <div id="os-reserve" class="flex flex-col gap-2 min-h-[200px]"></div>
+            </div>
+
+            <!-- Colonne droite : grille des postes -->
+            <div class="flex-1 bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
+                <h3 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par code (couleur_numéro)</h3>
+                <div id="os-postesGrid" class="min-w-[600px]">
+                    <!-- généré par JS ci-dessous -->
+                </div>
+            </div>
+        </div>
+    `;
+    container.innerHTML = gridHtml;
+
+    // Remplir la grille des postes
     const gridContainer = document.getElementById('os-postesGrid');
     if (gridContainer) {
         let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
@@ -94,33 +107,173 @@ function renderGridAndReserve() {
         gridContainer.innerHTML = html;
     }
 
-    // Réserve : charger les élèves non affectés
-    loadReserve();
-    setTimeout(() => initSortableOS(), 200);
+    // Ajouter le bouton "Matrice" après la grille (ou ailleurs)
+    const matrixBtn = document.createElement('button');
+    matrixBtn.id = 'os-toggle-matrix';
+    matrixBtn.className = 'bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400 mt-4';
+    matrixBtn.textContent = '📝 Matrice de correction';
+    matrixBtn.onclick = toggleMatrixVisibility;
+    container.appendChild(matrixBtn);
+
+    // Conteneur pour la matrice (initialement masqué)
+    const matrixContainer = document.createElement('div');
+    matrixContainer.id = 'os-matrix-container';
+    matrixContainer.className = 'bg-slate-900 p-4 rounded-2xl border border-slate-700 overflow-x-auto mt-4 hidden';
+    container.appendChild(matrixContainer);
 }
 
-async function loadReserve() {
-    const reserveContainer = document.getElementById('os-reserve');
-    if (!reserveContainer) return;
+// --------------------------------------------------------------
+// 3. AFFICHAGE / MASQUAGE DE LA MATRICE
+// --------------------------------------------------------------
+let matrixVisible = false;
 
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    const mapping = getLocalMapping(currentClasse) || {};
-
-    // Trouver les élèves déjà placés dans les dropzones
-    const placedIds = new Set();
-    document.querySelectorAll('.os-dropzone [data-id]').forEach(el => placedIds.add(el.dataset.id));
-
-    // Vider la réserve
-    reserveContainer.innerHTML = '';
-
-    // Ajouter les élèves non placés
-    for (const eleve of eleves) {
-        if (!placedIds.has(eleve.id)) {
-            reserveContainer.appendChild(await createEleveCard(eleve));
-        }
+function toggleMatrixVisibility() {
+    matrixVisible = !matrixVisible;
+    const container = document.getElementById('os-matrix-container');
+    if (container) {
+        container.classList.toggle('hidden', !matrixVisible);
+        if (matrixVisible) renderMatrix();
     }
 }
 
+// --------------------------------------------------------------
+// 4. GESTION DU CHANGEMENT DE CLASSE
+// --------------------------------------------------------------
+function attachClassChangeListener() {
+    const select = document.getElementById('selectClasse');
+    if (!select) return;
+    // On évite les doublons en retirant l'ancien écouteur (s'il existe)
+    select.removeEventListener('change', onClassChange);
+    select.addEventListener('change', onClassChange);
+}
+
+function onClassChange() {
+    // Recharger la config Firebase pour la nouvelle classe
+    const classe = getCurrentClasse();
+    if (classe) {
+        listenOrientShowConfig(classe, (config) => {
+            if (config && config.matrix) {
+                matrix = config.matrix;
+                startTime = config.startTime || null;
+                endTime = config.endTime || null;
+            } else {
+                resetMatrix();
+                startTime = null;
+                endTime = null;
+            }
+            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+            localStorage.setItem('eps_arena_os_startTime', startTime);
+            localStorage.setItem('eps_arena_os_endTime', endTime);
+            renderMatrix();
+            updateChronoButtons();
+        });
+    }
+    // Recharger les affectations
+    loadOrientShowAssignments();
+}
+
+// --------------------------------------------------------------
+// 5. CHARGEMENT DES AFFECTATIONS (mapping plat)
+// --------------------------------------------------------------
+export async function loadOrientShowAssignments() {
+    const classe = getCurrentClasse();
+    if (!classe) {
+        // Si pas de classe, on vide tout
+        document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
+        document.getElementById('os-reserve').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
+        return;
+    }
+
+    const mapping = getLocalMapping(classe) || {};
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+
+    // 1. Vider toutes les dropzones et la réserve
+    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
+    const reserveContainer = document.getElementById('os-reserve');
+    reserveContainer.innerHTML = '';
+
+    // 2. Parcourir le mapping et placer les élèves dans les dropzones
+    const placedIds = new Set();
+    for (const [key, eleveId] of Object.entries(mapping)) {
+        // key est de la forme "classe_COULEUR_numéro" ou "classe_code" ? 
+        // Dans le mapping plat on stocke "classe_COULEUR_numéro" -> eleveId
+        // On extrait la partie après la classe_
+        const codePart = key.replace(`${classe}_`, '');
+        const match = codePart.match(/^([A-Z]+)_(\d+)$/);
+        if (match) {
+            const color = match[1];
+            const num = parseInt(match[2], 10);
+            // Trouver la dropzone correspondante
+            const dropzone = document.querySelector(`.os-dropzone[data-code="${color}_${num}"]`);
+            if (dropzone) {
+                const eleve = eleves.find(e => e.id === eleveId);
+                if (eleve) {
+                    const card = await createEleveCard(eleve);
+                    dropzone.appendChild(card);
+                    placedIds.add(eleveId);
+                }
+            }
+        }
+    }
+
+    // 3. Ajouter les élèves non placés dans la réserve
+    for (const eleve of eleves) {
+        if (!placedIds.has(eleve.id)) {
+            const card = await createEleveCard(eleve);
+            reserveContainer.appendChild(card);
+        }
+    }
+
+    // 4. Réinitialiser Sortable pour les nouvelles cartes
+    initSortableOS();
+}
+
+// --------------------------------------------------------------
+// 6. SAUVEGARDE DES AFFECTATIONS (appelée après chaque glissé)
+// --------------------------------------------------------------
+export function saveOrientShowAssignments() {
+    const classe = getCurrentClasse();
+    if (!classe) return;
+
+    const mapping = {};
+    document.querySelectorAll('.os-dropzone').forEach(zone => {
+        const code = zone.dataset.code; // ex: "NOIR_1"
+        const card = zone.querySelector('[data-id]');
+        if (card) {
+            mapping[`${classe}_${code}`] = card.dataset.id;
+        }
+    });
+    setLocalMapping(classe, mapping);
+
+    // Met à jour la réserve (enlève les élèves maintenant placés)
+    // On recharge la réserve sans tout recharger (pour éviter un cycle)
+    refreshReserve();
+}
+
+// Met à jour la réserve sans recharger tout le mapping
+async function refreshReserve() {
+    const classe = getCurrentClasse();
+    if (!classe) return;
+
+    const mapping = getLocalMapping(classe) || {};
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    const placedIds = new Set();
+    document.querySelectorAll('.os-dropzone [data-id]').forEach(el => placedIds.add(el.dataset.id));
+
+    const reserveContainer = document.getElementById('os-reserve');
+    reserveContainer.innerHTML = '';
+    for (const eleve of eleves) {
+        if (!placedIds.has(eleve.id)) {
+            const card = await createEleveCard(eleve);
+            reserveContainer.appendChild(card);
+        }
+    }
+    initSortableOS(); // réattacher Sortable aux nouveaux éléments
+}
+
+// --------------------------------------------------------------
+// 7. CRÉATION D'UNE CARTE ÉLÈVE (avec photo)
+// --------------------------------------------------------------
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
     const bgClass = eleve.sexe === 'M' ? 'bg-blue-200 border-blue-400' : (eleve.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400');
@@ -133,62 +286,54 @@ async function createEleveCard(eleve) {
     return div;
 }
 
-// ---------- SORTABLE ----------
+// --------------------------------------------------------------
+// 8. SORTABLE (glisser-déposer)
+// --------------------------------------------------------------
 function initSortableOS() {
     if (typeof Sortable === 'undefined') return;
+
     const reserve = document.getElementById('os-reserve');
     if (reserve && !reserve.__sortable) {
         reserve.__sortable = new Sortable(reserve, {
             group: 'os',
             animation: 150,
-            onEnd: saveOSAssignments
+            onEnd: saveOrientShowAssignments
         });
     }
+
     document.querySelectorAll('.os-dropzone').forEach(el => {
         if (!el.__sortable) {
             el.__sortable = new Sortable(el, {
                 group: 'os',
                 animation: 150,
-                onEnd: saveOSAssignments
+                onEnd: saveOrientShowAssignments
             });
         }
     });
 }
 
-function saveOSAssignments() {
-    const mapping = {};
-    document.querySelectorAll('.os-dropzone').forEach(zone => {
-        const code = zone.dataset.code;
-        const card = zone.querySelector('[data-id]');
-        if (card) {
-            mapping[`${currentClasse}_${code}`] = card.dataset.id;
-        }
-    });
-    setLocalMapping(currentClasse, mapping);
-    // Recharger la réserve pour mettre à jour
-    loadReserve();
+// --------------------------------------------------------------
+// 9. MATRICE DE CORRECTION
+// --------------------------------------------------------------
+function resetMatrix() {
+    matrix = {};
+    for (let c = 1; c <= NB_CIRCUITS; c++) {
+        matrix[c] = {};
+        COULEURS.forEach(col => {
+            matrix[c][col] = ['', ''];
+        });
+    }
 }
 
-// ---------- MATRICE (inchangée) ----------
 function renderMatrix() {
-    let container = document.getElementById('os-matrix-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'os-matrix-container';
-        container.className = 'bg-slate-900 p-4 rounded-2xl border border-slate-700 overflow-x-auto mb-4';
-        const parent = document.getElementById('viewOrientShowSettings');
-        if (parent) {
-            const nextSibling = parent.querySelector('.flex.gap-4');
-            if (nextSibling) {
-                parent.insertBefore(container, nextSibling);
-            } else {
-                parent.appendChild(container);
-            }
-        }
-    }
+    const container = document.getElementById('os-matrix-container');
+    if (!container) return;
+    if (!matrix || Object.keys(matrix).length === 0) resetMatrix();
+
     let html = `<table class="w-full text-center font-bold text-[10px]"><thead><tr class="bg-slate-900 text-white"><th>#</th>`;
     COULEURS.forEach(col => {
-        html += `<th colspan="2" class="py-2 ${col === 'NOIR' ? 'bg-black' : col === 'ROUGE' ? 'bg-red-600' : col === 'BLEU' ? 'bg-blue-600' : col === 'VERT' ? 'bg-green-600' : 'bg-yellow-500 text-black'}">${col}</th>`;
+        const bg = col === 'NOIR' ? 'bg-black' : col === 'ROUGE' ? 'bg-red-600' : col === 'BLEU' ? 'bg-blue-600' : col === 'VERT' ? 'bg-green-600' : 'bg-yellow-500 text-black';
+        html += `<th colspan="2" class="py-2 ${bg}">${col}</th>`;
     });
     html += `</tr></thead><tbody>`;
     for (let c = 1; c <= NB_CIRCUITS; c++) {
@@ -216,12 +361,15 @@ window.updateOSMatrixCell = function(input) {
 };
 
 function saveMatrixToFirebase() {
-    if (!currentClasse) return;
+    const classe = getCurrentClasse();
+    if (!classe) return;
     const configData = { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS };
-    setOrientShowConfig(currentClasse, configData);
+    setOrientShowConfig(classe, configData);
 }
 
-// ---------- CHRONO ----------
+// --------------------------------------------------------------
+// 10. CHRONO (Départ / Arrêt)
+// --------------------------------------------------------------
 function updateChronoButtons() {
     const btnStart = document.getElementById('os-start-btn');
     const btnStop = document.getElementById('os-stop-btn');
@@ -244,7 +392,8 @@ function updateChronoButtons() {
 }
 
 export function startOrientShow() {
-    if (!currentClasse) return alert('Choisissez une classe.');
+    const classe = getCurrentClasse();
+    if (!classe) return alert('Choisissez une classe.');
     startTime = Date.now();
     endTime = null;
     localStorage.setItem('eps_arena_os_startTime', startTime);
@@ -261,24 +410,34 @@ export function stopOrientShow() {
     updateChronoButtons();
 }
 
-// ---------- EXPORT / IMPORT ----------
+// Exposer pour les boutons HTML
+window.startOrientShow = startOrientShow;
+window.stopOrientShow = stopOrientShow;
+
+// --------------------------------------------------------------
+// 11. EXPORT / IMPORT JSON complet
+// --------------------------------------------------------------
 export function exportOrientShowConfig() {
+    const classe = getCurrentClasse();
+    if (!classe) return alert('Choisissez une classe.');
     saveMatrixToFirebase();
+    const mapping = getLocalMapping(classe) || {};
     const data = {
         version: 1,
-        classe: currentClasse,
+        classe: classe,
         activite: 'orientshow',
         date: new Date().toISOString().slice(0,10).replace(/-/g,''),
         matrix: matrix,
         startTime,
         endTime,
         nbCircuits: NB_CIRCUITS,
-        nbCouleurs: NB_COULEURS
+        nbCouleurs: NB_COULEURS,
+        mapping: mapping  // <-- ajout du mapping
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${currentClasse}_orientshow_${data.date}.json`;
+    a.download = `${classe}_orientshow_${data.date}.json`;
     a.click();
 }
 
@@ -290,15 +449,28 @@ export function importOrientShowConfig(event) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.matrix) throw new Error('Format invalide');
+            const classe = data.classe;
             matrix = data.matrix;
             startTime = data.startTime || null;
             endTime = data.endTime || null;
             localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
             localStorage.setItem('eps_arena_os_startTime', startTime);
             localStorage.setItem('eps_arena_os_endTime', endTime);
-            setOrientShowConfig(currentClasse, { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: NB_COULEURS });
-            renderMatrix();
-            updateChronoButtons();
+            // Restaurer le mapping
+            if (data.mapping) {
+                setLocalMapping(classe, data.mapping);
+            }
+            // Forcer le select sur la bonne classe
+            const select = document.getElementById('selectClasse');
+            if (select && select.value !== classe) {
+                select.value = classe;
+                select.dispatchEvent(new Event('change'));
+            } else {
+                // Recharger l'affichage
+                loadOrientShowAssignments();
+                renderMatrix();
+                updateChronoButtons();
+            }
             alert('✅ Configuration OrientShow importée !');
         } catch (err) {
             alert('❌ Erreur : ' + err.message);
@@ -308,14 +480,8 @@ export function importOrientShowConfig(event) {
     event.target.value = '';
 }
 
-export function loadOrientShowAssignments() {
-    renderGridAndReserve();
-}
-
-// Exposer les fonctions globales
-window.initOrientShowInterface = initOrientShowInterface;
-window.loadOrientShowAssignments = loadOrientShowAssignments;
+// Exposer les fonctions globales pour les boutons HTML
 window.exportOrientShowConfig = exportOrientShowConfig;
 window.importOrientShowConfig = importOrientShowConfig;
-window.startOrientShow = startOrientShow;
-window.stopOrientShow = stopOrientShow;
+window.loadOrientShowAssignments = loadOrientShowAssignments;
+window.populateReserveOS = loadOrientShowAssignments; // pour le bouton "Charger"
