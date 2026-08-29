@@ -20,28 +20,12 @@ let matrixVisible = false;
 // 1. INITIALISATION
 // --------------------------------------------------------------
 export function initOrientShowInterface() {
-    const container = document.getElementById('viewOrientShowSettings');
-    if (!container) return;
+    // ... création du DOM ...
 
-    container.innerHTML = '';
-
-    const header = createHeader();
-    container.appendChild(header);
-
-    const main = createMain();
-    container.appendChild(main);
-
-    const matrixContainer = createMatrixContainer();
-    container.appendChild(matrixContainer);
-
-    // IMPORTANT : on initialise la matrice avec les valeurs par défaut
-    resetMatrix();
-
-    // On tente de charger la config Firebase pour écraser les valeurs par défaut
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-            // Fusion : on part des valeurs par défaut, on écrase avec la config Firebase
+            // Commencer avec les valeurs par défaut
             const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
             if (config && config.matrix) {
                 for (const circuit of Object.keys(defaultMatrix)) {
@@ -54,28 +38,19 @@ export function initOrientShowInterface() {
                     }
                 }
             }
-            matrix = defaultMatrix;
+            matrix = defaultMatrix; // <- on définit ici
             startTime = config?.startTime || null;
             endTime = config?.endTime || null;
-            
             localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-            localStorage.setItem('eps_arena_os_startTime', startTime);
-            localStorage.setItem('eps_arena_os_endTime', endTime);
-            
-            // On affiche la matrice si visible
+            // ...
             if (matrixVisible) renderMatrix();
             updateChronoButtons();
         });
     } else {
-        // Pas de classe : on affiche quand même la matrice par défaut
+        // Pas de classe : on utilise les valeurs par défaut
         matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-        localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
         if (matrixVisible) renderMatrix();
     }
-
-    // Charger les affectations
-    attachClassChangeListener();
-    loadOrientShowAssignments();
 }
 
 // --------------------------------------------------------------
@@ -509,7 +484,9 @@ function resetMatrix() {
 function renderMatrix() {
     const container = document.getElementById('os-matrix-container');
     if (!container) return;
-    if (!matrix || Object.keys(matrix).length === 0) resetMatrix();
+
+    // Si matrix est vide ou n'a pas de clés, on utilise les valeurs par défaut
+    const sourceMatrix = (matrix && Object.keys(matrix).length > 0) ? matrix : DEFAULT_OS_MATRIX;
 
     let html = `<table class="w-full text-center font-bold text-[10px]"><thead><tr class="bg-slate-900 text-white"><th>#</th>`;
     COULEURS.forEach(col => {
@@ -520,7 +497,7 @@ function renderMatrix() {
     for (let c = 1; c <= NB_CIRCUITS; c++) {
         html += `<tr class="border-b border-slate-700"><td class="font-black text-slate-500 py-2">C${c}</td>`;
         COULEURS.forEach(col => {
-            const val = matrix[c]?.[col] || ['', ''];
+            const val = (sourceMatrix[c] && sourceMatrix[c][col]) ? sourceMatrix[c][col] : ['', ''];
             html += `<td><input class="w-10 h-10 bg-slate-900 text-center font-black text-xl text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${val[0]}" maxlength="1" data-circuit="${c}" data-color="${col}" data-index="0" onchange="window.updateOSMatrixCell(this)"></td>
                      <td><input class="w-10 h-10 bg-slate-900 text-center font-black text-xl text-blue-400 m-0.5 uppercase outline-none rounded shadow-inner" value="${val[1]}" maxlength="1" data-circuit="${c}" data-color="${col}" data-index="1" onchange="window.updateOSMatrixCell(this)"></td>`;
         });
