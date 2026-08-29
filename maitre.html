@@ -296,11 +296,29 @@
             </div>
         </div>
 
-                <!-- ONGLET 5 : OUTILS (TIMER PLEIN ECRAN) -->
-        <div id="viewTools" class="hidden w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
+                <!-- ONGLET 5 : OUTILS (MENU) -->
+<div id="viewTools" class="hidden w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
+    
+    <!-- MENU PRINCIPAL DES OUTILS -->
+    <div id="tools-menu" class="w-full max-w-2xl p-6 text-center">
+        <h2 class="text-4xl font-black text-blue-400 mb-10 uppercase tracking-widest">🧰 Outils</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <button onclick="openTool('timer')" class="bg-slate-800 p-8 rounded-3xl border-2 border-slate-600 hover:border-blue-500 active:scale-95 transition-all text-left shadow-2xl">
+                <div class="text-5xl mb-4">⏱️</div>
+                <h3 class="text-2xl font-black text-white">Interval Timer</h3>
+                <p class="text-slate-400 text-sm mt-2">Séries, repos, sons et préréglages</p>
+            </button>
+            <button onclick="openTool('calculateur')" class="bg-slate-800 p-8 rounded-3xl border-2 border-slate-600 hover:border-blue-500 active:scale-95 transition-all text-left shadow-2xl">
+                <div class="text-5xl mb-4">🧮</div>
+                <h3 class="text-2xl font-black text-white">Vitesse / Temps</h3>
+                <p class="text-slate-400 text-sm mt-2">Sliders interdépendants & passages</p>
+            </button>
+        </div>
+    </div>
 
-            <!-- Dans la div viewTools, ajoutez un conteneur pour le convertisseur -->
-<div id="convertisseur-module" class="mt-6"></div>
+    <!-- VUE TIMER (l'ancien contenu, juste caché au départ) -->
+    <div id="tools-timer" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
+        <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
             
             <!-- Écran de configuration (visible au démarrage) -->
             <div id="tools-settings" class="w-full max-w-lg p-6">
@@ -355,8 +373,13 @@
                     <button onclick="resetTimer()" class="bg-blue-600 px-8 py-4 rounded-3xl text-xl font-black uppercase">↩ Recommencer</button>
                     <button onclick="backToSettings()" class="bg-slate-700 px-8 py-4 rounded-3xl text-xl font-black uppercase">⚙️ Réglages</button>
                 </div>
-            </div>
-        </div>
+            <!-- VUE CALCULATEUR (Nouveau) -->
+    <div id="tools-calculator" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
+        <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
+        <div id="calculateur-module" class="w-full max-w-xl"></div>
+    </div>
+
+</div>
     </div> <!-- Fin space-y-6 -->
 
     <script type="module">

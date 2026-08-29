@@ -2,7 +2,7 @@
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 import { initIntervalTimer, startTimer, stopTimer, resetTimer, backToSettings, savePreset, loadPreset, deletePreset } from '../../modules/commun/timer.js';
-import { initConvertisseur } from '../../modules/commun/convertisseur.js';
+import { initCalculateur } from '../../modules/commun/calculateur.js';
 
 export function initLayout() {
 
@@ -95,6 +95,26 @@ export function initLayout() {
             }, 100);
         }
     };
+    window.openTool = function(toolName) {
+    // Masquer le menu
+    document.getElementById('tools-menu').classList.add('hidden');
+    // Afficher la vue correspondante
+    if (toolName === 'timer') {
+        document.getElementById('tools-timer').classList.remove('hidden');
+        initIntervalTimer(); // Initialise le timer
+    } else if (toolName === 'calculateur') {
+        document.getElementById('tools-calculator').classList.remove('hidden');
+        initCalculateur(); // Initialise le calculateur
+    }
+};
+
+window.backToToolsMenu = function() {
+    // Cacher toutes les vues d'outils
+    document.getElementById('tools-timer').classList.add('hidden');
+    document.getElementById('tools-calculator').classList.add('hidden');
+    // Afficher le menu
+    document.getElementById('tools-menu').classList.remove('hidden');
+};
 
     // 2. Gestion des classes
     function initClassesSelect() {
