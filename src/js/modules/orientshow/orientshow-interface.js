@@ -427,7 +427,7 @@ async function refreshReserve() {
     for (const eleve of filles) {
         fillesContainer.appendChild(await createEleveCard(eleve));
     }
-    for (const eleve de autres) {
+    for (const eleve of autres) {
         garconsContainer.appendChild(await createEleveCard(eleve));
     }
 
