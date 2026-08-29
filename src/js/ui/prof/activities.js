@@ -12,6 +12,7 @@ import {
     importOrientShowConfig,
     startOrientShow,
     stopOrientShow
+    getMatrix
 } from '../../modules/orientshow/orientshow-interface.js';
 
 let currentDiscipline = 'multi';
@@ -164,45 +165,45 @@ export function initActivities() {
             }
         });
     } 
-    else if (currentDiscipline === 'orientshow') {
-        const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
-        const codeCounts = {};
-        Object.keys(orientShowMapping).forEach(key => {
-            if (key.startsWith(activeClasse + '_')) {
-                const code = key.replace(activeClasse + '_', '');
-                const match = code.match(/^([A-Z]+)_(\d+)$/);
-                if (match) {
-                    const couleur = match[1];
-                    codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
-                }
+    } else if (currentDiscipline === 'orientshow') {
+    // Importer la fonction getMatrix depuis orientshow-interface
+    // (en haut du fichier, ajouter : import { getMatrix } from '../../modules/orientshow/orientshow-interface.js';)
+    const matrix = getMatrix(); // récupère la matrice (avec fallback par défaut)
+    
+    const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+    const codeCounts = {};
+    Object.keys(orientShowMapping).forEach(key => {
+        if (key.startsWith(activeClasse + '_')) {
+            const code = key.replace(activeClasse + '_', '');
+            const match = code.match(/^([A-Z]+)_(\d+)$/);
+            if (match) {
+                const couleur = match[1];
+                codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
             }
-        });
-        configData = { activite: 'orientshow' };
-        Object.keys(codeCounts).forEach(couleur => {
-            configData[couleur] = codeCounts[couleur];
-        });
-
-        // Récupération de la matrice
-        const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-        configData.matrix = matrix;
-
-        // Récupération des temps (version robuste)
-        const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
-        const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
-
-        const parseTime = (value) => {
-            if (!value || value === 'null' || value === 'undefined') return null;
-            const parsed = parseInt(value);
-            if (isNaN(parsed)) return null;
-            return parsed;
-        };
-
-        const startTime = parseTime(startTimeStr);
-        const endTime = parseTime(endTimeStr);
-
-        if (startTime !== null) configData.startTime = startTime;
-        if (endTime !== null) configData.endTime = endTime;
-    } 
+        }
+    });
+    configData = { activite: 'orientshow' };
+    Object.keys(codeCounts).forEach(couleur => {
+        configData[couleur] = codeCounts[couleur];
+    });
+    
+    // Utiliser la matrice récupérée
+    configData.matrix = matrix;
+    
+    // Récupération des temps
+    const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
+    const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
+    const parseTime = (value) => {
+        if (!value || value === 'null' || value === 'undefined') return null;
+        const parsed = parseInt(value);
+        if (isNaN(parsed)) return null;
+        return parsed;
+    };
+    const startTime = parseTime(startTimeStr);
+    const endTime = parseTime(endTimeStr);
+    if (startTime !== null) configData.startTime = startTime;
+    if (endTime !== null) configData.endTime = endTime;
+} 
     else {
         // Multi-activités (par défaut)
         configData.activite = 'multi';
