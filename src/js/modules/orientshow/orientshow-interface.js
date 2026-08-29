@@ -250,9 +250,20 @@ function onClassChange() {
 // 6. CHARGEMENT DES AFFECTATIONS (avec listes d'IDs)
 // --------------------------------------------------------------
 export async function loadOrientShowAssignments() {
+    // Vérifier que les éléments de la réserve existent
+    if (!document.getElementById('os-reserve-garcons') || !document.getElementById('os-reserve-filles')) {
+        // Si non, on réinitialise l'interface
+        console.warn('Éléments de réserve manquants, réinitialisation de l’interface...');
+        initOrientShowInterface();
+        // On attend un tick pour que le DOM soit mis à jour
+        setTimeout(() => loadOrientShowAssignments(), 50);
+        return;
+    }
+
+    // Si la grille n'existe pas, on réinitialise aussi
     if (!document.getElementById('os-postesGrid')) {
         initOrientShowInterface();
-        setTimeout(() => loadOrientShowAssignments(), 100);
+        setTimeout(() => loadOrientShowAssignments(), 50);
         return;
     }
 
