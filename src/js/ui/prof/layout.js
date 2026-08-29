@@ -1,8 +1,8 @@
 // src/js/ui/prof/layout.js
 import { db } from '../../core/firebase-service.js';
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { initIntervalTimer, startTimer, stopTimer, resetTimer, backToSettings, savePreset, loadPreset, deletePreset } from '../../modules/commun/timer.js';
-import { initCalculateur } from '../../modules/commun/calculateur.js';
+import { initIntervalTimer } from '../../modules/commun/timer.js';
+import { initCalculateur } from '../../modules/commun/calculateur.js'; // ✅ Le bon nom !
 
 export function initLayout() {
 
@@ -15,30 +15,45 @@ export function initLayout() {
     window.loadPreset = loadPreset;
     window.deletePreset = deletePreset;
 
-    // 1. Gestion des onglets (sans Tailwind pour la TV)
+    // Gestion de l'ouverture des outils depuis le menu
+    window.openTool = function(toolName) {
+        // Masquer le menu principal
+        document.getElementById('tools-menu').classList.add('hidden');
+        
+        if (toolName === 'timer') {
+            document.getElementById('tools-timer').classList.remove('hidden');
+            initIntervalTimer();
+        } else if (toolName === 'calculateur') {
+            document.getElementById('tools-calculator').classList.remove('hidden');
+            initCalculateur(); // ✅ Initialise le calculateur
+        }
+    };
+
+    window.backToToolsMenu = function() {
+        document.getElementById('tools-timer').classList.add('hidden');
+        document.getElementById('tools-calculator').classList.add('hidden');
+        document.getElementById('tools-menu').classList.remove('hidden');
+    };
+
+    // 1. Gestion des onglets
     window.switchTab = function(tabName) {
         
-        // Cacher toutes les vues standard (Admin, Activités, Live, Outils)
+        // Cacher toutes les vues standard
         ['admin', 'activities', 'live', 'tools'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
             if (el) {
                 el.classList.add('hidden');
-                el.style.display = ''; // Reset pour éviter les conflits
+                el.style.display = ''; 
             }
         });
 
-        // Cas spécial pour TV : on utilise style.display (car elle gère le plein écran)
         const tvView = document.getElementById('viewTV');
         if (tvView) {
-            if (tabName === 'tv') {
-                tvView.style.display = 'block'; // On affiche
-            } else {
-                tvView.style.display = 'none'; // On cache
-            }
+            if (tabName === 'tv') tvView.style.display = 'block';
+            else tvView.style.display = 'none';
         }
 
-        // Mettre à jour les boutons d'onglets (Admin, Activités, Live, TV, Outils)
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
@@ -47,28 +62,24 @@ export function initLayout() {
             }
         });
 
-        // Mapping des onglets vers les boutons
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
 
-        // Afficher la vue correspondante
         if (tabName !== 'tv') {
             const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
             if (targetView) targetView.classList.remove('hidden');
         }
 
-        // Activer le bouton d'onglet correspondant
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
         // Logique spéciale lors de l'ouverture de l'onglet OUTILS
         if (tabName === 'tools') {
-            const viewTools = document.getElementById('viewTools');
-    viewTools.classList.remove('hidden');
-    initIntervalTimer(); // Remet le chrono à zéro
-    initConvertisseur(); // Initialise le convertisseur
+            // On remet le menu principal au premier plan
+            document.getElementById('tools-menu').classList.remove('hidden');
+            document.getElementById('tools-timer').classList.add('hidden');
+            document.getElementById('tools-calculator').classList.add('hidden');
         }
 
-        // Logique spéciale pour l'onglet TV
         if (tabName === 'tv') {
             const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
             setTimeout(() => {
@@ -81,10 +92,8 @@ export function initLayout() {
             }, 100);
         }
 
-        // Appel pour le Live si onglet live
         if (tabName === 'live') {
             setTimeout(() => {
-                // Recharger le live selon la discipline
                 import('../../ui/prof/live.js')
                     .then(module => {
                         if (typeof module.renderLive === 'function') {
@@ -95,26 +104,6 @@ export function initLayout() {
             }, 100);
         }
     };
-    window.openTool = function(toolName) {
-    // Masquer le menu
-    document.getElementById('tools-menu').classList.add('hidden');
-    // Afficher la vue correspondante
-    if (toolName === 'timer') {
-        document.getElementById('tools-timer').classList.remove('hidden');
-        initIntervalTimer(); // Initialise le timer
-    } else if (toolName === 'calculateur') {
-        document.getElementById('tools-calculator').classList.remove('hidden');
-        initCalculateur(); // Initialise le calculateur
-    }
-};
-
-window.backToToolsMenu = function() {
-    // Cacher toutes les vues d'outils
-    document.getElementById('tools-timer').classList.add('hidden');
-    document.getElementById('tools-calculator').classList.add('hidden');
-    // Afficher le menu
-    document.getElementById('tools-menu').classList.remove('hidden');
-};
 
     // 2. Gestion des classes
     function initClassesSelect() {
