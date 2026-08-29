@@ -4,6 +4,7 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../core/live-engine.js';
 import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase-service.js';
 import { DEFAULT_OS_MATRIX } from '../../config/orientshow-default-codes.js';
+console.log('DEFAULT_OS_MATRIX chargé :', DEFAULT_OS_MATRIX);
 
 // Constantes
 const COULEURS = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
