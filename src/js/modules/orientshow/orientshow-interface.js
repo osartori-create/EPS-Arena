@@ -714,13 +714,14 @@ export function importOrientShowConfig(event) {
     reader.onload = function(e) {
         try {
             const data = JSON.parse(e.target.result);
-            if (!data.classe || !data.matrix) throw new Error('Format invalide');
+            if (!data.classe || !data.matrix) throw new Error('Format invalide : champ "matrix" manquant.');
             const classe = data.classe;
             
-            // Fusion avec les valeurs par défaut
+            // On commence par la matrice par défaut
             const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-            for (const circuit of Object.keys(defaultMatrix)) {
-                if (data.matrix[circuit]) {
+            // On écrase avec les données du fichier, cellule par cellule
+            for (const circuit of Object.keys(data.matrix)) {
+                if (defaultMatrix[circuit]) {
                     for (const color of COULEURS) {
                         if (data.matrix[circuit][color] && data.matrix[circuit][color].length === 2) {
                             defaultMatrix[circuit][color] = [...data.matrix[circuit][color]];
@@ -740,6 +741,7 @@ export function importOrientShowConfig(event) {
                 setLocalMapping(classe, data.mapping);
             }
             
+            // Recharger les affectations et rafraîchir l'affichage
             const select = document.getElementById('selectClasse');
             if (select && select.value !== classe) {
                 select.value = classe;
@@ -749,9 +751,10 @@ export function importOrientShowConfig(event) {
                 if (matrixVisible) renderMatrix();
                 updateChronoButtons();
             }
-            alert('✅ Configuration OrientShow importée !');
+            alert('✅ Configuration OrientShow importée avec succès !');
         } catch (err) {
-            alert('❌ Erreur : ' + err.message);
+            alert('❌ Erreur lors de l\'import : ' + err.message);
+            console.error(err);
         }
     };
     reader.readAsText(file);
