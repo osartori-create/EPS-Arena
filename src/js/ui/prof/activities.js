@@ -136,97 +136,102 @@ export function initActivities() {
         }
     };
 
-    window.transmettreConfig = async function() {
-        const activeClasse = document.getElementById('selectClasse').value;
-        if (!activeClasse) return alert("Sélectionnez une classe.");
+   window.transmettreConfig = async function() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe.");
 
-        const baseProf = getBaseProf();
-        let configData = {};
-        let localMapping = {};
+    const baseProf = getBaseProf();
+    let configData = {};
+    let localMapping = {};
 
-        if (currentDiscipline === 'co') {
-            configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
-            configData.activite = 'co';
-            Object.keys(configData).forEach(lettre => {
-                if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
-                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
-                    configData[lettre] = configData[lettre].length;
-                }
-            });
-        } else if (currentDiscipline === 'escalade') {
-            configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
-            configData.activite = 'escalade';
-            Object.keys(configData).forEach(lettre => {
-                if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
-                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
-                    configData[lettre] = configData[lettre].length;
-                }
-            });
-        } else if (currentDiscipline === 'orientshow') {
-    const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
-    const codeCounts = {};
-    Object.keys(orientShowMapping).forEach(key => {
-        if (key.startsWith(activeClasse + '_')) {
-            const code = key.replace(activeClasse + '_', '');
-            const match = code.match(/^([A-Z]+)_(\d+)$/);
-            if (match) {
-                const couleur = match[1];
-                codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+    if (currentDiscipline === 'co') {
+        configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
+        configData.activite = 'co';
+        Object.keys(configData).forEach(lettre => {
+            if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
+                localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
+                configData[lettre] = configData[lettre].length;
             }
-        }
-    });
-    configData = { activite: 'orientshow' };
-    Object.keys(codeCounts).forEach(couleur => {
-        configData[couleur] = codeCounts[couleur];
-    });
-    
-    // Récupération de la matrice
-    const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-    configData.matrix = matrix;
-    
-    // Récupération des temps (version robuste)
-    const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
-    const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
-    
-    // Fonction utilitaire pour parser en toute sécurité
-    const parseTime = (value) => {
-        if (!value || value === 'null' || value === 'undefined') return null;
-        const parsed = parseInt(value);
-        if (isNaN(parsed)) return null;
-        return parsed;
-    };
-    
-    const startTime = parseTime(startTimeStr);
-    const endTime = parseTime(endTimeStr);
-    
-    if (startTime !== null) configData.startTime = startTime;
-    if (endTime !== null) configData.endTime = endTime;
-}
-            // Multi-activités
-            configData.activite = 'multi';
-            if (window.lastTeams) {
-                const lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-                window.lastTeams.forEach((team, index) => {
-                    const lettre = lettres[index] || `EQ${index+1}`;
-                    localMapping[`${activeClasse}_${lettre}`] = team.members.map(m => m.id);
-                    configData[lettre] = team.members.length;
-                });
-            } else {
-                return alert("Veuillez d'abord générer les équipes.");
+        });
+    } 
+    else if (currentDiscipline === 'escalade') {
+        configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+        configData.activite = 'escalade';
+        Object.keys(configData).forEach(lettre => {
+            if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
+                localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
+                configData[lettre] = configData[lettre].length;
             }
-        }
+        });
+    } 
+    else if (currentDiscipline === 'orientshow') {
+        const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+        const codeCounts = {};
+        Object.keys(orientShowMapping).forEach(key => {
+            if (key.startsWith(activeClasse + '_')) {
+                const code = key.replace(activeClasse + '_', '');
+                const match = code.match(/^([A-Z]+)_(\d+)$/);
+                if (match) {
+                    const couleur = match[1];
+                    codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+                }
+            }
+        });
+        configData = { activite: 'orientshow' };
+        Object.keys(codeCounts).forEach(couleur => {
+            configData[couleur] = codeCounts[couleur];
+        });
 
-        localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
+        // Récupération de la matrice
+        const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+        configData.matrix = matrix;
 
-        try {
-            await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
-            await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
-            alert("✅ Configuration transmise aux iPads !");
-        } catch (e) {
-            console.error("Erreur transmission :", e);
-            alert("Erreur lors de la transmission.");
+        // Récupération des temps (version robuste)
+        const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
+        const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
+
+        const parseTime = (value) => {
+            if (!value || value === 'null' || value === 'undefined') return null;
+            const parsed = parseInt(value);
+            if (isNaN(parsed)) return null;
+            return parsed;
+        };
+
+        const startTime = parseTime(startTimeStr);
+        const endTime = parseTime(endTimeStr);
+
+        if (startTime !== null) configData.startTime = startTime;
+        if (endTime !== null) configData.endTime = endTime;
+    } 
+    else {
+        // Multi-activités (par défaut)
+        configData.activite = 'multi';
+        if (window.lastTeams) {
+            const lettres = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            window.lastTeams.forEach((team, index) => {
+                const lettre = lettres[index] || `EQ${index+1}`;
+                localMapping[`${activeClasse}_${lettre}`] = team.members.map(m => m.id);
+                configData[lettre] = team.members.length;
+            });
+        } else {
+            return alert("Veuillez d'abord générer les équipes.");
         }
-    };
+    }
+
+    // Sauvegarde du mapping local
+    localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
+
+    // Envoi à Firebase
+    try {
+        console.log("📡 Configuration envoyée :", configData);
+        await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+        await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+        alert("✅ Configuration transmise aux iPads !");
+    } catch (e) {
+        console.error("Erreur transmission :", e);
+        alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
+    }
+};
 
     window.openPurgeModal = function() {
         const choix = prompt("Purge Firebase\n1- Purger la classe active\n2- Purger TOUTE la base (code RNE)");
