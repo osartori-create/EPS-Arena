@@ -36,16 +36,16 @@ let matrixVisible = false;
 function resetMatrix() {
     matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    // Sauvegarde dans Firebase si une classe est sélectionnée
-    const classe = getCurrentClasse();
-    if (classe) {
-        saveMatrixToFirebase();
-    }
+    // Ne pas appeler saveMatrixToFirebase() ici pour éviter les appels multiples
 }
 
-function saveMatrixToFirebase() {
+// Fonction de sauvegarde Firebase (exportée pour débogage)
+export function saveMatrixToFirebase() {
     const classe = getCurrentClasse();
-    if (!classe) return;
+    if (!classe) {
+        console.warn('Aucune classe sélectionnée, impossible de sauvegarder la matrice.');
+        return;
+    }
     const configData = { 
         matrix, 
         startTime, 
@@ -53,7 +53,9 @@ function saveMatrixToFirebase() {
         nbCircuits: NB_CIRCUITS, 
         nbCouleurs: COULEURS.length 
     };
-    setOrientShowConfig(classe, configData);
+    setOrientShowConfig(classe, configData)
+        .then(() => console.log('✅ Matrice sauvegardée dans Firebase pour la classe', classe))
+        .catch(err => console.error('❌ Erreur sauvegarde matrice :', err));
 }
 
 // --------------------------------------------------------------
@@ -102,8 +104,10 @@ export function initOrientShowInterface() {
                 }
                 matrix = defaultMatrix;
             } else {
-                // Firebase est vide : on garde les valeurs par défaut et on les sauvegarde
+                // Firebase est vide : on garde les valeurs par défaut et on sauvegarde
                 resetMatrix();
+                // 🔥 FORCER la sauvegarde dans Firebase
+                saveMatrixToFirebase();
             }
             
             startTime = config?.startTime || null;
@@ -308,6 +312,8 @@ function onClassChange() {
                 matrix = defaultMatrix;
             } else {
                 resetMatrix();
+                // 🔥 FORCER la sauvegarde dans Firebase
+                saveMatrixToFirebase();
             }
             startTime = config?.startTime || null;
             endTime = config?.endTime || null;
