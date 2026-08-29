@@ -1,5 +1,15 @@
 // src/js/modules/commun/calculateur.js
-
+/**
+ * Module "Vitesse / Temps" pour EPS-Arena
+ * 
+ * Ce code est dérivé de l'outil "Convertisseur Distance-Temps" de Webjéjé.
+ * Source originale : https://www.webjeje.com/online/webapp/convert/convertisseur.html
+ * Licence : Creative Commons Attribution 4.0 International (CC BY 4.0) [citation:7]
+ * Lien licence : https://creativecommons.org/licenses/by/4.0/
+ * 
+ * MODIFICATIONS : Code adapté et intégré dans une architecture ES6 modulaire pour l'application EPS-Arena.
+ * (Changement des IDs pour éviter les conflits, ajout du mode "Plein écran", intégration du menu).
+ */
 export function initCalculateur() {
     const container = document.getElementById('calculateur-module');
     if (!container) return;
