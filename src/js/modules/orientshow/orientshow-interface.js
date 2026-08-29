@@ -23,22 +23,17 @@ export function initOrientShowInterface() {
 
     container.innerHTML = '';
 
-    // 1. Barre des boutons
     const header = createHeader();
     container.appendChild(header);
 
-    // 2. Corps principal
     const main = createMain();
     container.appendChild(main);
 
-    // 3. Conteneur de matrice (caché)
     const matrixContainer = createMatrixContainer();
     container.appendChild(matrixContainer);
 
-    // 4. Attacher l'écouteur de changement de classe
     attachClassChangeListener();
 
-    // 5. Écouter la config Firebase
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
@@ -59,12 +54,11 @@ export function initOrientShowInterface() {
         });
     }
 
-    // 6. Charger les affectations
     loadOrientShowAssignments();
 }
 
 // --------------------------------------------------------------
-// 2. BARRE D'EN-TÊTE (avec export/import)
+// 2. BARRE D'EN-TÊTE
 // --------------------------------------------------------------
 function createHeader() {
     const div = document.createElement('div');
@@ -118,7 +112,7 @@ function createMain() {
     const mainDiv = document.createElement('div');
     mainDiv.className = 'flex gap-4';
 
-    // ---- RÉSERVE : 2 colonnes (garçons / filles) ----
+    // ---- RÉSERVE ----
     const reserveCol = document.createElement('div');
     reserveCol.className = 'w-1/3 shrink-0 bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600';
 
@@ -154,15 +148,13 @@ function createMain() {
     reserveCol.appendChild(sexesContainer);
     mainDiv.appendChild(reserveCol);
 
-    // ---- GRILLE DES GROUPES (construite en une seule fois) ----
+    // ---- GRILLE ----
     const gridCol = document.createElement('div');
     gridCol.className = 'flex-1 bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto';
     
-    // On construit TOUT le HTML de la grille ici
     let gridHtml = `<h3 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par code (couleur_numéro)</h3>`;
     gridHtml += `<div id="os-postesGrid" class="min-w-[600px]">`;
     
-    // En-tête des couleurs
     gridHtml += `<div class="flex items-center mb-2">
         <div class="w-12 shrink-0"></div>
         <div class="flex flex-1 gap-0">`;
@@ -173,7 +165,6 @@ function createMain() {
     });
     gridHtml += `</div></div>`;
 
-    // Lignes de numéros
     for (let ligne = 1; ligne <= NB_NUMEROS; ligne++) {
         gridHtml += `<div class="flex items-stretch mb-1">`;
         gridHtml += `<div class="w-12 shrink-0 flex items-center justify-center font-black text-yellow-400 text-2xl bg-slate-900 rounded-l-lg border-r-0 border border-yellow-500/30">${ligne}</div>`;
@@ -185,7 +176,7 @@ function createMain() {
         gridHtml += `</div></div>`;
     }
 
-    gridHtml += `</div>`; // fin #os-postesGrid
+    gridHtml += `</div>`;
     gridCol.innerHTML = gridHtml;
     mainDiv.appendChild(gridCol);
 
@@ -193,15 +184,7 @@ function createMain() {
 }
 
 // --------------------------------------------------------------
-// 4. REMPLISSAGE DE LA GRILLE (plus besoin, déjà fait dans createMain)
-// --------------------------------------------------------------
-// On garde une fonction vide pour éviter les erreurs, mais elle n'est plus utilisée.
-function fillGrid() {
-    // La grille est déjà construite dans createMain()
-}
-
-// --------------------------------------------------------------
-// 5. CONTENEUR MATRICE (masqué)
+// 4. MATRICE
 // --------------------------------------------------------------
 function createMatrixContainer() {
     const div = document.createElement('div');
@@ -221,7 +204,7 @@ function toggleMatrixVisibility() {
 window.openOSMatrixModal = toggleMatrixVisibility;
 
 // --------------------------------------------------------------
-// 6. GESTION DU CHANGEMENT DE CLASSE
+// 5. GESTION DU CHANGEMENT DE CLASSE
 // --------------------------------------------------------------
 function attachClassChangeListener() {
     const select = document.getElementById('selectClasse');
@@ -254,13 +237,11 @@ function onClassChange() {
 }
 
 // --------------------------------------------------------------
-// 7. CHARGEMENT DES AFFECTATIONS (simplifié)
+// 6. CHARGEMENT DES AFFECTATIONS (avec listes d'IDs)
 // --------------------------------------------------------------
 export async function loadOrientShowAssignments() {
-    // Si la grille n'existe pas, on initialise tout
     if (!document.getElementById('os-postesGrid')) {
         initOrientShowInterface();
-        // On attend que le DOM soit prêt puis on recharge
         setTimeout(() => loadOrientShowAssignments(), 100);
         return;
     }
@@ -273,6 +254,7 @@ export async function loadOrientShowAssignments() {
         return;
     }
 
+    // Le mapping est maintenant une liste d'IDs par code
     const mapping = getLocalMapping(classe) || {};
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
 
@@ -283,9 +265,11 @@ export async function loadOrientShowAssignments() {
     garconsContainer.innerHTML = '';
     fillesContainer.innerHTML = '';
 
-    // Placer selon le mapping
+    // Placer selon le mapping (chaque code peut avoir plusieurs IDs)
     const placedIds = new Set();
-    for (const [key, eleveId] of Object.entries(mapping)) {
+    for (const [key, eleveIds] of Object.entries(mapping)) {
+        // Si ce n'est pas une liste, on la convertit (compatibilité ancien format)
+        const ids = Array.isArray(eleveIds) ? eleveIds : [eleveIds];
         const codePart = key.replace(`${classe}_`, '');
         const match = codePart.match(/^([A-Z]+)_(\d+)$/);
         if (match) {
@@ -293,11 +277,13 @@ export async function loadOrientShowAssignments() {
             const num = parseInt(match[2], 10);
             const dropzone = document.querySelector(`.os-dropzone[data-code="${color}_${num}"]`);
             if (dropzone) {
-                const eleve = eleves.find(e => e.id === eleveId);
-                if (eleve) {
-                    const card = await createEleveCard(eleve);
-                    dropzone.appendChild(card);
-                    placedIds.add(eleveId);
+                for (const eleveId of ids) {
+                    const eleve = eleves.find(e => e.id === eleveId);
+                    if (eleve) {
+                        const card = await createEleveCard(eleve);
+                        dropzone.appendChild(card);
+                        placedIds.add(eleveId);
+                    }
                 }
             }
         }
@@ -326,7 +312,7 @@ export async function loadOrientShowAssignments() {
 }
 
 // --------------------------------------------------------------
-// 8. BOUTON "CHARGER" : RESET COMPLET
+// 7. RESET COMPLET (bouton "Charger")
 // --------------------------------------------------------------
 export async function resetAllToReserve() {
     const classe = getCurrentClasse();
@@ -359,13 +345,14 @@ export async function resetAllToReserve() {
     if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
     if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
 
+    // Supprimer le mapping
     setLocalMapping(classe, {});
     initSortableOS();
 }
 window.populateReserveOS = resetAllToReserve;
 
 // --------------------------------------------------------------
-// 9. SAUVEGARDE DES AFFECTATIONS
+// 8. SAUVEGARDE DES AFFECTATIONS (liste d'IDs par code)
 // --------------------------------------------------------------
 export function saveOrientShowAssignments() {
     const classe = getCurrentClasse();
@@ -374,21 +361,28 @@ export function saveOrientShowAssignments() {
     const mapping = {};
     document.querySelectorAll('.os-dropzone').forEach(zone => {
         const code = zone.dataset.code;
-        const card = zone.querySelector('[data-id]');
-        if (card) {
-            mapping[`${classe}_${code}`] = card.dataset.id;
+        const cards = zone.querySelectorAll('[data-id]');
+        if (cards.length > 0) {
+            const ids = [];
+            cards.forEach(card => ids.push(card.dataset.id));
+            mapping[`${classe}_${code}`] = ids;
         }
     });
     setLocalMapping(classe, mapping);
     refreshReserve();
 }
 
+// --------------------------------------------------------------
+// 9. RAFRAÎCHISSEMENT DE LA RÉSERVE (après glissé)
+// --------------------------------------------------------------
 async function refreshReserve() {
     const classe = getCurrentClasse();
     if (!classe) return;
 
     const mapping = getLocalMapping(classe) || {};
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+
+    // Collecter tous les IDs placés dans les dropzones
     const placedIds = new Set();
     document.querySelectorAll('.os-dropzone [data-id]').forEach(el => placedIds.add(el.dataset.id));
 
@@ -419,7 +413,7 @@ async function refreshReserve() {
 }
 
 // --------------------------------------------------------------
-// 10. CRÉATION CARTE ÉLÈVE (style escalade)
+// 10. CRÉATION CARTE ÉLÈVE
 // --------------------------------------------------------------
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
@@ -643,6 +637,5 @@ export function importOrientShowConfig(event) {
     event.target.value = '';
 }
 
-// Expositions globales
 window.exportOrientShowConfig = exportOrientShowConfig;
 window.importOrientShowConfig = importOrientShowConfig;
