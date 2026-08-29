@@ -45,10 +45,6 @@ export function getMatrix() {
 export function resetMatrix() {
     matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    const classe = getCurrentClasse();
-    if (classe) {
-        saveMatrixToFirebase();
-    }
 }
 
 export function saveMatrixToFirebase() {
@@ -117,7 +113,6 @@ export function initOrientShowInterface() {
             } else {
                 // Firebase vide : on garde les valeurs par défaut et on sauvegarde
                 resetMatrix();
-                saveMatrixToFirebase();
             }
             
             startTime = config?.startTime || null;
@@ -322,7 +317,6 @@ function onClassChange() {
                 matrix = defaultMatrix;
             } else {
                 resetMatrix();
-                saveMatrixToFirebase();
             }
             startTime = config?.startTime || null;
             endTime = config?.endTime || null;
