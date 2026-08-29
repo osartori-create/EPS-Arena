@@ -32,49 +32,11 @@
         <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
         <button id="btnTab3" onclick="switchTab('live')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📊 Résultats Live</button>
         <button id="btnTab4" onclick="switchTab('tv')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📺 TV</button>
+        <button id="btnTab5" onclick="switchTab('hub')" class="px-4 py-2 text-slate-500 whitespace-nowrap">🧰 Outils</button>
     </nav>
 
     <div class="space-y-6">
-        <!-- L'IMAGE CLICKABLE (Votre icône EPS) -->
-<div id="hub-entry" class="flex flex-col items-center justify-center py-10 cursor-pointer active:scale-95 transition-transform" onclick="window.openHub()">
-    <!-- Remplacez src par votre base64 si vous voulez l'image "en code" -->
-    <img src="hub-icon.svg" alt="Hub EPS" class="w-64 h-64 drop-shadow-xl">
-    <p class="text-center text-slate-400 font-bold mt-4 text-lg uppercase">Ouvrir les outils</p>
-</div>
-
-<!-- L'ECRAN HUB (Caché par défaut) -->
-<div id="hub-screen" class="hidden bg-slate-900 min-h-screen p-6">
-    <div class="flex justify-between items-center mb-6">
-        <button onclick="window.closeHub()" class="bg-slate-800 px-4 py-2 rounded-xl font-bold text-white text-xs uppercase">← Retour</button>
-        <h1 class="text-2xl font-black text-blue-500 italic">Couteau Suisse</h1>
-    </div>
-    
-    <!-- MODULE INTERVAL TIMER (PRIORITÉ) -->
-    <div id="interval-timer-module" class="mb-6"></div>
-    
-    <!-- AUTRES OUTILS (à ajouter plus tard) -->
-    <div class="grid grid-cols-3 gap-4">
-        <div class="bg-slate-800 p-4 rounded-xl text-center cursor-pointer">🗣️ Mégaphone</div>
-        <div class="bg-slate-800 p-4 rounded-xl text-center cursor-pointer">🏅 Barème</div>
-        <div class="bg-slate-800 p-4 rounded-xl text-center cursor-pointer">📋 Checklist</div>
-    </div>
-</div>
-    <header class="flex justify-between items-center mb-4 border-b border-slate-800 pb-4 flex-wrap gap-4">
-        <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-black text-blue-500 uppercase italic">EPS-Arena</h1>
-            <span class="text-[10px] font-black uppercase text-slate-400 border border-slate-700 px-2 py-0.5 rounded-full bg-slate-900">Espace Professeur</span>
-        </div>
-        <div class="flex items-center gap-3">
-            <span id="connDot" class="w-3 h-3 rounded-full bg-slate-600"></span>
-            <span id="connLabel" class="text-xs font-bold uppercase text-slate-500">Connexion...</span>
-            <input type="text" id="profCode" placeholder="Code Prof" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs font-bold text-white w-24">
-            <select id="selectClasse" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-xs font-bold text-white outline-none">
-                <option value="">-- Classe --</option>
-            </select>
-            <button onclick="addClasse()" class="btn btn-primary text-xs uppercase">+ Classe</button>
-            <button onclick="transmettreConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">📡 Transmettre aux iPads</button>
-            <button onclick="openPurgeModal()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400 ml-2">🗑️ Purge</button>
-        </div>
+   
         <!-- ONGLET ADMINISTRATION -->
         <div id="viewAdmin" class="space-y-4">
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
@@ -323,5 +285,22 @@
         import { initApp } from './src/js/app.js';
         initApp();
     </script>
+    <div id="viewHub" class="hidden">
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-black text-blue-400 uppercase text-sm">🧰 Couteau Suisse</h3>
+            <button onclick="closeHub()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">✖ Fermer</button>
+        </div>
+        
+        <!-- ICI, l'image cliquable REDIMENSIONNÉE -->
+        <!-- w-40 h-40 au lieu de w-64 h-64, et placée dans un coin -->
+        <div class="flex justify-end mb-4">
+            <img src="hub-icon.svg" onclick="openHub()" alt="Ouvrir le Hub" class="w-24 h-24 cursor-pointer active:scale-95 transition-transform">
+        </div>
+
+        <!-- Le module Interval Timer -->
+        <div id="interval-timer-module"></div>
+    </div>
+</div>
 </body>
 </html>
