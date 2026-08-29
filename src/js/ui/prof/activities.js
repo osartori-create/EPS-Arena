@@ -148,9 +148,15 @@ export function initActivities() {
                             </div>`;
                 }));
 
-                return `<div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
+                // Modification du rendu de l'équipe
+                return `<div class="bg-slate-900 rounded-2xl p-4 border-2 relative" style="border-color: ${team.color}">
                             <div class="flex justify-between items-center mb-3">
-                                <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
+                                <button onclick="openColorPicker('${team.id}')" 
+                                        class="font-black text-xl px-3 py-1 rounded-lg border-2 border-slate-600 hover:border-white transition-colors"
+                                        style="background-color: ${team.color}; color: ${team.textColor}">
+                                    ${team.label}
+                                </button>
+                                <span class="text-xs text-slate-500">${team.members.length} joueurs</span>
                             </div>
                             <div class="team-members flex flex-col gap-2">
                                 ${membersHTML.join('')}
