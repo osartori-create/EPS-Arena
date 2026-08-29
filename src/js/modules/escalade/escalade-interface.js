@@ -229,12 +229,23 @@ export function importEscaladeConfig(event) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
+            
+            // Sauvegarder les données
             localStorage.setItem(`eps_arena_escalade_assignments_${data.classe}`, JSON.stringify(data.groupes));
+            
+            // 🔥 Compter le nombre de groupes (clés autres que 'reserve')
+            const groupKeys = Object.keys(data.groupes).filter(k => k !== 'reserve');
+            const nbGroupes = groupKeys.length;
+            
+            // 🔥 Recréer la grille avec le bon nombre de groupes
             const select = document.getElementById('selectClasse');
             if (select.value !== data.classe) {
                 select.value = data.classe;
                 select.dispatchEvent(new Event('change'));
             } else {
+                // Reconstruire la grille avec le bon nombre
+                initEscaladeInterface(nbGroupes);
+                // Charger les affectations (les élèves seront répartis)
                 await loadEscaladeAssignments();
             }
             alert("✅ Configuration Escalade importée !");

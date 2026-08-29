@@ -82,12 +82,14 @@ export function initActivities() {
             return;
         }
         if (currentDiscipline === 'escalade') {
-            const nbGroupes = Math.ceil(eleves.length / 3);
-            initEscaladeInterface(nbGroupes);
-            await populateReserveEscalade(eleves);
-            alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
-            return;
-        }
+    // 🔥 Vider l'ancienne sauvegarde pour repartir de zéro
+    localStorage.removeItem(`eps_arena_escalade_assignments_${activeClasse}`);
+    const nbGroupes = Math.ceil(eleves.length / 3);
+    initEscaladeInterface(nbGroupes);
+    await populateReserveEscalade(eleves);
+    alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
+    return;
+}
         if (currentDiscipline === 'orientshow') {
             alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
             return;
