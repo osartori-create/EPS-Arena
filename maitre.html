@@ -27,7 +27,15 @@
 
     </header>
 
-    <!-- L'IMAGE CLICKABLE (Votre icône EPS) -->
+    <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
+        <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
+        <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
+        <button id="btnTab3" onclick="switchTab('live')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📊 Résultats Live</button>
+        <button id="btnTab4" onclick="switchTab('tv')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📺 TV</button>
+    </nav>
+
+    <div class="space-y-6">
+        <!-- L'IMAGE CLICKABLE (Votre icône EPS) -->
 <div id="hub-entry" class="flex flex-col items-center justify-center py-10 cursor-pointer active:scale-95 transition-transform" onclick="window.openHub()">
     <!-- Remplacez src par votre base64 si vous voulez l'image "en code" -->
     <img src="hub-icon.svg" alt="Hub EPS" class="w-64 h-64 drop-shadow-xl">
@@ -67,15 +75,6 @@
             <button onclick="transmettreConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">📡 Transmettre aux iPads</button>
             <button onclick="openPurgeModal()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400 ml-2">🗑️ Purge</button>
         </div>
-    <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
-        <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
-        <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
-        <button id="btnTab3" onclick="switchTab('live')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📊 Résultats Live</button>
-        <button id="btnTab4" onclick="switchTab('tv')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📺 TV</button>
-    </nav>
-
-    <div class="space-y-6">
-        
         <!-- ONGLET ADMINISTRATION -->
         <div id="viewAdmin" class="space-y-4">
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
