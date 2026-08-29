@@ -25,24 +25,16 @@ const DEFAULT_OS_MATRIX = {
     12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
 };
 
-// Variables d'état
 let matrix = {};
 let startTime = null;
 let endTime = null;
 let matrixVisible = false;
+let isLoading = false; // 🔥 Verrou pour éviter les chargements simultanés
 
 // --------------------------------------------------------------
-// EXPORTS POUR LE PROFESSEUR (utilisés par activities.js)
+// MATRICE - INITIALISATION ET SAUVEGARDE
 // --------------------------------------------------------------
-export function getMatrix() {
-    // Si la matrice est vide, on l'initialise avec les valeurs par défaut
-    if (!matrix || Object.keys(matrix).length === 0) {
-        resetMatrix();
-    }
-    return matrix;
-}
-
-export function resetMatrix() {
+function resetMatrix() {
     matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
 }
@@ -72,13 +64,11 @@ export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
 
-    // Si la grille existe déjà, on ne reconstruit pas tout
     if (document.getElementById('os-postesGrid') && document.getElementById('os-reserve-garcons')) {
         loadOrientShowAssignments();
         return;
     }
 
-    // Construction complète du DOM
     container.innerHTML = '';
 
     const header = createHeader();
@@ -90,14 +80,11 @@ export function initOrientShowInterface() {
     const matrixContainer = createMatrixContainer();
     container.appendChild(matrixContainer);
 
-    // Initialisation de la matrice avec les valeurs par défaut
     resetMatrix();
 
-    // Chargement de la config Firebase
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-            // Si Firebase a des données, on les fusionne
             if (config && config.matrix && Object.keys(config.matrix).length > 0) {
                 const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
                 for (const circuit of Object.keys(defaultMatrix)) {
@@ -111,31 +98,24 @@ export function initOrientShowInterface() {
                 }
                 matrix = defaultMatrix;
             } else {
-                // Firebase vide : on garde les valeurs par défaut et on sauvegarde
                 resetMatrix();
+                saveMatrixToFirebase();
             }
-            
             startTime = config?.startTime || null;
             endTime = config?.endTime || null;
-            
             localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
             localStorage.setItem('eps_arena_os_startTime', startTime);
             localStorage.setItem('eps_arena_os_endTime', endTime);
-            
             if (matrixVisible) renderMatrix();
             updateChronoButtons();
         });
     } else {
-        // Pas de classe : on garde les valeurs par défaut
         matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
         localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
         if (matrixVisible) renderMatrix();
     }
 
-    // Écouteur de changement de classe
     attachClassChangeListener();
-
-    // Chargement des affectations
     loadOrientShowAssignments();
 }
 
@@ -317,6 +297,7 @@ function onClassChange() {
                 matrix = defaultMatrix;
             } else {
                 resetMatrix();
+                saveMatrixToFirebase();
             }
             startTime = config?.startTime || null;
             endTime = config?.endTime || null;
@@ -335,103 +316,123 @@ function onClassChange() {
 }
 
 // --------------------------------------------------------------
-// 6. CHARGEMENT DES AFFECTATIONS (avec listes d'IDs)
+// 6. CHARGEMENT DES AFFECTATIONS (avec verrou)
 // --------------------------------------------------------------
 export async function loadOrientShowAssignments() {
-    // Vérifier que les éléments de la réserve existent
-    if (!document.getElementById('os-reserve-garcons') || !document.getElementById('os-reserve-filles')) {
-        const container = document.getElementById('viewOrientShowSettings');
-        if (container) {
-            const main = createMain();
-            const header = container.querySelector('.flex.justify-between');
-            if (header) {
-                container.insertBefore(main, header.nextSibling);
-            } else {
-                container.prepend(main);
-            }
-            if (!document.getElementById('os-matrix-container')) {
-                const matrixContainer = createMatrixContainer();
-                container.appendChild(matrixContainer);
-            }
-            resetMatrix();
-        }
-        setTimeout(() => loadOrientShowAssignments(), 50);
+    // Éviter les chargements simultanés
+    if (isLoading) {
+        console.log('⏳ Chargement déjà en cours, ignoré.');
         return;
     }
+    isLoading = true;
 
-    if (!document.getElementById('os-postesGrid')) {
-        const container = document.getElementById('viewOrientShowSettings');
-        if (container) {
-            const main = createMain();
-            const header = container.querySelector('.flex.justify-between');
-            if (header) {
-                container.insertBefore(main, header.nextSibling);
-            } else {
-                container.prepend(main);
+    try {
+        // Vérifier que les éléments de la réserve existent
+        if (!document.getElementById('os-reserve-garcons') || !document.getElementById('os-reserve-filles')) {
+            const container = document.getElementById('viewOrientShowSettings');
+            if (container) {
+                const main = createMain();
+                const header = container.querySelector('.flex.justify-between');
+                if (header) {
+                    container.insertBefore(main, header.nextSibling);
+                } else {
+                    container.prepend(main);
+                }
+                if (!document.getElementById('os-matrix-container')) {
+                    const matrixContainer = createMatrixContainer();
+                    container.appendChild(matrixContainer);
+                }
+                resetMatrix();
             }
+            // On rappelle une seule fois après un délai
+            setTimeout(() => loadOrientShowAssignments(), 50);
+            isLoading = false;
+            return;
         }
-        setTimeout(() => loadOrientShowAssignments(), 50);
-        return;
-    }
 
-    const classe = getCurrentClasse();
-    if (!classe) {
+        if (!document.getElementById('os-postesGrid')) {
+            const container = document.getElementById('viewOrientShowSettings');
+            if (container) {
+                const main = createMain();
+                const header = container.querySelector('.flex.justify-between');
+                if (header) {
+                    container.insertBefore(main, header.nextSibling);
+                } else {
+                    container.prepend(main);
+                }
+            }
+            setTimeout(() => loadOrientShowAssignments(), 50);
+            isLoading = false;
+            return;
+        }
+
+        const classe = getCurrentClasse();
+        if (!classe) {
+            document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
+            document.getElementById('os-reserve-garcons').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
+            document.getElementById('os-reserve-filles').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
+            isLoading = false;
+            return;
+        }
+
+        const mapping = getLocalMapping(classe) || {};
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+
+        // 🔥 Nettoyage complet avant de remplir
         document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
-        document.getElementById('os-reserve-garcons').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
-        document.getElementById('os-reserve-filles').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
-        return;
-    }
+        const garconsContainer = document.getElementById('os-reserve-garcons');
+        const fillesContainer = document.getElementById('os-reserve-filles');
+        garconsContainer.innerHTML = '';
+        fillesContainer.innerHTML = '';
 
-    const mapping = getLocalMapping(classe) || {};
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-
-    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
-    const garconsContainer = document.getElementById('os-reserve-garcons');
-    const fillesContainer = document.getElementById('os-reserve-filles');
-    garconsContainer.innerHTML = '';
-    fillesContainer.innerHTML = '';
-
-    const placedIds = new Set();
-    for (const [key, eleveIds] of Object.entries(mapping)) {
-        const ids = Array.isArray(eleveIds) ? eleveIds : [eleveIds];
-        const codePart = key.replace(`${classe}_`, '');
-        const match = codePart.match(/^([A-Z]+)_(\d+)$/);
-        if (match) {
-            const color = match[1];
-            const num = parseInt(match[2], 10);
-            const dropzone = document.querySelector(`.os-dropzone[data-code="${color}_${num}"]`);
-            if (dropzone) {
-                for (const eleveId of ids) {
-                    const eleve = eleves.find(e => e.id === eleveId);
-                    if (eleve) {
-                        const card = await createEleveCard(eleve);
-                        dropzone.appendChild(card);
-                        placedIds.add(eleveId);
+        // Placer selon le mapping
+        const placedIds = new Set();
+        for (const [key, eleveIds] of Object.entries(mapping)) {
+            const ids = Array.isArray(eleveIds) ? eleveIds : [eleveIds];
+            const codePart = key.replace(`${classe}_`, '');
+            const match = codePart.match(/^([A-Z]+)_(\d+)$/);
+            if (match) {
+                const color = match[1];
+                const num = parseInt(match[2], 10);
+                const dropzone = document.querySelector(`.os-dropzone[data-code="${color}_${num}"]`);
+                if (dropzone) {
+                    for (const eleveId of ids) {
+                        const eleve = eleves.find(e => e.id === eleveId);
+                        if (eleve) {
+                            const card = await createEleveCard(eleve);
+                            dropzone.appendChild(card);
+                            placedIds.add(eleveId);
+                        }
                     }
                 }
             }
         }
-    }
 
-    const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
-    const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
-    const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
-    const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+        // Répartition des non placés par sexe
+        const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
+        const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+        const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+        const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
 
-    for (const eleve of garcons) {
-        garconsContainer.appendChild(await createEleveCard(eleve));
-    }
-    for (const eleve of filles) {
-        fillesContainer.appendChild(await createEleveCard(eleve));
-    }
-    for (const eleve of autres) {
-        garconsContainer.appendChild(await createEleveCard(eleve));
-    }
+        for (const eleve of garcons) {
+            garconsContainer.appendChild(await createEleveCard(eleve));
+        }
+        for (const eleve of filles) {
+            fillesContainer.appendChild(await createEleveCard(eleve));
+        }
+        for (const eleve of autres) {
+            garconsContainer.appendChild(await createEleveCard(eleve));
+        }
 
-    if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
-    if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
+        if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+        if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
 
-    initSortableOS();
+        initSortableOS();
+    } catch (err) {
+        console.error('Erreur lors du chargement des affectations :', err);
+    } finally {
+        isLoading = false;
+    }
 }
 
 // --------------------------------------------------------------
@@ -499,38 +500,54 @@ export function saveOrientShowAssignments() {
 // 9. RAFRAÎCHISSEMENT DE LA RÉSERVE (après glissé)
 // --------------------------------------------------------------
 async function refreshReserve() {
-    const classe = getCurrentClasse();
-    if (!classe) return;
+    // Éviter les exécutions simultanées
+    if (isLoading) return;
+    isLoading = true;
 
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-    const placedIds = new Set();
-    document.querySelectorAll('.os-dropzone [data-id]').forEach(el => placedIds.add(el.dataset.id));
+    try {
+        const classe = getCurrentClasse();
+        if (!classe) {
+            isLoading = false;
+            return;
+        }
 
-    const garconsContainer = document.getElementById('os-reserve-garcons');
-    const fillesContainer = document.getElementById('os-reserve-filles');
-    if (!garconsContainer || !fillesContainer) return;
-    garconsContainer.innerHTML = '';
-    fillesContainer.innerHTML = '';
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+        const placedIds = new Set();
+        document.querySelectorAll('.os-dropzone [data-id]').forEach(el => placedIds.add(el.dataset.id));
 
-    const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
-    const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
-    const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
-    const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+        const garconsContainer = document.getElementById('os-reserve-garcons');
+        const fillesContainer = document.getElementById('os-reserve-filles');
+        if (!garconsContainer || !fillesContainer) {
+            isLoading = false;
+            return;
+        }
+        garconsContainer.innerHTML = '';
+        fillesContainer.innerHTML = '';
 
-    for (const eleve of garcons) {
-        garconsContainer.appendChild(await createEleveCard(eleve));
+        const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
+        const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+        const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+        const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+
+        for (const eleve of garcons) {
+            garconsContainer.appendChild(await createEleveCard(eleve));
+        }
+        for (const eleve of filles) {
+            fillesContainer.appendChild(await createEleveCard(eleve));
+        }
+        for (const eleve of autres) {
+            garconsContainer.appendChild(await createEleveCard(eleve));
+        }
+
+        if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+        if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
+
+        initSortableOS();
+    } catch (err) {
+        console.error('Erreur dans refreshReserve :', err);
+    } finally {
+        isLoading = false;
     }
-    for (const eleve of filles) {
-        fillesContainer.appendChild(await createEleveCard(eleve));
-    }
-    for (const eleve of autres) {
-        garconsContainer.appendChild(await createEleveCard(eleve));
-    }
-
-    if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
-    if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
-
-    initSortableOS();
 }
 
 // --------------------------------------------------------------
@@ -565,17 +582,32 @@ async function createEleveCard(eleve) {
 function initSortableOS() {
     if (typeof Sortable === 'undefined') return;
 
+    // Détruire les instances existantes pour éviter les doublons
     const garcons = document.getElementById('os-reserve-garcons');
     const filles = document.getElementById('os-reserve-filles');
+    if (garcons && garcons.__sortable) {
+        garcons.__sortable.destroy();
+        garcons.__sortable = null;
+    }
+    if (filles && filles.__sortable) {
+        filles.__sortable.destroy();
+        filles.__sortable = null;
+    }
+    document.querySelectorAll('.os-dropzone').forEach(el => {
+        if (el.__sortable) {
+            el.__sortable.destroy();
+            el.__sortable = null;
+        }
+    });
 
-    if (garcons && !garcons.__sortable) {
+    if (garcons) {
         garcons.__sortable = new Sortable(garcons, {
             group: 'os',
             animation: 150,
             onEnd: saveOrientShowAssignments
         });
     }
-    if (filles && !filles.__sortable) {
+    if (filles) {
         filles.__sortable = new Sortable(filles, {
             group: 'os',
             animation: 150,
@@ -601,7 +633,6 @@ function renderMatrix() {
     const container = document.getElementById('os-matrix-container');
     if (!container) return;
 
-    // Utiliser la matrice (fallback sur DEFAULT_OS_MATRIX si vide)
     const sourceMatrix = (matrix && Object.keys(matrix).length > 0) ? matrix : DEFAULT_OS_MATRIX;
 
     let html = `<table class="w-full text-center font-bold text-[10px]"><thead><tr class="bg-slate-900 text-white"><th>#</th>`;
@@ -714,14 +745,12 @@ export function importOrientShowConfig(event) {
     reader.onload = function(e) {
         try {
             const data = JSON.parse(e.target.result);
-            if (!data.classe || !data.matrix) throw new Error('Format invalide : champ "matrix" manquant.');
+            if (!data.classe || !data.matrix) throw new Error('Format invalide');
             const classe = data.classe;
             
-            // On commence par la matrice par défaut
             const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-            // On écrase avec les données du fichier, cellule par cellule
-            for (const circuit of Object.keys(data.matrix)) {
-                if (defaultMatrix[circuit]) {
+            for (const circuit of Object.keys(defaultMatrix)) {
+                if (data.matrix[circuit]) {
                     for (const color of COULEURS) {
                         if (data.matrix[circuit][color] && data.matrix[circuit][color].length === 2) {
                             defaultMatrix[circuit][color] = [...data.matrix[circuit][color]];
@@ -741,7 +770,6 @@ export function importOrientShowConfig(event) {
                 setLocalMapping(classe, data.mapping);
             }
             
-            // Recharger les affectations et rafraîchir l'affichage
             const select = document.getElementById('selectClasse');
             if (select && select.value !== classe) {
                 select.value = classe;
@@ -751,10 +779,9 @@ export function importOrientShowConfig(event) {
                 if (matrixVisible) renderMatrix();
                 updateChronoButtons();
             }
-            alert('✅ Configuration OrientShow importée avec succès !');
+            alert('✅ Configuration OrientShow importée !');
         } catch (err) {
-            alert('❌ Erreur lors de l\'import : ' + err.message);
-            console.error(err);
+            alert('❌ Erreur : ' + err.message);
         }
     };
     reader.readAsText(file);
