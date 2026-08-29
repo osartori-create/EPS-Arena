@@ -163,32 +163,45 @@ export function initActivities() {
                 }
             });
         } else if (currentDiscipline === 'orientshow') {
-            const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
-            const codeCounts = {};
-            Object.keys(orientShowMapping).forEach(key => {
-                if (key.startsWith(activeClasse + '_')) {
-                    const code = key.replace(activeClasse + '_', '');
-                    const match = code.match(/^([A-Z]+)_(\d+)$/);
-                    if (match) {
-                        const couleur = match[1];
-                        codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
-                    }
-                }
-            });
-            configData = { activite: 'orientshow' };
-            Object.keys(codeCounts).forEach(couleur => {
-                configData[couleur] = codeCounts[couleur];
-            });
-            const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-            configData.matrix = matrix;
-            const startTime = localStorage.getItem('eps_arena_os_startTime');
-            const endTime = localStorage.getItem('eps_arena_os_endTime');
-            if (startTime && startTime !== 'null' && startTime !== 'undefined' && !isNaN(parseInt(startTime))) {
-    configData.startTime = parseInt(startTime);
+    const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+    const codeCounts = {};
+    Object.keys(orientShowMapping).forEach(key => {
+        if (key.startsWith(activeClasse + '_')) {
+            const code = key.replace(activeClasse + '_', '');
+            const match = code.match(/^([A-Z]+)_(\d+)$/);
+            if (match) {
+                const couleur = match[1];
+                codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+            }
+        }
+    });
+    configData = { activite: 'orientshow' };
+    Object.keys(codeCounts).forEach(couleur => {
+        configData[couleur] = codeCounts[couleur];
+    });
+    
+    // Récupération de la matrice
+    const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+    configData.matrix = matrix;
+    
+    // Récupération des temps (version robuste)
+    const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
+    const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
+    
+    // Fonction utilitaire pour parser en toute sécurité
+    const parseTime = (value) => {
+        if (!value || value === 'null' || value === 'undefined') return null;
+        const parsed = parseInt(value);
+        if (isNaN(parsed)) return null;
+        return parsed;
+    };
+    
+    const startTime = parseTime(startTimeStr);
+    const endTime = parseTime(endTimeStr);
+    
+    if (startTime !== null) configData.startTime = startTime;
+    if (endTime !== null) configData.endTime = endTime;
 }
-if (endTime && endTime !== 'null' && endTime !== 'undefined' && !isNaN(parseInt(endTime))) {
-    configData.endTime = parseInt(endTime);
-        } else {
             // Multi-activités
             configData.activite = 'multi';
             if (window.lastTeams) {
