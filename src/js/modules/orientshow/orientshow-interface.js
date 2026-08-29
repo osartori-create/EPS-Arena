@@ -1,6 +1,5 @@
 // src/js/modules/orientshow/orientshow-interface.js
 
-import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../core/live-engine.js';
 import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase-service.js';
 
@@ -30,16 +29,25 @@ let startTime = null;
 let endTime = null;
 let matrixVisible = false;
 
-// --------------------------------------------------------------
-// MATRICE - INITIALISATION ET SAUVEGARDE
-// --------------------------------------------------------------
-function resetMatrix() {
-    matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    // Ne pas appeler saveMatrixToFirebase() ici pour éviter les appels multiples
+// ---- Export de la matrice (pour être utilisée par activities.js) ----
+export function getMatrix() {
+    // Si matrix est vide, on l'initialise avec les valeurs par défaut
+    if (!matrix || Object.keys(matrix).length === 0) {
+        resetMatrix();
+    }
+    return matrix;
 }
 
-// Fonction de sauvegarde Firebase (exportée pour débogage)
+export function resetMatrix() {
+    matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+    // On sauvegarde dans Firebase si une classe est sélectionnée
+    const classe = getCurrentClasse();
+    if (classe) {
+        saveMatrixToFirebase();
+    }
+}
+
 export function saveMatrixToFirebase() {
     const classe = getCurrentClasse();
     if (!classe) {
@@ -65,13 +73,11 @@ export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
 
-    // Si la grille existe déjà, on ne reconstruit pas tout
     if (document.getElementById('os-postesGrid') && document.getElementById('os-reserve-garcons')) {
         loadOrientShowAssignments();
         return;
     }
 
-    // Construction complète du DOM
     container.innerHTML = '';
 
     const header = createHeader();
@@ -83,14 +89,12 @@ export function initOrientShowInterface() {
     const matrixContainer = createMatrixContainer();
     container.appendChild(matrixContainer);
 
-    // Initialisation de la matrice avec les valeurs par défaut
+    // Initialisation de la matrice
     resetMatrix();
 
-    // Chargement de la config Firebase
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-            // Si Firebase a des données, on les fusionne
             if (config && config.matrix && Object.keys(config.matrix).length > 0) {
                 const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
                 for (const circuit of Object.keys(defaultMatrix)) {
@@ -104,9 +108,8 @@ export function initOrientShowInterface() {
                 }
                 matrix = defaultMatrix;
             } else {
-                // Firebase est vide : on garde les valeurs par défaut et on sauvegarde
+                // Firebase vide : on garde les valeurs par défaut et on sauvegarde
                 resetMatrix();
-                // 🔥 FORCER la sauvegarde dans Firebase
                 saveMatrixToFirebase();
             }
             
@@ -121,23 +124,20 @@ export function initOrientShowInterface() {
             updateChronoButtons();
         });
     } else {
-        // Pas de classe : on garde les valeurs par défaut
         matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
         localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
         if (matrixVisible) renderMatrix();
     }
 
-    // Écouteur de changement de classe
     attachClassChangeListener();
-
-    // Chargement des affectations
     loadOrientShowAssignments();
 }
 
 // --------------------------------------------------------------
-// 2. BARRE D'EN-TÊTE (avec export/import)
+// 2. BARRE D'EN-TÊTE (inchangée, mais conserve les exports)
 // --------------------------------------------------------------
 function createHeader() {
+    // ... (inchangé, même code que précédemment)
     const div = document.createElement('div');
     div.className = 'flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4 flex-wrap gap-2';
 
