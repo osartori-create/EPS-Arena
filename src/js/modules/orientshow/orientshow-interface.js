@@ -21,14 +21,13 @@ export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
 
-    // On vide complètement
     container.innerHTML = '';
 
-    // 1. Barre des boutons (en-tête)
+    // 1. Barre des boutons
     const header = createHeader();
     container.appendChild(header);
 
-    // 2. Corps principal (réserve + grille)
+    // 2. Corps principal
     const main = createMain();
     container.appendChild(main);
 
@@ -65,7 +64,7 @@ export function initOrientShowInterface() {
 }
 
 // --------------------------------------------------------------
-// 2. CRÉATION DE LA BARRE D'EN-TÊTE (avec export/import)
+// 2. BARRE D'EN-TÊTE (avec export/import)
 // --------------------------------------------------------------
 function createHeader() {
     const div = document.createElement('div');
@@ -78,24 +77,20 @@ function createHeader() {
     const btnGroup = document.createElement('div');
     btnGroup.className = 'flex gap-2 flex-wrap';
 
-    // Bouton Matrice
     const btnMatrix = document.createElement('button');
     btnMatrix.className = 'bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400';
     btnMatrix.textContent = '📝 Matrice';
     btnMatrix.onclick = toggleMatrixVisibility;
 
-    // Bouton Export
     const btnExport = document.createElement('button');
     btnExport.className = 'bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400';
     btnExport.textContent = '⬇️ Export';
     btnExport.onclick = () => exportOrientShowConfig();
 
-    // Bouton Import
     const btnImport = document.createElement('button');
     btnImport.className = 'bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400';
     btnImport.textContent = '⬆️ Import';
     
-    // Input file caché pour l'import
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.id = 'importOSFile';
@@ -117,84 +112,102 @@ function createHeader() {
 }
 
 // --------------------------------------------------------------
-// 3. CRÉATION DU CORPS (réserve + grille)
+// 3. CORPS PRINCIPAL (réserve 2 colonnes + grille)
 // --------------------------------------------------------------
 function createMain() {
     const mainDiv = document.createElement('div');
     mainDiv.className = 'flex gap-4';
 
-    // Réserve (largeur 1/3, 2 colonnes)
+    // ---- RÉSERVE : 2 colonnes (garçons / filles) ----
     const reserveCol = document.createElement('div');
     reserveCol.className = 'w-1/3 shrink-0 bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600';
-    reserveCol.innerHTML = `
-        <div class="flex justify-between items-center mb-3">
-            <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
-            <button onclick="window.populateReserveOS()" class="bg-blue-600 px-3 py-1 rounded-xl font-black text-[10px] uppercase text-white">⬇️ Charger (reset)</button>
-        </div>
-        <div id="os-reserve" class="grid grid-cols-2 gap-1 min-h-[200px]"></div>
-    `;
 
-    // Grille des postes (2/3)
+    // En-tête réserve avec bouton reset
+    const reserveHeader = document.createElement('div');
+    reserveHeader.className = 'flex justify-between items-center mb-3';
+    reserveHeader.innerHTML = `
+        <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
+        <button onclick="window.populateReserveOS()" class="bg-blue-600 px-3 py-1 rounded-xl font-black text-[10px] uppercase text-white">⬇️ Charger (reset)</button>
+    `;
+    reserveCol.appendChild(reserveHeader);
+
+    // Deux colonnes pour les sexes
+    const sexesContainer = document.createElement('div');
+    sexesContainer.className = 'flex gap-2';
+
+    // Colonne Garçons
+    const garconsDiv = document.createElement('div');
+    garconsDiv.className = 'flex-1';
+    garconsDiv.innerHTML = `<div class="text-xs font-bold text-blue-400 uppercase mb-1">👦 Garçons</div>`;
+    const garconsList = document.createElement('div');
+    garconsList.id = 'os-reserve-garcons';
+    garconsList.className = 'flex flex-col gap-1 min-h-[100px] border border-blue-800/30 rounded-lg p-1';
+    garconsDiv.appendChild(garconsList);
+    sexesContainer.appendChild(garconsDiv);
+
+    // Colonne Filles
+    const fillesDiv = document.createElement('div');
+    fillesDiv.className = 'flex-1';
+    fillesDiv.innerHTML = `<div class="text-xs font-bold text-rose-400 uppercase mb-1">👩 Filles</div>`;
+    const fillesList = document.createElement('div');
+    fillesList.id = 'os-reserve-filles';
+    fillesList.className = 'flex flex-col gap-1 min-h-[100px] border border-rose-800/30 rounded-lg p-1';
+    fillesDiv.appendChild(fillesList);
+    sexesContainer.appendChild(fillesDiv);
+
+    reserveCol.appendChild(sexesContainer);
+    mainDiv.appendChild(reserveCol);
+
+    // ---- GRILLE DES GROUPES ----
     const gridCol = document.createElement('div');
     gridCol.className = 'flex-1 bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto';
     gridCol.innerHTML = `
         <h3 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par code (couleur_numéro)</h3>
         <div id="os-postesGrid" class="min-w-[600px]"></div>
     `;
-
-    mainDiv.appendChild(reserveCol);
     mainDiv.appendChild(gridCol);
 
-    // Remplir la grille des postes (sans espace)
+    // Remplir la grille immédiatement
     fillGrid();
 
     return mainDiv;
 }
 
+// --------------------------------------------------------------
+// 4. REMPLISSAGE DE LA GRILLE (une seule fois)
+// --------------------------------------------------------------
 function fillGrid() {
     const gridContainer = document.getElementById('os-postesGrid');
     if (!gridContainer) return;
 
     // En-tête des couleurs
-    let headerHtml = `<div class="flex items-center mb-2">
+    let html = `<div class="flex items-center mb-2">
         <div class="w-12 shrink-0"></div>
         <div class="flex flex-1 gap-0">`;
     COULEURS.forEach(c => {
         const bg = c === 'NOIR' ? 'bg-black' : c === 'ROUGE' ? 'bg-red-600' : c === 'BLEU' ? 'bg-blue-600' : c === 'VERT' ? 'bg-green-600' : 'bg-yellow-500';
         const text = c === 'JAUNE' ? 'text-black' : 'text-white';
-        headerHtml += `<div class="${bg} ${text} font-black text-center p-2 rounded-t-lg uppercase text-[10px] flex-1">${c}</div>`;
+        html += `<div class="${bg} ${text} font-black text-center p-2 rounded-t-lg uppercase text-[10px] flex-1">${c}</div>`;
     });
-    headerHtml += `</div></div>`;
-    gridContainer.innerHTML = headerHtml;
+    html += `</div></div>`;
 
     // Lignes de numéros
     for (let ligne = 1; ligne <= NB_NUMEROS; ligne++) {
-        const rowDiv = document.createElement('div');
-        rowDiv.className = 'flex items-stretch mb-1';
-
-        // Numéro jaune
-        const numDiv = document.createElement('div');
-        numDiv.className = 'w-12 shrink-0 flex items-center justify-center font-black text-yellow-400 text-2xl bg-slate-900 rounded-l-lg border-r-0 border border-yellow-500/30';
-        numDiv.textContent = ligne;
-        rowDiv.appendChild(numDiv);
-
-        // Colonnes des couleurs (sans gap)
-        const colsDiv = document.createElement('div');
-        colsDiv.className = 'flex flex-1 gap-0';
+        html += `<div class="flex items-stretch mb-1">`;
+        html += `<div class="w-12 shrink-0 flex items-center justify-center font-black text-yellow-400 text-2xl bg-slate-900 rounded-l-lg border-r-0 border border-yellow-500/30">${ligne}</div>`;
+        html += `<div class="flex flex-1 gap-0">`;
         COULEURS.forEach(col => {
             const code = `${col}_${ligne}`;
-            const dropzone = document.createElement('div');
-            dropzone.className = 'os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 flex-1';
-            dropzone.dataset.code = code;
-            colsDiv.appendChild(dropzone);
+            html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 flex-1" data-code="${code}"></div>`;
         });
-        rowDiv.appendChild(colsDiv);
-        gridContainer.appendChild(rowDiv);
+        html += `</div></div>`;
     }
+
+    gridContainer.innerHTML = html;
 }
 
 // --------------------------------------------------------------
-// 4. CONTENEUR DE MATRICE (masqué par défaut)
+// 5. CONTENEUR MATRICE (masqué)
 // --------------------------------------------------------------
 function createMatrixContainer() {
     const div = document.createElement('div');
@@ -214,7 +227,7 @@ function toggleMatrixVisibility() {
 window.openOSMatrixModal = toggleMatrixVisibility;
 
 // --------------------------------------------------------------
-// 5. GESTION DU CHANGEMENT DE CLASSE
+// 6. GESTION DU CHANGEMENT DE CLASSE
 // --------------------------------------------------------------
 function attachClassChangeListener() {
     const select = document.getElementById('selectClasse');
@@ -247,7 +260,7 @@ function onClassChange() {
 }
 
 // --------------------------------------------------------------
-// 6. CHARGEMENT DES AFFECTATIONS
+// 7. CHARGEMENT DES AFFECTATIONS
 // --------------------------------------------------------------
 export async function loadOrientShowAssignments() {
     if (!document.getElementById('os-postesGrid')) {
@@ -259,8 +272,8 @@ export async function loadOrientShowAssignments() {
     const classe = getCurrentClasse();
     if (!classe) {
         document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
-        const reserve = document.getElementById('os-reserve');
-        if (reserve) reserve.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Sélectionnez une classe.</p>';
+        document.getElementById('os-reserve-garcons').innerHTML = '';
+        document.getElementById('os-reserve-filles').innerHTML = '';
         return;
     }
 
@@ -269,8 +282,10 @@ export async function loadOrientShowAssignments() {
 
     // Vider tout
     document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
-    const reserveContainer = document.getElementById('os-reserve');
-    if (reserveContainer) reserveContainer.innerHTML = '';
+    const garconsContainer = document.getElementById('os-reserve-garcons');
+    const fillesContainer = document.getElementById('os-reserve-filles');
+    garconsContainer.innerHTML = '';
+    fillesContainer.innerHTML = '';
 
     // Placer selon le mapping
     const placedIds = new Set();
@@ -292,31 +307,31 @@ export async function loadOrientShowAssignments() {
         }
     }
 
-    // Réserve : tous les élèves non placés, triés par sexe puis nom
+    // Répartition des non placés par sexe
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
-    // Tri : d'abord les garçons (M), puis les filles (F), puis les autres
-    nonPlaces.sort((a, b) => {
-        if (a.sexe === 'M' && b.sexe !== 'M') return -1;
-        if (a.sexe !== 'M' && b.sexe === 'M') return 1;
-        if (a.sexe === 'F' && b.sexe === 'F') return a.nom.localeCompare(b.nom);
-        if (a.sexe === 'M' && b.sexe === 'M') return a.nom.localeCompare(b.nom);
-        return 0;
-    });
-    if (reserveContainer) {
-        for (const eleve of nonPlaces) {
-            const card = await createEleveCard(eleve);
-            reserveContainer.appendChild(card);
-        }
-        if (nonPlaces.length === 0) {
-            reserveContainer.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Tous les élèves sont affectés.</p>';
-        }
+    const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+    const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+    // Les élèves sans sexe vont du côté des garçons (ou on peut les mettre dans une section "Autres")
+    const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+
+    for (const eleve of garcons) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
     }
+    for (const eleve of filles) {
+        fillesContainer.appendChild(await createEleveCard(eleve));
+    }
+    for (const eleve of autres) {
+        garconsContainer.appendChild(await createEleveCard(eleve)); // ou on crée une section "Autres"
+    }
+
+    if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+    if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
 
     initSortableOS();
 }
 
 // --------------------------------------------------------------
-// 7. BOUTON "CHARGER" : RESET COMPLET
+// 8. BOUTON "CHARGER" : RESET COMPLET
 // --------------------------------------------------------------
 export async function resetAllToReserve() {
     const classe = getCurrentClasse();
@@ -326,26 +341,28 @@ export async function resetAllToReserve() {
     }
 
     document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
-    const reserveContainer = document.getElementById('os-reserve');
-    if (reserveContainer) reserveContainer.innerHTML = '';
+    const garconsContainer = document.getElementById('os-reserve-garcons');
+    const fillesContainer = document.getElementById('os-reserve-filles');
+    garconsContainer.innerHTML = '';
+    fillesContainer.innerHTML = '';
 
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-    // Tri : garçons en premier, puis par nom
-    eleves.sort((a, b) => {
-        if (a.sexe === 'M' && b.sexe !== 'M') return -1;
-        if (a.sexe !== 'M' && b.sexe === 'M') return 1;
-        return a.nom.localeCompare(b.nom);
-    });
+    const garcons = eleves.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+    const filles = eleves.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+    const autres = eleves.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
 
-    if (reserveContainer) {
-        for (const eleve of eleves) {
-            const card = await createEleveCard(eleve);
-            reserveContainer.appendChild(card);
-        }
-        if (eleves.length === 0) {
-            reserveContainer.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Aucun élève dans cette classe.</p>';
-        }
+    for (const eleve of garcons) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
     }
+    for (const eleve of filles) {
+        fillesContainer.appendChild(await createEleveCard(eleve));
+    }
+    for (const eleve of autres) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
+    }
+
+    if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+    if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
 
     setLocalMapping(classe, {});
     initSortableOS();
@@ -353,7 +370,7 @@ export async function resetAllToReserve() {
 window.populateReserveOS = resetAllToReserve;
 
 // --------------------------------------------------------------
-// 8. SAUVEGARDE DES AFFECTATIONS (après glissé)
+// 9. SAUVEGARDE DES AFFECTATIONS
 // --------------------------------------------------------------
 export function saveOrientShowAssignments() {
     const classe = getCurrentClasse();
@@ -380,28 +397,34 @@ async function refreshReserve() {
     const placedIds = new Set();
     document.querySelectorAll('.os-dropzone [data-id]').forEach(el => placedIds.add(el.dataset.id));
 
-    const reserveContainer = document.getElementById('os-reserve');
-    if (!reserveContainer) return;
-    reserveContainer.innerHTML = '';
+    const garconsContainer = document.getElementById('os-reserve-garcons');
+    const fillesContainer = document.getElementById('os-reserve-filles');
+    garconsContainer.innerHTML = '';
+    fillesContainer.innerHTML = '';
 
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
-    nonPlaces.sort((a, b) => {
-        if (a.sexe === 'M' && b.sexe !== 'M') return -1;
-        if (a.sexe !== 'M' && b.sexe === 'M') return 1;
-        return a.nom.localeCompare(b.nom);
-    });
-    for (const eleve of nonPlaces) {
-        const card = await createEleveCard(eleve);
-        reserveContainer.appendChild(card);
+    const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+    const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+    const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+
+    for (const eleve of garcons) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
     }
-    if (nonPlaces.length === 0) {
-        reserveContainer.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Tous les élèves sont affectés.</p>';
+    for (const eleve of filles) {
+        fillesContainer.appendChild(await createEleveCard(eleve));
     }
+    for (const eleve of autres) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
+    }
+
+    if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+    if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
+
     initSortableOS();
 }
 
 // --------------------------------------------------------------
-// 9. CRÉATION D'UNE CARTE ÉLÈVE (style escalade)
+// 10. CRÉATION CARTE ÉLÈVE (style escalade)
 // --------------------------------------------------------------
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
@@ -427,14 +450,23 @@ async function createEleveCard(eleve) {
 }
 
 // --------------------------------------------------------------
-// 10. SORTABLE
+// 11. SORTABLE
 // --------------------------------------------------------------
 function initSortableOS() {
     if (typeof Sortable === 'undefined') return;
 
-    const reserve = document.getElementById('os-reserve');
-    if (reserve && !reserve.__sortable) {
-        reserve.__sortable = new Sortable(reserve, {
+    const garcons = document.getElementById('os-reserve-garcons');
+    const filles = document.getElementById('os-reserve-filles');
+
+    if (garcons && !garcons.__sortable) {
+        garcons.__sortable = new Sortable(garcons, {
+            group: 'os',
+            animation: 150,
+            onEnd: saveOrientShowAssignments
+        });
+    }
+    if (filles && !filles.__sortable) {
+        filles.__sortable = new Sortable(filles, {
             group: 'os',
             animation: 150,
             onEnd: saveOrientShowAssignments
@@ -453,7 +485,7 @@ function initSortableOS() {
 }
 
 // --------------------------------------------------------------
-// 11. MATRICE DE CORRECTION
+// 12. MATRICE DE CORRECTION
 // --------------------------------------------------------------
 function resetMatrix() {
     matrix = {};
@@ -508,7 +540,7 @@ function saveMatrixToFirebase() {
 }
 
 // --------------------------------------------------------------
-// 12. CHRONO
+// 13. CHRONO
 // --------------------------------------------------------------
 function updateChronoButtons() {
     const btnStart = document.getElementById('os-start-btn');
@@ -554,7 +586,7 @@ window.startOrientShow = startOrientShow;
 window.stopOrientShow = stopOrientShow;
 
 // --------------------------------------------------------------
-// 13. EXPORT / IMPORT JSON
+// 14. EXPORT / IMPORT
 // --------------------------------------------------------------
 export function exportOrientShowConfig() {
     const classe = getCurrentClasse();
