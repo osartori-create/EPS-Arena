@@ -70,7 +70,96 @@ export function initActivities() {
         }
     };
 
-        window.generateTeams = async function()
+            window.generateTeams = async function() {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+        if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
+
+        if (currentDiscipline === 'co') {
+            await populateReserveWithStudents(eleves);
+            alert("Tous les élèves sont dans la réserve CO.");
+            return;
+        }
+        if (currentDiscipline === 'escalade') {
+            const nbGroupes = Math.ceil(eleves.length / 3);
+            initEscaladeInterface(nbGroupes, true);
+            await populateReserveEscalade(eleves);
+            alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
+            return;
+        }
+        if (currentDiscipline === 'orientshow') {
+            alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
+            return;
+        }
+
+        // ---- Multi-activités ----
+        const options = {
+            mode: document.getElementById('modeRepartition')?.value || 'melange',
+            mixite: document.getElementById('modeMixite')?.value || 'ignore',
+            critere: document.getElementById('critereForce')?.value || 'vma',
+            formatLibelle: document.getElementById('formatLibelle')?.value || 'Couleurs',
+            nbEquipes: parseInt(document.getElementById('nbEquipes')?.value) || 0,
+            nbParEquipe: parseInt(document.getElementById('nbParEquipe')?.value) || 0,
+            couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
+        };
+        if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
+        else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
+
+        const teams = generateClassicTeams(eleves, options);
+        window.lastTeams = teams;
+
+        const container = document.getElementById('teamsGrid');
+        if (container) {
+            // Génération asynchrone des cartes avec photos
+            const teamsHTML = await Promise.all(teams.map(async (team) => {
+                const membersHTML = await Promise.all(team.members.map(async (m) => {
+                    const url = await getPhotoUrl(m.id);
+                    const photoHtml = url 
+                        ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+                        : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
+                    
+                    // Couleur selon le sexe (exactement comme dans les modules CO/Escalade)
+                    let bgClass = 'bg-slate-200 border-slate-400';
+                    if (m.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+                    else if (m.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+
+                    // Affichage du critère sélectionné
+                    let criteriaHtml = '';
+                    if (options.critere === 'vma') {
+                        criteriaHtml = `<span class="text-emerald-700">VMA: ${m.vma || '--'}</span>`;
+                    } else if (options.critere === 'force') {
+                        // N'affiche que les étoiles remplies (pas de "☆" vide)
+                        let stars = '';
+                        for (let i = 1; i <= (m.force || 0); i++) {
+                            stars += '★';
+                        }
+                        criteriaHtml = `<span class="text-yellow-600 font-black">${stars}</span>`;
+                    } else { // Polyvalent
+                        criteriaHtml = `<span class="text-purple-700">V: ${m.vma || '--'} | L: ${m.longueur || '--'} | 30m: ${m.sprint30 || '--'}</span>`;
+                    }
+
+                    return `<div class="p-2 rounded-lg border-2 ${bgClass} flex items-center gap-3 text-sm font-bold text-slate-900">
+                                ${photoHtml}
+                                <div class="flex flex-col leading-tight">
+                                    <span>${m.prenom} ${m.nom}</span>
+                                    <span class="text-[10px] font-bold">${criteriaHtml}</span>
+                                </div>
+                            </div>`;
+                }));
+
+                return `<div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
+                            </div>
+                            <div class="team-members flex flex-col gap-2">
+                                ${membersHTML.join('')}
+                            </div>
+                        </div>`;
+            }));
+            container.innerHTML = teamsHTML.join('');
+        }
+    };
 
     window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
