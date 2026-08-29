@@ -106,6 +106,7 @@ window.applyColor = function(teamId, colorName, colorHex) {
 // Fonction pour régénérer l'affichage (utilisée après un changement de couleur)
 window.renderTeams = async function() {
     const container = document.getElementById('teamsGrid');
+    const options = window.lastOptions || {};
     if (!container || !window.lastTeams) return;
 
     const teamsHTML = await Promise.all(window.lastTeams.map(async (team) => {
@@ -238,6 +239,7 @@ export function initActivities() {
             nbParEquipe: parseInt(document.getElementById('nbParEquipe')?.value) || 0,
             couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
         };
+        window.lastOptions = options;
         if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
