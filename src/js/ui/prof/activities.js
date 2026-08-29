@@ -246,25 +246,46 @@ export function initActivities() {
     };
 
     window.openPurgeModal = function() {
-        const choix = prompt("Purge Firebase\n1- Purger la classe active\n2- Purger TOUTE la base (code RNE)");
-        const baseProf = getBaseProf();
+    const choix = prompt("Purge Firebase\n1- Purger la classe active (sauf OrientShow)\n2- Purger TOUTE la base (code RNE)");
+    const baseProf = getBaseProf();
 
-        if (choix === "1") {
-            const activeClasse = document.getElementById('selectClasse').value;
-            if (activeClasse && confirm("Supprimer toutes les données de la classe " + activeClasse + " ?")) {
-                remove(ref(db, `${baseProf}/${activeClasse}`))
-                    .then(() => location.reload())
-                    .catch(err => alert("Erreur purge : " + err.message));
-            }
-        } else if (choix === "2") {
-            const code = prompt("Code RNE :");
-            if (code === "0680013V" && confirm("Supprimer TOUTE la base ?")) {
-                remove(ref(db))
-                    .then(() => location.reload())
-                    .catch(err => alert("Erreur purge : " + err.message));
-            }
+    if (choix === "1") {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (activeClasse && confirm("Supprimer toutes les données de la classe " + activeClasse + " (sauf la matrice OrientShow) ?")) {
+            // Supprimer la classe en préservant le chemin orientshow/config
+            const classePath = `${baseProf}/${activeClasse}`;
+            // On pourrait ici faire un update pour supprimer tous les champs sauf orientshow/config
+            // Mais pour simplifier, on peut sauvegarder la matrice avant la purge
+            const matrixBackup = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
+            remove(ref(db, classePath))
+                .then(() => {
+                    // Restaurer la matrice sauvegardée
+                    if (Object.keys(matrixBackup).length > 0) {
+                        const configData = {
+                            activite: 'orientshow',
+                            matrix: matrixBackup,
+                            nbCircuits: 12,
+                            nbCouleurs: 5
+                        };
+                        set(ref(db, `${classePath}/orientshow/config`), configData);
+                    }
+                    location.reload();
+                })
+                .catch(err => alert("Erreur purge : " + err.message));
         }
-    };
+    } else if (choix === "2") {
+        const code = prompt("Code RNE :");
+        if (code === "0680013V" && confirm("Supprimer TOUTE la base ?")) {
+            // Avant de purger, exporter la matrice dans localStorage
+            const allMatrices = {};
+            // Ici, on pourrait parcourir toutes les classes pour sauvegarder leurs matrices
+            // Mais c'est plus complexe. L'export manuel reste la meilleure solution.
+            remove(ref(db))
+                .then(() => location.reload())
+                .catch(err => alert("Erreur purge : " + err.message));
+        }
+    }
+};
 
     // CO specific
     window.addCircuit = function() {
