@@ -124,67 +124,20 @@ export function initActivities() {
                     if (m.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
                     else if (m.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
 
-                    // Affichage du critère sélectionné
+                                        // Affichage du critère sélectionné
                     let criteriaHtml = '';
-                            // CRITÈRE POLYVALENT (VMA + Longueur + 30m)
-        if (options.critere === 'polyvalent') {
-            // 1. Préparer les tableaux pour calculer les rangs
-            let vmaList = pool.map(e => ({ id: e.id, val: e.vma || 0 }));
-            let longList = pool.map(e => ({ id: e.id, val: e.longueur || 0 }));
-            let sprintList = pool.map(e => ({ id: e.id, val: e.sprint30 || 0 }));
-
-            // 2. Trier pour établir les rangs (Meilleur = Rang 1)
-            // VMA et Longueur : Plus grand est meilleur
-            vmaList.sort((a, b) => b.val - a.val);
-            longList.sort((a, b) => b.val - a.val);
-            // 30m : Plus petit temps est meilleur
-            sprintList.sort((a, b) => a.val - b.val);
-
-            // 3. Fonction pour assigner les rangs (gère les valeurs manquantes = 0)
-            const getRanks = (arr) => {
-                const ranks = {};
-                arr.forEach((item, index) => {
-                    // Si la valeur est 0 (non renseignée), on lui donne le dernier rang possible (pénalité)
-                    if (item.val === 0) {
-                        ranks[item.id] = arr.length; 
-                    } else {
-                        ranks[item.id] = index + 1;
-                    }
-                });
-                return ranks;
-            };
-
-            const vmaRanks = getRanks(vmaList);
-            const longRanks = getRanks(longList);
-            const sprintRanks = getRanks(sprintList);
-
-            // 4. Calcul du score total (somme des rangs) pour chaque élève
-            pool.forEach(e => {
-                e.polyvalentScore = (vmaRanks[e.id] || pool.length) + (longRanks[e.id] || pool.length) + (sprintRanks[e.id] || pool.length);
-            });
-
-            // 5. Tri par score total CROISSANT : Le plus petit total est le plus polyvalent !
-            pool.sort((a, b) => a.polyvalentScore - b.polyvalentScore);
-        }
                     if (options.critere === 'vma') {
                         criteriaHtml = `<span class="text-emerald-700">VMA: ${m.vma || '--'}</span>`;
-                                        } else if (options.critere === 'force') {
+                    } else if (options.critere === 'force') {
                         // N'affiche que les étoiles remplies (pas de "☆" vide)
                         let stars = '';
                         for (let i = 1; i <= (m.force || 0); i++) {
                             stars += '★';
                         }
                         criteriaHtml = `<span class="text-yellow-600 font-black">${stars}</span>`;
-                    } 
-
-                    return `<div class="p-2 rounded-lg border-2 ${bgClass} flex items-center gap-3 text-sm font-bold text-slate-900">
-                                ${photoHtml}
-                                <div class="flex flex-col leading-tight">
-                                    <span>${m.prenom} ${m.nom}</span>
-                                    <span class="text-[10px] font-bold">${criteriaHtml}</span>
-                                </div>
-                            </div>`;
-                }));
+                    } else { // Polyvalent
+                        criteriaHtml = `<span class="text-purple-700">V: ${m.vma || '--'} | L: ${m.longueur || '--'} | 30m: ${m.sprint30 || '--'}</span>`;
+                    }
                 return `<div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${team.color}">
                             <div class="flex justify-between items-center mb-3">
                                 <h3 class="font-black text-xl" style="color: ${team.color}">${team.label}</h3>
