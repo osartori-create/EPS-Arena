@@ -164,56 +164,57 @@ export function initActivities() {
             }
         });
     } 
-     // Codes par défaut pour la matrice (intégrés en dur)
-    const DEFAULT_OS_MATRIX = {
-        1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
-        2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
-        3: { NOIR: ['C','L'], ROUGE: ['H','U'], BLEU: ['I','B'], VERT: ['O','I'], JAUNE: ['T','E'] },
-        4: { NOIR: ['R','V'], ROUGE: ['E','E'], BLEU: ['C','R'], VERT: ['T','N'], JAUNE: ['O','I'] },
-        5: { NOIR: ['A','B'], ROUGE: ['J','O'], BLEU: ['O','U'], VERT: ['N','E'], JAUNE: ['C','S'] },
-        6: { NOIR: ['F','M'], ROUGE: ['I','E'], BLEU: ['C','R'], VERT: ['U','O'], JAUNE: ['S','U'] },
-        7: { NOIR: ['G','H'], ROUGE: ['U','A'], BLEU: ['E','C'], VERT: ['U','H'], JAUNE: ['X','E'] },
-        8: { NOIR: ['I','J'], ROUGE: ['V','E'], BLEU: ['R','A'], VERT: ['E','N'], JAUNE: ['S','S'] },
-        9: { NOIR: ['K','N'], ROUGE: ['R','Y'], BLEU: ['A','L'], VERT: ['F','O'], JAUNE: ['T','N'] },
-        10: { NOIR: ['O','S'], ROUGE: ['C','E'], BLEU: ['E','I'], VERT: ['A','Z'], JAUNE: ['N','E'] },
-        11: { NOIR: ['P','T'], ROUGE: ['A','U'], BLEU: ['L','Y'], VERT: ['U','A'], JAUNE: ['D','U'] },
-        12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
-    };
+    else if (currentDiscipline === 'orientshow') {
+        // Codes par défaut pour la matrice (intégrés en dur)
+        const DEFAULT_OS_MATRIX = {
+            1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
+            2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
+            3: { NOIR: ['C','L'], ROUGE: ['H','U'], BLEU: ['I','B'], VERT: ['O','I'], JAUNE: ['T','E'] },
+            4: { NOIR: ['R','V'], ROUGE: ['E','E'], BLEU: ['C','R'], VERT: ['T','N'], JAUNE: ['O','I'] },
+            5: { NOIR: ['A','B'], ROUGE: ['J','O'], BLEU: ['O','U'], VERT: ['N','E'], JAUNE: ['C','S'] },
+            6: { NOIR: ['F','M'], ROUGE: ['I','E'], BLEU: ['C','R'], VERT: ['U','O'], JAUNE: ['S','U'] },
+            7: { NOIR: ['G','H'], ROUGE: ['U','A'], BLEU: ['E','C'], VERT: ['U','H'], JAUNE: ['X','E'] },
+            8: { NOIR: ['I','J'], ROUGE: ['V','E'], BLEU: ['R','A'], VERT: ['E','N'], JAUNE: ['S','S'] },
+            9: { NOIR: ['K','N'], ROUGE: ['R','Y'], BLEU: ['A','L'], VERT: ['F','O'], JAUNE: ['T','N'] },
+            10: { NOIR: ['O','S'], ROUGE: ['C','E'], BLEU: ['E','I'], VERT: ['A','Z'], JAUNE: ['N','E'] },
+            11: { NOIR: ['P','T'], ROUGE: ['A','U'], BLEU: ['L','Y'], VERT: ['U','A'], JAUNE: ['D','U'] },
+            12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
+        };
 
-    const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
-    const codeCounts = {};
-    Object.keys(orientShowMapping).forEach(key => {
-        if (key.startsWith(activeClasse + '_')) {
-            const code = key.replace(activeClasse + '_', '');
-            const match = code.match(/^([A-Z]+)_(\d+)$/);
-            if (match) {
-                const couleur = match[1];
-                codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+        const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+        const codeCounts = {};
+        Object.keys(orientShowMapping).forEach(key => {
+            if (key.startsWith(activeClasse + '_')) {
+                const code = key.replace(activeClasse + '_', '');
+                const match = code.match(/^([A-Z]+)_(\d+)$/);
+                if (match) {
+                    const couleur = match[1];
+                    codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+                }
             }
-        }
-    });
-    configData = { activite: 'orientshow' };
-    Object.keys(codeCounts).forEach(couleur => {
-        configData[couleur] = codeCounts[couleur];
-    });
-    
-    // Utiliser la matrice en dur (garantie complète)
-    configData.matrix = DEFAULT_OS_MATRIX;
-    
-    // Récupération des temps (version robuste)
-    const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
-    const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
-    const parseTime = (value) => {
-        if (!value || value === 'null' || value === 'undefined') return null;
-        const parsed = parseInt(value);
-        if (isNaN(parsed)) return null;
-        return parsed;
-    };
-    const startTime = parseTime(startTimeStr);
-    const endTime = parseTime(endTimeStr);
-    if (startTime !== null) configData.startTime = startTime;
-    if (endTime !== null) configData.endTime = endTime;
- 
+        });
+        configData = { activite: 'orientshow' };
+        Object.keys(codeCounts).forEach(couleur => {
+            configData[couleur] = codeCounts[couleur];
+        });
+        
+        // Utiliser la matrice en dur (garantie complète)
+        configData.matrix = DEFAULT_OS_MATRIX;
+        
+        // Récupération des temps (version robuste)
+        const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
+        const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
+        const parseTime = (value) => {
+            if (!value || value === 'null' || value === 'undefined') return null;
+            const parsed = parseInt(value);
+            if (isNaN(parsed)) return null;
+            return parsed;
+        };
+        const startTime = parseTime(startTimeStr);
+        const endTime = parseTime(endTimeStr);
+        if (startTime !== null) configData.startTime = startTime;
+        if (endTime !== null) configData.endTime = endTime;
+    } 
     else {
         // Multi-activités (par défaut)
         configData.activite = 'multi';
@@ -228,6 +229,21 @@ export function initActivities() {
             return alert("Veuillez d'abord générer les équipes.");
         }
     }
+
+    // Sauvegarde du mapping local
+    localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
+
+    // Envoi à Firebase
+    try {
+        console.log("📡 Configuration envoyée :", configData);
+        await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+        await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+        alert("✅ Configuration transmise aux iPads !");
+    } catch (e) {
+        console.error("Erreur transmission :", e);
+        alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
+    }
+};
 
     // Sauvegarde du mapping local
     localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
