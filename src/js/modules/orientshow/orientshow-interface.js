@@ -21,22 +21,17 @@ export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
 
-    // On vide complètement le conteneur pour repartir de zéro
+    // On vide complètement le conteneur
     container.innerHTML = '';
 
     // Construire la grille + réserve
     buildGridAndReserve(container);
 
-    // Ajouter le bouton "Matrice" (s'il n'existe pas déjà)
+    // Ajouter le bouton "Matrice"
     addMatrixToggleButton(container);
-
-    // Ajouter le conteneur de matrice (masqué)
     addMatrixContainer(container);
-
-    // Attacher l'écouteur de changement de classe
     attachClassChangeListener();
 
-    // Écouter la config Firebase (matrice + temps)
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
@@ -57,7 +52,6 @@ export function initOrientShowInterface() {
         });
     }
 
-    // Charger les affectations (si une classe est sélectionnée)
     loadOrientShowAssignments();
 }
 
@@ -65,22 +59,21 @@ export function initOrientShowInterface() {
 // 2. CONSTRUCTION DU DOM
 // --------------------------------------------------------------
 function buildGridAndReserve(container) {
-    // Structure principale
     const mainDiv = document.createElement('div');
     mainDiv.className = 'flex gap-4';
 
-    // Colonne réserve
+    // Réserve (largeur ajustée à 1/3 pour mieux contenir 2 colonnes)
     const reserveCol = document.createElement('div');
-    reserveCol.className = 'w-1/4 shrink-0 bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600';
+    reserveCol.className = 'w-1/3 shrink-0 bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600';
     reserveCol.innerHTML = `
         <div class="flex justify-between items-center mb-3">
             <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
-            <button onclick="window.populateReserveOS()" class="bg-blue-600 px-3 py-1 rounded-xl font-black text-[10px] uppercase text-white">⬇️ Charger</button>
+            <button onclick="window.populateReserveOS()" class="bg-blue-600 px-3 py-1 rounded-xl font-black text-[10px] uppercase text-white">⬇️ Charger (reset)</button>
         </div>
-        <div id="os-reserve" class="flex flex-col gap-2 min-h-[200px]"></div>
+        <div id="os-reserve" class="grid grid-cols-2 gap-1 min-h-[200px]"></div>
     `;
 
-    // Colonne grille des postes
+    // Grille des postes (2/3 restants)
     const gridCol = document.createElement('div');
     gridCol.className = 'flex-1 bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto';
     gridCol.innerHTML = `
@@ -92,30 +85,50 @@ function buildGridAndReserve(container) {
     mainDiv.appendChild(gridCol);
     container.appendChild(mainDiv);
 
-    // Remplir la grille des postes
+    // Remplir la grille des postes (sans espace entre le numéro et les colonnes)
     const gridContainer = document.getElementById('os-postesGrid');
     if (gridContainer) {
-        let html = `<div class="grid grid-cols-6 gap-2 mb-2"><div></div>`;
+        // En-tête des couleurs
+        let headerHtml = `<div class="flex items-center mb-2">
+            <div class="w-12 shrink-0"></div> <!-- placeholder pour aligner -->
+            <div class="flex flex-1 gap-0">`;
         COULEURS.forEach(c => {
             const bg = c === 'NOIR' ? 'bg-black' : c === 'ROUGE' ? 'bg-red-600' : c === 'BLEU' ? 'bg-blue-600' : c === 'VERT' ? 'bg-green-600' : 'bg-yellow-500';
             const text = c === 'JAUNE' ? 'text-black' : 'text-white';
-            html += `<div class="${bg} ${text} font-black text-center p-2 rounded-lg uppercase text-[10px] shadow-md">${c}</div>`;
+            headerHtml += `<div class="${bg} ${text} font-black text-center p-2 rounded-t-lg uppercase text-[10px] flex-1">${c}</div>`;
         });
-        html += `</div>`;
+        headerHtml += `</div></div>`;
+        gridContainer.innerHTML = headerHtml;
 
+        // Lignes de numéros
         for (let ligne = 1; ligne <= NB_NUMEROS; ligne++) {
-            html += `<div class="grid grid-cols-6 gap-2 mb-2">`;
-            html += `<div class="flex items-center justify-center font-black text-yellow-400 text-2xl bg-slate-900 w-12 h-12 rounded-lg shadow-inner border border-yellow-500/30">${ligne}</div>`;
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'flex items-stretch mb-1'; // pas d'espace vertical
+            // Numéro jaune
+            const numDiv = document.createElement('div');
+            numDiv.className = 'w-12 shrink-0 flex items-center justify-center font-black text-yellow-400 text-2xl bg-slate-900 rounded-l-lg border-r-0 border border-yellow-500/30';
+            numDiv.textContent = ligne;
+            rowDiv.appendChild(numDiv);
+
+            // Colonnes des couleurs (sans gap)
+            const colsDiv = document.createElement('div');
+            colsDiv.className = 'flex flex-1 gap-0';
             COULEURS.forEach(col => {
                 const code = `${col}_${ligne}`;
-                html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 rounded-lg" data-code="${code}"></div>`;
+                const dropzone = document.createElement('div');
+                dropzone.className = 'os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 flex-1';
+                dropzone.dataset.code = code;
+                colsDiv.appendChild(dropzone);
             });
-            html += `</div>`;
+            rowDiv.appendChild(colsDiv);
+            gridContainer.appendChild(rowDiv);
         }
-        gridContainer.innerHTML = html;
     }
 }
 
+// --------------------------------------------------------------
+// 3. MATRICE (affichage/masquage)
+// --------------------------------------------------------------
 function addMatrixToggleButton(container) {
     const btn = document.createElement('button');
     btn.id = 'os-toggle-matrix';
@@ -132,9 +145,6 @@ function addMatrixContainer(container) {
     container.appendChild(matrixContainer);
 }
 
-// --------------------------------------------------------------
-// 3. MATRICE (affichage/masquage)
-// --------------------------------------------------------------
 function toggleMatrixVisibility() {
     matrixVisible = !matrixVisible;
     const container = document.getElementById('os-matrix-container');
@@ -143,7 +153,6 @@ function toggleMatrixVisibility() {
         if (matrixVisible) renderMatrix();
     }
 }
-// Alias pour le bouton dans maitre.html
 window.openOSMatrixModal = toggleMatrixVisibility;
 
 // --------------------------------------------------------------
@@ -180,15 +189,11 @@ function onClassChange() {
 }
 
 // --------------------------------------------------------------
-// 5. CHARGEMENT DES AFFECTATIONS (mapping plat)
+// 5. CHARGEMENT DES AFFECTATIONS (restaure le mapping)
 // --------------------------------------------------------------
 export async function loadOrientShowAssignments() {
-    // Si la grille n'existe pas, on l'initialise
     if (!document.getElementById('os-postesGrid')) {
         initOrientShowInterface();
-        // Après création, on rappelle la fonction (mais attention aux boucles)
-        // On va plutôt tout refaire dans la même exécution.
-        // On attend un tick pour que le DOM soit prêt
         setTimeout(() => loadOrientShowAssignments(), 50);
         return;
     }
@@ -197,19 +202,19 @@ export async function loadOrientShowAssignments() {
     if (!classe) {
         document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
         const reserve = document.getElementById('os-reserve');
-        if (reserve) reserve.innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
+        if (reserve) reserve.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Sélectionnez une classe.</p>';
         return;
     }
 
     const mapping = getLocalMapping(classe) || {};
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
 
-    // Vider toutes les dropzones et la réserve
+    // Vider tout
     document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
     const reserveContainer = document.getElementById('os-reserve');
     if (reserveContainer) reserveContainer.innerHTML = '';
 
-    // Placer les élèves selon le mapping
+    // Placer selon le mapping
     const placedIds = new Set();
     for (const [key, eleveId] of Object.entries(mapping)) {
         const codePart = key.replace(`${classe}_`, '');
@@ -229,7 +234,7 @@ export async function loadOrientShowAssignments() {
         }
     }
 
-    // Ajouter les élèves non placés dans la réserve
+    // Réserve : tous les élèves non placés
     if (reserveContainer) {
         for (const eleve of eleves) {
             if (!placedIds.has(eleve.id)) {
@@ -237,17 +242,56 @@ export async function loadOrientShowAssignments() {
                 reserveContainer.appendChild(card);
             }
         }
+        // Si aucun élève dans la réserve, afficher un message
+        if (reserveContainer.children.length === 0) {
+            reserveContainer.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Tous les élèves sont affectés.</p>';
+        }
     }
+
+    initSortableOS();
+}
+
+// --------------------------------------------------------------
+// 6. BOUTON "CHARGER" : RESET COMPLET (tout en réserve)
+// --------------------------------------------------------------
+export async function resetAllToReserve() {
+    const classe = getCurrentClasse();
+    if (!classe) {
+        alert('Veuillez sélectionner une classe.');
+        return;
+    }
+
+    // Vider toutes les dropzones et la réserve
+    document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
+    const reserveContainer = document.getElementById('os-reserve');
+    if (reserveContainer) reserveContainer.innerHTML = '';
+
+    // Récupérer tous les élèves
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+
+    // Ajouter tous les élèves dans la réserve
+    if (reserveContainer) {
+        for (const eleve of eleves) {
+            const card = await createEleveCard(eleve);
+            reserveContainer.appendChild(card);
+        }
+        if (eleves.length === 0) {
+            reserveContainer.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Aucun élève dans cette classe.</p>';
+        }
+    }
+
+    // Supprimer le mapping local pour cette classe
+    setLocalMapping(classe, {});
 
     // Réinitialiser Sortable
     initSortableOS();
 }
 
-// Fonction pour le bouton "Charger"
-window.populateReserveOS = loadOrientShowAssignments;
+// Exposer le bouton "Charger" avec la nouvelle fonction
+window.populateReserveOS = resetAllToReserve;
 
 // --------------------------------------------------------------
-// 6. SAUVEGARDE DES AFFECTATIONS (après glissé)
+// 7. SAUVEGARDE DES AFFECTATIONS (après glissé)
 // --------------------------------------------------------------
 export function saveOrientShowAssignments() {
     const classe = getCurrentClasse();
@@ -283,26 +327,40 @@ async function refreshReserve() {
             reserveContainer.appendChild(card);
         }
     }
+    if (reserveContainer.children.length === 0) {
+        reserveContainer.innerHTML = '<p class="text-slate-500 text-xs col-span-2">Tous les élèves sont affectés.</p>';
+    }
     initSortableOS();
 }
 
 // --------------------------------------------------------------
-// 7. CRÉATION D'UNE CARTE ÉLÈVE
+// 8. CRÉATION D'UNE CARTE ÉLÈVE (style escalade)
 // --------------------------------------------------------------
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
-    const bgClass = eleve.sexe === 'M' ? 'bg-blue-200 border-blue-400' : (eleve.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400');
-    const photoHtml = url ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">` : `<div class="w-8 h-8 rounded-full bg-slate-400 flex items-center justify-center text-sm">👤</div>`;
+    let bgClass = 'bg-slate-200 border-slate-400';
+    if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
+    else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
+    
+    const photoHtml = url 
+        ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
+        : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
 
     const div = document.createElement('div');
-    div.className = `p-1 rounded border-2 cursor-grab active:cursor-grabbing flex items-center gap-2 ${bgClass}`;
+    div.className = `p-2 rounded-lg border-2 cursor-grab active:cursor-grabbing flex items-center gap-3 ${bgClass}`;
     div.dataset.id = eleve.id;
-    div.innerHTML = `${photoHtml}<div class="flex flex-col leading-none"><span class="font-black text-slate-900 text-[10px] truncate max-w-[80px]">${eleve.prenom}</span><span class="text-[9px] font-bold text-slate-600 uppercase truncate max-w-[80px]">${eleve.nom}</span></div>`;
+    div.innerHTML = `
+        ${photoHtml}
+        <div class="flex flex-col leading-tight">
+            <span class="font-black text-slate-900 text-base">${eleve.prenom}</span>
+            <span class="text-xs font-bold text-slate-600 uppercase">${eleve.nom}</span>
+        </div>
+    `;
     return div;
 }
 
 // --------------------------------------------------------------
-// 8. SORTABLE (glisser-déposer)
+// 9. SORTABLE (glisser-déposer)
 // --------------------------------------------------------------
 function initSortableOS() {
     if (typeof Sortable === 'undefined') return;
@@ -328,7 +386,7 @@ function initSortableOS() {
 }
 
 // --------------------------------------------------------------
-// 9. MATRICE DE CORRECTION (rendu)
+// 10. MATRICE DE CORRECTION (rendu)
 // --------------------------------------------------------------
 function resetMatrix() {
     matrix = {};
@@ -383,7 +441,7 @@ function saveMatrixToFirebase() {
 }
 
 // --------------------------------------------------------------
-// 10. CHRONO
+// 11. CHRONO
 // --------------------------------------------------------------
 function updateChronoButtons() {
     const btnStart = document.getElementById('os-start-btn');
@@ -429,7 +487,7 @@ window.startOrientShow = startOrientShow;
 window.stopOrientShow = stopOrientShow;
 
 // --------------------------------------------------------------
-// 11. EXPORT / IMPORT
+// 12. EXPORT / IMPORT JSON (avec mapping)
 // --------------------------------------------------------------
 export function exportOrientShowConfig() {
     const classe = getCurrentClasse();
