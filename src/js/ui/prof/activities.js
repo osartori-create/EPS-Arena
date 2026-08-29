@@ -106,8 +106,90 @@ export function initActivities() {
         if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
-        const teams = generateClassicTeams(eleves, options);
+         // Liste des couleurs disponibles (nom + code hexadécimal)
+    const colorOptions = [
+        { name: "Rouge", hex: "#ef4444" },
+        { name: "Bleu", hex: "#3b82f6" },
+        { name: "Vert", hex: "#22c55e" },
+        { name: "Jaune", hex: "#eab308" },
+        { name: "Orange", hex: "#f97316" },
+        { name: "Violet", hex: "#a855f7" },
+        { name: "Rose", hex: "#ec4899" },
+        { name: "Cyan", hex: "#06b6d4" },
+        { name: "Blanc", hex: "#ffffff" },
+        { name: "Noir", hex: "#000000" }
+    ];
+
+    // Fonction pour calculer la couleur du texte en fonction du fond
+    function getContrastColor(hex) {
+        const r = parseInt(hex.substr(1,2), 16);
+        const g = parseInt(hex.substr(3,2), 16);
+        const b = parseInt(hex.substr(5,2), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? '#000000' : '#ffffff';
+    }
+
+    // Fonction globale pour ouvrir la palette (appelée par le clic sur "Couleur")
+    window.openColorPicker = function(teamId) {
+        const team = window.lastTeams.find(t => t.id === teamId);
+        if (!team) return;
+
+        // Récupérer les couleurs déjà choisies par les autres équipes
+        const usedColors = window.lastTeams
+            .filter(t => t.id !== teamId && t.color !== '#e2e8f0')
+            .map(t => t.color);
+        
+        // Créer la modale
+        const modal = document.createElement('div');
+        modal.id = 'colorPickerModal';
+        modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-sm">
+                <h3 class="text-xl font-black text-blue-400 uppercase mb-4 text-center">Choisir la couleur</h3>
+                <div class="grid grid-cols-2 gap-3">
+                    ${colorOptions.map(color => {
+                        // Si la couleur est déjà utilisée par une autre équipe, on la grise
+                        const isUsed = usedColors.includes(color.hex);
+                        return `
+                        <button onclick="applyColor('${teamId}', '${color.name}', '${color.hex}')"
+                                class="p-4 rounded-2xl font-bold text-lg border-2 transition-all flex items-center justify-center gap-2 ${isUsed ? 'opacity-30 cursor-not-allowed border-slate-700' : 'border-slate-600 hover:border-white'}"
+                                style="background-color: ${color.hex}; color: ${getContrastColor(color.hex)}"
+                                ${isUsed ? 'disabled' : ''}>
+                            <span class="w-4 h-4 rounded-full border border-slate-500" style="background-color: ${color.hex}"></span>
+                            ${color.name}
+                            ${isUsed ? '<span class="text-red-400 font-black ml-1">✖</span>' : ''}
+                        </button>`;
+                    }).join('')}
+                </div>
+                <button onclick="document.getElementById('colorPickerModal').remove()" 
+                        class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white text-sm uppercase">
+                    Fermer
+                </button>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    };
+
+    // Fonction pour appliquer la couleur choisie
+    window.applyColor = function(teamId, colorName, colorHex) {
+        const team = window.lastTeams.find(t => t.id === teamId);
+        if (team) {
+            team.label = colorName;
+            team.color = colorHex;
+            team.textColor = getContrastColor(colorHex);
+        }
+
+        // Fermer la modale
+        document.getElementById('colorPickerModal').remove();
+
+        // Régénérer l'affichage avec le nouveau label
+        window.renderTeams();
+    };
+
         window.lastTeams = teams;
+        
+        // Appel direct de votre fonction de rendu (celle avec les fiches élèves)
+        window.renderTeams();
 
         const container = document.getElementById('teamsGrid');
         if (container) {
