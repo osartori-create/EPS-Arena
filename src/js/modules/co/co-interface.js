@@ -63,19 +63,39 @@ async function createEleveCard(eleve) {
 }
 
 export async function populateReserveWithStudents(eleves) {
-    const reserveContainer = document.getElementById('reserveList');
-    if (!reserveContainer) return;
+    const garconsContainer = document.getElementById('reserveCOGarcons');
+    const fillesContainer = document.getElementById('reserveCOFilles');
+    if (!garconsContainer || !fillesContainer) return;
 
-    const coView = document.getElementById('viewCOSettings');
-    if (coView) coView.classList.remove('hidden');
+    // Vider les deux conteneurs
+    garconsContainer.innerHTML = '';
+    fillesContainer.innerHTML = '';
 
-    reserveContainer.innerHTML = '';
+    // Trier les élèves par sexe
+    const garcons = eleves.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+    const filles = eleves.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+    const autres = eleves.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+
+    for (const eleve of garcons) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
+    }
+    for (const eleve of filles) {
+        fillesContainer.appendChild(await createEleveCard(eleve));
+    }
+    for (const eleve of autres) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
+    }
+
+    if (garconsContainer.children.length === 0) {
+        garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+    }
+    if (fillesContainer.children.length === 0) {
+        fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
+    }
+
+    // Nettoyer l'ancienne sauvegarde
     localStorage.removeItem(getStorageKey());
     document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
-
-    for (const eleve of eleves) {
-        reserveContainer.appendChild(await createEleveCard(eleve));
-    }
 
     setTimeout(() => initSortableCO(), 100);
 }
@@ -109,11 +129,18 @@ export function saveCOAssignments() {
 
 export async function loadCOAssignments() {
     const assignments = JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${document.getElementById('selectClasse').value}`) || '[]');
+    const activeClasse = document.getElementById('selectClasse').value;
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
 
-    document.getElementById('reserveList').innerHTML = '';
+    // Vider les conteneurs
     document.querySelectorAll('.poste-members').forEach(el => el.innerHTML = '');
+    const garconsContainer = document.getElementById('reserveCOGarcons');
+    const fillesContainer = document.getElementById('reserveCOFilles');
+    garconsContainer.innerHTML = '';
+    fillesContainer.innerHTML = '';
 
+    // Placer les élèves dans les postes selon le mapping
+    const placedIds = new Set();
     const postes = document.querySelectorAll('[data-poste]');
     for (const posteDiv of postes) {
         const posteId = posteDiv.dataset.poste;
@@ -121,26 +148,35 @@ export async function loadCOAssignments() {
         if (membersDiv && assignments[posteId]) {
             for (const id of assignments[posteId]) {
                 const eleve = eleves.find(e => e.id === id);
-                if (eleve) membersDiv.appendChild(await createEleveCard(eleve));
+                if (eleve) {
+                    membersDiv.appendChild(await createEleveCard(eleve));
+                    placedIds.add(id);
+                }
             }
         }
     }
 
-    const affectedIds = new Set();
-    postes.forEach(posteDiv => {
-        const membersDiv = posteDiv.querySelector('.poste-members');
-        if (membersDiv) membersDiv.querySelectorAll('[data-id]').forEach(el => affectedIds.add(el.dataset.id));
-    });
+    // Les élèves non placés vont dans la réserve (par sexe)
+    const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
+    const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+    const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+    const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
 
-    let reserveIds = assignments.reserve || [];
-    eleves.forEach(eleve => {
-        if (!affectedIds.has(eleve.id) && !reserveIds.includes(eleve.id)) reserveIds.push(eleve.id);
-    });
+    for (const eleve of garcons) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
+    }
+    for (const eleve of filles) {
+        fillesContainer.appendChild(await createEleveCard(eleve));
+    }
+    for (const eleve of autres) {
+        garconsContainer.appendChild(await createEleveCard(eleve));
+    }
 
-    const reserveContainer = document.getElementById('reserveList');
-    for (const id of reserveIds) {
-        const eleve = eleves.find(e => e.id === id);
-        if (eleve) reserveContainer.appendChild(await createEleveCard(eleve));
+    if (garconsContainer.children.length === 0) {
+        garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+    }
+    if (fillesContainer.children.length === 0) {
+        fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
     }
 
     saveCOAssignments();
