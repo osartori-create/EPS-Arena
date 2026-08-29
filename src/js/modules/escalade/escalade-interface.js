@@ -1,17 +1,17 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 // 1. Génération de la grille (avec lecture de la sauvegarde pour le bon nombre de groupes)
-export function initEscaladeInterface(nbGroupes = 6) {
+export function initEscaladeInterface(nbGroupes = 6, force = false) {
     const container = document.getElementById('postesGridEscalade');
     if (!container) return;
 
-    // 1. Lire la sauvegarde (si elle existe déjà, on conserve ce nombre)
     const activeClasse = document.getElementById('selectClasse').value;
-    let nbGroupesCalcule = nbGroupes; // Valeur par défaut (6)
-    
-    if (activeClasse) {
+    let nbGroupesCalcule = nbGroupes;
+
+    // Si on force, on utilise nbGroupes sans regarder la sauvegarde
+    if (!force && activeClasse) {
         const saved = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
-        const savedGroupes = Object.keys(saved).filter(k => k !== 'reserve' && Array.isArray(saved[k])).length;
+        const savedGroupes = Object.keys(saved).filter(k => k !== 'reserve' && Array.isArray(saved[k]) && saved[k].length > 0).length;
         if (savedGroupes > 0) {
             nbGroupesCalcule = savedGroupes;
         } else {
@@ -20,9 +20,12 @@ export function initEscaladeInterface(nbGroupes = 6) {
                 nbGroupesCalcule = Math.ceil(eleves.length / 3);
             }
         }
+    } else if (force && activeClasse) {
+        // On force le nombre de groupes, on peut aussi vider la sauvegarde ici
+        localStorage.removeItem(`eps_arena_escalade_assignments_${activeClasse}`);
     }
 
-    // 2. Construire le HTML avec le bon nombre de groupes
+    // Construire le HTML avec le bon nombre de groupes
     let html = '';
     for (let i = 0; i < nbGroupesCalcule; i++) {
         const lettre = String.fromCharCode(65 + i);
@@ -38,22 +41,39 @@ export function initEscaladeInterface(nbGroupes = 6) {
     container.innerHTML = html;
 
     window.currentEscaladeGroupes = nbGroupesCalcule;
+    // Réinitialiser Sortable après construction
+    setTimeout(() => initSortableEscalade(), 100);
 }
 
-// 2. Initialisation du glisser-déposer (avec instances réelles stockées)
+// 2. Initialisation du glisser-déposer
 export function initSortableEscalade() {
-    // Réserve : garçons et filles
     const garconsContainer = document.getElementById('reserveEscaladeGarcons');
     const fillesContainer = document.getElementById('reserveEscaladeFilles');
 
-    if (garconsContainer && !garconsContainer.__sortable) {
+    // Détruire les instances existantes
+    if (garconsContainer && garconsContainer.__sortable) {
+        garconsContainer.__sortable.destroy();
+        garconsContainer.__sortable = null;
+    }
+    if (fillesContainer && fillesContainer.__sortable) {
+        fillesContainer.__sortable.destroy();
+        fillesContainer.__sortable = null;
+    }
+    document.querySelectorAll('.groupe-members').forEach(el => {
+        if (el.__sortable) {
+            el.__sortable.destroy();
+            el.__sortable = null;
+        }
+    });
+
+    if (garconsContainer) {
         garconsContainer.__sortable = new Sortable(garconsContainer, {
             group: 'escalade',
             animation: 150,
             onEnd: saveEscaladeAssignments
         });
     }
-    if (fillesContainer && !fillesContainer.__sortable) {
+    if (fillesContainer) {
         fillesContainer.__sortable = new Sortable(fillesContainer, {
             group: 'escalade',
             animation: 150,
@@ -61,26 +81,23 @@ export function initSortableEscalade() {
         });
     }
 
-    // Groupes
     document.querySelectorAll('.groupe-members').forEach(el => {
-        if (!el.__sortable) {
-            el.__sortable = new Sortable(el, {
-                group: 'escalade',
-                animation: 150,
-                onEnd: saveEscaladeAssignments
-            });
-        }
+        el.__sortable = new Sortable(el, {
+            group: 'escalade',
+            animation: 150,
+            onEnd: saveEscaladeAssignments
+        });
     });
 }
 
-// 3. Création d'une carte élève (avec photo)
+// 3. Création d'une carte élève
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
     let bgClass = 'bg-slate-200 border-slate-400';
     if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
     else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-    
-    const photoHtml = url 
+
+    const photoHtml = url
         ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
         : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
 
@@ -97,35 +114,29 @@ async function createEleveCard(eleve) {
     return div;
 }
 
-// 4. Remplissage de la réserve (2 colonnes : garçons / filles)
+// 4. Remplissage de la réserve
 export async function populateReserveEscalade(eleves) {
     const garconsContainer = document.getElementById('reserveEscaladeGarcons');
     const fillesContainer = document.getElementById('reserveEscaladeFilles');
     if (!garconsContainer || !fillesContainer) return;
 
-    // Vider les deux conteneurs
     garconsContainer.innerHTML = '';
     fillesContainer.innerHTML = '';
 
-    // Trier les élèves par sexe
     const garcons = eleves.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
     const filles = eleves.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
     const autres = eleves.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
 
-    // Ajouter les garçons
     for (const eleve of garcons) {
         garconsContainer.appendChild(await createEleveCard(eleve));
     }
-    // Ajouter les filles
     for (const eleve of filles) {
         fillesContainer.appendChild(await createEleveCard(eleve));
     }
-    // Ajouter les autres (sans sexe) à la colonne des garçons
     for (const eleve of autres) {
         garconsContainer.appendChild(await createEleveCard(eleve));
     }
 
-    // Messages si colonnes vides
     if (garconsContainer.children.length === 0) {
         garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
     }
@@ -151,13 +162,11 @@ export function saveEscaladeAssignments() {
     const assignments = {};
     const reserveIds = [];
 
-    // Récupérer les IDs des deux colonnes de réserve
     document.querySelectorAll('#reserveEscaladeGarcons [data-id], #reserveEscaladeFilles [data-id]').forEach(el => {
         reserveIds.push(el.dataset.id);
     });
     if (reserveIds.length > 0) assignments.reserve = reserveIds;
 
-    // Récupérer les IDs des groupes
     document.querySelectorAll('[data-groupe]').forEach(colDiv => {
         const groupe = colDiv.dataset.groupe;
         const membersDiv = colDiv.querySelector('.groupe-members');
@@ -177,14 +186,12 @@ export async function loadEscaladeAssignments() {
     const activeClasse = document.getElementById('selectClasse').value;
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
 
-    // Vider les conteneurs
     document.querySelectorAll('.groupe-members').forEach(el => el.innerHTML = '');
     const garconsContainer = document.getElementById('reserveEscaladeGarcons');
     const fillesContainer = document.getElementById('reserveEscaladeFilles');
     garconsContainer.innerHTML = '';
     fillesContainer.innerHTML = '';
 
-    // Placer les élèves dans les groupes selon le mapping
     const placedIds = new Set();
     const groupes = document.querySelectorAll('[data-groupe]');
     for (const colDiv of groupes) {
@@ -201,7 +208,6 @@ export async function loadEscaladeAssignments() {
         }
     }
 
-    // Les élèves non placés vont dans la réserve (par sexe)
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
     const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
     const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
@@ -229,7 +235,7 @@ export async function loadEscaladeAssignments() {
     setTimeout(() => initSortableEscalade(), 100);
 }
 
-// 8. Mise à jour des numéros de rang
+// 8. Mise à jour des rangs
 export function updateRanks() {
     document.querySelectorAll('[data-groupe]').forEach(colDiv => {
         const membersDiv = colDiv.querySelector('.groupe-members');
@@ -254,7 +260,7 @@ export function exportEscaladeConfig() {
 
     const date = new Date();
     const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-    
+
     const data = { version: 1, classe: activeClasse, activite: 'escalade', date: dateStr, groupes: assignments };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -272,18 +278,15 @@ export function importEscaladeConfig(event) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.groupes) throw new Error("Format de fichier invalide");
-            
             localStorage.setItem(`eps_arena_escalade_assignments_${data.classe}`, JSON.stringify(data.groupes));
-            
-            const groupKeys = Object.keys(data.groupes).filter(k => k !== 'reserve');
-            const nbGroupes = groupKeys.length;
-            
             const select = document.getElementById('selectClasse');
             if (select.value !== data.classe) {
                 select.value = data.classe;
                 select.dispatchEvent(new Event('change'));
             } else {
-                initEscaladeInterface(nbGroupes);
+                const groupKeys = Object.keys(data.groupes).filter(k => k !== 'reserve');
+                const nbGroupes = groupKeys.length;
+                initEscaladeInterface(nbGroupes, true);
                 await loadEscaladeAssignments();
             }
             alert("✅ Configuration Escalade importée !");
