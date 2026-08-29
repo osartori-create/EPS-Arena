@@ -122,7 +122,6 @@ function createMain() {
     const reserveCol = document.createElement('div');
     reserveCol.className = 'w-1/3 shrink-0 bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600';
 
-    // En-tête réserve avec bouton reset
     const reserveHeader = document.createElement('div');
     reserveHeader.className = 'flex justify-between items-center mb-3';
     reserveHeader.innerHTML = `
@@ -131,11 +130,9 @@ function createMain() {
     `;
     reserveCol.appendChild(reserveHeader);
 
-    // Deux colonnes pour les sexes
     const sexesContainer = document.createElement('div');
     sexesContainer.className = 'flex gap-2';
 
-    // Colonne Garçons
     const garconsDiv = document.createElement('div');
     garconsDiv.className = 'flex-1';
     garconsDiv.innerHTML = `<div class="text-xs font-bold text-blue-400 uppercase mb-1">👦 Garçons</div>`;
@@ -145,7 +142,6 @@ function createMain() {
     garconsDiv.appendChild(garconsList);
     sexesContainer.appendChild(garconsDiv);
 
-    // Colonne Filles
     const fillesDiv = document.createElement('div');
     fillesDiv.className = 'flex-1';
     fillesDiv.innerHTML = `<div class="text-xs font-bold text-rose-400 uppercase mb-1">👩 Filles</div>`;
@@ -158,52 +154,50 @@ function createMain() {
     reserveCol.appendChild(sexesContainer);
     mainDiv.appendChild(reserveCol);
 
-    // ---- GRILLE DES GROUPES ----
+    // ---- GRILLE DES GROUPES (construite en une seule fois) ----
     const gridCol = document.createElement('div');
     gridCol.className = 'flex-1 bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto';
-    gridCol.innerHTML = `
-        <h3 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par code (couleur_numéro)</h3>
-        <div id="os-postesGrid" class="min-w-[600px]"></div>
-    `;
-    mainDiv.appendChild(gridCol);
-
-    // Remplir la grille immédiatement
-    fillGrid();
-
-    return mainDiv;
-}
-
-// --------------------------------------------------------------
-// 4. REMPLISSAGE DE LA GRILLE (une seule fois)
-// --------------------------------------------------------------
-function fillGrid() {
-    const gridContainer = document.getElementById('os-postesGrid');
-    if (!gridContainer) return;
-
+    
+    // On construit TOUT le HTML de la grille ici
+    let gridHtml = `<h3 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par code (couleur_numéro)</h3>`;
+    gridHtml += `<div id="os-postesGrid" class="min-w-[600px]">`;
+    
     // En-tête des couleurs
-    let html = `<div class="flex items-center mb-2">
+    gridHtml += `<div class="flex items-center mb-2">
         <div class="w-12 shrink-0"></div>
         <div class="flex flex-1 gap-0">`;
     COULEURS.forEach(c => {
         const bg = c === 'NOIR' ? 'bg-black' : c === 'ROUGE' ? 'bg-red-600' : c === 'BLEU' ? 'bg-blue-600' : c === 'VERT' ? 'bg-green-600' : 'bg-yellow-500';
         const text = c === 'JAUNE' ? 'text-black' : 'text-white';
-        html += `<div class="${bg} ${text} font-black text-center p-2 rounded-t-lg uppercase text-[10px] flex-1">${c}</div>`;
+        gridHtml += `<div class="${bg} ${text} font-black text-center p-2 rounded-t-lg uppercase text-[10px] flex-1">${c}</div>`;
     });
-    html += `</div></div>`;
+    gridHtml += `</div></div>`;
 
     // Lignes de numéros
     for (let ligne = 1; ligne <= NB_NUMEROS; ligne++) {
-        html += `<div class="flex items-stretch mb-1">`;
-        html += `<div class="w-12 shrink-0 flex items-center justify-center font-black text-yellow-400 text-2xl bg-slate-900 rounded-l-lg border-r-0 border border-yellow-500/30">${ligne}</div>`;
-        html += `<div class="flex flex-1 gap-0">`;
+        gridHtml += `<div class="flex items-stretch mb-1">`;
+        gridHtml += `<div class="w-12 shrink-0 flex items-center justify-center font-black text-yellow-400 text-2xl bg-slate-900 rounded-l-lg border-r-0 border border-yellow-500/30">${ligne}</div>`;
+        gridHtml += `<div class="flex flex-1 gap-0">`;
         COULEURS.forEach(col => {
             const code = `${col}_${ligne}`;
-            html += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 flex-1" data-code="${code}"></div>`;
+            gridHtml += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 flex-1" data-code="${code}"></div>`;
         });
-        html += `</div></div>`;
+        gridHtml += `</div></div>`;
     }
 
-    gridContainer.innerHTML = html;
+    gridHtml += `</div>`; // fin #os-postesGrid
+    gridCol.innerHTML = gridHtml;
+    mainDiv.appendChild(gridCol);
+
+    return mainDiv;
+}
+
+// --------------------------------------------------------------
+// 4. REMPLISSAGE DE LA GRILLE (plus besoin, déjà fait dans createMain)
+// --------------------------------------------------------------
+// On garde une fonction vide pour éviter les erreurs, mais elle n'est plus utilisée.
+function fillGrid() {
+    // La grille est déjà construite dans createMain()
 }
 
 // --------------------------------------------------------------
@@ -260,20 +254,22 @@ function onClassChange() {
 }
 
 // --------------------------------------------------------------
-// 7. CHARGEMENT DES AFFECTATIONS
+// 7. CHARGEMENT DES AFFECTATIONS (simplifié)
 // --------------------------------------------------------------
 export async function loadOrientShowAssignments() {
+    // Si la grille n'existe pas, on initialise tout
     if (!document.getElementById('os-postesGrid')) {
         initOrientShowInterface();
-        setTimeout(() => loadOrientShowAssignments(), 50);
+        // On attend que le DOM soit prêt puis on recharge
+        setTimeout(() => loadOrientShowAssignments(), 100);
         return;
     }
 
     const classe = getCurrentClasse();
     if (!classe) {
         document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
-        document.getElementById('os-reserve-garcons').innerHTML = '';
-        document.getElementById('os-reserve-filles').innerHTML = '';
+        document.getElementById('os-reserve-garcons').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
+        document.getElementById('os-reserve-filles').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
         return;
     }
 
@@ -311,7 +307,6 @@ export async function loadOrientShowAssignments() {
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
     const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
     const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
-    // Les élèves sans sexe vont du côté des garçons (ou on peut les mettre dans une section "Autres")
     const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
 
     for (const eleve of garcons) {
@@ -321,7 +316,7 @@ export async function loadOrientShowAssignments() {
         fillesContainer.appendChild(await createEleveCard(eleve));
     }
     for (const eleve of autres) {
-        garconsContainer.appendChild(await createEleveCard(eleve)); // ou on crée une section "Autres"
+        garconsContainer.appendChild(await createEleveCard(eleve));
     }
 
     if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
