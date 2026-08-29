@@ -8,47 +8,68 @@ function shuffleArray(arr) {
     return arr;
 }
 
+// Fonction de tri par critère (utilisée en interne)
+function sortByCriteria(pool, critere) {
+    return [...pool].sort((a, b) => {
+        if (critere === 'polyvalent') {
+            // Calcul inversé pour le 30m (plus bas = mieux)
+            const scoreA = (a.vma || 0) + ((a.longueur || 0) / 10) - (a.sprint30 || 99);
+            const scoreB = (b.vma || 0) + ((b.longueur || 0) / 10) - (b.sprint30 || 99);
+            return scoreB - scoreA;
+        }
+        if (critere === 'vma') {
+            return (b.vma || 0) - (a.vma || 0);
+        }
+        return (b.force || 0) - (a.force || 0); // Critère Force
+    });
+}
+
 export function generateTeams(eleves, options) {
     let pool = [...eleves];
     let teams = [];
 
-    // 1. Gestion de la mixité (CORRIGÉE)
+    // 1. Gestion de la mixité
     if (options.mixite === 'non-mixte') {
-        // Séparation stricte
         const garcons = pool.filter(e => e.sexe === 'M');
         const filles = pool.filter(e => e.sexe === 'F' || !e.sexe);
-        teams = [...buildTeams(garcons, options, 0), ...buildTeams(filles, options, garcons.length)];
+        
+        // Tri par critère à l'intérieur de chaque groupe
+        garcons.sort((a, b) => (options.critere === 'vma' ? (b.vma||0)-(a.vma||0) : (b.force||0)-(a.force||0)));
+        filles.sort((a, b) => (options.critere === 'vma' ? (b.vma||0)-(a.vma||0) : (b.force||0)-(a.force||0)));
+
+        teams = [...buildTeams(garcons, options, 0, false), ...buildTeams(filles, options, garcons.length, false)];
     } 
     else if (options.mixite === 'mixte') {
-        // Pour garantir une mixité PARFAITE, on sépare, on mélange, puis on entrelace
         const garcons = pool.filter(e => e.sexe === 'M');
         const filles = pool.filter(e => e.sexe === 'F');
         const autres = pool.filter(e => e.sexe !== 'M' && e.sexe !== 'F');
 
-        shuffleArray(garcons);
-        shuffleArray(filles);
-        shuffleArray(autres);
+        // 1. Trier chaque groupe par critère
+        const garconsTries = sortByCriteria(garcons, options.critere);
+        const fillesTries = sortByCriteria(filles, options.critere);
+        const autresTries = sortByCriteria(autres, options.critere);
 
-        // Création d'un pool alterné : G1, F1, G2, F2, G3, F3...
+        // 2. Entrelacer G1, F1, G2, F2... (préserver le niveau)
         let poolMixte = [];
-        let maxLength = Math.max(garcons.length, filles.length, autres.length);
+        let maxLength = Math.max(garconsTries.length, fillesTries.length, autresTries.length);
         for (let i = 0; i < maxLength; i++) {
-            if (garcons[i]) poolMixte.push(garcons[i]);
-            if (filles[i]) poolMixte.push(filles[i]);
-            if (autres[i]) poolMixte.push(autres[i]);
+            if (garconsTries[i]) poolMixte.push(garconsTries[i]);
+            if (fillesTries[i]) poolMixte.push(fillesTries[i]);
+            if (autresTries[i]) poolMixte.push(autresTries[i]);
         }
 
-        teams = buildTeams(poolMixte, options, 0);
+        // 3. Passer le pool mixte SANS re-tri
+        teams = buildTeams(poolMixte, options, 0, false);
     } 
     else {
         // Mode 'ignore' (non prise en compte du sexe)
-        teams = buildTeams(pool, options, 0);
+        teams = buildTeams(pool, options, 0, true); // on garde le tri
     }
 
     return teams;
 }
 
-function buildTeams(pool, options, startIndex) {
+function buildTeams(pool, options, startIndex, doSort) {
     if (pool.length === 0) return [];
 
     // >>> CORRECTION DU BUG DE DIVISION PAR ZÉRO <<<
@@ -69,6 +90,14 @@ function buildTeams(pool, options, startIndex) {
         nbEq = Math.max(1, Math.min(pool.length, 4));
     }
     // <<< FIN DE LA CORRECTION >>>
+
+    // Si le tri est demandé (mode ignore), on trie le pool
+    if (doSort) {
+        pool.sort((a, b) => {
+            if (options.critere === 'vma') return (b.vma || 0) - (a.vma || 0);
+            return (b.force || 0) - (a.force || 0);
+        });
+    }
 
     // Génération des labels
     const nomsCouleurs = ['Rouge', 'Bleu', 'Vert', 'Jaune', 'Orange', 'Violet', 'Rose', 'Cyan', 'Blanc', 'Noir'];
@@ -96,22 +125,7 @@ function buildTeams(pool, options, startIndex) {
         };
     });
 
-    // Tri selon le critère (VMA, Force, Polyvalent)
-    pool.sort((a, b) => {
-        if (options.critere === 'polyvalent') {
-            // Rangs inversés pour le 30m (plus bas = mieux)
-            const scoreA = (a.vma || 0) + ((a.longueur || 0) / 10) - (a.sprint30 || 99);
-            const scoreB = (b.vma || 0) + ((b.longueur || 0) / 10) - (b.sprint30 || 99);
-            return scoreB - scoreA;
-        }
-        if (options.critere === 'vma') {
-            return (b.vma || 0) - (a.vma || 0);
-        }
-        return (b.force || 0) - (a.force || 0);
-    });
-
-    // >>> CORRECTION DE LA RÉPARTITION POUR GARANTIR LA MIXITÉ <<<
-    // On utilise TOUJOURS l'algorithme "serpentin" (un par un) pour éviter les équipes ségréguées par blocs.
+    // >>> RÉPARTITION SERPENTIN UNIQUE (garantie une mixité parfaite) <<<
     let index = 0;
     let direction = 1;
     for (const eleve of pool) {
