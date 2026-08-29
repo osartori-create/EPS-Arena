@@ -3,6 +3,7 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../core/live-engine.js';
 import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase-service.js';
+import { DEFAULT_OS_MATRIX } from '../../config/orientshow-default-codes.js';
 
 // Constantes
 const COULEURS = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
@@ -37,21 +38,31 @@ export function initOrientShowInterface() {
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-            if (config && config.matrix) {
-                matrix = config.matrix;
-                startTime = config.startTime || null;
-                endTime = config.endTime || null;
-            } else {
-                resetMatrix();
-                startTime = null;
-                endTime = null;
+    if (config && config.matrix) {
+        // Fusionner avec les valeurs par défaut pour combler les trous
+        matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+        const configMatrix = config.matrix;
+        // Pour chaque circuit, si configMatrix a des valeurs, on les copie
+        for (const circuit of Object.keys(DEFAULT_OS_MATRIX)) {
+            if (configMatrix[circuit]) {
+                for (const color of ['NOIR','ROUGE','BLEU','VERT','JAUNE']) {
+                    if (configMatrix[circuit][color] && configMatrix[circuit][color].length === 2) {
+                        matrix[circuit][color] = [...configMatrix[circuit][color]];
+                    }
+                }
             }
-            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-            localStorage.setItem('eps_arena_os_startTime', startTime);
-            localStorage.setItem('eps_arena_os_endTime', endTime);
-            if (matrixVisible) renderMatrix();
-            updateChronoButtons();
-        });
+        }
+    } else {
+        resetMatrix();
+    }
+    startTime = config?.startTime || null;
+    endTime = config?.endTime || null;
+    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+    localStorage.setItem('eps_arena_os_startTime', startTime);
+    localStorage.setItem('eps_arena_os_endTime', endTime);
+    if (matrixVisible) renderMatrix();
+    updateChronoButtons();
+});
     }
 
     loadOrientShowAssignments();
@@ -217,21 +228,31 @@ function onClassChange() {
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-            if (config && config.matrix) {
-                matrix = config.matrix;
-                startTime = config.startTime || null;
-                endTime = config.endTime || null;
-            } else {
-                resetMatrix();
-                startTime = null;
-                endTime = null;
+    if (config && config.matrix) {
+        // Fusionner avec les valeurs par défaut pour combler les trous
+        matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+        const configMatrix = config.matrix;
+        // Pour chaque circuit, si configMatrix a des valeurs, on les copie
+        for (const circuit of Object.keys(DEFAULT_OS_MATRIX)) {
+            if (configMatrix[circuit]) {
+                for (const color of ['NOIR','ROUGE','BLEU','VERT','JAUNE']) {
+                    if (configMatrix[circuit][color] && configMatrix[circuit][color].length === 2) {
+                        matrix[circuit][color] = [...configMatrix[circuit][color]];
+                    }
+                }
             }
-            localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-            localStorage.setItem('eps_arena_os_startTime', startTime);
-            localStorage.setItem('eps_arena_os_endTime', endTime);
-            if (matrixVisible) renderMatrix();
-            updateChronoButtons();
-        });
+        }
+    } else {
+        resetMatrix();
+    }
+    startTime = config?.startTime || null;
+    endTime = config?.endTime || null;
+    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+    localStorage.setItem('eps_arena_os_startTime', startTime);
+    localStorage.setItem('eps_arena_os_endTime', endTime);
+    if (matrixVisible) renderMatrix();
+    updateChronoButtons();
+});
     }
     loadOrientShowAssignments();
 }
@@ -477,13 +498,8 @@ function initSortableOS() {
 // 12. MATRICE DE CORRECTION
 // --------------------------------------------------------------
 function resetMatrix() {
-    matrix = {};
-    for (let c = 1; c <= NB_CIRCUITS; c++) {
-        matrix[c] = {};
-        COULEURS.forEach(col => {
-            matrix[c][col] = ['', ''];
-        });
-    }
+    // Clone profond de la matrice par défaut
+    matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
 }
 
 function renderMatrix() {
