@@ -1,5 +1,6 @@
 // src/js/modules/orientshow/orientshow-interface.js
 
+import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../core/live-engine.js';
 import { setOrientShowConfig, listenOrientShowConfig } from '../../core/firebase-service.js';
 
@@ -24,14 +25,17 @@ const DEFAULT_OS_MATRIX = {
     12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
 };
 
+// Variables d'état
 let matrix = {};
 let startTime = null;
 let endTime = null;
 let matrixVisible = false;
 
-// ---- Export de la matrice (pour être utilisée par activities.js) ----
+// --------------------------------------------------------------
+// EXPORTS POUR LE PROFESSEUR (utilisés par activities.js)
+// --------------------------------------------------------------
 export function getMatrix() {
-    // Si matrix est vide, on l'initialise avec les valeurs par défaut
+    // Si la matrice est vide, on l'initialise avec les valeurs par défaut
     if (!matrix || Object.keys(matrix).length === 0) {
         resetMatrix();
     }
@@ -41,7 +45,6 @@ export function getMatrix() {
 export function resetMatrix() {
     matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
-    // On sauvegarde dans Firebase si une classe est sélectionnée
     const classe = getCurrentClasse();
     if (classe) {
         saveMatrixToFirebase();
@@ -73,11 +76,13 @@ export function initOrientShowInterface() {
     const container = document.getElementById('viewOrientShowSettings');
     if (!container) return;
 
+    // Si la grille existe déjà, on ne reconstruit pas tout
     if (document.getElementById('os-postesGrid') && document.getElementById('os-reserve-garcons')) {
         loadOrientShowAssignments();
         return;
     }
 
+    // Construction complète du DOM
     container.innerHTML = '';
 
     const header = createHeader();
@@ -89,12 +94,14 @@ export function initOrientShowInterface() {
     const matrixContainer = createMatrixContainer();
     container.appendChild(matrixContainer);
 
-    // Initialisation de la matrice
+    // Initialisation de la matrice avec les valeurs par défaut
     resetMatrix();
 
+    // Chargement de la config Firebase
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
+            // Si Firebase a des données, on les fusionne
             if (config && config.matrix && Object.keys(config.matrix).length > 0) {
                 const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
                 for (const circuit of Object.keys(defaultMatrix)) {
@@ -124,20 +131,23 @@ export function initOrientShowInterface() {
             updateChronoButtons();
         });
     } else {
+        // Pas de classe : on garde les valeurs par défaut
         matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
         localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
         if (matrixVisible) renderMatrix();
     }
 
+    // Écouteur de changement de classe
     attachClassChangeListener();
+
+    // Chargement des affectations
     loadOrientShowAssignments();
 }
 
 // --------------------------------------------------------------
-// 2. BARRE D'EN-TÊTE (inchangée, mais conserve les exports)
+// 2. BARRE D'EN-TÊTE (avec export/import)
 // --------------------------------------------------------------
 function createHeader() {
-    // ... (inchangé, même code que précédemment)
     const div = document.createElement('div');
     div.className = 'flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4 flex-wrap gap-2';
 
@@ -312,7 +322,6 @@ function onClassChange() {
                 matrix = defaultMatrix;
             } else {
                 resetMatrix();
-                // 🔥 FORCER la sauvegarde dans Firebase
                 saveMatrixToFirebase();
             }
             startTime = config?.startTime || null;
@@ -598,7 +607,7 @@ function renderMatrix() {
     const container = document.getElementById('os-matrix-container');
     if (!container) return;
 
-    // On utilise la matrice (soit les valeurs par défaut, soit celles de Firebase)
+    // Utiliser la matrice (fallback sur DEFAULT_OS_MATRIX si vide)
     const sourceMatrix = (matrix && Object.keys(matrix).length > 0) ? matrix : DEFAULT_OS_MATRIX;
 
     let html = `<table class="w-full text-center font-bold text-[10px]"><thead><tr class="bg-slate-900 text-white"><th>#</th>`;
