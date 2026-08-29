@@ -31,6 +31,32 @@ let endTime = null;
 let matrixVisible = false;
 
 // --------------------------------------------------------------
+// MATRICE - INITIALISATION ET SAUVEGARDE
+// --------------------------------------------------------------
+function resetMatrix() {
+    matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
+    localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
+    // Sauvegarde dans Firebase si une classe est sélectionnée
+    const classe = getCurrentClasse();
+    if (classe) {
+        saveMatrixToFirebase();
+    }
+}
+
+function saveMatrixToFirebase() {
+    const classe = getCurrentClasse();
+    if (!classe) return;
+    const configData = { 
+        matrix, 
+        startTime, 
+        endTime, 
+        nbCircuits: NB_CIRCUITS, 
+        nbCouleurs: COULEURS.length 
+    };
+    setOrientShowConfig(classe, configData);
+}
+
+// --------------------------------------------------------------
 // 1. INITIALISATION (appelée par activities.js)
 // --------------------------------------------------------------
 export function initOrientShowInterface() {
@@ -62,8 +88,9 @@ export function initOrientShowInterface() {
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-            const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-            if (config && config.matrix) {
+            // Si Firebase a des données, on les fusionne
+            if (config && config.matrix && Object.keys(config.matrix).length > 0) {
+                const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
                 for (const circuit of Object.keys(defaultMatrix)) {
                     if (config.matrix[circuit]) {
                         for (const color of COULEURS) {
@@ -73,18 +100,24 @@ export function initOrientShowInterface() {
                         }
                     }
                 }
+                matrix = defaultMatrix;
+            } else {
+                // Firebase est vide : on garde les valeurs par défaut et on les sauvegarde
+                resetMatrix();
             }
-            matrix = defaultMatrix;
+            
             startTime = config?.startTime || null;
             endTime = config?.endTime || null;
+            
             localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
             localStorage.setItem('eps_arena_os_startTime', startTime);
             localStorage.setItem('eps_arena_os_endTime', endTime);
+            
             if (matrixVisible) renderMatrix();
             updateChronoButtons();
         });
     } else {
-        // Pas de classe : on utilise les valeurs par défaut
+        // Pas de classe : on garde les valeurs par défaut
         matrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
         localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
         if (matrixVisible) renderMatrix();
@@ -261,8 +294,8 @@ function onClassChange() {
     const classe = getCurrentClasse();
     if (classe) {
         listenOrientShowConfig(classe, (config) => {
-            const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
-            if (config && config.matrix) {
+            if (config && config.matrix && Object.keys(config.matrix).length > 0) {
+                const defaultMatrix = JSON.parse(JSON.stringify(DEFAULT_OS_MATRIX));
                 for (const circuit of Object.keys(defaultMatrix)) {
                     if (config.matrix[circuit]) {
                         for (const color of COULEURS) {
@@ -272,8 +305,10 @@ function onClassChange() {
                         }
                     }
                 }
+                matrix = defaultMatrix;
+            } else {
+                resetMatrix();
             }
-            matrix = defaultMatrix;
             startTime = config?.startTime || null;
             endTime = config?.endTime || null;
             localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
@@ -296,7 +331,6 @@ function onClassChange() {
 export async function loadOrientShowAssignments() {
     // Vérifier que les éléments de la réserve existent
     if (!document.getElementById('os-reserve-garcons') || !document.getElementById('os-reserve-filles')) {
-        // On les crée sans tout vider
         const container = document.getElementById('viewOrientShowSettings');
         if (container) {
             const main = createMain();
@@ -306,19 +340,16 @@ export async function loadOrientShowAssignments() {
             } else {
                 container.prepend(main);
             }
-            // Ajouter la matrice si elle n'existe pas
             if (!document.getElementById('os-matrix-container')) {
                 const matrixContainer = createMatrixContainer();
                 container.appendChild(matrixContainer);
             }
             resetMatrix();
         }
-        // On rappelle une seule fois après un délai
         setTimeout(() => loadOrientShowAssignments(), 50);
         return;
     }
 
-    // Si la grille n'existe pas, on la crée aussi
     if (!document.getElementById('os-postesGrid')) {
         const container = document.getElementById('viewOrientShowSettings');
         if (container) {
@@ -561,8 +592,8 @@ function renderMatrix() {
     const container = document.getElementById('os-matrix-container');
     if (!container) return;
 
-    // On utilise DIRECTEMENT les codes en dur
-    const sourceMatrix = DEFAULT_OS_MATRIX;
+    // On utilise la matrice (soit les valeurs par défaut, soit celles de Firebase)
+    const sourceMatrix = (matrix && Object.keys(matrix).length > 0) ? matrix : DEFAULT_OS_MATRIX;
 
     let html = `<table class="w-full text-center font-bold text-[10px]"><thead><tr class="bg-slate-900 text-white"><th>#</th>`;
     COULEURS.forEach(col => {
@@ -593,13 +624,6 @@ window.updateOSMatrixCell = function(input) {
     localStorage.setItem('eps_arena_os_matrix', JSON.stringify(matrix));
     saveMatrixToFirebase();
 };
-
-function saveMatrixToFirebase() {
-    const classe = getCurrentClasse();
-    if (!classe) return;
-    const configData = { matrix, startTime, endTime, nbCircuits: NB_CIRCUITS, nbCouleurs: COULEURS.length };
-    setOrientShowConfig(classe, configData);
-}
 
 // --------------------------------------------------------------
 // 13. CHRONO
