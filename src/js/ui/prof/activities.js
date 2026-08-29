@@ -183,8 +183,11 @@ export function initActivities() {
             configData.matrix = matrix;
             const startTime = localStorage.getItem('eps_arena_os_startTime');
             const endTime = localStorage.getItem('eps_arena_os_endTime');
-            if (startTime) configData.startTime = parseInt(startTime);
-            if (endTime) configData.endTime = parseInt(endTime);
+            if (startTime && startTime !== 'null' && startTime !== 'undefined' && !isNaN(parseInt(startTime))) {
+    configData.startTime = parseInt(startTime);
+}
+if (endTime && endTime !== 'null' && endTime !== 'undefined' && !isNaN(parseInt(endTime))) {
+    configData.endTime = parseInt(endTime);
         } else {
             // Multi-activités
             configData.activite = 'multi';
