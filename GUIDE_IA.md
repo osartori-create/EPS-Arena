@@ -8,79 +8,83 @@ Application web EPS (Éducation Physique et Sportive) pour gérer des activités
 
 ## 2. Architecture des dossiers (Exhaustive)
 ```text
-EPS-Arena/
-├── eleve.html                     (Squelette UI Élève - importe les modules)
-├── eleve_ancien.html              (Archivé - ne pas modifier)
-├── GUIDE_IA.md                    (Ce fichier - contexte pour les IA)
-├── icon.svg                       (Favicon / Icône PWA)
-├── maitre.html                    (Squelette UI Professeur - importe les modules)
-├── maitre_ancien.html             (Archivé - ne pas modifier)
-├── manifest.json                  (Configuration PWA pour iPad)
-└── src/
-    ├── index.html
-    ├── css/
-    │   └── style.css
-    └── js/
-        ├── app.js                 (Point d'entrée Prof - initialise layout, admin, activities, live)
-        ├── config/
-        │   ├── constants.js       (Barème escalade, constantes globales)
-        │   ├── firebase-config.js (URL Firebase + chemins hiérarchiques)
-        │   └── index.js
-        ├── core/
-        │   ├── firebase-service.js(Connexion Firebase, listenConfig, sendPassage, etc.)
-        │   ├── live-engine.js     (Cœur du Live : mapping local, écoute des performances)
-        │   ├── index.js
-        │   └── state.js
-        ├── modules/
-        │   ├── index.js
-        │   ├── co/
-        │   │   ├── circuit-manager.js
-        │   │   ├── co-interface.js (Réserves + Postes CO)
-        │   │   ├── co-live.js
-        │   │   └── matrice.js     (Matrice des balises)
-        │   ├── commun/
-        │   │   ├── penalite.js
-        │   │   ├── timer.js
-        │   │   └── tir.js
-        │   ├── eleve/
-        │   │   ├── escalade-kiosk.js (Interface Escalade Élève)
-        │   │   └── escalade-kiosk.js
-        │   ├── escalade/
-        │   │   ├── escalade-calculations.js (Calcul points + conversion cotation)
-        │   │   ├── escalade-controller.js
-        │   │   ├── escalade-interface.js (Grille A, B, C + réserve)
-        │   │   ├── escalade-live.js (Rendu Live + fiche bilan élève)
-        │   │   └── escalade-tv-ui.js (Rendu Montagne TV)
-        │   ├── multi/
-        │   │   ├── multi-controller.js
-        │   │   └── multi-live.js
-        │   ├── poursuite/
-        │   │   └── poursuite-controller.js
-        │   ├── sprint/
-        │   │   └── sprint-controller.js
-        │   └── teams/
-        │       └── team-generator.js (Algorithme équipes homogènes/hétérogènes)
-        ├── services/
-        │   ├── admin-service.js    (Import CSV/ZIP, stockage IndexedDB photos)
-        │   ├── index.js
-        │   ├── photo-service.js
-        │   └── toast-service.js
-        ├── ui/
-        │   ├── action-ui.js
-        │   ├── dashboard-ui.js     (Grille élèves Prof)
-        │   ├── index.js
-        │   ├── login-ui.js
-        │   ├── eleve/
-        │   │   ├── eleve-actions.js (Feedback + Montagne collective Élève)
-        │   │   └── eleve-app.js    (Initialisation + sélection classe/code Élève)
-        │   └── prof/
-        │       ├── activities.js   (Gestion des activités Prof : génération, transmission, purge)
-        │       ├── layout.js       (Navigation onglets, classes, connexion)
-        │       └── live.js         (Rendu Live Prof + agrégation des données)
-        └── utils/
-            ├── format.js
-            ├── index.js
-            └── validation.js
+C:.
+|   eleve.html
+|   eleve_ancien.html
+|   GUIDE_IA.md
+|   icon.svg
+|   maitre.html
+|   maitre_ancien.html
+|   manifest.json
+|   
+\---src
+    |   index.html
+    |   
+    +---css
+    |       style.css
+    |       
+    \---js
+        |   app.js
+        |   
+        +---config
+        |       constants.js
+        |       firebase-config.js
+        |       index.js
+        |       
+        +---core
+        |       firebase-service.js
+        |       index.js
+        |       live-engine.js
+        |       state.js
+        |       
+        +---modules
+        |   |   index.js
+        |   |   
+        |   +---co
+        |   |       circuit-manager.js
+        |   |       co-interface.js
+        |   |       co-live.js
+        |   |       matrice.js
+        |   |       
+        |   +---commun
+        |   |       penalite.js
+        |   |       timer.js
+        |   |       tir.js
+        |   |       
+        |   +---eleve
+        |   |       escalade-kiosk.js
+        |   |       orientshow-kiosk.js
+        |   |       
+        |   +---escalade
+        |   |       escalade-calculations.js
+        |   |       escalade-controller.js
+        |   |       escalade-interface.js
+        |   |       escalade-live.js
+        |   |       escalade-tv-ui.js
+        |   |       
+        |   +---multi
+        |   |       multi-controller.js
+        |   |       multi-live.js
+        |   |       
+        |   +---orientshow
+        |   |       orientshow-interface.js
+        |   |       orientshow-live.js
+        |   |       orientshow-tv.js
+        |   |       
+        |   +---poursuite
+        |   |       poursuite-controller.js
+        |   |       
+        |   +---sprint
+        |   \---teams
+        |           team-generator.js
+        |           
+        +---services
+        |       admin-service.js
+        |       index.js
+        |       photo-service.js
+        |       toast-service.js
+        |       
+        +---ui
 
 3. Structure Firebase (TRÈS IMPORTANT - RGPD)
 Chemin hiérarchique exact :
