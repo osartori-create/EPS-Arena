@@ -26,21 +26,21 @@ export function initLiveUI() {
         } else if (type === 'orientshow' && currentActivite === 'orientshow') {
             renderOrientShowLive();
         } else if (type === 'badminton' && currentActivite === 'badminton') {
-            // ✅ Import dynamique pour éviter de casser toute l'application si le module échoue
+            // Import dynamique : ne casse pas l'app si le module a une erreur
             import('../../modules/badminton/badminton-live.js')
                 .then(module => module.renderBadmintonLive())
-                .catch(err => console.error("Erreur chargement Live Badminton :", err));
+                .catch(err => console.error("Erreur Live Badminton :", err));
         }
     });
 
-    // ✅ Même logique pour l'événement config
+    // Import dynamique au changement de config
     window.addEventListener('live-config-updated', () => {
         const currentActivite = getConfigData().activite || 'multi';
 
         if (currentActivite === 'badminton') {
             import('../../modules/badminton/badminton-live.js')
                 .then(module => module.renderBadmintonLive())
-                .catch(err => console.error("Erreur chargement Live Badminton :", err));
+                .catch(err => console.error("Erreur Live Badminton :", err));
         } else {
             document.getElementById('live-content').innerHTML = '<p class="text-slate-500 text-center">En attente des données...</p>';
             if (currentActivite === 'escalade' && isTVVisible()) {

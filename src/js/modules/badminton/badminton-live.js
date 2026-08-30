@@ -4,7 +4,6 @@
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
-import { openBadmintonPlayerStats } from './badminton-stats.js'; // Import du module stats
 
 // Exposer la fonction pour le HTML
 window.openBadmintonPlayerStats = openBadmintonPlayerStats;
@@ -123,7 +122,7 @@ async function renderGrid(terrainsConfig, data) {
                         } catch(e) {}
                     }
 
-                    return `<div onclick="openBadmintonPlayerStats('${player}', '${terrain}', '${currentClasse}')" 
+                    return `<div onclick="loadPlayerStats('${player}', '${terrain}', '${currentClasse}')" 
                                 class="flex justify-between items-center bg-slate-900 p-2 rounded-xl border border-slate-700 cursor-pointer hover:border-blue-500">
                                 <div class="flex items-center gap-2">
                                     ${photoHtml}
@@ -152,6 +151,15 @@ async function renderGrid(terrainsConfig, data) {
     container.innerHTML = html;
 }
 
+window.loadPlayerStats = async function(player, terrain, classe) {
+    try {
+        // Import dynamique du module stats
+        const module = await import('./badminton-stats.js');
+        module.openBadmintonPlayerStats(player, terrain, classe);
+    } catch (err) {
+        console.error("Erreur chargement Stats Badminton :", err);
+    }
+}
 // Export iDoceo enrichi
 window.exportBadmintonImpactCSV = function() {
     alert("Export des stats Impacts en préparation !");
