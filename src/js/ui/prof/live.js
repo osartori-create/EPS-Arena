@@ -13,29 +13,72 @@ export function renderLive(discipline) {
 
     container.innerHTML = '<p class="text-slate-500 text-center">Chargement du Live...</p>';
 
+    // Détruit l'ancien écouteur si besoin
     if (window.currentLiveUnsub) {
         window.currentLiveUnsub();
         window.currentLiveUnsub = null;
     }
 
-    // Import dynamique du module Live correspondant à la discipline
-    import(`../../modules/${discipline}/${discipline}-live.js`)
-        .then(module => {
-            if (typeof module.renderLive === 'function') {
-                module.renderLive();
-            } else {
-                container.innerHTML = '<p class="text-red-400">Module Live non trouvé pour cette discipline.</p>';
-            }
-        })
-        .catch(err => {
-            console.error("Erreur chargement Live :", err);
-            // Fallback pour les activités sans module Live dédié
-            if (discipline === 'multi' || discipline === 'sprint' || discipline === 'poursuite') {
-                container.innerHTML = `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">⏱️ Résultats ${discipline}</h3><div class="space-y-2">En attente des données élèves...</div>`;
-            } else {
-                container.innerHTML = '<p class="text-red-400">Erreur : module Live non chargé.</p>';
-            }
-        });
+    // ROUTAGE SPÉCIFIQUE PAR DISCIPLINE
+    switch (discipline) {
+        case 'badminton':
+            import('../../modules/badminton/badminton-live.js')
+                .then(module => {
+                    if (module.renderBadmintonLive) {
+                        module.renderBadmintonLive();
+                    } else {
+                        container.innerHTML = '<p class="text-red-400">Erreur : module badminton non trouvé.</p>';
+                    }
+                })
+                .catch(err => console.error("Erreur Live Badminton :", err));
+            break;
+
+        case 'escalade':
+            import('../../modules/escalade/escalade-live.js')
+                .then(module => {
+                    const data = window.lastLiveData || {};
+                    if (module.renderEscaladeLive) {
+                        module.renderEscaladeLive(data);
+                    }
+                })
+                .catch(err => console.error("Erreur Live Escalade :", err));
+            break;
+
+        case 'co':
+            import('../../modules/co/co-live.js')
+                .then(module => {
+                    const data = window.lastLiveData || {};
+                    if (module.renderCOLive) {
+                        module.renderCOLive(data);
+                    }
+                })
+                .catch(err => console.error("Erreur Live CO :", err));
+            break;
+
+        case 'orientshow':
+            import('../../modules/orientshow/orientshow-live.js')
+                .then(module => {
+                    if (module.renderOrientShowLive) {
+                        module.renderOrientShowLive();
+                    }
+                })
+                .catch(err => console.error("Erreur Live OrientShow :", err));
+            break;
+
+        case 'multi':
+            import('../../modules/multi/multi-live.js')
+                .then(module => {
+                    const data = window.lastLiveData || {};
+                    if (module.renderMultiLive) {
+                        module.renderMultiLive(data);
+                    }
+                })
+                .catch(err => console.error("Erreur Live Multi :", err));
+            break;
+
+        default:
+            container.innerHTML = '<p class="text-red-400">Aucun module Live pour cette discipline.</p>';
+    }
 }
 
 window.exportCOiDoceo = function() {
