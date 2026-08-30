@@ -89,8 +89,14 @@ export function generateBadmintonTeams(eleves) {
 export function initSortableBadminton() {
     const absContainer = document.getElementById('reserveBadmintonAbsents');
     const inaptContainer = document.getElementById('reserveBadmintonInaptes');
-    if (!absContainer || !inaptContainer) return;
+    
+    // Vérification stricte pour ne pas casser si l'élément n'existe pas
+    if (!absContainer || !inaptContainer) {
+        console.warn('Conteneurs de réserve Badminton introuvables.');
+        return;
+    }
 
+    // Destruction propre des anciennes instances
     if (absContainer.__sortable) absContainer.__sortable.destroy();
     if (inaptContainer.__sortable) inaptContainer.__sortable.destroy();
     document.querySelectorAll('.terrain-members').forEach(el => {

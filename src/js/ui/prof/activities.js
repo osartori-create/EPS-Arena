@@ -466,10 +466,12 @@ export function initActivities() {
     };
 
     // Fonction pour ajouter un terrain supplémentaire
-    window.addBadmintonTerrain = function() {
+        window.addBadmintonTerrain = function() {
         let nb = window.currentBadmintonTerrains || 6;
         nb++;
+        // Force la recréation de la grille avec le nouveau nombre
         initBadmintonInterface(nb, true);
+        // Recharge les affectations existantes
         setTimeout(() => loadBadmintonAssignments(), 100);
         alert("✅ Terrain " + nb + " ajouté !");
     };
