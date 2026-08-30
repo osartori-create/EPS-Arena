@@ -15,11 +15,10 @@ let ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } }
 let terrainsConfig = {};
 let historyStack = [];
 let redoStack = [];
-let resultsListenerAttached = false; // Pour éviter la boucle infinie
+let resultsListenerAttached = false;
 
-// Variables pour la configuration du terrain
 let middleZoneSize = 33;
-let isFrontBackLayout = true; // true = Avant/Arrière, false = Gauche/Droite
+let isFrontBackLayout = true;
 let centerPoints = 1;
 let otherPoints = 3;
 
@@ -49,7 +48,6 @@ export function initBadmintonKiosk(classe) {
         }
     });
 
-    // On attache l'écouteur de résultats UNE SEULE FOIS
     if (!resultsListenerAttached) {
         listenForScoreUpdates();
         resultsListenerAttached = true;
@@ -139,19 +137,18 @@ function renderMatchSetup() {
                 <div class="space-y-4 mb-6">
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Joueur 1 (P1)</label>
-                        <select id="select-p1" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white">
+                        <select id="select-p1" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white" onchange="checkAndStartMatch()">
                             <option value="">-- Choisir --</option>
                             ${playersList.map(p => `<option value="${p}">Joueur ${p}</option>`).join('')}
                         </select>
                     </div>
                     <div>
                         <label class="block text-xs text-slate-400 mb-1">Joueur 2 (P2)</label>
-                        <select id="select-p2" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white">
+                        <select id="select-p2" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white" onchange="checkAndStartMatch()">
                             <option value="">-- Choisir --</option>
                             ${playersList.map(p => `<option value="${p}">Joueur ${p}</option>`).join('')}
                         </select>
                     </div>
-                    <button onclick="startSelectedMatch()" class="w-full bg-emerald-600 py-3 rounded-xl font-black text-white uppercase">🎮 Lancer ce match</button>
                 </div>
 
                 <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Programmation (Round Robin)</h3>
@@ -159,9 +156,11 @@ function renderMatchSetup() {
                     ${matchSchedule.map(match => {
                         const isPlayed = match.s1 !== null;
                         const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
+                        // Style grisé + barré pour les matchs terminés
+                        const playedStyle = isPlayed ? 'line-through opacity-60' : '';
                         return `
                             <button onclick="selectMatchFromList('${match.id}')" 
-                                class="w-full text-left p-3 rounded-lg border-2 transition-colors ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
+                                class="w-full text-left p-3 rounded-lg border-2 transition-colors ${playedStyle} ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
                                 <div class="flex justify-between items-center font-black">
                                     <span>${match.p1} vs ${match.p2}</span>
                                     <span class="text-sm">${scoreDisplay}</span>
@@ -169,18 +168,22 @@ function renderMatchSetup() {
                             </button>`;
                     }).join('')}
                 </div>
+
+                <!-- TABLEAU DE CLASSEMENT -->
+                <div id="classement" class="mt-6"></div>
             </div>
 
             <!-- Colonne Droite : Terrain 3D -->
             <div class="w-full lg:w-2/3 bg-slate-900 p-6 rounded-2xl border border-slate-700" id="court-zone">
                 <div class="text-center py-10">
-                    <p class="text-2xl font-black text-slate-500">Sélectionnez un match pour jouer</p>
+                    <p class="text-2xl font-black text-slate-500">Sélectionnez deux joueurs pour commencer</p>
                 </div>
             </div>
         </div>
     `;
 
     container.innerHTML = html;
+    renderClassement(); // Appel du classement
 }
 
 window.selectMatchFromList = function(matchId) {
@@ -193,7 +196,16 @@ window.selectMatchFromList = function(matchId) {
     startSelectedMatch();
 };
 
-// --- ÉCOUTE DES RÉSULTATS (Une seule fois, pour mettre à jour l'affichage) ---
+// Lancement automatique du match dès que les deux joueurs sont choisis
+window.checkAndStartMatch = function() {
+    const p1 = document.getElementById('select-p1').value;
+    const p2 = document.getElementById('select-p2').value;
+    if (p1 && p2 && p1 !== p2) {
+        startSelectedMatch();
+    }
+};
+
+// ÉCOUTE DES RÉSULTATS
 function listenForScoreUpdates() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
@@ -208,14 +220,14 @@ function listenForScoreUpdates() {
             }
         });
 
-        // Mise à jour de la liste des matchs sans recréer toute l'interface
         const list = document.querySelector('#badminton-content .space-y-2');
         if (list) {
             list.innerHTML = matchSchedule.map(match => {
                 const isPlayed = match.s1 !== null;
                 const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
+                const playedStyle = isPlayed ? 'line-through opacity-60' : '';
                 return `<button onclick="selectMatchFromList('${match.id}')" 
-                            class="w-full text-left p-3 rounded-lg border-2 transition-colors ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
+                            class="w-full text-left p-3 rounded-lg border-2 transition-colors ${playedStyle} ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
                             <div class="flex justify-between items-center font-black">
                                 <span>${match.p1} vs ${match.p2}</span>
                                 <span class="text-sm">${scoreDisplay}</span>
@@ -223,7 +235,41 @@ function listenForScoreUpdates() {
                         </button>`;
             }).join('');
         }
+        renderClassement(); // Mise à jour du classement
     });
+}
+
+// CALCUL ET AFFICHAGE DU CLASSEMENT
+function renderClassement() {
+    const container = document.getElementById('classement');
+    if (!container) return;
+
+    const standings = {};
+    playersList.forEach(p => standings[p] = { pts: 0, wins: 0, losses: 0, diff: 0 });
+
+    matchSchedule.forEach(m => {
+        if (m.s1 === null) return;
+        if (m.s1 > m.s2) {
+            standings[m.p1].pts += 3; standings[m.p1].wins++; standings[m.p1].diff += (m.s1 - m.s2);
+            standings[m.p2].losses++; standings[m.p2].diff -= (m.s1 - m.s2);
+        } else {
+            standings[m.p2].pts += 3; standings[m.p2].wins++; standings[m.p2].diff += (m.s2 - m.s1);
+            standings[m.p1].losses++; standings[m.p1].diff -= (m.s2 - m.s1);
+        }
+    });
+
+    const sorted = Object.entries(standings).sort((a, b) => b[1].pts - a[1].pts || b[1].diff - a[1].diff);
+    
+    let html = `<h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Classement</h3>
+                <div class="space-y-2">`;
+    sorted.forEach(([player, data], idx) => {
+        html += `<div class="bg-slate-900 p-2 rounded-lg border border-slate-700 flex justify-between items-center">
+                    <span class="font-black text-white">${idx + 1}. ${player}</span>
+                    <span class="text-xs text-slate-400">${data.pts} pts | ${data.wins} V - ${data.losses} D</span>
+                </div>`;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
 }
 
 window.startSelectedMatch = function() {
@@ -231,7 +277,6 @@ window.startSelectedMatch = function() {
     const p2 = document.getElementById('select-p2').value;
 
     if (!p1 || !p2 || p1 === p2) {
-        alert("Veuillez sélectionner deux joueurs différents !");
         return;
     }
 
@@ -244,11 +289,10 @@ window.startSelectedMatch = function() {
     renderCourtInterface();
 };
 
-// --- 3. INTERFACE DU TERRAIN 3D (Slider Bleu + Switch Layout) ---
+// --- 3. INTERFACE DU TERRAIN 3D ---
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
 
-    // CSS pour Slider Bleu et Switch
     const controlsStyle = `
         <style>
             #middle-zone-slider {
@@ -288,7 +332,6 @@ function renderCourtInterface() {
         </style>
     `;
 
-    // Zones différenciées par couleur
     const zoneHtml = isFrontBackLayout ? `
         <div class="flex flex-col h-full">
             <div class="zone front bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
@@ -330,10 +373,10 @@ function renderCourtInterface() {
 
             <div class="flex gap-2">
                 <select id="center-points" class="bg-slate-900 text-white p-1 rounded text-xs">
-                    <option value="1">C: 1</option><option value="2">C: 2</option><option value="3">C: 3</option>
+                    <option value="1">Centre : 1</option><option value="2">Centre : 2</option><option value="3">Centre : 3</option>
                 </select>
                 <select id="other-points" class="bg-slate-900 text-white p-1 rounded text-xs">
-                    <option value="1">E: 1</option><option value="2">E: 2</option><option value="3" selected>E: 3</option>
+                    <option value="1">Extérieur : 1</option><option value="2">Extérieur : 2</option><option value="3" selected>Extérieur : 3</option>
                 </select>
             </div>
         </div>
@@ -375,8 +418,6 @@ function renderCourtInterface() {
 }
 
 // --- 4. INTERACTIONS ---
-
-// CORRECTION : La jauge fait varier la taille proportionnellement
 function updateZoneSize() {
     const slider = document.getElementById('middle-zone-slider');
     if (!slider) return;
@@ -384,17 +425,13 @@ function updateZoneSize() {
     middleZoneSize = parseInt(slider.value);
     document.getElementById('zone-size-display').innerText = middleZoneSize + '%';
     
-    // Calcul des pourcentages : Si centre = 60%, extérieur = (100 - 60) / 2 = 20% chacun.
-    // On retire flex:1 sur les enfants et on applique les % directement.
     const sideSize = (100 - middleZoneSize) / 2;
 
     document.querySelectorAll('#court .half-court').forEach((half) => {
         const zones = half.querySelectorAll('.zone');
-        
         zones.forEach(zone => { zone.style.flex = 'none'; });
 
         if (isFrontBackLayout) {
-            // Avant / Arrière (Vertical)
             zones[0].style.height = sideSize + '%';
             zones[1].style.height = middleZoneSize + '%';
             zones[2].style.height = sideSize + '%';
@@ -402,7 +439,6 @@ function updateZoneSize() {
             zones[1].style.width = '100%';
             zones[2].style.width = '100%';
         } else {
-            // Gauche / Droite (Horizontal)
             zones[0].style.width = sideSize + '%';
             zones[1].style.width = middleZoneSize + '%';
             zones[2].style.width = sideSize + '%';
@@ -448,7 +484,8 @@ function handleImpact(e) {
     matchPoints[player] += points;
     ratioData[player][isMiddle ? 'middle' : 'extreme']++;
 
-    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
+    // Inversion de l'affichage des scores (p2 - p1) pour correspondre à la demande
+    document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
     
     const p1Total = ratioData.p1.extreme + ratioData.p1.middle;
     const p2Total = ratioData.p2.extreme + ratioData.p2.middle;
@@ -478,7 +515,7 @@ function undoImpact() {
     matchPoints[last.player] -= last.points;
     ratioData[last.player][last.isMiddle ? 'middle' : 'extreme']--;
     
-    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
+    document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
     
     const p1Total = ratioData.p1.extreme + ratioData.p1.middle;
     const p2Total = ratioData.p2.extreme + ratioData.p2.middle;
@@ -499,18 +536,17 @@ function resetCourt() {
     redoStack = [];
 }
 
-// Suppression de l'ancien toggleLayout (le switch prend le relais)
 window.undoImpact = undoImpact;
 window.resetCourt = resetCourt;
 
 // --- 5. FIN DE MATCH ---
 window.endMatch = function() {
     if (!currentMatch) return;
-    if (confirm(`Valider le score ${matchPoints.p1} - ${matchPoints.p2} ?`)) {
+    if (confirm(`Valider le score ${matchPoints.p2} - ${matchPoints.p1} ?`)) {
         const p1 = currentMatch.p1;
         const p2 = currentMatch.p2;
-        const s1 = matchPoints.p1;
-        const s2 = matchPoints.p2;
+        const s1 = matchPoints.p2;
+        const s2 = matchPoints.p1;
 
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
