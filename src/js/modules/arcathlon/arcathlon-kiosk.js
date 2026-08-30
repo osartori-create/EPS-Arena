@@ -1,5 +1,5 @@
 // src/js/modules/arcathlon/arcathlon-kiosk.js
-// Interface élève – Phases, chrono, tirs, pénalités, enregistrement Firebase
+// Interface élève – Sélection équipe + PIN, phases, chrono, tirs, pénalités, enregistrement
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -8,19 +8,20 @@ import { db, ref, onValue, push } from '../../core/firebase-service.js';
 // --------------------------------------------------------------
 const state = {
     classe: '',
-    code: '',
+    code: '',              // EQ1_Rouge
     equipeId: '',
     maillot: '',
     config: null,
+    equipes: {},
     serieActuelle: 1,
     nbSeries: 3,
-    phase: 'course',          // course | tir | penalite
+    phase: 'course',       // course | tir | penalite | fin
     running: false,
     phaseStart: null,
-    phaseAccum: 0,            // temps écoulé dans la phase en cours
-    tempsCourse: 0,           // temps total cumulé de toutes les courses (sans pénalités)
-    tempsPenalite: 0,         // temps total cumulé des pénalités
-    tempsTotal: 0,            // temps total cumulé (course + pénalités)
+    phaseAccum: 0,
+    tempsCourse: 0,
+    tempsPenalite: 0,
+    tempsTotal: 0,
     nbFleches: 2,
     shots: [],
     penReq: 0,
@@ -28,18 +29,22 @@ const state = {
     departSignal: false,
     handicapMs: 0,
     vmaRef: 0,
-    distanceTotale: 0,
+    distanceCourse: 0,
     longueurPenalite: 30,
-    mode: 'sprint'
+    mode: 'sprint',
+    // Pour la détection de fraude
+    alerteTriche: false,
+    // Pour l'affichage du bilan
+    distanceTotaleParcourue: 0,
+    reussitesTir: 0
 };
 
 let configListener = null;
 let departListener = null;
 let clockInterval = null;
-let isFirstRender = true;
 
 // --------------------------------------------------------------
-// 1. INITIALISATION
+// 1. INITIALISATION (appelée par eleve-app.js)
 // --------------------------------------------------------------
 export function initArcathlonKiosk(classe, code) {
     state.classe = classe;
@@ -55,7 +60,9 @@ export function initArcathlonKiosk(classe, code) {
     state.penReq = 0;
     state.penDone = 0;
     state.departSignal = false;
-    isFirstRender = true;
+    state.alerteTriche = false;
+    state.distanceTotaleParcourue = 0;
+    state.reussitesTir = 0;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/config`);
@@ -68,12 +75,13 @@ export function initArcathlonKiosk(classe, code) {
             state.mode = config.mode || 'sprint';
             state.nbSeries = config.nbSeries || 3;
             state.nbFleches = config.nbFleches || 2;
-            state.distanceTotale = config.distanceTotale || 100;
+            state.distanceCourse = config.distanceTotale || 100;
             state.longueurPenalite = config.longueurPenalite || 30;
             state.equipes = config.equipes || {};
             state.handicapMs = (config.handicaps && config.handicaps[code]) || 0;
             state.vmaRef = (config.vmaReference && config.vmaReference[code]) || 12;
 
+            // Trouver l'équipe et le maillot
             for (const [eqId, eqData] of Object.entries(state.equipes)) {
                 const membre = eqData.membres.find(m => m.code === code);
                 if (membre) {
@@ -82,6 +90,7 @@ export function initArcathlonKiosk(classe, code) {
                     break;
                 }
             }
+
             renderPhase();
         } else {
             const container = document.getElementById('arcathlon-module');
@@ -120,7 +129,7 @@ export function initArcathlonKiosk(classe, code) {
 }
 
 // --------------------------------------------------------------
-// 2. AFFICHAGE
+// 2. AFFICHAGE DE LA PHASE
 // --------------------------------------------------------------
 function renderPhase() {
     const container = document.getElementById('arcathlon-module');
@@ -150,8 +159,6 @@ function renderPhase() {
     };
     const phaseInfo = phaseLabels[state.phase] || phaseLabels.course;
 
-    // Si on est en course et que le bouton doit être "Démarrer", on le laisse actif
-    // Si le chrono tourne, on change le texte
     let btnText = phaseInfo.btnText;
     if (state.phase === 'course' && state.running) {
         btnText = '🏁 Arrivée';
@@ -209,21 +216,12 @@ function renderPhase() {
 
     injectStyles();
 
-    // Attacher l'événement du bouton
     const btn = document.getElementById('giantBtn');
     if (btn) {
         btn.addEventListener('click', onGiantAction);
     }
 
-    // Mettre à jour le chrono
     updateClockDisplay();
-
-    // Si c'est la première fois et qu'on est en mode sprint, on ne démarre PAS automatiquement
-    // L'élève doit cliquer sur "Démarrer la course"
-    if (isFirstRender && state.phase === 'course' && state.mode === 'sprint') {
-        isFirstRender = false;
-        // On ne fait rien, on attend le clic
-    }
 }
 
 // --------------------------------------------------------------
@@ -233,7 +231,7 @@ function renderPhaseContent() {
     if (state.phase === 'course') {
         return `
             <div class="text-center py-4">
-                <p class="text-slate-400">Course de ${state.distanceTotale}m</p>
+                <p class="text-slate-400">Course de ${state.distanceCourse}m</p>
                 <p class="text-xs text-slate-500 mt-2">Objectif VMA : ${state.vmaRef} km/h</p>
                 ${state.handicapMs > 0 ? `<p class="text-xs text-amber-400 mt-1">⏱ Handicap de ${(state.handicapMs/1000).toFixed(1)}s</p>` : ''}
                 ${state.running ? '<p class="text-emerald-400 font-bold mt-2">⏱ Course en cours...</p>' : '<p class="text-slate-500 mt-2">Cliquez sur "Démarrer la course" pour commencer</p>'}
@@ -250,15 +248,18 @@ function renderPhaseContent() {
             </button>
         `).join('');
 
+        const reussites = state.shots.filter(s => s === 1).length;
+        const manques = state.shots.filter(s => s === -1).length;
+
         return `
             <div class="flex flex-col items-center gap-3">
                 <div class="flex gap-3 flex-wrap justify-center">
                     ${shotsHtml}
                 </div>
                 <div class="flex gap-4 text-sm">
-                    <span class="text-emerald-400">✅ ${state.shots.filter(s => s === 1).length}</span>
-                    <span class="text-red-400">❌ ${state.shots.filter(s => s === -1).length}</span>
-                    <span class="text-slate-400">Score : <strong class="text-yellow-400">${calculateTirScore()}</strong></span>
+                    <span class="text-emerald-400">✅ ${reussites}</span>
+                    <span class="text-red-400">❌ ${manques}</span>
+                    <span class="text-slate-400">Réussite : <strong class="text-yellow-400">${Math.round((reussites / state.nbFleches) * 100)}%</strong></span>
                 </div>
                 <button onclick="window.undoShot()" class="bg-slate-700 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">
                     ↩ Annuler dernière
@@ -294,7 +295,7 @@ function renderPhaseContent() {
 }
 
 // --------------------------------------------------------------
-// 4. CHRONO (corrigé – temps total cumulatif)
+// 4. CHRONO
 // --------------------------------------------------------------
 function startClock() {
     if (state.running) return;
@@ -317,23 +318,13 @@ function stopClock() {
         cancelAnimationFrame(clockInterval);
         clockInterval = null;
     }
-    // On met à jour les temps cumulés
+    // Mise à jour des temps cumulés
     if (state.phase === 'course') {
         state.tempsCourse += state.phaseAccum;
     } else if (state.phase === 'penalite') {
         state.tempsPenalite += state.phaseAccum;
     }
     state.tempsTotal = state.tempsCourse + state.tempsPenalite;
-}
-
-function resetClock() {
-    stopClock();
-    state.phaseAccum = 0;
-    state.phaseStart = null;
-    state.tempsCourse = 0;
-    state.tempsPenalite = 0;
-    state.tempsTotal = 0;
-    updateClockDisplay();
 }
 
 function updateClock() {
@@ -396,10 +387,9 @@ function startCourse() {
 
 function finishCourse() {
     stopClock();
-    // On ajoute le temps de course cumulé (déjà fait dans stopClock)
     state.tempsTotal = state.tempsCourse + state.tempsPenalite;
 
-    // Dernière série ? On enregistre directement (pas de tir)
+    // Dernière série ? On enregistre directement (pas de tir ni pénalité)
     if (state.serieActuelle >= state.nbSeries) {
         savePassage();
         return;
@@ -411,12 +401,12 @@ function finishCourse() {
     state.phaseAccum = 0;
     state.phaseStart = null;
     renderPhase();
-    startClock(); // Le chrono continue pour le tir
+    startClock();
     updateButton('tir', 'Fin de tir');
 }
 
 // --------------------------------------------------------------
-// 6. TIRS
+// 6. TIRS (avec règle simple : 1 tour par flèche manquée)
 // --------------------------------------------------------------
 window.toggleShot = function(index) {
     if (state.phase !== 'tir') return;
@@ -425,7 +415,6 @@ window.toggleShot = function(index) {
     if (current === 0) state.shots[index] = 1;
     else if (current === 1) state.shots[index] = -1;
     else state.shots[index] = 0;
-    // Rafraîchir le contenu de la phase
     const phaseContent = document.getElementById('phaseContent');
     if (phaseContent) phaseContent.innerHTML = renderPhaseContent();
 };
@@ -443,22 +432,14 @@ window.undoShot = function() {
     showToast('Aucune flèche à annuler', 1500);
 };
 
-function calculateTirScore() {
-    return state.shots.filter(s => s === 1).length * 5;
-}
-
 function finishTir() {
     stopClock();
-    // On ajoute le temps de tir (qui est dans phaseAccum) – mais il n'est pas stocké séparément
-    // Le temps total inclut déjà le temps de tir via phaseAccum
-    const score = calculateTirScore();
+    const reussites = state.shots.filter(s => s === 1).length;
+    const manques = state.shots.filter(s => s === -1).length;
+    state.reussitesTir = reussites;
 
-    // Barème des pénalités
-    if (score < 7) state.penReq = 3;
-    else if (score < 12) state.penReq = 2;
-    else if (score < 16) state.penReq = 1;
-    else state.penReq = 0;
-
+    // Règle simple : 1 tour de pénalité par flèche manquée
+    state.penReq = manques;
     state.penDone = 0;
 
     if (state.penReq > 0) {
@@ -466,10 +447,12 @@ function finishTir() {
         state.phaseAccum = 0;
         state.phaseStart = null;
         renderPhase();
-        startClock(); // Le chrono continue pour les pénalités
+        startClock();
         updateButton('penalite', 'Effectuer les tours');
     } else {
-        // Pas de pénalité → fin de série
+        // Pas de pénalité → on termine la série (pas de grande boucle supplémentaire)
+        // Mais selon la logique, on doit faire une grande boucle après les pénalités ? Non, on termine.
+        // On enregistre directement.
         savePassage();
     }
 }
@@ -494,21 +477,35 @@ window.validatePenalty = function(index) {
 
     if (state.penDone >= state.penReq) {
         stopClock();
-        // Le temps des pénalités est déjà dans phaseAccum, on l'ajoute
         state.tempsPenalite += state.phaseAccum;
         state.tempsTotal = state.tempsCourse + state.tempsPenalite;
-        savePassage();
+        // Après avoir terminé les pénalités, on fait une grande boucle (course)
+        // Sauf si c'est la dernière série → on enregistre directement
+        if (state.serieActuelle >= state.nbSeries) {
+            savePassage();
+        } else {
+            // On repart en course (grande boucle)
+            state.phase = 'course';
+            state.phaseAccum = 0;
+            state.phaseStart = null;
+            renderPhase();
+            // On laisse l'élève démarrer manuellement
+            updateButton('course', 'Démarrer la course');
+        }
     }
 };
 
 // --------------------------------------------------------------
-// 8. SAUVEGARDE DU PASSAGE (avec bilan)
+// 8. SAUVEGARDE DU PASSAGE (avec détection de fraude)
 // --------------------------------------------------------------
 function savePassage() {
     stopClock();
 
-    // Calcul de la distance totale parcourue (course + pénalités)
-    const distanceKm = (state.distanceTotale + (state.penDone * state.longueurPenalite)) / 1000;
+    // Distance totale parcourue : course + pénalités
+    const distanceTotale = state.distanceCourse + (state.penDone * state.longueurPenalite);
+    state.distanceTotaleParcourue = distanceTotale;
+
+    const distanceKm = distanceTotale / 1000;
     const tempsHeures = state.tempsTotal / 1000 / 3600;
     const vitesse = tempsHeures > 0 ? distanceKm / tempsHeures : 0;
 
@@ -518,14 +515,24 @@ function savePassage() {
     else if (vitesse >= state.vmaRef - 0.5) ptsVMA = 2;
     else if (vitesse >= state.vmaRef - 1) ptsVMA = 1;
 
-    const score = calculateTirScore();
+    // Bonus de tir (simple : 5 pts par flèche réussie)
+    const scoreTir = state.reussitesTir * 5;
     let bonus = 0;
-    if (score < 7) bonus = 0;
-    else if (score < 12) bonus = -10;
-    else if (score < 16) bonus = -15;
+    if (scoreTir < 7) bonus = 0;
+    else if (scoreTir < 12) bonus = -10;
+    else if (scoreTir < 16) bonus = -15;
     else bonus = -20;
 
     const tempsBonifie = (state.tempsTotal / 1000) + bonus;
+
+    // Détection de fraude
+    state.alerteTriche = false;
+    if (vitesse > 0) {
+        const vitesseNum = parseFloat(vitesse);
+        if (vitesseNum > 25 || vitesseNum > state.vmaRef * 1.5) {
+            state.alerteTriche = true;
+        }
+    }
 
     const passageData = {
         code: state.code,
@@ -539,10 +546,13 @@ function savePassage() {
         tempsBonifie: Math.round(tempsBonifie * 10) / 10,
         vitesse: Math.round(vitesse * 10) / 10,
         ptsVMA: ptsVMA,
-        scoreTir: score,
+        scoreTir: scoreTir,
         bonus: bonus,
         penalites: state.penDone,
         handicap: state.handicapMs,
+        distanceTotale: Math.round(distanceTotale),
+        reussitesTir: state.reussitesTir,
+        alerteTriche: state.alerteTriche,
         timestamp: Date.now()
     };
 
@@ -552,7 +562,6 @@ function savePassage() {
 
     push(passageRef, passageData)
         .then(() => {
-            // Afficher un bilan pour l'élève
             showBilan(passageData);
             if (state.serieActuelle < state.nbSeries) {
                 state.serieActuelle++;
@@ -565,9 +574,9 @@ function savePassage() {
                 state.shots = [];
                 state.penReq = 0;
                 state.penDone = 0;
+                state.reussitesTir = 0;
                 renderPhase();
                 if (state.mode === 'sprint') {
-                    // On laisse l'élève cliquer sur "Démarrer"
                     updateButton('course', 'Démarrer la course');
                 } else {
                     updateButton('course', '⏳ Attente départ...');
@@ -585,7 +594,9 @@ function savePassage() {
                             <div class="mt-6 bg-slate-800 p-6 rounded-2xl border border-slate-700 max-w-md mx-auto text-left">
                                 <p class="text-sm text-slate-400">Dernière série :</p>
                                 <p class="text-lg font-bold text-white">Temps total : ${formatTime(passageData.tempsTotal)}</p>
+                                <p class="text-lg font-bold text-white">Distance : ${passageData.distanceTotale}m</p>
                                 <p class="text-lg font-bold text-white">Vitesse : ${passageData.vitesse} km/h</p>
+                                ${passageData.alerteTriche ? '<p class="text-lg font-bold text-red-400">⚠️ Vitesse suspecte</p>' : ''}
                                 <p class="text-lg font-bold text-yellow-400">Points VMA : ${passageData.ptsVMA}</p>
                                 <p class="text-lg font-bold text-blue-400">Points Tir : ${passageData.scoreTir}</p>
                                 <p class="text-lg font-bold text-emerald-400">Total : ${totalPts} pts</p>
@@ -609,10 +620,6 @@ function savePassage() {
 // --------------------------------------------------------------
 function showBilan(data) {
     const totalPts = data.ptsVMA + data.scoreTir;
-    const container = document.getElementById('arcathlon-module');
-    if (!container) return;
-
-    // On surcharge le contenu pour afficher le bilan avant de passer à la suite
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50 p-4';
     overlay.innerHTML = `
@@ -621,7 +628,9 @@ function showBilan(data) {
             <h2 class="text-2xl font-black text-white mb-2">Série ${data.serie} terminée</h2>
             <div class="space-y-2 text-left text-sm">
                 <p class="flex justify-between"><span class="text-slate-400">Temps total</span><span class="font-bold text-white">${formatTime(data.tempsTotal)}</span></p>
+                <p class="flex justify-between"><span class="text-slate-400">Distance</span><span class="font-bold text-white">${data.distanceTotale}m</span></p>
                 <p class="flex justify-between"><span class="text-slate-400">Vitesse</span><span class="font-bold text-white">${data.vitesse} km/h</span></p>
+                ${data.alerteTriche ? '<p class="flex justify-between"><span class="text-slate-400">⚠️ Alerte</span><span class="font-bold text-red-400">Vitesse suspecte</span></p>' : ''}
                 <p class="flex justify-between"><span class="text-slate-400">Points VMA</span><span class="font-bold text-yellow-400">${data.ptsVMA}</span></p>
                 <p class="flex justify-between"><span class="text-slate-400">Points Tir</span><span class="font-bold text-blue-400">${data.scoreTir}</span></p>
                 <p class="flex justify-between border-t border-slate-700 pt-2"><span class="font-bold text-emerald-400">Total</span><span class="font-bold text-emerald-400">${totalPts} pts</span></p>
@@ -739,4 +748,4 @@ window.undoShot = window.undoShot;
 window.validatePenalty = window.validatePenalty;
 window.retourMenuArcathlon = window.retourMenuArcathlon;
 
-console.log('✅ Arcathlon kiosque chargé (version corrigée)');
+console.log('✅ Arcathlon kiosque chargé (version enrichie)');
