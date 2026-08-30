@@ -2,7 +2,8 @@
 <html lang="fr">
     <style>
     body { overflow-x: hidden; }
-    #activity-screen { min-height: 100vh; }
+    /* On enlève la hauteur forcée pour que l'écran s'adapte au contenu */
+    #activity-screen { min-height: auto; }
 </style>
 <head>
     <meta charset="UTF-8">
@@ -89,7 +90,7 @@
                     <button onclick="window.sendBalise()" class="w-full bg-blue-600 py-5 rounded-3xl text-xl font-black uppercase shadow-xl active:scale-95 transition-all">✅ Valider</button>
                 </div>
             </div>
-            <!-- MODULE MULTI -->
+                        <!-- MODULE MULTI -->
             <div id="multi-module" class="hidden space-y-4">
                 <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
                     <div id="chrono-display" class="text-8xl font-black tabular-nums text-yellow-400 mb-8">00:00</div>
@@ -97,11 +98,13 @@
                     <button id="stop-btn" onclick="window.stopChrono()" class="hidden w-full bg-red-600 py-5 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95 transition-all">⏹ Arrêter</button>
                 </div>
             </div>
-        </div>
-        <div id="badminton-module" class="hidden space-y-4">
+
+            <!-- MODULE BADMINTON (Déplacé ICI, à l'intérieur de activity-screen) -->
+            <div id="badminton-module" class="hidden space-y-4">
                 <div id="badminton-content" class="space-y-4"></div>
             </div>
+
         </div> <!-- Fin de activity-screen -->
-    </div>
+    </div> <!-- Fin du conteneur principal -->
 </body>
 </html>
