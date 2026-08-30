@@ -40,8 +40,7 @@
             <button onclick="addClasse()" class="btn btn-primary text-xs uppercase">+ Classe</button>
             <button onclick="transmettreConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">📡 Transmettre aux iPads</button>
             <button onclick="openPurgeModal()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400 ml-2">🗑️ Purge</button>
-            
-            
+        </div>
     </header>
 
     <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
@@ -84,14 +83,15 @@
                     <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏹 Arcathlon</button>
                 </div>
             </div>
-            <!-- Dans viewActivities, après le sélecteur de discipline -->
-<div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 mb-4">
-    <div class="flex gap-2 font-black text-xs uppercase">
-        <button id="subtab-settings" onclick="switchActivitySubTab('settings')" class="px-4 py-2 rounded-lg bg-blue-600 text-white">⚙️ Réglages</button>
-        <button id="subtab-live" onclick="switchActivitySubTab('live')" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-300">📊 Live</button>
-        <button id="subtab-tv" onclick="switchActivitySubTab('tv')" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-300">📺 TV</button>
-    </div>
-</div>
+
+            <!-- Sous-onglets (Réglages / Live / TV) -->
+            <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 mb-4">
+                <div class="flex gap-2 font-black text-xs uppercase">
+                    <button id="subtab-settings" onclick="switchActivitySubTab('settings')" class="px-4 py-2 rounded-lg bg-blue-600 text-white">⚙️ Réglages</button>
+                    <button id="subtab-live" onclick="switchActivitySubTab('live')" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-300">📊 Live</button>
+                    <button id="subtab-tv" onclick="switchActivitySubTab('tv')" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-300">📺 TV</button>
+                </div>
+            </div>
 
             <!-- PARAMÈTRES MULTI-ACTIVITÉS -->
             <div id="viewMultiSettings" class="space-y-4">
@@ -163,8 +163,6 @@
                         <input type="file" id="importCOFile" class="hidden" onchange="importCOConfig(event)">
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        
-                        <!-- RÉSERVE CO restaurée ici ! -->
                         <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve</h4>
                             <div class="flex gap-2">
@@ -186,10 +184,8 @@
                 </div>
             </div>
 
-                                                            <!-- VUE PARAMÈTRES ORIENT'SHOW -->
+            <!-- PARAMÈTRES ORIENT'SHOW -->
             <div id="viewOrientShowSettings" class="hidden space-y-4">
-                
-                <!-- Boutons en haut -->
                 <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
                     <h3 class="font-black text-blue-400 uppercase text-sm">Configuration Orient'Show</h3>
                     <div class="flex gap-2">
@@ -199,46 +195,28 @@
                         <input type="file" id="importOSFile" class="hidden" onchange="importOSConfig(event)">
                     </div>
                 </div>
-
-                <!-- Matrice modifiable -->
-<div id="os-matrix-container" class="bg-slate-900 p-4 rounded-2xl border border-slate-700 overflow-x-auto mb-4">
-    <!-- Remplie par le script -->
-</div>
-
-<!-- Boutons Chrono -->
-<div class="flex gap-2 mb-4">
-    <button id="os-start-btn" onclick="window.startOrientShow()" class="bg-emerald-600 px-6 py-3 rounded-xl font-black text-sm uppercase text-white border-2 border-emerald-400">🚀 TOP DÉPART</button>
-    <button id="os-stop-btn" onclick="window.stopOrientShow()" class="bg-red-600 px-6 py-3 rounded-xl font-black text-sm uppercase text-white border-2 border-red-400 disabled:opacity-50" disabled>🛑 ARRÊTER</button>
-</div>
-
-                <!-- Zone Réserve à gauche + Grille à droite (réserve plus étroite) -->
+                <div id="os-matrix-container" class="bg-slate-900 p-4 rounded-2xl border border-slate-700 overflow-x-auto mb-4"></div>
+                <div class="flex gap-2 mb-4">
+                    <button id="os-start-btn" onclick="window.startOrientShow()" class="bg-emerald-600 px-6 py-3 rounded-xl font-black text-sm uppercase text-white border-2 border-emerald-400">🚀 TOP DÉPART</button>
+                    <button id="os-stop-btn" onclick="window.stopOrientShow()" class="bg-red-600 px-6 py-3 rounded-xl font-black text-sm uppercase text-white border-2 border-red-400 disabled:opacity-50" disabled>🛑 ARRÊTER</button>
+                </div>
                 <div class="flex gap-4">
-                    
-                    <!-- Colonne Gauche : Réserve (plus étroite) -->
                     <div class="w-1/4 shrink-0 bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
                         <div class="flex justify-between items-center mb-3">
                             <h4 class="font-bold text-slate-400 uppercase text-xs">Réserve</h4>
                             <button onclick="populateReserveOS()" class="bg-blue-600 px-3 py-1 rounded-xl font-black text-[10px] uppercase text-white">⬇️ Charger</button>
                         </div>
-                        <div id="os-reserve" class="flex flex-col gap-2 min-h-[200px]">
-                            <!-- Les élèves non affectés apparaissent ici -->
-                        </div>
+                        <div id="os-reserve" class="flex flex-col gap-2 min-h-[200px]"></div>
                     </div>
-
-                    <!-- Colonne Droite : Grille des groupes (Fluide, prend le reste) -->
                     <div class="flex-1 bg-slate-800 p-4 border border-slate-700 rounded-xl overflow-x-auto">
                         <h3 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes par numéro</h3>
-                        <div id="os-postesGrid" class="min-w-[600px]">
-                            <!-- La grille 5 couleurs x 6 lignes est générée ici -->
-                        </div>
+                        <div id="os-postesGrid" class="min-w-[600px]"></div>
                     </div>
                 </div>
             </div>
 
             <!-- PARAMÈTRES ARCATHLON -->
-            <!-- VUE PARAMÈTRES ARCATHLON -->
-<div id="viewArcathlonSettings" class="hidden space-y-4"></div>
-            </div>
+            <div id="viewArcathlonSettings" class="hidden space-y-4"></div>
 
             <!-- PARAMÈTRES ESCALADE -->
             <div id="viewEscaladeSettings" class="hidden space-y-4">
@@ -255,18 +233,18 @@
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
-    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve</h4>
-    <div class="flex gap-2">
-        <div class="flex-1">
-            <div class="text-xs font-bold text-blue-400 uppercase mb-1">👦 Garçons</div>
-            <div id="reserveEscaladeGarcons" class="flex flex-col gap-1 min-h-[100px] border border-blue-800/30 rounded-lg p-1"></div>
-        </div>
-        <div class="flex-1">
-            <div class="text-xs font-bold text-rose-400 uppercase mb-1">👩 Filles</div>
-            <div id="reserveEscaladeFilles" class="flex flex-col gap-1 min-h-[100px] border border-rose-800/30 rounded-lg p-1"></div>
-        </div>
-    </div>
-</div>
+                            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve</h4>
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <div class="text-xs font-bold text-blue-400 uppercase mb-1">👦 Garçons</div>
+                                    <div id="reserveEscaladeGarcons" class="flex flex-col gap-1 min-h-[100px] border border-blue-800/30 rounded-lg p-1"></div>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-xs font-bold text-rose-400 uppercase mb-1">👩 Filles</div>
+                                    <div id="reserveEscaladeFilles" class="flex flex-col gap-1 min-h-[100px] border border-rose-800/30 rounded-lg p-1"></div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="lg:col-span-2">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes</h4>
                             <div id="postesGridEscalade" class="grid grid-cols-3 md:grid-cols-4 gap-4"></div>
@@ -274,53 +252,51 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- PARAMÈTRES BADMINTON -->
-<div id="viewBadmintonSettings" class="hidden space-y-4">
-    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="font-black text-blue-400 uppercase text-sm">Terrains de Badminton (Groupes de niveau)</h3>
-        </div>
-        <div class="flex gap-2 items-center">
-    <label class="text-xs font-black uppercase text-slate-400 mr-1">Nb Terrains :</label>
-    <select id="badmintonNbTerrains" class="bg-slate-900 border border-slate-600 rounded px-2 py-2 text-xs font-black text-white outline-none">
-        <option value="6" selected>6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-    </select>
-    
-    <button onclick="generateBadmintonTeamsFromCurrentClass()" class="btn-success text-xs uppercase">🔄 Générer Terrains</button>
-    <button onclick="exportBadmintonConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Export JSON</button>
-    <button onclick="document.getElementById('importBadmintonFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Import JSON</button>
-    <input type="file" id="importBadmintonFile" class="hidden" onchange="importBadmintonConfig(event)">
-</div>
-        <p class="text-xs text-slate-400 mb-4">Glissez les élèves. Les lettres (A, B, C...) s'attribuent automatiquement.</p>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
-    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (Absents / Inaptes)</h4>
-    <div class="flex flex-col gap-2 min-h-[100px]">
-        <div class="border border-red-800/30 rounded-lg p-2">
-            <div class="text-xs font-bold text-red-400 uppercase mb-1">🚫 Absents</div>
-            <div id="reserveBadmintonAbsents" class="flex flex-col gap-1 min-h-[40px]"></div>
-        </div>
-        <div class="border border-orange-800/30 rounded-lg p-2">
-            <div class="text-xs font-bold text-orange-400 uppercase mb-1">🤕 Inaptes</div>
-            <div id="reserveBadmintonInaptes" class="flex flex-col gap-1 min-h-[40px]"></div>
-        </div>
-    </div>
-</div>
-</div>
-            <div class="lg:col-span-2">
-                <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Terrains</h4>
-                <div id="postesGridBadminton" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+            <div id="viewBadmintonSettings" class="hidden space-y-4">
+                <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-black text-blue-400 uppercase text-sm">Terrains de Badminton (Groupes de niveau)</h3>
+                    </div>
+                    <div class="flex gap-2 items-center">
+                        <label class="text-xs font-black uppercase text-slate-400 mr-1">Nb Terrains :</label>
+                        <select id="badmintonNbTerrains" class="bg-slate-900 border border-slate-600 rounded px-2 py-2 text-xs font-black text-white outline-none">
+                            <option value="6" selected>6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                        </select>
+                        <button onclick="generateBadmintonTeamsFromCurrentClass()" class="btn-success text-xs uppercase">🔄 Générer Terrains</button>
+                        <button onclick="exportBadmintonConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Export JSON</button>
+                        <button onclick="document.getElementById('importBadmintonFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Import JSON</button>
+                        <input type="file" id="importBadmintonFile" class="hidden" onchange="importBadmintonConfig(event)">
+                    </div>
+                    <p class="text-xs text-slate-400 mb-4">Glissez les élèves. Les lettres (A, B, C...) s'attribuent automatiquement.</p>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+                            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve (Absents / Inaptes)</h4>
+                            <div class="flex flex-col gap-2 min-h-[100px]">
+                                <div class="border border-red-800/30 rounded-lg p-2">
+                                    <div class="text-xs font-bold text-red-400 uppercase mb-1">🚫 Absents</div>
+                                    <div id="reserveBadmintonAbsents" class="flex flex-col gap-1 min-h-[40px]"></div>
+                                </div>
+                                <div class="border border-orange-800/30 rounded-lg p-2">
+                                    <div class="text-xs font-bold text-orange-400 uppercase mb-1">🤕 Inaptes</div>
+                                    <div id="reserveBadmintonInaptes" class="flex flex-col gap-1 min-h-[40px]"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2">
+                            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Terrains</h4>
+                            <div id="postesGridBadminton" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
 
         </div> <!-- Fin viewActivities -->
 
-        <!-- ONGLET 3 : LIVE (NOUVEAU) -->
+        <!-- ONGLET 3 : LIVE -->
         <div id="viewLive" class="hidden space-y-4">
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <div class="flex justify-between items-center mb-4">
@@ -328,7 +304,6 @@
                     <button onclick="exportResultsLive()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">📥 Export CSV</button>
                     <button onclick="exportCOiDoceo()" class="bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (CO)</button>
                 </div>
-                
                 <div id="live-content" class="space-y-4">
                     <p class="text-slate-500 text-center">En attente des données des élèves...</p>
                 </div>
@@ -345,10 +320,8 @@
             </div>
         </div>
 
-                                <!-- ONGLET 5 : OUTILS (MENU) -->
+        <!-- ONGLET 5 : OUTILS -->
         <div id="viewTools" class="hidden w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
-            
-            <!-- MENU PRINCIPAL DES OUTILS -->
             <div id="tools-menu" class="w-full max-w-2xl p-6 text-center">
                 <h2 class="text-4xl font-black text-blue-400 mb-10 uppercase tracking-widest">🧰 Outils</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -364,11 +337,8 @@
                     </button>
                 </div>
             </div>
-
-            <!-- VUE TIMER (Conteneur : config + chrono + fin) -->
             <div id="tools-timer-container" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
                 <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
-                
                 <div id="tools-settings" class="w-full max-w-lg p-6">
                     <h3 class="font-black text-blue-400 uppercase text-sm mb-6 text-center">⏱️ Interval Timer</h3>
                     <div class="grid grid-cols-2 gap-4 mb-4">
@@ -385,8 +355,6 @@
                             <label class="text-xs font-bold text-slate-400 uppercase">Repos (s)</label>
                             <input type="number" id="timer-rest" value="15" min="1" class="w-full bg-transparent text-4xl font-black text-amber-400 text-center outline-none">
                         </div>
-                        
-                        <!-- Banque de chronos -->
                         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
                             <label class="text-xs font-bold text-slate-400 uppercase">Banque de chronos</label>
                             <select id="timer-presets" class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-white font-bold text-sm mt-2">
@@ -401,14 +369,12 @@
                     </div>
                     <button id="timer-start-btn" onclick="startTimer()" class="w-full bg-emerald-600 py-10 rounded-3xl text-4xl font-black uppercase shadow-xl active:scale-95 transition-all">🚀 Démarrer</button>
                 </div>
-
                 <div id="tools-timer" class="hidden w-full h-full flex flex-col items-center justify-center p-8">
                     <div id="timer-phase" class="text-4xl font-black uppercase tracking-widest mb-4 text-slate-400"></div>
                     <div id="timer-display" class="text-[25vh] leading-none font-black tabular-nums text-white drop-shadow-2xl">00:00</div>
                     <div id="timer-series-display" class="text-2xl font-black text-slate-500 mt-4"></div>
                     <button onclick="stopTimer()" class="mt-12 bg-red-600 px-12 py-6 rounded-3xl text-2xl font-black uppercase shadow-xl active:scale-95">🛑 Arrêter</button>
                 </div>
-
                 <div id="tools-finished" class="hidden w-full h-full flex flex-col items-center justify-center">
                     <div class="text-9xl mb-8">🏆</div>
                     <h1 class="text-8xl font-black text-emerald-400 mb-8">TERMINÉ !</h1>
@@ -419,13 +385,10 @@
                     </div>
                 </div>
             </div>
-
-            <!-- VUE CALCULATEUR -->
             <div id="tools-calculator" class="hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
                 <button onclick="backToToolsMenu()" class="absolute top-4 left-4 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">← Retour</button>
                 <div id="calculateur-module" class="w-full max-w-xl"></div>
             </div>
-
         </div> <!-- Fin viewTools -->
     </div> <!-- Fin space-y-6 -->
 

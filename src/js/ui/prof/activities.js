@@ -7,7 +7,7 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
 import { initOrientShowInterface, loadOrientShowAssignments, exportOrientShowConfig, importOrientShowConfig, startOrientShow, stopOrientShow } from '../../modules/orientshow/orientshow-interface.js';
 import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
-import { initArcathlonInterface } from '../modules/arcathlon/index.js';
+import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
 
 let currentDiscipline = 'multi';
 
@@ -25,6 +25,10 @@ export function initActivities() {
     try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
 
+    // Exposer les fonctions globales
+    window.generateArcathlonTeams = generateArcathlonTeams;
+    window.transmettreArcathlonConfig = transmettreArcathlonConfig;
+
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         localStorage.setItem('eps_arena_current_discipline', disc);
@@ -35,12 +39,14 @@ export function initActivities() {
         const osView = document.getElementById('viewOrientShowSettings');
         const escView = document.getElementById('viewEscaladeSettings');
         const bmtView = document.getElementById('viewBadmintonSettings');
+        const arcView = document.getElementById('viewArcathlonSettings');
 
         if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
         if (coView) coView.classList.toggle('hidden', disc !== 'co');
         if (osView) osView.classList.toggle('hidden', disc !== 'orientshow');
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
         if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
+        if (arcView) arcView.classList.toggle('hidden', disc !== 'arcathlon');
 
         // Mettre à jour les boutons
         const btnMulti = document.getElementById('btnDisc-multi');
@@ -48,12 +54,14 @@ export function initActivities() {
         const btnOs = document.getElementById('btnDisc-orientshow');
         const btnEsc = document.getElementById('btnDisc-escalade');
         const btnBmt = document.getElementById('btnDisc-badminton');
+        const btnArc = document.getElementById('btnDisc-arcathlon');
 
         if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
         if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
         if (btnOs) btnOs.classList.toggle('border-blue-500', disc === 'orientshow');
         if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
         if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
+        if (btnArc) btnArc.classList.toggle('border-blue-500', disc === 'arcathlon');
 
         // Initialisation spécifique
         if (disc === 'co') {
@@ -69,11 +77,9 @@ export function initActivities() {
             try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
         }
         if (disc === 'arcathlon') {
-    const viewArcathlon = document.getElementById('viewArcathlonSettings');
-    if (viewArcathlon) viewArcathlon.classList.remove('hidden');
-}
+            try { initArcathlonInterface(); } catch (e) {}
+        }
     };
-    // Dans initActivities(), après switchDiscipline :
 
     window.switchActivitySubTab = function(subTab) {
         const disc = currentDiscipline;
@@ -98,9 +104,10 @@ export function initActivities() {
         const osView = document.getElementById('viewOrientShowSettings');
         const escView = document.getElementById('viewEscaladeSettings');
         const bmtView = document.getElementById('viewBadmintonSettings');
+        const arcView = document.getElementById('viewArcathlonSettings');
         
         // On masque TOUTES les vues de réglages
-        [multiView, coView, osView, escView, bmtView].forEach(el => {
+        [multiView, coView, osView, escView, bmtView, arcView].forEach(el => {
             if (el) el.classList.add('hidden');
         });
 
@@ -117,6 +124,7 @@ export function initActivities() {
             else if (disc === 'orientshow') osView.classList.remove('hidden');
             else if (disc === 'escalade') escView.classList.remove('hidden');
             else if (disc === 'badminton') bmtView.classList.remove('hidden');
+            else if (disc === 'arcathlon') arcView.classList.remove('hidden');
         } 
         else if (subTab === 'live') {
             // Afficher le conteneur Live et appeler le bon module
@@ -136,6 +144,9 @@ export function initActivities() {
                         import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV());
                     } else if (disc === 'orientshow') {
                         import('../../modules/orientshow/orientshow-tv.js').then(m => m.renderOrientShowTV());
+                    } else if (disc === 'arcathlon') {
+                        // Pour Arcathlon, on importera plus tard le module TV
+                        import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV());
                     } else {
                         import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV());
                     }
@@ -166,15 +177,16 @@ export function initActivities() {
             alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
             return;
         }
-                if (currentDiscipline === 'badminton') {
-            // Récupère les élèves (sans les absents/inaptes pour le tri, mais on garde tout pour la répartition)
-            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-            // On filtre les inaptes pour qu'ils soient traités différemment par le module
+        if (currentDiscipline === 'badminton') {
             const joueurs = eleves.filter(e => e.code !== 'INAPTE');
             const inaptes = eleves.filter(e => e.code === 'INAPTE');
-            
-            generateBadmintonTeams([...joueurs, ...inaptes]); // Le module gère le tri interne
+            generateBadmintonTeams([...joueurs, ...inaptes]);
             alert("✅ Terrains générés par niveau de force !");
+            return;
+        }
+        if (currentDiscipline === 'arcathlon') {
+            // Appel direct à la fonction du module
+            generateArcathlonTeams();
             return;
         }
 
@@ -194,20 +206,17 @@ export function initActivities() {
 
         const teams = generateClassicTeams(eleves, options);
         
-        // Personnalisation : On remplace les couleurs par défaut par le libellé "Couleur"
         teams.forEach(team => {
             team.label = "Couleur";
-            team.color = "#e2e8f0"; // Gris clair
-            team.textColor = "#334155"; // Gris foncé
+            team.color = "#e2e8f0";
+            team.textColor = "#334155";
         });
 
         window.lastTeams = teams;
-        
-        // Appel direct de la fonction de rendu (celle avec les fiches élèves)
         window.renderTeams();
     };
     
-        window.transmettreConfig = async function() {
+    window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe.");
 
@@ -284,32 +293,30 @@ export function initActivities() {
             if (endTime !== null) configData.endTime = endTime;
         } 
         else if (currentDiscipline === 'badminton') {
-            // Récupération des affectations sauvegardées
             const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
             configData = { activite: 'badminton' };
             
-            // On parcourt chaque terrain pour construire le mapping local et la config
             const lettres = ['A','B','C','D','E','F','G','H','I','J'];
             for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
                 const idsTerrain = assignments[t] || [];
-                
-                // Construction du mapping local : { Classe_1_A: "IDélève" }
                 idsTerrain.forEach((eleveId, index) => {
                     const lettre = lettres[index] || '?';
                     localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
                 });
-                
-                // Config pour les iPads : Nombre de joueurs par terrain
                 configData[t] = idsTerrain.length;
             }
         } 
+        else if (currentDiscipline === 'arcathlon') {
+            // On délègue au module Arcathlon
+            transmettreArcathlonConfig();
+            return;
+        }
         else {
             // Multi-activités (par défaut)
             configData.activite = 'multi';
             if (window.lastTeams) {
-                // Utilisation de team.label pour envoyer la couleur choisie aux iPads !
                 window.lastTeams.forEach((team) => {
-                    const key = team.label; // ex: "Rouge", "Bleu", etc.
+                    const key = team.label;
                     localMapping[`${activeClasse}_${key}`] = team.members.map(m => m.id);
                     configData[key] = team.members.length;
                 });
@@ -318,10 +325,8 @@ export function initActivities() {
             }
         }
 
-        // Sauvegarde du mapping local
         localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
 
-        // Envoi à Firebase
         try {
             console.log("📡 Configuration envoyée :", configData);
             await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
@@ -387,8 +392,8 @@ export function initActivities() {
     window.delCircuit = function(id) {
         if(confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
     };
-        // Fonction pour générer les terrains de badminton (appelée par le bouton)
-        window.generateBadmintonTeamsFromCurrentClass = async function() {
+
+    window.generateBadmintonTeamsFromCurrentClass = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
@@ -396,7 +401,6 @@ export function initActivities() {
         generateBadmintonTeams(eleves, nbTerrains);
         alert("✅ Terrains générés par niveau de force !");
     };
-
 
     // Exports globaux
     window.exportCOConfig = exportCOConfig;
@@ -408,7 +412,6 @@ export function initActivities() {
     window.startOrientShow = startOrientShow;
     window.stopOrientShow = stopOrientShow;
     window.exportBadmintonConfig = exportBadmintonConfig;
-
     window.importBadmintonConfig = importBadmintonConfig;
 
     try { initSortableCO(); } catch (e) {}
