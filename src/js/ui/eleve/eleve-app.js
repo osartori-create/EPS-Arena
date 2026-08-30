@@ -81,10 +81,34 @@ function showLogin() {
     codeList.innerHTML = '';
     const config = currentConfig;
     activityTitle.innerText = "Choisis ton code";
+    
     if (!config) {
         codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
         return;
     }
+
+    // --- SPÉCIAL BADMINTON : Affiche "Terrain_Lettre" (ex: 1_A, 2_B) ---
+    if (config.activite === 'badminton') {
+        const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        Object.keys(config).forEach(key => {
+            // On ignore les clés non numériques
+            if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
+            
+            const count = parseInt(config[key]) || 0;
+            for (let i = 0; i < count; i++) {
+                // Code au format "Terrain_Lettre" (ex: "1_A")
+                const code = `${key}_${lettres[i]}`;
+                const btn = document.createElement('button');
+                btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
+                btn.innerText = code;
+                btn.onclick = () => selectCode(code);
+                codeList.appendChild(btn);
+            }
+        });
+        return; // On sort de la fonction pour ne pas exécuter le code générique
+    }
+
+    // --- AUTRES ACTIVITÉS (Escalade, CO, etc. - Code actuel) ---
     Object.keys(config).forEach(key => {
         if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
         let count = 0;
