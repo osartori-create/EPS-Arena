@@ -1,21 +1,26 @@
 // src/js/modules/badminton/badminton-kiosk.js
-// Interface élève : Sélection Terrain -> Joueur -> Tournoi Round Robin
+// Interface élève : Sélection Terrain -> Joueur -> Match visuel sur terrain
 // Inspiré et adapté de BadZ Impact (Webjéjé) et du module EPS-Arena.
 // Licence Creative Commons Attribution (CC BY).
 
-import { db, ref, onValue, update } from '../../core/firebase-service.js';
+import { db, ref, onValue, update, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
 let currentTerrain = '';
-let currentCode = '';
+let currentCode = ''; // Ma lettre (A, B, C...)
+let opponentCode = ''; // Lettre adverse
 let playersList = [];
 let matchSchedule = [];
+let currentMatch = null;
+let matchPoints = { p1: 0, p2: 0 }; // Scores du match en cours
+let ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } }; // Ratios
 let terrainsConfig = {};
 
 export function initBadmintonKiosk(classe) {
     currentClasse = classe;
-    currentTerrain = ''; // On réinitialise la sélection
+    currentTerrain = '';
     currentCode = '';
+    opponentCode = '';
     
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
@@ -24,7 +29,6 @@ export function initBadmintonKiosk(classe) {
         const config = snap.val() || {};
         if (config.activite !== 'badminton') return;
 
-        // On récupère le nombre de joueurs par terrain
         terrainsConfig = {};
         for (let key in config) {
             if (!isNaN(parseInt(key))) {
@@ -95,13 +99,13 @@ function checkAndRenderPlayerSelection() {
 window.selectBadmintonPlayer = function(letter) {
     currentCode = letter;
     generateRoundRobin();
-    renderGameInterface();
-    listenForScoreUpdates();
+    findNextMatch();
 };
 
 window.resetBadmintonSelection = function() {
     currentTerrain = '';
     currentCode = '';
+    opponentCode = '';
     renderTerrainSelection();
 };
 
@@ -129,93 +133,149 @@ function generateRoundRobin() {
     }
 }
 
-// --- 4. INTERFACE DE JEU ---
-function renderGameInterface() {
-    const container = document.getElementById('badminton-content');
-    container.innerHTML = `
-        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4 text-center">
-            <p class="text-sm text-slate-400">Terrain ${currentTerrain} - Vous êtes le joueur <span class="text-blue-400 font-black text-2xl">${currentCode}</span></p>
-        </div>
-        <div id="match-display" class="bg-slate-900 p-6 rounded-3xl border-4 border-blue-500 text-center mb-4"></div>
-        <div id="classement-terrain" class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-            <h3 class="font-black text-blue-400 uppercase text-sm mb-2">Classement</h3>
-            <div id="classement-content" class="space-y-2"></div>
-        </div>
-    `;
-    displayNextMatch();
-}
-
-function displayNextMatch() {
-    const display = document.getElementById('match-display');
-    if (!display) return;
-
+function findNextMatch() {
+    // On cherche un match concernant l'élève, sinon on regarde les autres pour patienter
     let match = matchSchedule.find(m => (m.p1 === currentCode || m.p2 === currentCode) && m.s1 === null);
     if (!match) match = matchSchedule.find(m => m.s1 === null);
 
     if (!match) {
-        display.innerHTML = `<div class="text-5xl mb-4">🏆</div><p class="text-xl font-black text-white mb-4">Tous les matchs sont terminés !</p><p class="text-slate-400">Consultez le classement.</p>`;
-        updateStandings();
+        renderStandings();
+        document.getElementById('badminton-content').innerHTML = `
+            <div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
+                <div class="text-6xl mb-4">🏆</div>
+                <p class="text-2xl font-black text-white">Tous les matchs sont terminés !</p>
+                <p class="text-slate-400 mt-2">Regardez le classement ci-dessous.</p>
+            </div>` + document.getElementById('badminton-content').innerHTML;
         return;
     }
 
-    if (match.p1 !== currentCode && match.p2 !== currentCode) {
-        display.innerHTML = `<p class="text-lg font-black text-white mb-2">Match en cours :</p><p class="text-4xl font-black text-yellow-400">${match.p1} vs ${match.p2}</p><p class="text-slate-400 mt-2">Ce n'est pas votre match, patientez...</p>`;
-    } else {
-        const opponent = match.p1 === currentCode ? match.p2 : match.p1;
-        display.innerHTML = `
-            <p class="text-lg font-black text-white mb-2">Votre prochain match :</p>
-            <p class="text-4xl font-black text-yellow-400 mb-4">Vous (${currentCode}) vs ${opponent}</p>
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase">Votre score</label>
-                    <input type="number" id="score-me" min="0" max="30" placeholder="21" class="w-full bg-slate-950 text-center text-4xl font-black text-white border-2 border-slate-600 rounded-xl p-2 mt-1">
-                </div>
-                <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase">Score adverse</label>
-                    <input type="number" id="score-opp" min="0" max="30" placeholder="0" class="w-full bg-slate-950 text-center text-4xl font-black text-white border-2 border-slate-600 rounded-xl p-2 mt-1">
-                </div>
-            </div>
-            <button onclick="submitScore('${match.id}', '${match.p1}', '${match.p2}')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-5 rounded-3xl text-xl uppercase active:scale-95 transition-transform">✅ Valider le score</button>
-        `;
-    }
+    currentMatch = match;
+    opponentCode = match.p1 === currentCode ? match.p2 : match.p1;
+    matchPoints = { p1: 0, p2: 0 };
+    ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
+    
+    renderCourtInterface();
 }
 
-// --- 5. ENVOI DU SCORE ---
-window.submitScore = function(matchId, p1, p2) {
-    const scoreMe = parseInt(document.getElementById('score-me').value);
-    const scoreOpp = parseInt(document.getElementById('score-opp').value);
+// --- 4. INTERFACE DU TERRAIN (Inspirée de BadZ) ---
+function renderCourtInterface() {
+    const container = document.getElementById('badminton-content');
+    let html = `
+        <div class="flex justify-between items-center mb-4">
+            <div class="text-center">
+                <h3 class="text-xl font-black text-white">${currentCode}</h3>
+                <p class="text-xs text-slate-400">Vous</p>
+            </div>
+            <div class="text-center">
+                <h3 class="text-3xl font-black text-yellow-400">${matchPoints.p1} - ${matchPoints.p2}</h3>
+                <p class="text-xs text-slate-400">Score du match</p>
+            </div>
+            <div class="text-center">
+                <h3 class="text-xl font-black text-white">${opponentCode}</h3>
+                <p class="text-xs text-slate-400">Adversaire</p>
+            </div>
+        </div>
 
-    if (isNaN(scoreMe) || isNaN(scoreOpp) || scoreMe < 0 || scoreOpp < 0) {
-        alert("Veuillez saisir des scores valides.");
+        <div id="court-container" class="relative w-full max-w-2xl mx-auto mb-6 border-4 border-slate-600 rounded-2xl overflow-hidden shadow-2xl" style="aspect-ratio: 2/1; background: #166534;">
+            <div class="absolute top-0 bottom-0 left-1/2 w-1 bg-black z-10"></div>
+            <div class="grid grid-cols-2 h-full">
+                <div id="left-side" class="relative border-r border-black/50">
+                    <div class="absolute inset-0 flex flex-col">
+                        <div onclick="handleImpact('p1', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
+                        <div onclick="handleImpact('p1', 'middle')" class="flex-1 bg-teal-500/40 hover:bg-teal-500/70 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">1 pt</div>
+                        <div onclick="handleImpact('p1', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
+                    </div>
+                    <div id="p1-ratio" class="absolute bottom-2 left-2 bg-black/70 text-white px-3 py-1 rounded-lg text-xs font-bold">0%</div>
+                </div>
+                <div id="right-side" class="relative border-l border-black/50">
+                    <div class="absolute inset-0 flex flex-col">
+                        <div onclick="handleImpact('p2', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
+                        <div onclick="handleImpact('p2', 'middle')" class="flex-1 bg-teal-500/40 hover:bg-teal-500/70 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">1 pt</div>
+                        <div onclick="handleImpact('p2', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
+                    </div>
+                    <div id="p2-ratio" class="absolute bottom-2 right-2 bg-black/70 text-white px-3 py-1 rounded-lg text-xs font-bold">0%</div>
+                </div>
+            </div>
+            <div class="absolute top-0 left-0 right-0 bg-black/60 text-white py-2 text-center font-black">BadZ Impact</div>
+        </div>
+        
+        <div class="flex justify-center gap-4">
+            <button onclick="endMatch()" class="bg-red-600 hover:bg-red-700 text-white font-black py-3 px-6 rounded-2xl">🏁 Terminer le match</button>
+            <button onclick="resetBadmintonSelection()" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-2xl">Quitter</button>
+        </div>
+
+        <div id="classement-terrain" class="mt-6 bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h3 class="font-black text-blue-400 uppercase text-sm mb-2">Classement</h3>
+            <div id="classement-content" class="space-y-2"></div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+    renderStandings();
+}
+
+// --- 5. GESTION DES CLICS (Impacts) ---
+window.handleImpact = function(player, zone) {
+    if (currentMatch.p1 !== currentCode && currentMatch.p2 !== currentCode) {
+        // Ce n'est pas notre match, on ne peut pas cliquer pour l'autre
         return;
     }
-
-    if (p1 !== currentCode && p2 !== currentCode) {
-        alert("Vous ne pouvez pas valider ce match !");
-        return;
-    }
-
-    let s1, s2;
-    if (p1 === currentCode) {
-        s1 = scoreMe; s2 = scoreOpp;
-    } else {
-        s1 = scoreOpp; s2 = scoreMe;
-    }
-
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${matchId}`);
     
-    update(resultRef, { terrain: currentTerrain, p1, p2, s1, s2, timestamp: Date.now() })
-    .then(() => {
-        const match = matchSchedule.find(m => m.id === matchId);
-        if (match) { match.s1 = s1; match.s2 = s2; }
-        displayNextMatch();
-        updateStandings();
-    })
-    .catch(err => alert("Erreur envoi : " + err.message));
+    // On s'assure que le joueur qui clique est bien celui qui joue
+    // (Dans une vraie interface, on pourrait autoriser les 2 joueurs à cliquer sur leur propre côté. Ici, seul le joueur connecté peut cliquer)
+    if (player === 'p1' && currentMatch.p1 !== currentCode) return;
+    if (player === 'p2' && currentMatch.p2 !== currentCode) return;
+
+    let pts = zone === 'middle' ? 1 : 3;
+    
+    // Mise à jour des scores et ratios
+    matchPoints[player] += pts;
+    ratioData[player][zone]++;
+
+    // Créer un effet visuel (point jaune clignotant)
+    const sideId = player === 'p1' ? 'left-side' : 'right-side';
+    const side = document.getElementById(sideId);
+    const impact = document.createElement('div');
+    impact.className = 'absolute w-4 h-4 bg-yellow-400 rounded-full shadow-lg transform -translate-x-1/2 -translate-y-1/2';
+    impact.style.left = Math.random() * 80 + 10 + '%';
+    impact.style.top = Math.random() * 80 + 10 + '%';
+    side.appendChild(impact);
+    setTimeout(() => impact.remove(), 700);
+
+    // Mise à jour de l'affichage
+    document.querySelector('.text-3xl.font-black.text-yellow-400').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
+    
+    const p1Total = ratioData.p1.extreme + ratioData.p1.middle;
+    const p2Total = ratioData.p2.extreme + ratioData.p2.middle;
+    document.getElementById('p1-ratio').innerText = `${p1Total > 0 ? Math.round((ratioData.p1.extreme / p1Total) * 100) : 0}%`;
+    document.getElementById('p2-ratio').innerText = `${p2Total > 0 ? Math.round((ratioData.p2.extreme / p2Total) * 100) : 0}%`;
 };
 
-// --- 6. CLASSEMENT EN DIRECT ---
+// --- 6. FIN DE MATCH ET ENVOI ---
+window.endMatch = function() {
+    if (!currentMatch) return;
+    if (confirm(`Valider le score ${matchPoints.p1} - ${matchPoints.p2} ?`)) {
+        // On envoie le score à Firebase
+        const p1 = currentMatch.p1;
+        const p2 = currentMatch.p2;
+        const s1 = matchPoints.p1;
+        const s2 = matchPoints.p2;
+
+        const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+        const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
+        
+        update(resultRef, { terrain: currentTerrain, p1, p2, s1, s2, timestamp: Date.now() })
+        .then(() => {
+            currentMatch.s1 = s1;
+            currentMatch.s2 = s2;
+            findNextMatch(); // On passe au match suivant
+            listenForScoreUpdates();
+        })
+        .catch(err => alert("Erreur envoi : " + err.message));
+    }
+};
+
+// --- 7. ÉCOUTE DES SCORES (synchronisation entre iPads) ---
 function listenForScoreUpdates() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
@@ -229,14 +289,12 @@ function listenForScoreUpdates() {
                 m.s2 = result.s2;
             }
         });
-        if (document.getElementById('match-display') && !document.querySelector('#match-display input')) {
-            displayNextMatch();
-        }
-        updateStandings();
+        renderStandings();
     });
 }
 
-function updateStandings() {
+// --- 8. CLASSEMENT DU TERRAIN ---
+function renderStandings() {
     const container = document.getElementById('classement-content');
     if (!container) return;
 
