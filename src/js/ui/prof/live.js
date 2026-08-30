@@ -24,7 +24,9 @@ export function initLiveUI() {
             renderMultiLive(data);
         } else if (type === 'orientshow' && currentActivite === 'orientshow') {
             renderOrientShowLive();
-        }
+        } else if (type === 'badminton' && currentActivite === 'badminton') {
+    import('../../modules/badminton/badminton-live.js').then(module => module.renderBadmintonLive());
+}
     });
 
     window.addEventListener('live-config-updated', () => {

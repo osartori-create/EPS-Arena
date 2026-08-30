@@ -507,21 +507,30 @@ window.endMatch = function() {
     const s2 = matchPoints.p1;
 
     if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
+        // ✅ Création de l'objet statistiques complet
+        const stats = {
+            p1: { 
+                extreme: ratioData.p1.extreme, 
+                middle: ratioData.p1.middle,
+                total: matchPoints.p1 
+            },
+            p2: { 
+                extreme: ratioData.p2.extreme, 
+                middle: ratioData.p2.middle, 
+                total: matchPoints.p2 
+            }
+        };
+
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
         
-        update(resultRef, { terrain: currentTerrain, p1, p2, s1, s2, timestamp: Date.now() })
-        .then(() => {
-            // Mise à jour locale immédiate
-            const matchIndex = matchSchedule.findIndex(m => m.id === currentMatch.id);
-            if (matchIndex !== -1) {
-                matchSchedule[matchIndex].s1 = s1;
-                matchSchedule[matchIndex].s2 = s2;
-            }
-            
-            currentMatch = null;
-            renderMatchSetup(); // Retour à la liste, les matchs joués seront grisés
+        // ✅ Ajout de "stats" dans l'objet envoyé à Firebase
+        update(resultRef, { 
+            terrain: currentTerrain, 
+            p1, p2, s1, s2, 
+            stats: stats, // <--- C'est ici que la donnée d'impact est collectée !
+            timestamp: Date.now() 
         })
-        .catch(err => alert("Erreur envoi : " + err.message));
+        .then(() => { ... });
     }
 };
