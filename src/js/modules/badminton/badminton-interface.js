@@ -24,6 +24,7 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
         }
     }
 
+    // Génération du HTML
     let html = '';
     for (let i = 1; i <= nbTerrainsCalcule; i++) {
         html += `
@@ -37,6 +38,7 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
     }
     container.innerHTML = html;
 
+    // Sauvegarde du nombre de terrains
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     assignments.nbTerrains = nbTerrainsCalcule;
     localStorage.setItem(`eps_arena_badminton_assignments_${activeClasse}`, JSON.stringify(assignments));
@@ -63,14 +65,17 @@ export function generateBadmintonTeams(eleves) {
         terrains[terrainIndex].push(eleve);
     });
 
-    // Les inaptes sont répartis équitablement sur les terrains (pour le décompte)
     inaptes.forEach((eleve, index) => {
         const terrainIndex = index % nbTerrains;
         eleve.isPlaying = false;
         terrains[terrainIndex].push(eleve);
     });
 
-    const assignments = { reserveAbsents: absents.map(e => e.id), reserveInaptes: inaptes.map(e => e.id), nbTerrains: nbTerrains };
+    const assignments = {
+        reserveAbsents: absents.map(e => e.id),
+        reserveInaptes: inaptes.map(e => e.id),
+        nbTerrains: nbTerrains
+    };
     terrains.forEach((terrain, idx) => {
         const terrainNum = idx + 1;
         assignments[terrainNum] = terrain.map(e => e.id);
@@ -81,7 +86,6 @@ export function generateBadmintonTeams(eleves) {
     setTimeout(() => loadBadmintonAssignments(), 100);
 }
 
-// --- GLISSER-DÉPOSER ---
 export function initSortableBadminton() {
     const absContainer = document.getElementById('reserveBadmintonAbsents');
     const inaptContainer = document.getElementById('reserveBadmintonInaptes');
@@ -97,7 +101,6 @@ export function initSortableBadminton() {
 
     absContainer.__sortable = new Sortable(absContainer, { group: 'badminton', animation: 150, onEnd });
     inaptContainer.__sortable = new Sortable(inaptContainer, { group: 'badminton', animation: 150, onEnd });
-
     document.querySelectorAll('.terrain-members').forEach(el => {
         el.__sortable = new Sortable(el, { group: 'badminton', animation: 150, onEnd });
     });
@@ -166,7 +169,6 @@ export async function loadBadmintonAssignments() {
         }
     }
 
-    // Remplir les réserves spécifiques
     const absents = assignments.reserveAbsents || [];
     const inaptes = assignments.reserveInaptes || [];
 
@@ -179,10 +181,6 @@ export async function loadBadmintonAssignments() {
         if (eleve) inaptContainer.appendChild(await createEleveCard(eleve));
     }
 
-    // Les élèves non placés ailleurs (sans statut) sont mis dans les inaptes par défaut? Non, on les laisse dans la réserve principale ? On les met en "non classés". 
-    // Ici, pour simplifier, on les laisse dans les inaptes s'ils ont été oubliés.
-    // (Option: on pourrait les mettre dans les "absents" ou les laisser dans la liste générale, mais pour l'instant on les ignore ou on les met en inaptes).
-    // On va plutôt créer une réserve "générale" non utilisée ? Non, on va les ajouter aux inaptes si non placés.
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id) && !absents.includes(e.id) && !inaptes.includes(e.id));
     for (const eleve of nonPlaces) {
         inaptContainer.appendChild(await createEleveCard(eleve));
