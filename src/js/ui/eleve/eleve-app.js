@@ -16,6 +16,8 @@ export const db = getDatabase(app);
 let selectedClass = "";
 let selectedCode = "";
 let currentConfig = null;
+let currentConfigListener = null;
+let arcathlonConfigListener = null;
 
 const classSelect = document.getElementById('class-select');
 const waitingScreen = document.getElementById('waiting-screen');
@@ -30,7 +32,6 @@ const osModule = document.getElementById('orientshow-module');
 const badmintonModule = document.getElementById('badminton-module');
 
 export function initApp() {
-    // Rester sur l'écran d'attente au démarrage
     currentConfig = null;
     showWaiting();
 
@@ -57,15 +58,57 @@ export function initApp() {
     classSelect.addEventListener('change', () => {
         selectedClass = classSelect.value;
         if (!selectedClass) return;
+
+        // Nettoyer les anciens écouteurs
+        if (currentConfigListener) {
+            currentConfigListener();
+            currentConfigListener = null;
+        }
+        if (arcathlonConfigListener) {
+            arcathlonConfigListener();
+            arcathlonConfigListener = null;
+        }
+
+        // Écouter la configuration principale
         const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/config`);
-        onValue(configRef, (snap) => {
-            currentConfig = snap.val();
-            if (currentConfig) showLogin();
-            else showWaiting();
+        currentConfigListener = onValue(configRef, (snap) => {
+            const config = snap.val();
+            console.log('[eleve] Config principale reçue :', config);
+            if (config && config.activite) {
+                currentConfig = config;
+                if (config.activite === 'arcathlon') {
+                    // Si l'activité est déjà détectée via la config principale
+                    console.log('[eleve] Activité Arcathlon détectée (config principale)');
+                    showLogin();
+                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi'].includes(config.activite)) {
+                    // Pour les autres activités
+                    currentConfig = config;
+                    showLogin();
+                } else {
+                    showWaiting();
+                }
+            } else {
+                // Si la config principale ne contient pas encore d'activité,
+                // on vérifie si une config Arcathlon existe dans le sous-chemin
+                const arcConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
+                if (arcathlonConfigListener) arcathlonConfigListener();
+                arcathlonConfigListener = onValue(arcConfigRef, (snap) => {
+                    const arcConfig = snap.val();
+                    console.log('[eleve] Config Arcathlon (sous-chemin) reçue :', arcConfig ? 'présente' : 'absente');
+                    if (arcConfig && Object.keys(arcConfig).length > 0) {
+                        // On simule une config Arcathlon pour l'affichage
+                        currentConfig = { activite: 'arcathlon' };
+                        console.log('[eleve] Activité Arcathlon détectée via sous-chemin');
+                        showLogin();
+                    } else {
+                        // Sinon, on reste en attente
+                        showWaiting();
+                    }
+                }, { onlyOnce: true }); // On écoute une seule fois pour ne pas surcharger
+            }
         });
     });
 
-    // Initialisation
     showWaiting();
 }
 
@@ -135,32 +178,39 @@ function showLogin() {
         }
         arcModule.classList.remove('hidden');
 
-        const equipes = config.equipes || {};
-        let html = '';
-        let hasCodes = false;
-        for (const [eqId, eqData] of Object.entries(equipes)) {
-            const membres = eqData.membres || [];
-            for (const m of membres) {
-                if (m.absent || m.inapte) continue;
-                const code = `${eqId}_${m.maillot}`;
-                html += `<button class="bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform" onclick="window.selectArcathlonCode('${code}')">${code}</button>`;
-                hasCodes = true;
+        // Récupérer les équipes depuis Firebase (sous-chemin)
+        const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+        const arcConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
+        onValue(arcConfigRef, (snap) => {
+            const arcConfig = snap.val();
+            console.log('[eleve] Chargement des équipes Arcathlon :', arcConfig);
+            const equipes = arcConfig?.equipes || {};
+            let html = '';
+            let hasCodes = false;
+            for (const [eqId, eqData] of Object.entries(equipes)) {
+                const membres = eqData.membres || [];
+                for (const m of membres) {
+                    if (m.absent || m.inapte) continue;
+                    const code = `${eqId}_${m.maillot}`;
+                    html += `<button class="bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform" onclick="window.selectArcathlonCode('${code}')">${code}</button>`;
+                    hasCodes = true;
+                }
             }
-        }
-        if (!hasCodes) {
-            html = '<p class="text-red-400 text-center">Aucun maillot disponible dans votre équipe.<br>Contactez votre professeur.</p>';
-        }
-        arcModule.innerHTML = `
-            <div class="text-center py-6">
-                <h2 class="text-2xl font-black text-white mb-4">Choisis ton maillot</h2>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-md mx-auto">
-                    ${html}
+            if (!hasCodes) {
+                html = '<p class="text-red-400 text-center">Aucun maillot disponible dans votre équipe.<br>Contactez votre professeur.</p>';
+            }
+            arcModule.innerHTML = `
+                <div class="text-center py-6">
+                    <h2 class="text-2xl font-black text-white mb-4">Choisis ton maillot</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-md mx-auto">
+                        ${html}
+                    </div>
+                    <button onclick="window.retourClasseArcathlon()" class="mt-6 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                        ← Changer de classe
+                    </button>
                 </div>
-                <button onclick="window.retourClasseArcathlon()" class="mt-6 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
-                    ← Changer de classe
-                </button>
-            </div>
-        `;
+            `;
+        }, { onlyOnce: true });
 
         window.selectArcathlonCode = (code) => {
             selectedCode = code;
