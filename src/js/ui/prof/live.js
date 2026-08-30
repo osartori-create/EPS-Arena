@@ -4,6 +4,7 @@ import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
 import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
 import { renderOrientShowLive } from '../../modules/orientshow/orientshow-live.js';
+import { exportIDoceo } from '../../services/export-idocéo.js';
 
 let currentClasse = "";
 
@@ -36,6 +37,47 @@ function isTVVisible() {
     const tvView = document.getElementById('viewTV');
     return tvView && !tvView.classList.contains('hidden');
 }
+window.exportCOiDoceo = function() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe.");
+
+    // 1. Récupérer les élèves (avec leurs codes d'équipe)
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+    if (eleves.length === 0) return alert("Aucun élève.");
+
+    // 2. Récupérer les données de la CO depuis Firebase (ou depuis votre état local)
+    // Note : Ici, on suppose que `getConfigData()` ou `listenToActivityData` vous donne les balises validées.
+    // Pour CO, la structure est souvent : { code: { circuitKey: { pts, total, time, details } } }
+    const sessionData = window.lastLiveSnap || {}; // Si vous stockez les données en direct
+    
+    // On prépare un objet "results" pour le module d'export
+    const results = {};
+    eleves.forEach(e => {
+        const code = e.code; // Ex: "A1"
+        if (!code || code === 'ABS' || code === 'INAPTE') return;
+
+        let score = 0;
+        let max = 0;
+        let temps = 0;
+
+        // On parcourt les circuits validés pour cet élève
+        Object.values(sessionData[code] || {}).forEach(circ => {
+            score += circ.pts || 0;
+            max += circ.total || 0;
+            if (circ.time && circ.time > temps) temps = circ.time;
+        });
+
+        results[code] = { points: score, objectif: max, time: temps };
+    });
+
+    // 3. Appeler le module d'export
+    exportIDoceo({
+        students: eleves,
+        results: results,
+        className: activeClasse,
+        activityName: "CO"
+    });
+};
 
 window.exportResultsLive = function() {
     if (!currentClasse) {
