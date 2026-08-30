@@ -10,7 +10,7 @@ import {
     savePreset, 
     loadPreset, 
     deletePreset 
-} from '../../modules/commun/timer.js'; // ✅ On importe TOUTES les fonctions
+} from '../../modules/commun/timer.js';
 import { initCalculateur } from '../../modules/commun/calculateur.js';
 
 export function initLayout() {
@@ -26,9 +26,7 @@ export function initLayout() {
 
     // Gestion de l'ouverture des outils depuis le menu
     window.openTool = function(toolName) {
-        // Masquer le menu principal
         document.getElementById('tools-menu').classList.add('hidden');
-        
         if (toolName === 'timer') {
             document.getElementById('tools-timer').classList.remove('hidden');
             initIntervalTimer();
@@ -46,42 +44,38 @@ export function initLayout() {
 
     // 1. Gestion des onglets
     window.switchTab = function(tabName) {
-    // On cache TOUTES les vues, y compris Activities
-    ['admin', 'activities', 'live', 'tv', 'tools'].forEach(t => {
-        const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
-        const el = document.getElementById(viewId);
-        if (el) {
-            el.classList.add('hidden');
-            el.style.display = 'none';
+        
+        // On cache TOUTES les vues, y compris Activities (pour éviter les réapparitions)
+        ['admin', 'activities', 'live', 'tv', 'tools'].forEach(t => {
+            const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
+            const el = document.getElementById(viewId);
+            if (el) {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            }
+        });
+
+        // Cas spécial TV (pour gérer le plein écran)
+        const tvView = document.getElementById('viewTV');
+        if (tabName === 'tv') {
+            tvView.style.display = 'block';
         }
-    });
 
-    // Cas spécial TV (pour gérer le plein écran)
-    const tvView = document.getElementById('viewTV');
-    if (tabName === 'tv') {
-        tvView.style.display = 'block';
-    }
+        // Activation des boutons d'onglet
+        ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.classList.remove('tab-active', 'text-blue-500');
+        });
 
-    // Activation des boutons d'onglet
-    ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) btn.classList.remove('tab-active', 'text-blue-500');
-    });
+        // Affichage de la vue demandée
+        const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+        if (targetView) {
+            targetView.classList.remove('hidden');
+            targetView.style.display = '';
+        }
 
-    // Affichage de la vue demandée
-    const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-    if (targetView) targetView.classList.remove('hidden');
-
-    // ... le reste de votre logique (appels TV, etc.)
-};
-
+        // Activation du bouton correspondant
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
-
-        if (tabName !== 'tv') {
-            const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-            if (targetView) targetView.classList.remove('hidden');
-        }
-
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
@@ -92,26 +86,27 @@ export function initLayout() {
             document.getElementById('tools-calculator').classList.add('hidden');
         }
 
+        // Logique spéciale TV
         if (tabName === 'tv') {
-    const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
-    setTimeout(() => {
-        if (discipline === 'badminton') {
-            // Import dynamique du module TV Badminton
-            import('../../modules/badminton/badminton-tv.js').then(module => module.renderBadmintonTV());
-        } else if (discipline === 'orientshow') {
-            import('../../modules/orientshow/orientshow-tv.js').then(module => module.renderOrientShowTV());
-        } else {
-            import('../../modules/escalade/escalade-tv-ui.js').then(module => module.renderEscaladeTV());
+            const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
+            setTimeout(() => {
+                if (discipline === 'badminton') {
+                    import('../../modules/badminton/badminton-tv.js').then(module => module.renderBadmintonTV());
+                } else if (discipline === 'orientshow') {
+                    import('../../modules/orientshow/orientshow-tv.js').then(module => module.renderOrientShowTV());
+                } else {
+                    import('../../modules/escalade/escalade-tv-ui.js').then(module => module.renderEscaladeTV());
+                }
+            }, 100);
         }
-    }, 100);
-}
 
+        // Logique spéciale Live
         if (tabName === 'live') {
             setTimeout(() => {
                 import('../../ui/prof/live.js')
                     .then(module => {
-                        if (typeof module.renderLive === 'function') {
-                            module.renderLive();
+                        if (typeof module.initLiveUI === 'function') {
+                            module.initLiveUI();
                         }
                     })
                     .catch(err => console.error("Erreur import Live:", err));
@@ -179,3 +174,4 @@ export function initLayout() {
             label.textContent = snap.val() ? "En ligne" : "Hors ligne";
         }
     });
+}
