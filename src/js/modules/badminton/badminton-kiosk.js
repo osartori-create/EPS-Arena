@@ -252,19 +252,38 @@ window.startSelectedMatch = function() {
 // --- 3. INTERFACE DU TERRAIN 3D ---
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
+
+    // Style du slider (pour qu'il ressemble à BadZ avec une poignée bleue)
+    const sliderStyle = `
+        <style>
+            #middle-zone-slider {
+                -webkit-appearance: none; appearance: none;
+                width: 100%; height: 6px;
+                background: #1e293b; border-radius: 9999px; outline: none;
+            }
+            #middle-zone-slider::-webkit-slider-thumb {
+                -webkit-appearance: none; appearance: none;
+                width: 18px; height: 18px;
+                background: #3b82f6; border-radius: 50%;
+                cursor: pointer; border: 2px solid #ffffff;
+            }
+        </style>
+    `;
+
+    // Zones différenciées par couleur (Vert foncé pour l'extérieur, Teal pour le centre)
     const zoneHtml = isFrontBackLayout ? `
         <div class="flex flex-col h-full">
-            <div class="zone front flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-            <div class="zone middle flex-1" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
-            <div class="zone back flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone front flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone middle flex-1 bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
+            <div class="zone back flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
         </div>` : `
         <div class="flex flex-row h-full">
-            <div class="zone left flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-            <div class="zone center flex-1" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
-            <div class="zone right flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone left flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone center flex-1 bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
+            <div class="zone right flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
         </div>`;
 
-    container.innerHTML = `
+    container.innerHTML = sliderStyle + `
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
                 <h3 class="text-3xl font-black text-white">${currentMatch.p1}</h3>
@@ -282,7 +301,12 @@ function renderCourtInterface() {
                 <label class="text-xs font-bold text-slate-400">Zone : <span id="zone-size-display">${middleZoneSize}%</span></label>
                 <input type="range" id="middle-zone-slider" min="20" max="60" value="${middleZoneSize}" class="w-32">
             </div>
-            <button onclick="toggleLayout()" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">Layout</button>
+
+            <!-- BOUTON LAYOUT DYNAMIQUE : Affiche l'état actuel -->
+            <button onclick="toggleLayout()" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">
+                Layout: ${isFrontBackLayout ? 'Avant/Arrière' : 'Gauche/Droite'}
+            </button>
+
             <div class="flex gap-2">
                 <select id="center-points" class="bg-slate-900 text-white p-1 rounded text-xs">
                     <option value="1">C: 1</option><option value="2">C: 2</option><option value="3">C: 3</option>
@@ -293,7 +317,7 @@ function renderCourtInterface() {
             </div>
         </div>
 
-        <div id="court" class="court-container relative w-full mx-auto mb-4 shadow-2xl" style="background-color: #4CAF50; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
+        <div id="court" class="court-container relative w-full mx-auto mb-4 shadow-2xl" style="background-color: #15803d; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
             <div class="absolute inset-0 flex">
                 <div class="half-court w-1/2 h-full relative p-0">
                     ${zoneHtml}
@@ -315,6 +339,7 @@ function renderCourtInterface() {
         </div>
     `;
 
+    // Application des écouteurs et des tailles
     document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
     document.getElementById('center-points').addEventListener('change', updateZonePoints);
     document.getElementById('other-points').addEventListener('change', updateZonePoints);
