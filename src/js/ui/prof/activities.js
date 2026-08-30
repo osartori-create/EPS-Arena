@@ -13,6 +13,7 @@ import {
     startOrientShow,
     stopOrientShow
 } from '../../modules/orientshow/orientshow-interface.js';
+import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes } from '../../modules/badminton/badminton-interface.js';
 
 let currentDiscipline = 'multi';
 
@@ -161,6 +162,7 @@ window.renderTeams = async function() {
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
     try { initEscaladeInterface(6); } catch (e) {}
+    try { initBadmintonInterface(6); } catch (e) {}
     try { initOrientShowInterface(); } catch (e) {}
 
     window.switchDiscipline = function(disc) {
@@ -171,20 +173,24 @@ export function initActivities() {
         const coView = document.getElementById('viewCOSettings');
         const osView = document.getElementById('viewOrientShowSettings');
         const escView = document.getElementById('viewEscaladeSettings');
+        const bmtView = document.getElementById('viewBadmintonSettings');
         if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
         if (coView) coView.classList.toggle('hidden', disc !== 'co');
         if (osView) osView.classList.toggle('hidden', disc !== 'orientshow');
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
+        if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
 
         const btnMulti = document.getElementById('btnDisc-multi');
         const btnCo = document.getElementById('btnDisc-co');
         const btnOs = document.getElementById('btnDisc-orientshow');
         const btnEsc = document.getElementById('btnDisc-escalade');
-        
+        const btnBmt = document.getElementById('btnDisc-badminton');
+
         if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
         if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
         if (btnOs) btnOs.classList.toggle('border-blue-500', disc === 'orientshow');
         if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
+        if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
 
         if (disc === 'co') {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
@@ -202,6 +208,13 @@ export function initActivities() {
                     initOrientShowInterface();
                     loadOrientShowAssignments();
                 }, 100);
+            } catch (e) {}
+        }
+        if (disc === 'badminton') {
+            try {
+                initBadmintonInterface();
+                initSortableBadminton();
+                loadBadmintonAssignments();
             } catch (e) {}
         }
     };
@@ -226,6 +239,17 @@ export function initActivities() {
         }
         if (currentDiscipline === 'orientshow') {
             alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
+            return;
+        }
+                if (currentDiscipline === 'badminton') {
+            // Récupère les élèves (sans les absents/inaptes pour le tri, mais on garde tout pour la répartition)
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+            // On filtre les inaptes pour qu'ils soient traités différemment par le module
+            const joueurs = eleves.filter(e => e.code !== 'INAPTE');
+            const inaptes = eleves.filter(e => e.code === 'INAPTE');
+            
+            generateBadmintonTeams([...joueurs, ...inaptes]); // Le module gère le tri interne
+            alert("✅ Terrains générés par niveau de force !");
             return;
         }
 
@@ -336,6 +360,27 @@ export function initActivities() {
             if (endTime !== null) configData.endTime = endTime;
         } 
         else {
+
+                else if (currentDiscipline === 'badminton') {
+            // Récupération des affectations sauvegardées
+            const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
+            configData = { activite: 'badminton' };
+            
+            // On parcourt chaque terrain pour construire le mapping local et la config
+            const lettres = ['A','B','C','D','E','F','G','H','I','J'];
+            for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
+                const idsTerrain = assignments[t] || [];
+                
+                // Construction du mapping local : { Classe_1_A: "IDélève" }
+                idsTerrain.forEach((eleveId, index) => {
+                    const lettre = lettres[index] || '?';
+                    localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
+                });
+                
+                // Config pour les iPads : Nombre de joueurs par terrain
+                configData[t] = idsTerrain.length;
+            }
+        }
             // Multi-activités (par défaut)
             configData.activite = 'multi';
             if (window.lastTeams) {

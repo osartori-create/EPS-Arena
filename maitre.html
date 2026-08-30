@@ -83,7 +83,7 @@
                     <!-- NOUVEAU BOUTON ORIENTSHOW -->
                     <button onclick="switchDiscipline('orientshow')" id="btnDisc-orientshow" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏃‍♂️ OrientShow</button>
                     <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🎯 Arcathlon</button>
-                    <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button>
+                    <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button><button onclick="switchDiscipline('badminton')" id="btnDisc-badminton" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏸 Badminton</button>
                 </div>
             </div>
 
@@ -269,6 +269,27 @@
                     </div>
                 </div>
             </div>
+            
+            <!-- PARAMÈTRES BADMINTON -->
+<div id="viewBadmintonSettings" class="hidden space-y-4">
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-black text-blue-400 uppercase text-sm">Terrains de Badminton (Groupes de niveau)</h3>
+            <button onclick="generateBadmintonTeamsFromCurrentClass()" class="btn-success text-xs uppercase">🔄 Générer Terrains</button>
+        </div>
+        <p class="text-xs text-slate-400 mb-4">Glissez les élèves. Les lettres (A, B, C...) s'attribuent automatiquement.</p>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+                <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve</h4>
+                <div id="reserveBadminton" class="flex flex-col gap-2 min-h-[100px]"></div>
+            </div>
+            <div class="lg:col-span-2">
+                <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Terrains</h4>
+                <div id="postesGridBadminton" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
         </div> <!-- Fin viewActivities -->
 
