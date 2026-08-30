@@ -253,37 +253,57 @@ window.startSelectedMatch = function() {
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
 
-    // Style du slider (pour qu'il ressemble à BadZ avec une poignée bleue)
-    const sliderStyle = `
+    // CSS Inline pour le Slider Bleu et le Switch
+    const controlsStyle = `
         <style>
             #middle-zone-slider {
                 -webkit-appearance: none; appearance: none;
-                width: 100%; height: 6px;
-                background: #1e293b; border-radius: 9999px; outline: none;
+                width: 100%; height: 10px;
+                background: #e2e8f0; /* Piste grise claire très visible */
+                border-radius: 9999px; outline: none;
+                box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
             }
             #middle-zone-slider::-webkit-slider-thumb {
                 -webkit-appearance: none; appearance: none;
-                width: 18px; height: 18px;
-                background: #3b82f6; border-radius: 50%;
-                cursor: pointer; border: 2px solid #ffffff;
+                width: 26px; height: 26px;
+                background: #3b82f6; /* Poignée BLEUE épaisse */
+                border-radius: 50%;
+                cursor: pointer; border: 4px solid #ffffff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             }
+            /* Style du Switch (Interrupteur) */
+            .switch {
+                position: relative; display: inline-block; width: 60px; height: 30px;
+            }
+            .switch input { opacity: 0; width: 0; height: 0; }
+            .slider-toggle {
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #94a3b8; transition: .4s; border-radius: 34px;
+            }
+            .slider-toggle:before {
+                position: absolute; content: ""; height: 22px; width: 22px;
+                left: 4px; bottom: 4px; background-color: white;
+                transition: .4s; border-radius: 50%;
+            }
+            input:checked + .slider-toggle { background-color: #3b82f6; }
+            input:checked + .slider-toggle:before { transform: translateX(30px); }
         </style>
     `;
 
-    // Zones différenciées par couleur (Vert foncé pour l'extérieur, Teal pour le centre)
+    // Zones différenciées par couleur (Vert foncé pour extérieur, Turquoise pour centre)
     const zoneHtml = isFrontBackLayout ? `
         <div class="flex flex-col h-full">
-            <div class="zone front flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-            <div class="zone middle flex-1 bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
-            <div class="zone back flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone front bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone middle bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
+            <div class="zone back bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
         </div>` : `
         <div class="flex flex-row h-full">
-            <div class="zone left flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-            <div class="zone center flex-1 bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
-            <div class="zone right flex-1 bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone left bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone center bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
+            <div class="zone right bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
         </div>`;
 
-    container.innerHTML = sliderStyle + `
+    container.innerHTML = controlsStyle + `
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
                 <h3 class="text-3xl font-black text-white">${currentMatch.p1}</h3>
@@ -297,15 +317,19 @@ function renderCourtInterface() {
         </div>
 
         <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-4 flex gap-4 items-center justify-between">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-1">
                 <label class="text-xs font-bold text-slate-400">Zone : <span id="zone-size-display">${middleZoneSize}%</span></label>
-                <input type="range" id="middle-zone-slider" min="20" max="60" value="${middleZoneSize}" class="w-32">
+                <input type="range" id="middle-zone-slider" min="20" max="60" value="${middleZoneSize}" class="w-full">
             </div>
 
-            <!-- BOUTON LAYOUT DYNAMIQUE : Affiche l'état actuel -->
-            <button onclick="toggleLayout()" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">
-                Layout: ${isFrontBackLayout ? 'Avant/Arrière' : 'Gauche/Droite'}
-            </button>
+            <div class="flex items-center gap-3">
+                <label class="text-xs font-bold text-slate-400">${isFrontBackLayout ? 'Avant/Arrière' : 'Gauche/Droite'}</label>
+                <!-- Switch stylisé -->
+                <label class="switch">
+                    <input type="checkbox" id="layout-switch" ${!isFrontBackLayout ? 'checked' : ''}>
+                    <span class="slider-toggle"></span>
+                </label>
+            </div>
 
             <div class="flex gap-2">
                 <select id="center-points" class="bg-slate-900 text-white p-1 rounded text-xs">
@@ -339,41 +363,62 @@ function renderCourtInterface() {
         </div>
     `;
 
-    // Application des écouteurs et des tailles
+    // Écouteurs d'événements
     document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
     document.getElementById('center-points').addEventListener('change', updateZonePoints);
     document.getElementById('other-points').addEventListener('change', updateZonePoints);
     document.getElementById('court').addEventListener('click', handleImpact);
     document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
 
+    // Nouveau listener pour le Switch
+    document.getElementById('layout-switch').addEventListener('change', (e) => {
+        isFrontBackLayout = !e.target.checked; // Coche = Gauche/Droite (false), Décoche = Avant/Arrière (true)
+        renderCourtInterface(); // On redessine avec le nouveau layout
+    });
+
     updateZoneSize();
 }
 
-// --- 4. INTERACTIONS (identiques) ---
+// --- 4. INTERACTIONS ---
+
+// CORRECTION IMPORTANTE : La jauge doit faire varier la taille proportionnellement !
 function updateZoneSize() {
     const slider = document.getElementById('middle-zone-slider');
     if (!slider) return;
+
     middleZoneSize = parseInt(slider.value);
     document.getElementById('zone-size-display').innerText = middleZoneSize + '%';
+    
+    // Calcul des pourcentages : Si centre = 60%, extérieur = (100 - 60) / 2 = 20% chacun.
+    // Le flex-1 a été retiré du HTML pour que les pourcentages s'appliquent correctement.
     const sideSize = (100 - middleZoneSize) / 2;
+
     document.querySelectorAll('#court .half-court').forEach((half) => {
         const zones = half.querySelectorAll('.zone');
+        
+        // On s'assure que les zones n'ont pas de flex qui force leur taille
+        zones.forEach(zone => { zone.style.flex = 'none'; });
+
         if (isFrontBackLayout) {
+            // Avant / Arrière (Vertical)
             zones[0].style.height = sideSize + '%';
             zones[1].style.height = middleZoneSize + '%';
             zones[2].style.height = sideSize + '%';
+            zones[0].style.width = '100%';
+            zones[1].style.width = '100%';
+            zones[2].style.width = '100%';
         } else {
+            // Gauche / Droite (Horizontal)
             zones[0].style.width = sideSize + '%';
             zones[1].style.width = middleZoneSize + '%';
             zones[2].style.width = sideSize + '%';
+            zones[0].style.height = '100%';
+            zones[1].style.height = '100%';
+            zones[2].style.height = '100%';
         }
     });
 }
 
-function toggleLayout() {
-    isFrontBackLayout = !isFrontBackLayout;
-    renderCourtInterface();
-}
 
 function updateZonePoints() {
     centerPoints = parseInt(document.getElementById('center-points').value);
