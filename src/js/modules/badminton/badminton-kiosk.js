@@ -1,26 +1,30 @@
 // src/js/modules/badminton/badminton-kiosk.js
-// Interface élève : Sélection Terrain -> Joueur -> Match visuel sur terrain
-// Inspiré et adapté de BadZ Impact (Webjéjé) et du module EPS-Arena.
+// Interface élève : Sélection Terrain -> Terrain 3D avec impacts persistants
+// Reprend intégralement la logique de BadZ Impact (Webjéjé) et l'intègre au Round Robin EPS-Arena.
 // Licence Creative Commons Attribution (CC BY).
 
-import { db, ref, onValue, update, push } from '../../core/firebase-service.js';
+import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
 let currentClasse = '';
 let currentTerrain = '';
-let currentCode = ''; // Ma lettre (A, B, C...)
-let opponentCode = ''; // Lettre adverse
 let playersList = [];
 let matchSchedule = [];
 let currentMatch = null;
-let matchPoints = { p1: 0, p2: 0 }; // Scores du match en cours
-let ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } }; // Ratios
+let matchPoints = { p1: 0, p2: 0 };
+let ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
 let terrainsConfig = {};
+let historyStack = [];
+let redoStack = [];
+
+// Variables pour la configuration du terrain
+let middleZoneSize = 33;
+let isFrontBackLayout = true; // Thème : Avant/Arrière (vrai) ou Gauche/Droite (faux)
+let centerPoints = 1;
+let otherPoints = 3;
 
 export function initBadmintonKiosk(classe) {
     currentClasse = classe;
     currentTerrain = '';
-    currentCode = '';
-    opponentCode = '';
     
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
@@ -39,7 +43,8 @@ export function initBadmintonKiosk(classe) {
         if (!currentTerrain) {
             renderTerrainSelection();
         } else {
-            checkAndRenderPlayerSelection();
+            // Si on revient sur l'écran, on regénère la configuration du terrain
+            checkAndSetupTerrain();
         }
     });
 }
@@ -66,50 +71,32 @@ function renderTerrainSelection() {
 
 window.selectBadmintonTerrain = function(terrain) {
     currentTerrain = terrain;
-    checkAndRenderPlayerSelection();
-};
-
-// --- 2. SÉLECTION DU JOUEUR ---
-function checkAndRenderPlayerSelection() {
-    const container = document.getElementById('badminton-content');
-    if (!container) return;
-
-    const nbPlayers = terrainsConfig[currentTerrain] || 0;
-    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    playersList = lettres.slice(0, nbPlayers);
-
-    let html = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
-        <h2 class="text-xl font-black text-white mb-4">Terrain ${currentTerrain} - Choisis ton joueur</h2>
-        <div class="grid grid-cols-2 gap-4">`;
-
-    playersList.forEach(letter => {
-        html += `<button onclick="selectBadmintonPlayer('${letter}')" 
-                    class="bg-indigo-600 p-6 rounded-2xl font-black text-3xl text-white active:scale-95 transition-transform">
-                    Joueur ${letter}
-                </button>`;
-    });
-
-    html += `</div>
-        <button onclick="resetBadmintonSelection()" class="mt-4 w-full bg-slate-600 py-2 rounded-xl font-bold text-white text-sm active:scale-95">← Changer de terrain</button>
-    </div>`;
-
-    container.innerHTML = html;
-}
-
-window.selectBadmintonPlayer = function(letter) {
-    currentCode = letter;
-    generateRoundRobin();
-    findNextMatch();
+    checkAndSetupTerrain();
 };
 
 window.resetBadmintonSelection = function() {
     currentTerrain = '';
-    currentCode = '';
-    opponentCode = '';
     renderTerrainSelection();
 };
 
-// --- 3. GÉNÉRATION DU ROUND ROBIN ---
+// --- 2. PRÉPARATION DU TERRAIN (Joueurs & Matchs) ---
+function checkAndSetupTerrain() {
+    const nbPlayers = terrainsConfig[currentTerrain] || 0;
+    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    playersList = lettres.slice(0, nbPlayers);
+
+    if (playersList.length < 2) {
+        document.getElementById('badminton-content').innerHTML = `
+            <div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
+                <p class="text-2xl font-black text-white">En attente d'autres joueurs sur ce terrain...</p>
+            </div>`;
+        return;
+    }
+
+    generateRoundRobin();
+    findNextMatch();
+}
+
 function generateRoundRobin() {
     matchSchedule = [];
     const n = playersList.length;
@@ -134,128 +121,260 @@ function generateRoundRobin() {
 }
 
 function findNextMatch() {
-    // On cherche un match concernant l'élève, sinon on regarde les autres pour patienter
-    let match = matchSchedule.find(m => (m.p1 === currentCode || m.p2 === currentCode) && m.s1 === null);
-    if (!match) match = matchSchedule.find(m => m.s1 === null);
-
+    let match = matchSchedule.find(m => m.s1 === null);
+    
     if (!match) {
         renderStandings();
         document.getElementById('badminton-content').innerHTML = `
-            <div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
+            <div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700 mb-4">
                 <div class="text-6xl mb-4">🏆</div>
                 <p class="text-2xl font-black text-white">Tous les matchs sont terminés !</p>
-                <p class="text-slate-400 mt-2">Regardez le classement ci-dessous.</p>
             </div>` + document.getElementById('badminton-content').innerHTML;
         return;
     }
 
     currentMatch = match;
-    opponentCode = match.p1 === currentCode ? match.p2 : match.p1;
     matchPoints = { p1: 0, p2: 0 };
     ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
+    historyStack = [];
+    redoStack = [];
     
     renderCourtInterface();
 }
 
-// --- 4. INTERFACE DU TERRAIN (Inspirée de BadZ) ---
+// --- 3. INTERFACE DU TERRAIN (Basée sur le code Webjéjé) ---
 function renderCourtInterface() {
     const container = document.getElementById('badminton-content');
-    let html = `
+
+    // Génération du HTML du terrain avec les zones selon le layout
+    const zoneHtml = isFrontBackLayout ? `
+        <div class="flex flex-col h-full">
+            <div class="zone front flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone middle flex-1" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
+            <div class="zone back flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+        </div>` : `
+        <div class="flex flex-row h-full">
+            <div class="zone left flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+            <div class="zone center flex-1" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
+            <div class="zone right flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
+        </div>`;
+
+    container.innerHTML = `
+        <!-- Barre de titre et score -->
         <div class="flex justify-between items-center mb-4">
-            <div class="text-center">
-                <h3 class="text-xl font-black text-white">${currentCode}</h3>
-                <p class="text-xs text-slate-400">Vous</p>
+            <div class="text-center w-1/3">
+                <h3 class="text-xl font-black text-white">${currentMatch.p1}</h3>
+                <p class="text-xs text-slate-400">Joueur 1</p>
             </div>
-            <div class="text-center">
-                <h3 class="text-3xl font-black text-yellow-400">${matchPoints.p1} - ${matchPoints.p2}</h3>
-                <p class="text-xs text-slate-400">Score du match</p>
+            <div class="text-center w-1/3">
+                <h3 id="score-display" class="text-3xl font-black text-yellow-400">0 - 0</h3>
             </div>
-            <div class="text-center">
-                <h3 class="text-xl font-black text-white">${opponentCode}</h3>
-                <p class="text-xs text-slate-400">Adversaire</p>
+            <div class="text-center w-1/3">
+                <h3 class="text-xl font-black text-white">${currentMatch.p2}</h3>
+                <p class="text-xs text-slate-400">Joueur 2</p>
             </div>
         </div>
 
-        <div id="court-container" class="relative w-full max-w-2xl mx-auto mb-6 border-4 border-slate-600 rounded-2xl overflow-hidden shadow-2xl" style="aspect-ratio: 2/1; background: #166534;">
-            <div class="absolute top-0 bottom-0 left-1/2 w-1 bg-black z-10"></div>
-            <div class="grid grid-cols-2 h-full">
-                <div id="left-side" class="relative border-r border-black/50">
-                    <div class="absolute inset-0 flex flex-col">
-                        <div onclick="handleImpact('p1', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
-                        <div onclick="handleImpact('p1', 'middle')" class="flex-1 bg-teal-500/40 hover:bg-teal-500/70 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">1 pt</div>
-                        <div onclick="handleImpact('p1', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
-                    </div>
-                    <div id="p1-ratio" class="absolute bottom-2 left-2 bg-black/70 text-white px-3 py-1 rounded-lg text-xs font-bold">0%</div>
-                </div>
-                <div id="right-side" class="relative border-l border-black/50">
-                    <div class="absolute inset-0 flex flex-col">
-                        <div onclick="handleImpact('p2', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
-                        <div onclick="handleImpact('p2', 'middle')" class="flex-1 bg-teal-500/40 hover:bg-teal-500/70 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">1 pt</div>
-                        <div onclick="handleImpact('p2', 'extreme')" class="flex-1 bg-green-700/30 hover:bg-green-700/60 transition-colors cursor-pointer flex items-center justify-center text-3xl font-black text-white">3 pts</div>
-                    </div>
-                    <div id="p2-ratio" class="absolute bottom-2 right-2 bg-black/70 text-white px-3 py-1 rounded-lg text-xs font-bold">0%</div>
+        <!-- Contrôles (Slider + Layout + Points) -->
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-4">
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-xs font-bold text-slate-400">Largeur zone centrale : <span id="zone-size-display">${middleZoneSize}%</span></label>
+                <input type="range" id="middle-zone-slider" min="20" max="60" value="${middleZoneSize}" class="w-1/2">
+            </div>
+            <div class="flex items-center justify-between">
+                <button onclick="toggleLayout()" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">Changer Layout</button>
+                <div class="flex gap-2">
+                    <label class="text-xs text-slate-400">Centre: 
+                        <select id="center-points" class="bg-slate-900 text-white p-1 rounded">
+                            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                        </select>
+                    </label>
+                    <label class="text-xs text-slate-400">Ext: 
+                        <select id="other-points" class="bg-slate-900 text-white p-1 rounded">
+                            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
+                        </select>
+                    </label>
                 </div>
             </div>
-            <div class="absolute top-0 left-0 right-0 bg-black/60 text-white py-2 text-center font-black">BadZ Impact</div>
-        </div>
-        
-        <div class="flex justify-center gap-4">
-            <button onclick="endMatch()" class="bg-red-600 hover:bg-red-700 text-white font-black py-3 px-6 rounded-2xl">🏁 Terminer le match</button>
-            <button onclick="resetBadmintonSelection()" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-2xl">Quitter</button>
         </div>
 
-        <div id="classement-terrain" class="mt-6 bg-slate-800 p-4 rounded-2xl border border-slate-700">
+        <!-- Le terrain 3D -->
+        <div id="court" class="court-container relative w-full max-w-2xl mx-auto mb-4 shadow-2xl" style="background-color: #4CAF50; aspect-ratio: 2/1; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
+            <div class="absolute inset-0 flex">
+                <div class="w-1/2 h-full relative p-0">
+                    ${zoneHtml}
+                    <div id="ratio-p1" class="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
+                </div>
+                <div class="w-1 h-full bg-black"></div>
+                <div class="w-1/2 h-full relative p-0">
+                    ${zoneHtml.replace(/p1/g, 'p2')}
+                    <div id="ratio-p2" class="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
+                </div>
+            </div>
+            <!-- Impacts persistants injectés ici -->
+        </div>
+
+        <div class="flex justify-center gap-4 mb-4">
+            <button onclick="undoImpact()" class="bg-slate-600 text-white px-4 py-2 rounded-xl font-bold">↩ Annuler</button>
+            <button onclick="resetCourt()" class="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">Reset</button>
+            <button onclick="endMatch()" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-black">🏁 Terminer Match</button>
+        </div>
+
+        <div id="classement-terrain" class="mt-4 bg-slate-800 p-4 rounded-2xl border border-slate-700">
             <h3 class="font-black text-blue-400 uppercase text-sm mb-2">Classement</h3>
             <div id="classement-content" class="space-y-2"></div>
         </div>
     `;
 
-    container.innerHTML = html;
+    // Écouteurs pour les sliders et selects
+    document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
+    document.getElementById('center-points').addEventListener('change', updateZonePoints);
+    document.getElementById('other-points').addEventListener('change', updateZonePoints);
+    document.getElementById('court').addEventListener('click', handleImpact);
+    // Support tactile
+    document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
+
+    // Initialisation des tailles
+    updateZoneSize();
     renderStandings();
 }
 
-// --- 5. GESTION DES CLICS (Impacts) ---
-window.handleImpact = function(player, zone) {
-    if (currentMatch.p1 !== currentCode && currentMatch.p2 !== currentCode) {
-        // Ce n'est pas notre match, on ne peut pas cliquer pour l'autre
-        return;
-    }
+// --- 4. GESTION DES INTERACTIONS (Sliders, Layout, Impacts) ---
+function updateZoneSize() {
+    const slider = document.getElementById('middle-zone-slider');
+    if (!slider) return;
     
-    // On s'assure que le joueur qui clique est bien celui qui joue
-    // (Dans une vraie interface, on pourrait autoriser les 2 joueurs à cliquer sur leur propre côté. Ici, seul le joueur connecté peut cliquer)
-    if (player === 'p1' && currentMatch.p1 !== currentCode) return;
-    if (player === 'p2' && currentMatch.p2 !== currentCode) return;
+    middleZoneSize = parseInt(slider.value);
+    document.getElementById('zone-size-display').innerText = middleZoneSize + '%';
+    const sideSize = (100 - middleZoneSize) / 2;
 
-    let pts = zone === 'middle' ? 1 : 3;
+    document.querySelectorAll('#court .w-1/2').forEach((half) => {
+        // Applique la taille en fonction du layout (vertical ou horizontal)
+        const zones = half.querySelectorAll('.zone');
+        if (isFrontBackLayout) {
+            zones[0].style.height = sideSize + '%';
+            zones[1].style.height = middleZoneSize + '%';
+            zones[2].style.height = sideSize + '%';
+        } else {
+            zones[0].style.width = sideSize + '%';
+            zones[1].style.width = middleZoneSize + '%';
+            zones[2].style.width = sideSize + '%';
+        }
+    });
+}
+
+function toggleLayout() {
+    isFrontBackLayout = !isFrontBackLayout;
+    // On régénère simplement l'interface
+    renderCourtInterface();
+}
+
+function updateZonePoints() {
+    centerPoints = parseInt(document.getElementById('center-points').value);
+    otherPoints = parseInt(document.getElementById('other-points').value);
     
-    // Mise à jour des scores et ratios
-    matchPoints[player] += pts;
-    ratioData[player][zone]++;
+    document.querySelectorAll('.zone').forEach(zone => {
+        const player = zone.dataset.player;
+        const isMiddle = zone.classList.contains('middle') || zone.classList.contains('center');
+        const points = isMiddle ? centerPoints : otherPoints;
+        zone.setAttribute('data-points', points);
+        zone.innerText = points + ' pt' + (points > 1 ? 's' : '');
+    });
+}
 
-    // Créer un effet visuel (point jaune clignotant)
-    const sideId = player === 'p1' ? 'left-side' : 'right-side';
-    const side = document.getElementById(sideId);
+function handleImpact(e) {
+    const court = document.getElementById('court');
+    const rect = court.getBoundingClientRect();
+    
+    // Calcul position relative au clic
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // On cherche la zone cliquée
+    const target = e.target.closest('.zone');
+    if (!target) return;
+
+    const player = target.dataset.player;
+    const points = parseInt(target.dataset.points);
+    const isMiddle = target.classList.contains('middle') || target.classList.contains('center');
+
+    // Création d'un impact persistant
     const impact = document.createElement('div');
-    impact.className = 'absolute w-4 h-4 bg-yellow-400 rounded-full shadow-lg transform -translate-x-1/2 -translate-y-1/2';
-    impact.style.left = Math.random() * 80 + 10 + '%';
-    impact.style.top = Math.random() * 80 + 10 + '%';
-    side.appendChild(impact);
-    setTimeout(() => impact.remove(), 700);
+    impact.className = 'impact absolute w-3 h-3 bg-yellow-400 rounded-full';
+    impact.style.left = x + 'px';
+    impact.style.top = y + 'px';
+    court.appendChild(impact);
+
+    // Mise à jour du score et du ratio
+    matchPoints[player] += points;
+    ratioData[player][isMiddle ? 'middle' : 'extreme']++;
 
     // Mise à jour de l'affichage
-    document.querySelector('.text-3xl.font-black.text-yellow-400').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
+    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
     
     const p1Total = ratioData.p1.extreme + ratioData.p1.middle;
     const p2Total = ratioData.p2.extreme + ratioData.p2.middle;
-    document.getElementById('p1-ratio').innerText = `${p1Total > 0 ? Math.round((ratioData.p1.extreme / p1Total) * 100) : 0}%`;
-    document.getElementById('p2-ratio').innerText = `${p2Total > 0 ? Math.round((ratioData.p2.extreme / p2Total) * 100) : 0}%`;
-};
+    document.getElementById('ratio-p1').innerText = (p1Total > 0 ? Math.round((ratioData.p1.extreme / p1Total) * 100) : 0) + '%';
+    document.getElementById('ratio-p2').innerText = (p2Total > 0 ? Math.round((ratioData.p2.extreme / p2Total) * 100) : 0) + '%';
 
-// --- 6. FIN DE MATCH ET ENVOI ---
+    // Gestion de l'historique (Annuler)
+    historyStack.push({ element: impact, player, points, isMiddle });
+    redoStack = [];
+    updateUndoRedoButtons();
+}
+
+function handleTouch(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    handleImpact({
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        target: document.elementFromPoint(touch.clientX, touch.clientY)
+    });
+}
+
+function undoImpact() {
+    if (historyStack.length === 0) return;
+    const last = historyStack.pop();
+    redoStack.push(last);
+    last.element.remove();
+    
+    matchPoints[last.player] -= last.points;
+    ratioData[last.player][last.isMiddle ? 'middle' : 'extreme']--;
+    
+    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
+    
+    const p1Total = ratioData.p1.extreme + ratioData.p1.middle;
+    const p2Total = ratioData.p2.extreme + ratioData.p2.middle;
+    document.getElementById('ratio-p1').innerText = (p1Total > 0 ? Math.round((ratioData.p1.extreme / p1Total) * 100) : 0) + '%';
+    document.getElementById('ratio-p2').innerText = (p2Total > 0 ? Math.round((ratioData.p2.extreme / p2Total) * 100) : 0) + '%';
+    
+    updateUndoRedoButtons();
+}
+
+function resetCourt() {
+    // Supprime tous les impacts
+    document.querySelectorAll('#court .impact').forEach(el => el.remove());
+    matchPoints = { p1: 0, p2: 0 };
+    ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
+    
+    document.getElementById('score-display').innerText = '0 - 0';
+    document.getElementById('ratio-p1').innerText = '0%';
+    document.getElementById('ratio-p2').innerText = '0%';
+    
+    historyStack = [];
+    redoStack = [];
+    updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons() {
+    // (Les boutons undo/redo sont gérés visuellement via la présence de l'historique)
+}
+
+// --- 5. FIN DE MATCH ET ENVOI ---
 window.endMatch = function() {
     if (!currentMatch) return;
     if (confirm(`Valider le score ${matchPoints.p1} - ${matchPoints.p2} ?`)) {
-        // On envoie le score à Firebase
         const p1 = currentMatch.p1;
         const p2 = currentMatch.p2;
         const s1 = matchPoints.p1;
@@ -268,32 +387,13 @@ window.endMatch = function() {
         .then(() => {
             currentMatch.s1 = s1;
             currentMatch.s2 = s2;
-            findNextMatch(); // On passe au match suivant
-            listenForScoreUpdates();
+            findNextMatch();
         })
         .catch(err => alert("Erreur envoi : " + err.message));
     }
 };
 
-// --- 7. ÉCOUTE DES SCORES (synchronisation entre iPads) ---
-function listenForScoreUpdates() {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
-    
-    onValue(resultsRef, (snap) => {
-        const data = snap.val() || {};
-        matchSchedule.forEach(m => {
-            const result = data[m.id];
-            if (result && result.terrain === currentTerrain) {
-                m.s1 = result.s1;
-                m.s2 = result.s2;
-            }
-        });
-        renderStandings();
-    });
-}
-
-// --- 8. CLASSEMENT DU TERRAIN ---
+// --- 6. CLASSEMENT ---
 function renderStandings() {
     const container = document.getElementById('classement-content');
     if (!container) return;
@@ -315,12 +415,10 @@ function renderStandings() {
     const sorted = Object.entries(standings).sort((a, b) => b[1].pts - a[1].pts || b[1].diff - a[1].diff);
     let html = '';
     sorted.forEach(([player, data], idx) => {
-        const isMe = player === currentCode ? 'bg-blue-900 border-blue-500' : 'bg-slate-900 border-slate-700';
-        html += `<div class="flex items-center justify-between p-2 rounded-xl border ${isMe}">
+        html += `<div class="flex items-center justify-between p-2 rounded-xl border ${player === currentMatch?.p1 || player === currentMatch?.p2 ? 'bg-slate-900 border-slate-600' : 'bg-slate-900 border-slate-700'}">
                     <div class="flex items-center gap-3">
                         <span class="font-black text-slate-500 w-6">${idx + 1}</span>
                         <span class="font-black text-xl text-white">${player}</span>
-                        ${isMe ? '<span class="text-[10px] text-blue-300">(Vous)</span>' : ''}
                     </div>
                     <div class="flex gap-4 text-xs font-black">
                         <span class="text-emerald-400">${data.wins} V</span>
