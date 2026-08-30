@@ -15,18 +15,18 @@ let ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } }
 let terrainsConfig = {};
 let historyStack = [];
 let redoStack = [];
-let resultsListenerAttached = false; // Flag pour éviter la boucle infinie
+let resultsListenerAttached = false; // Pour éviter la boucle infinie
 
 // Variables pour la configuration du terrain
 let middleZoneSize = 33;
-let isFrontBackLayout = true;
+let isFrontBackLayout = true; // true = Avant/Arrière, false = Gauche/Droite
 let centerPoints = 1;
 let otherPoints = 3;
 
 export function initBadmintonKiosk(classe) {
     currentClasse = classe;
     currentTerrain = '';
-    resultsListenerAttached = false; // On réinitialise le flag
+    resultsListenerAttached = false;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
@@ -61,7 +61,6 @@ function renderTerrainSelection() {
     const container = document.getElementById('badminton-content');
     if (!container) return;
 
-    // Affichage centré et large pour PC/iPad
     let html = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center w-full max-w-5xl mx-auto">
         <h2 class="text-3xl font-black text-white mb-6">🏸 Choisis ton terrain</h2>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-6">`;
@@ -182,7 +181,6 @@ function renderMatchSetup() {
     `;
 
     container.innerHTML = html;
-    // Fini la boucle infinie ! On ne réappelle PLUS loadMatchResults ici.
 }
 
 window.selectMatchFromList = function(matchId) {
@@ -202,8 +200,6 @@ function listenForScoreUpdates() {
     
     onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
-        
-        // On met à jour les scores des matchs déjà joués
         matchSchedule.forEach(m => {
             const result = data[m.id];
             if (result && result.terrain === currentTerrain) {
@@ -212,11 +208,10 @@ function listenForScoreUpdates() {
             }
         });
 
-        // On re-rend uniquement la liste des matchs sans réécouter Firebase
-        if (document.getElementById('select-p1') && document.getElementById('select-p2')) {
-            // On ne fait rien si on est en pleine saisie de match, juste on met à jour la liste des matchs
-            const list = document.querySelector('#badminton-content .space-y-2');
-            if (list) list.innerHTML = matchSchedule.map(match => {
+        // Mise à jour de la liste des matchs sans recréer toute l'interface
+        const list = document.querySelector('#badminton-content .space-y-2');
+        if (list) {
+            list.innerHTML = matchSchedule.map(match => {
                 const isPlayed = match.s1 !== null;
                 const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
                 return `<button onclick="selectMatchFromList('${match.id}')" 
@@ -249,29 +244,32 @@ window.startSelectedMatch = function() {
     renderCourtInterface();
 };
 
-// --- 3. INTERFACE DU TERRAIN 3D ---
+// --- 3. INTERFACE DU TERRAIN 3D (Slider Bleu + Switch Layout) ---
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
 
-    // CSS Inline pour le Slider Bleu et le Switch
+    // CSS pour Slider Bleu et Switch
     const controlsStyle = `
         <style>
             #middle-zone-slider {
                 -webkit-appearance: none; appearance: none;
                 width: 100%; height: 10px;
-                background: #e2e8f0; /* Piste grise claire très visible */
-                border-radius: 9999px; outline: none;
+                background: #e2e8f0; border-radius: 9999px; outline: none;
                 box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
             }
             #middle-zone-slider::-webkit-slider-thumb {
                 -webkit-appearance: none; appearance: none;
                 width: 26px; height: 26px;
-                background: #3b82f6; /* Poignée BLEUE épaisse */
-                border-radius: 50%;
+                background: #3b82f6; border-radius: 50%;
                 cursor: pointer; border: 4px solid #ffffff;
                 box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             }
-            /* Style du Switch (Interrupteur) */
+            #middle-zone-slider::-moz-range-thumb {
+                width: 26px; height: 26px;
+                background: #3b82f6; border-radius: 50%;
+                cursor: pointer; border: 4px solid #ffffff;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            }
             .switch {
                 position: relative; display: inline-block; width: 60px; height: 30px;
             }
@@ -290,7 +288,7 @@ function renderCourtInterface() {
         </style>
     `;
 
-    // Zones différenciées par couleur (Vert foncé pour extérieur, Turquoise pour centre)
+    // Zones différenciées par couleur
     const zoneHtml = isFrontBackLayout ? `
         <div class="flex flex-col h-full">
             <div class="zone front bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
@@ -324,7 +322,6 @@ function renderCourtInterface() {
 
             <div class="flex items-center gap-3">
                 <label class="text-xs font-bold text-slate-400">${isFrontBackLayout ? 'Avant/Arrière' : 'Gauche/Droite'}</label>
-                <!-- Switch stylisé -->
                 <label class="switch">
                     <input type="checkbox" id="layout-switch" ${!isFrontBackLayout ? 'checked' : ''}>
                     <span class="slider-toggle"></span>
@@ -363,17 +360,15 @@ function renderCourtInterface() {
         </div>
     `;
 
-    // Écouteurs d'événements
     document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
     document.getElementById('center-points').addEventListener('change', updateZonePoints);
     document.getElementById('other-points').addEventListener('change', updateZonePoints);
     document.getElementById('court').addEventListener('click', handleImpact);
     document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
 
-    // Nouveau listener pour le Switch
     document.getElementById('layout-switch').addEventListener('change', (e) => {
-        isFrontBackLayout = !e.target.checked; // Coche = Gauche/Droite (false), Décoche = Avant/Arrière (true)
-        renderCourtInterface(); // On redessine avec le nouveau layout
+        isFrontBackLayout = !e.target.checked;
+        renderCourtInterface();
     });
 
     updateZoneSize();
@@ -381,7 +376,7 @@ function renderCourtInterface() {
 
 // --- 4. INTERACTIONS ---
 
-// CORRECTION IMPORTANTE : La jauge doit faire varier la taille proportionnellement !
+// CORRECTION : La jauge fait varier la taille proportionnellement
 function updateZoneSize() {
     const slider = document.getElementById('middle-zone-slider');
     if (!slider) return;
@@ -390,13 +385,12 @@ function updateZoneSize() {
     document.getElementById('zone-size-display').innerText = middleZoneSize + '%';
     
     // Calcul des pourcentages : Si centre = 60%, extérieur = (100 - 60) / 2 = 20% chacun.
-    // Le flex-1 a été retiré du HTML pour que les pourcentages s'appliquent correctement.
+    // On retire flex:1 sur les enfants et on applique les % directement.
     const sideSize = (100 - middleZoneSize) / 2;
 
     document.querySelectorAll('#court .half-court').forEach((half) => {
         const zones = half.querySelectorAll('.zone');
         
-        // On s'assure que les zones n'ont pas de flex qui force leur taille
         zones.forEach(zone => { zone.style.flex = 'none'; });
 
         if (isFrontBackLayout) {
@@ -418,7 +412,6 @@ function updateZoneSize() {
         }
     });
 }
-
 
 function updateZonePoints() {
     centerPoints = parseInt(document.getElementById('center-points').value);
@@ -506,7 +499,7 @@ function resetCourt() {
     redoStack = [];
 }
 
-window.toggleLayout = toggleLayout;
+// Suppression de l'ancien toggleLayout (le switch prend le relais)
 window.undoImpact = undoImpact;
 window.resetCourt = resetCourt;
 
@@ -532,7 +525,7 @@ window.endMatch = function() {
                 matchSchedule.push(currentMatch);
             }
             currentMatch = null;
-            renderMatchSetup(); // On revient à la liste des matchs
+            renderMatchSetup();
         })
         .catch(err => alert("Erreur envoi : " + err.message));
     }
