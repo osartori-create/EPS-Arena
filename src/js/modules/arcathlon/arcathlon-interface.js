@@ -14,13 +14,11 @@ export function generateArcathlonTeams() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
 
-    // Récupérer les couleurs choisies par le professeur
     const couleurVMAplus = document.getElementById('couleurVMAplus')?.value || 'Rouge';
     const couleurVMAinter = document.getElementById('couleurVMAinter')?.value || 'Jaune';
     const couleurVMAmoins = document.getElementById('couleurVMAmoins')?.value || 'Bleu';
     const couleursSelectionnees = [couleurVMAplus, couleurVMAinter, couleurVMAmoins];
 
-    // Vérifier l'unicité
     if (new Set(couleursSelectionnees).size < 3) {
         alert("Les trois couleurs doivent être différentes.");
         return;
@@ -29,18 +27,15 @@ export function generateArcathlonTeams() {
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     if (eleves.length < 3) return alert("Il faut au moins 3 élèves pour constituer des équipes.");
 
-    // 1. Trier par VMA décroissante
     const sorted = [...eleves].sort((a, b) => (b.vma || 0) - (a.vma || 0));
 
-    // 2. Répartir en 3 quartiles
     const quartileSize = Math.ceil(sorted.length / 3);
     const quartiles = [
-        sorted.slice(0, quartileSize),          // VMA+
-        sorted.slice(quartileSize, quartileSize * 2), // VMA±
-        sorted.slice(quartileSize * 2)          // VMA−
+        sorted.slice(0, quartileSize),
+        sorted.slice(quartileSize, quartileSize * 2),
+        sorted.slice(quartileSize * 2)
     ];
 
-    // 3. Mélanger chaque quartile pour répartir aléatoirement
     quartiles.forEach(q => {
         for (let i = q.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -48,7 +43,6 @@ export function generateArcathlonTeams() {
         }
     });
 
-    // 4. Construire les équipes
     const nbEquipes = Math.min(
         quartiles[0].length,
         quartiles[1].length,
@@ -87,7 +81,7 @@ function chargerEquipes(classe) {
 }
 
 // --------------------------------------------------------------
-// 3. REMPLACEMENT COLLECTIF DES COULEURS (corrigé)
+// 3. REMPLACEMENT COLLECTIF DES COULEURS
 // --------------------------------------------------------------
 export function remplacerCouleurCollectif() {
     const activeClasse = document.getElementById('selectClasse').value;
@@ -121,13 +115,12 @@ export function remplacerCouleurCollectif() {
 }
 
 // --------------------------------------------------------------
-// 4. AFFICHAGE DES ÉQUIPES (avec bandeau couleur + sexe)
+// 4. AFFICHAGE DES ÉQUIPES
 // --------------------------------------------------------------
 export async function renderArcathlonTeams() {
     const container = document.getElementById('teamsGridArcathlon');
     if (!container) return;
 
-    // Sauvegarder la position de défilement
     const scrollContainer = container.closest('.overflow-y-auto') || container.parentElement;
     const firstVisibleCard = scrollContainer.querySelector('.bg-slate-900.rounded-2xl');
     let targetId = null;
@@ -154,12 +147,10 @@ export async function renderArcathlonTeams() {
                 ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover">`
                 : `<div class="w-8 h-8 rounded-full bg-slate-700"></div>`;
 
-            // Fond selon le sexe (comme dans les autres modules)
             let bgSexe = 'bg-slate-200 border-slate-400';
             if (m.sexe === 'M') bgSexe = 'bg-blue-200 border-blue-400';
             else if (m.sexe === 'F') bgSexe = 'bg-rose-200 border-rose-400';
 
-            // Bandeau de couleur du maillot en haut de la carte
             const colorMap = {
                 'Rouge': 'bg-red-600',
                 'Jaune': 'bg-yellow-500',
@@ -175,14 +166,12 @@ export async function renderArcathlonTeams() {
             const absentChecked = m.absent ? 'checked' : '';
             const inapteChecked = m.inapte ? 'checked' : '';
 
-            // Sélecteur de couleur individuel
             const colorOptions = COULEURS_DISPONIBLES.map(c =>
                 `<option value="${c}" ${c === m.maillot ? 'selected' : ''}>${c}</option>`
             ).join('');
 
             html += `
                 <div class="relative rounded-lg border-2 ${bgSexe} bg-opacity-80" data-id="${m.id}">
-                    <!-- Bandeau de couleur du maillot -->
                     <div class="${bandeauCouleur} h-1.5 rounded-t-lg"></div>
                     <div class="flex items-center justify-between p-2">
                         <div class="flex items-center gap-2">
@@ -212,7 +201,6 @@ export async function renderArcathlonTeams() {
         container.innerHTML += html;
     }
 
-    // Restaurer la position de défilement
     if (targetId) {
         const targetCard = container.querySelector(`[data-team-id="${targetId}"]`);
         if (targetCard) {
@@ -220,7 +208,6 @@ export async function renderArcathlonTeams() {
         }
     }
 
-    // Attacher les événements
     document.querySelectorAll('.couleur-select').forEach(sel => {
         sel.addEventListener('change', (e) => {
             const eqId = e.target.dataset.eq;
@@ -307,16 +294,15 @@ export function initSortableArcathlon() {
 }
 
 // --------------------------------------------------------------
-// 6. TRANSMISSION VERS FIREBASE
+// 6. TRANSMISSION VERS FIREBASE (CORRIGÉE)
 // --------------------------------------------------------------
-export function transmettreArcathlonConfig() {
+export async function transmettreArcathlonConfig() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe.");
 
     const equipes = chargerEquipes(activeClasse);
     if (equipes.length === 0) return alert("Générez d'abord les équipes.");
 
-    // Récupérer les paramètres
     const mode = document.getElementById('arcathlonMode')?.value || 'sprint';
     const nbSeries = parseInt(document.getElementById('arcathlonNbSeries')?.value) || 3;
     const longueurPiste = parseInt(document.getElementById('arcathlonLongueurPiste')?.value) || 100;
@@ -360,16 +346,26 @@ export function transmettreArcathlonConfig() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${activeClasse}/arcathlon/config`);
+    const basePath = `etablissements/0680013V/profs/${profCode}`;
 
-    set(configRef, configData)
-        .then(() => {
-            alert("✅ Configuration Arcathlon transmise aux iPads !");
-        })
-        .catch(err => {
-            console.error(err);
-            alert("❌ Erreur lors de la transmission.");
-        });
+    try {
+        // 1) Écrire la configuration détaillée dans le sous‑chemin Arcathlon
+        const configRef = ref(db, `${basePath}/${activeClasse}/arcathlon/config`);
+        await set(configRef, configData);
+
+        // 2) Écrire la configuration principale (pour que l'élève détecte l'activité)
+        const mainConfigRef = ref(db, `${basePath}/${activeClasse}/config`);
+        await set(mainConfigRef, { activite: 'arcathlon' });
+
+        // 3) Marquer la classe comme active (optionnel, déjà fait par le bouton "Transmettre" global)
+        const activeRef = ref(db, `${basePath}/active_classes/${activeClasse}`);
+        await set(activeRef, true);
+
+        alert("✅ Configuration Arcathlon transmise aux iPads !");
+    } catch (err) {
+        console.error(err);
+        alert("❌ Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
+    }
 }
 
 // --------------------------------------------------------------
@@ -441,7 +437,6 @@ export function initArcathlonInterface() {
                     </div>
                 </div>
 
-                <!-- Choix des couleurs par quartile (avant génération) -->
                 <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 mb-4 flex flex-wrap items-center gap-3">
                     <span class="text-xs font-bold text-slate-400 uppercase">Couleurs des maillots :</span>
                     <label class="text-xs text-slate-400">VMA+</label>
@@ -458,7 +453,6 @@ export function initArcathlonInterface() {
                     </select>
                 </div>
 
-                <!-- Panneau de remplacement collectif -->
                 <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 mb-4 flex flex-wrap items-center gap-3">
                     <span class="text-xs font-bold text-slate-400 uppercase">Remplacer :</span>
                     <select id="couleurSource" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white">
@@ -519,7 +513,6 @@ export function initArcathlonInterface() {
         }
     }
 
-    // Exposer les fonctions globales
     window.generateArcathlonTeams = generateArcathlonTeams;
     window.transmettreArcathlonConfig = transmettreArcathlonConfig;
     window.exportArcathlonConfig = exportArcathlonConfig;
