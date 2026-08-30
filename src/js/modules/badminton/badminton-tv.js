@@ -80,10 +80,10 @@ async function renderTVGrid(terrainsConfig, data) {
 
             if (m.s1 > m.s2) {
                 terrainData[m.p1].pts += 3; terrainData[m.p1].wins++; terrainData[m.p1].diff += (m.s1 - m.s2);
-                terrainData[m.p2].losses++; terrainData[m.p2].diff -= (m.s1 - m.s2);
+                terrainData[m.p2].losses++; terrainData[m.p2].pts += 1; terrainData[m.p2].diff -= (m.s1 - m.s2);
             } else {
                 terrainData[m.p2].pts += 3; terrainData[m.p2].wins++; terrainData[m.p2].diff += (m.s2 - m.s1);
-                terrainData[m.p1].losses++; terrainData[m.p1].diff -= (m.s2 - m.s1);
+                terrainData[m.p1].losses++; terrainData[m.p1].pts += 1; terrainData[m.p1].diff -= (m.s2 - m.s1);
             }
 
             if (m.stats) {

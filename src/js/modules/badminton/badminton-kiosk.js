@@ -227,10 +227,10 @@ function renderClassement() {
         if (m.s1 === null) return;
         if (m.s1 > m.s2) {
             standings[m.p1].pts += 3; standings[m.p1].wins++; standings[m.p1].diff += (m.s1 - m.s2);
-            standings[m.p2].losses++; standings[m.p2].diff -= (m.s1 - m.s2);
+            standings[m.p2].losses++; standings[m.p2].pts += 1; standings[m.p2].diff -= (m.s1 - m.s2);
         } else {
-            standings[m.p2].pts += 3; standings[m.p2].wins++; standings[m.p2].diff += (m.s2 - m.s1);
-            standings[m.p1].losses++; standings[m.p1].diff -= (m.s2 - m.s1);
+             standings[m.p2].pts += 3; standings[m.p2].wins++; standings[m.p2].diff += (m.s2 - m.s1);
+            standings[m.p1].losses++; standings[m.p1].pts += 1; standings[m.p1].diff -= (m.s2 - m.s1);
         }
     });
 
