@@ -126,29 +126,11 @@ function renderMatchSetup() {
     let html = `
         <div class="flex flex-col lg:flex-row gap-6 w-full max-w-7xl mx-auto">
             
-            <!-- Colonne Gauche : Sélection et Liste -->
+            <!-- Colonne Gauche : Liste des matchs + Classement -->
             <div class="w-full lg:w-1/3 bg-slate-800 p-6 rounded-2xl border border-slate-700">
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-black text-white">Terrain ${currentTerrain}</h2>
                     <button onclick="window.retourTerrains()" class="bg-red-600 px-3 py-1 rounded-lg text-xs font-black text-white">← Terrain</button>
-                </div>
-
-                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Sélection des joueurs</h3>
-                <div class="space-y-4 mb-6">
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Joueur 1 (P1)</label>
-                        <select id="select-p1" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white" onchange="checkAndStartMatch()">
-                            <option value="">-- Choisir --</option>
-                            ${playersList.map(p => `<option value="${p}">Joueur ${p}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-slate-400 mb-1">Joueur 2 (P2)</label>
-                        <select id="select-p2" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white" onchange="checkAndStartMatch()">
-                            <option value="">-- Choisir --</option>
-                            ${playersList.map(p => `<option value="${p}">Joueur ${p}</option>`).join('')}
-                        </select>
-                    </div>
                 </div>
 
                 <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Programmation (Round Robin)</h3>
@@ -156,10 +138,11 @@ function renderMatchSetup() {
                     ${matchSchedule.map(match => {
                         const isPlayed = match.s1 !== null;
                         const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
-                        // Style grisé + barré pour les matchs terminés
                         const playedStyle = isPlayed ? 'line-through opacity-60' : '';
+                        // On désactive le clic si le match est déjà joué
+                        const clickAction = isPlayed ? '' : `onclick="selectMatchFromList('${match.id}')"`;
                         return `
-                            <button onclick="selectMatchFromList('${match.id}')" 
+                            <button ${clickAction} 
                                 class="w-full text-left p-3 rounded-lg border-2 transition-colors ${playedStyle} ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
                                 <div class="flex justify-between items-center font-black">
                                     <span>${match.p1} vs ${match.p2}</span>
@@ -176,24 +159,27 @@ function renderMatchSetup() {
             <!-- Colonne Droite : Terrain 3D -->
             <div class="w-full lg:w-2/3 bg-slate-900 p-6 rounded-2xl border border-slate-700" id="court-zone">
                 <div class="text-center py-10">
-                    <p class="text-2xl font-black text-slate-500">Sélectionnez deux joueurs pour commencer</p>
+                    <p class="text-2xl font-black text-slate-500">Cliquez sur un match pour jouer</p>
                 </div>
             </div>
         </div>
     `;
 
     container.innerHTML = html;
-    renderClassement(); // Appel du classement
-}
+    renderClassement();
+}}
 
 window.selectMatchFromList = function(matchId) {
     const match = matchSchedule.find(m => m.id === matchId);
-    if (!match) return;
+    if (!match || match.s1 !== null) return; // Empêche de relancer un match déjà joué
     
-    document.getElementById('select-p1').value = match.p1;
-    document.getElementById('select-p2').value = match.p2;
+    currentMatch = match; // On définit le match réel, pas un "custom"
+    matchPoints = { p1: 0, p2: 0 };
+    ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
+    historyStack = [];
+    redoStack = [];
     
-    startSelectedMatch();
+    renderCourtInterface();
 };
 
 // Lancement automatique du match dès que les deux joueurs sont choisis
