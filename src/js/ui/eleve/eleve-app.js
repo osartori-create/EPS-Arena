@@ -105,11 +105,10 @@ function showLogin() {
         document.getElementById('btn-back-terrain').classList.remove('hidden');
 
         if (config.activite === 'badminton') {
-    // Élargit le conteneur principal pour le Badminton
-    document.getElementById('main-container').classList.remove('max-w-md');
-    document.getElementById('main-container').classList.add('max-w-7xl');
-    // ... le reste de ton code (lancement du module)
-}
+            // Élargit le conteneur principal pour le Badminton
+            document.getElementById('main-container').classList.remove('max-w-md');
+            document.getElementById('main-container').classList.add('max-w-7xl');
+        }
         // Afficher le module Badminton et lancer le kiosque
         badmintonModule.classList.remove('hidden');
         console.log('Lancement Badminton pour classe :', selectedClass);
@@ -117,7 +116,98 @@ function showLogin() {
         return;
     }
 
-    // Pour les autres activités, on cache le module Badminton
+    // SPÉCIAL ARCATHLON
+    if (config.activite === 'arcathlon') {
+        loginScreen.classList.add('hidden');
+        activityScreen.classList.remove('hidden');
+
+        // Cacher les autres modules
+        escaladeModule.classList.add('hidden');
+        coModule.classList.add('hidden');
+        multiModule.classList.add('hidden');
+        if (osModule) osModule.classList.add('hidden');
+        badmintonModule.classList.add('hidden');
+
+        // Gérer les boutons du haut
+        document.getElementById('code-info').classList.add('hidden');
+        document.getElementById('btn-quit').classList.add('hidden');
+        document.getElementById('btn-back-terrain').classList.remove('hidden');
+
+        // Créer le module Arcathlon s'il n'existe pas
+        let arcModule = document.getElementById('arcathlon-module');
+        if (!arcModule) {
+            arcModule = document.createElement('div');
+            arcModule.id = 'arcathlon-module';
+            arcModule.className = 'hidden space-y-4 module';
+            activityScreen.appendChild(arcModule);
+        }
+        arcModule.classList.remove('hidden');
+
+        // Générer les codes à partir des équipes
+        const equipes = config.equipes || {};
+        let html = '';
+        let hasCodes = false;
+        for (const [eqId, eqData] of Object.entries(equipes)) {
+            const membres = eqData.membres || [];
+            for (const m of membres) {
+                // Ne pas afficher les absents ou inaptes
+                if (m.absent || m.inapte) continue;
+                const code = `${eqId}_${m.maillot}`;
+                html += `<button class="bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform" onclick="window.selectArcathlonCode('${code}')">${code}</button>`;
+                hasCodes = true;
+            }
+        }
+        if (!hasCodes) {
+            html = '<p class="text-red-400 text-center">Aucun maillot disponible dans votre équipe.<br>Contactez votre professeur.</p>';
+        }
+        arcModule.innerHTML = `
+            <div class="text-center py-6">
+                <h2 class="text-2xl font-black text-white mb-4">Choisis ton maillot</h2>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-md mx-auto">
+                    ${html}
+                </div>
+                <button onclick="window.retourClasseArcathlon()" class="mt-6 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    ← Changer de classe
+                </button>
+            </div>
+        `;
+
+        // Exposer la fonction de sélection pour ce contexte
+        window.selectArcathlonCode = (code) => {
+            selectedCode = code;
+            // Cacher le module de sélection et afficher le kiosque
+            arcModule.innerHTML = '<div class="text-center py-10 text-slate-400"><p>Chargement...</p></div>';
+            // Lancer le kiosque
+            import('../../modules/arcathlon/arcathlon-kiosk.js').then(m => {
+                m.initArcathlonKiosk(selectedClass, selectedCode);
+            }).catch(err => {
+                console.error('Erreur chargement Arcathlon :', err);
+                arcModule.innerHTML = `
+                    <div class="text-center py-10 text-red-400">
+                        <p>❌ Erreur de chargement du module.</p>
+                        <button onclick="window.retourClasseArcathlon()" class="mt-4 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                            ← Retour
+                        </button>
+                    </div>
+                `;
+            });
+        };
+
+        // Fonction retour pour ce contexte
+        window.retourClasseArcathlon = () => {
+            // Revenir à l'écran de sélection de classe
+            activityScreen.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+            // Réinitialiser le module
+            if (arcModule) arcModule.classList.add('hidden');
+            // Réafficher les codes de login
+            showLogin();
+        };
+
+        return;
+    }
+
+    // Pour les autres activités (escalade, co, multi, orientshow)
     badmintonModule.classList.add('hidden');
     document.getElementById('code-info').classList.remove('hidden');
     document.getElementById('btn-quit').classList.remove('hidden');
@@ -132,7 +222,7 @@ function showLogin() {
         for (let i = 0; i < count; i++) {
             const code = `${key}${i + 1}`;
             const btn = document.createElement('button');
-            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
+            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
             btn.innerText = code;
             btn.onclick = () => selectCode(code);
             codeList.appendChild(btn);
@@ -162,17 +252,43 @@ function selectCode(code) {
             osModule.classList.remove('hidden');
             initOrientShowKiosk(selectedClass, selectedCode);
         }
+    } else if (currentConfig.activite === 'arcathlon') {
+        // Le cas Arcathlon est déjà traité dans showLogin, mais au cas où
+        // on pourrait relancer le module
+        let arcModule = document.getElementById('arcathlon-module');
+        if (!arcModule) {
+            arcModule = document.createElement('div');
+            arcModule.id = 'arcathlon-module';
+            arcModule.className = 'hidden space-y-4 module';
+            activityScreen.appendChild(arcModule);
+        }
+        arcModule.classList.remove('hidden');
+        arcModule.innerHTML = '<div class="text-center py-10 text-slate-400"><p>Chargement...</p></div>';
+        import('../../modules/arcathlon/arcathlon-kiosk.js').then(m => {
+            m.initArcathlonKiosk(selectedClass, selectedCode);
+        }).catch(err => {
+            console.error('Erreur chargement Arcathlon :', err);
+            arcModule.innerHTML = `
+                <div class="text-center py-10 text-red-400">
+                    <p>❌ Erreur de chargement du module.</p>
+                    <button onclick="window.resetToLogin()" class="mt-4 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                        ← Retour
+                    </button>
+                </div>
+            `;
+        });
     } else {
         multiModule.classList.remove('hidden');
     }
 }
 
-// Exposition globale
+// Exposition globale pour les boutons HTML
 window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
 window.startChrono = () => { console.log("Chrono démarré"); };
 window.stopChrono = () => { console.log("Chrono arrêté"); };
 window.validateOSPassage = validateOSPassage;
+window.resetToLogin = resetToLogin;
 
 // Exportations pour les modules
 export function getSelectedClass() { return selectedClass; }
