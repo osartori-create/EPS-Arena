@@ -16,10 +16,12 @@ function getBaseProf() {
 }
 
 export function initActivities() {
-    try { initCOInterface(); } catch (e) {}
-    try { initEscaladeInterface(6); } catch (e) {}
-    try { initBadmintonInterface(6); } catch (e) {}
-    try { initOrientShowInterface(); } catch (e) {}
+    console.log("🚀 initActivities appelée !");
+    
+    try { console.log("→ Initialisation CO..."); initCOInterface(); console.log("✅ CO OK"); } catch (e) { console.error("❌ Erreur CO :", e); }
+    try { console.log("→ Initialisation Escalade..."); initEscaladeInterface(6); console.log("✅ Escalade OK"); } catch (e) { console.error("❌ Erreur Escalade :", e); }
+    try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
+    try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
