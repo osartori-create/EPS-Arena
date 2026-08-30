@@ -167,7 +167,7 @@ function renderMatchSetup() {
 
     container.innerHTML = html;
     renderClassement();
-}}
+}
 
 window.selectMatchFromList = function(matchId) {
     const match = matchSchedule.find(m => m.id === matchId);
