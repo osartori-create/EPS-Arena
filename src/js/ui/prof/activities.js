@@ -456,25 +456,18 @@ export function initActivities() {
         if(confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
     };
         // Fonction pour générer les terrains de badminton (appelée par le bouton)
-    window.generateBadmintonTeamsFromCurrentClass = async function() {
+        window.generateBadmintonTeamsFromCurrentClass = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        generateBadmintonTeams(eleves);
+        // Lire le nombre de terrains sélectionné dans le menu
+        const nbTerrains = parseInt(document.getElementById('badmintonNbTerrains').value) || 6;
+
+        generateBadmintonTeams(eleves, nbTerrains);
         alert("✅ Terrains générés par niveau de force !");
     };
 
-    // Fonction pour ajouter un terrain supplémentaire
-        window.addBadmintonTerrain = function() {
-        let nb = window.currentBadmintonTerrains || 6;
-        nb++;
-        // Force la recréation de la grille avec le nouveau nombre
-        initBadmintonInterface(nb, true);
-        // Recharge les affectations existantes
-        setTimeout(() => loadBadmintonAssignments(), 100);
-        alert("✅ Terrain " + nb + " ajouté !");
-    };
 
     // Exports globaux
     window.exportCOConfig = exportCOConfig;

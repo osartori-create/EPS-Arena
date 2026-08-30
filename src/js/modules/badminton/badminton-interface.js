@@ -47,10 +47,16 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
     setTimeout(() => initSortableBadminton(), 100);
 }
 
-export function generateBadmintonTeams(eleves) {
+export function generateBadmintonTeams(eleves, nbTerrains = 6) {
     const activeClasse = document.getElementById('selectClasse').value;
-    const nbTerrains = window.currentBadmintonTerrains || 6;
-
+    
+    // On sauvegarde immédiatement le nombre choisi
+    window.currentBadmintonTerrains = nbTerrains;
+    
+    // On force l'initialisation de l'interface avec ce nombre précis (évite les conflits)
+    initBadmintonInterface(nbTerrains, true);
+    
+    // ... (le reste de la logique de génération reste identique, mais utilisez nbTerrains local)
     const absents = eleves.filter(e => e.code === 'ABS');
     const inaptes = eleves.filter(e => e.code === 'INAPTE');
     const joueurs = eleves.filter(e => e.code !== 'ABS' && e.code !== 'INAPTE');
@@ -74,7 +80,7 @@ export function generateBadmintonTeams(eleves) {
     const assignments = {
         reserveAbsents: absents.map(e => e.id),
         reserveInaptes: inaptes.map(e => e.id),
-        nbTerrains: nbTerrains
+        nbTerrains: nbTerrains // On enregistre le vrai nombre
     };
     terrains.forEach((terrain, idx) => {
         const terrainNum = idx + 1;
@@ -82,7 +88,8 @@ export function generateBadmintonTeams(eleves) {
     });
 
     localStorage.setItem(`eps_arena_badminton_assignments_${activeClasse}`, JSON.stringify(assignments));
-    initBadmintonInterface(nbTerrains, true);
+    
+    // Comme on a déjà forcé l'interface, on recharge juste les affectations
     setTimeout(() => loadBadmintonAssignments(), 100);
 }
 

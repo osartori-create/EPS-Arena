@@ -265,12 +265,18 @@
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-black text-blue-400 uppercase text-sm">Terrains de Badminton (Groupes de niveau)</h3>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+    <label class="text-xs font-black uppercase text-slate-400 mr-1">Nb Terrains :</label>
+    <select id="badmintonNbTerrains" class="bg-slate-900 border border-slate-600 rounded px-2 py-2 text-xs font-black text-white outline-none">
+        <option value="6" selected>6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+    </select>
+    
     <button onclick="generateBadmintonTeamsFromCurrentClass()" class="btn-success text-xs uppercase">🔄 Générer Terrains</button>
     <button onclick="exportBadmintonConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">⬇️ Export JSON</button>
     <button onclick="document.getElementById('importBadmintonFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Import JSON</button>
     <input type="file" id="importBadmintonFile" class="hidden" onchange="importBadmintonConfig(event)">
-    <button onclick="addBadmintonTerrain()" class="bg-blue-600 text-xs uppercase px-4 py-2 rounded-xl font-black text-white border-2 border-blue-400">+ Terrain</button>
 </div>
         <p class="text-xs text-slate-400 mb-4">Glissez les élèves. Les lettres (A, B, C...) s'attribuent automatiquement.</p>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
