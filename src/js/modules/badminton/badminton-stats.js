@@ -54,8 +54,8 @@ export async function openBadmintonPlayerStats(player, terrain, classe) {
     onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
         const playerMatches = Object.entries(data).filter(([id, m]) => 
-            (m.p1 === player && m.terrain === terrain) || (m.p2 === player && m.terrain === terrain)
-        );
+    (m.p1 === player && String(m.terrain) === String(terrain)) || (m.p2 === player && String(m.terrain) === String(terrain))
+);
 
         const listContainer = document.getElementById('match-list-content');
         if (!listContainer) return;
