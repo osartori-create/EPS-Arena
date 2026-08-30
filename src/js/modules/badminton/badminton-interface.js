@@ -61,20 +61,24 @@ export function generateBadmintonTeams(eleves, nbTerrains = 6) {
 
     joueurs.sort((a, b) => (b.force || 0) - (a.force || 0) || Math.random() - 0.5);
 
-    // Répartition par blocs (les plus forts au terrain 1, etc.)
-    const perTerrain = Math.ceil(joueurs.length / nbTerrains);
+    // Répartition équilibrée : chaque terrain reçoit au moins 1 élève, les plus forts en premier.
+    const nbJoueurs = joueurs.length;
+    const nbParTerrain = Math.floor(nbJoueurs / nbTerrains); // base
+    const reste = nbJoueurs % nbTerrains; // combien de terrains auront 1 élève de plus
+
     const terrains = Array.from({ length: nbTerrains }, () => []);
 
-    joueurs.forEach((eleve, index) => {
-        const terrainIndex = Math.floor(index / perTerrain);
-        // Sécurité pour ne pas dépasser le nombre de terrains
-        if (terrainIndex < nbTerrains) {
-            terrains[terrainIndex].push(eleve);
-        } else {
-            // Si jamais on dépasse, on met le dernier terrain (ne devrait pas arriver)
-            terrains[nbTerrains - 1].push(eleve);
+    let index = 0;
+    for (let t = 0; t < nbTerrains; t++) {
+        // Nombre d'élèves pour ce terrain (base + 1 si t < reste)
+        const taille = nbParTerrain + (t < reste ? 1 : 0);
+        for (let i = 0; i < taille; i++) {
+            if (index < nbJoueurs) {
+                terrains[t].push(joueurs[index]);
+                index++;
+            }
         }
-    });
+    }
 
     // Les inaptes sont répartis équitablement (juste pour le décompte)
     inaptes.forEach((eleve, index) => {
