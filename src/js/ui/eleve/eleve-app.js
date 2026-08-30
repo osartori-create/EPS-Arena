@@ -104,6 +104,12 @@ function showLogin() {
         document.getElementById('btn-quit').classList.add('hidden');
         document.getElementById('btn-back-terrain').classList.remove('hidden');
 
+        if (config.activite === 'badminton') {
+    // Élargit le conteneur principal pour le Badminton
+    document.getElementById('main-container').classList.remove('max-w-md');
+    document.getElementById('main-container').classList.add('max-w-7xl');
+    // ... le reste de ton code (lancement du module)
+}
         // Afficher le module Badminton et lancer le kiosque
         badmintonModule.classList.remove('hidden');
         console.log('Lancement Badminton pour classe :', selectedClass);

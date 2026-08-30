@@ -15,6 +15,7 @@ let ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } }
 let terrainsConfig = {};
 let historyStack = [];
 let redoStack = [];
+let resultsListenerAttached = false; // Flag pour éviter la boucle infinie
 
 // Variables pour la configuration du terrain
 let middleZoneSize = 33;
@@ -25,7 +26,8 @@ let otherPoints = 3;
 export function initBadmintonKiosk(classe) {
     currentClasse = classe;
     currentTerrain = '';
-    
+    resultsListenerAttached = false; // On réinitialise le flag
+
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
 
@@ -46,6 +48,12 @@ export function initBadmintonKiosk(classe) {
             renderMatchSetup();
         }
     });
+
+    // On attache l'écouteur de résultats UNE SEULE FOIS
+    if (!resultsListenerAttached) {
+        listenForScoreUpdates();
+        resultsListenerAttached = true;
+    }
 }
 
 // --- 1. SÉLECTION DU TERRAIN ---
@@ -53,9 +61,10 @@ function renderTerrainSelection() {
     const container = document.getElementById('badminton-content');
     if (!container) return;
 
-    let html = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center w-full max-w-4xl mx-auto">
+    // Affichage centré et large pour PC/iPad
+    let html = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center w-full max-w-5xl mx-auto">
         <h2 class="text-3xl font-black text-white mb-6">🏸 Choisis ton terrain</h2>
-        <div class="grid grid-cols-3 gap-6">`;
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-6">`;
 
     Object.keys(terrainsConfig).forEach(terrain => {
         html += `<button onclick="selectBadmintonTerrain(${terrain})" 
@@ -109,7 +118,7 @@ function renderMatchSetup() {
     playersList = lettres.slice(0, nbPlayers);
 
     if (playersList.length < 2) {
-        container.innerHTML = `<div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
+        container.innerHTML = `<div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700 w-full max-w-4xl mx-auto">
             <p class="text-2xl font-black text-white">En attente d'autres joueurs sur ce terrain...</p>
         </div>`;
         return;
@@ -118,7 +127,7 @@ function renderMatchSetup() {
     generateRoundRobin();
 
     let html = `
-        <div class="flex flex-col lg:flex-row gap-6 w-full max-w-6xl mx-auto">
+        <div class="flex flex-col lg:flex-row gap-6 w-full max-w-7xl mx-auto">
             
             <!-- Colonne Gauche : Sélection et Liste -->
             <div class="w-full lg:w-1/3 bg-slate-800 p-6 rounded-2xl border border-slate-700">
@@ -173,7 +182,7 @@ function renderMatchSetup() {
     `;
 
     container.innerHTML = html;
-    loadMatchResults();
+    // Fini la boucle infinie ! On ne réappelle PLUS loadMatchResults ici.
 }
 
 window.selectMatchFromList = function(matchId) {
@@ -186,12 +195,15 @@ window.selectMatchFromList = function(matchId) {
     startSelectedMatch();
 };
 
-function loadMatchResults() {
+// --- ÉCOUTE DES RÉSULTATS (Une seule fois, pour mettre à jour l'affichage) ---
+function listenForScoreUpdates() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
     
     onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
+        
+        // On met à jour les scores des matchs déjà joués
         matchSchedule.forEach(m => {
             const result = data[m.id];
             if (result && result.terrain === currentTerrain) {
@@ -199,7 +211,23 @@ function loadMatchResults() {
                 m.s2 = result.s2;
             }
         });
-        renderMatchSetup();
+
+        // On re-rend uniquement la liste des matchs sans réécouter Firebase
+        if (document.getElementById('select-p1') && document.getElementById('select-p2')) {
+            // On ne fait rien si on est en pleine saisie de match, juste on met à jour la liste des matchs
+            const list = document.querySelector('#badminton-content .space-y-2');
+            if (list) list.innerHTML = matchSchedule.map(match => {
+                const isPlayed = match.s1 !== null;
+                const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
+                return `<button onclick="selectMatchFromList('${match.id}')" 
+                            class="w-full text-left p-3 rounded-lg border-2 transition-colors ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
+                            <div class="flex justify-between items-center font-black">
+                                <span>${match.p1} vs ${match.p2}</span>
+                                <span class="text-sm">${scoreDisplay}</span>
+                            </div>
+                        </button>`;
+            }).join('');
+        }
     });
 }
 
@@ -296,7 +324,7 @@ function renderCourtInterface() {
     updateZoneSize();
 }
 
-// --- 4. INTERACTIONS ---
+// --- 4. INTERACTIONS (identiques) ---
 function updateZoneSize() {
     const slider = document.getElementById('middle-zone-slider');
     if (!slider) return;
@@ -434,7 +462,7 @@ window.endMatch = function() {
                 matchSchedule.push(currentMatch);
             }
             currentMatch = null;
-            renderMatchSetup();
+            renderMatchSetup(); // On revient à la liste des matchs
         })
         .catch(err => alert("Erreur envoi : " + err.message));
     }
