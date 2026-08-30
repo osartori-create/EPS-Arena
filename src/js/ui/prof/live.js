@@ -1,9 +1,12 @@
+// src/js/ui/prof/live.js
 import { initLiveEngine, getConfigData, getStudentsMap, getLocalMapping } from '../../core/live-engine.js';
 import { renderEscaladeLive } from '../../modules/escalade/escalade-live.js';
 import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
 import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
 import { renderOrientShowLive } from '../../modules/orientshow/orientshow-live.js';
+// ✅ IMPORT STATIQUE DU MODULE BADMINTON
+import { renderBadmintonLive } from '../../modules/badminton/badminton-live.js';
 import { exportIDoceo } from '../../services/export-idocéo.js';
 
 let currentClasse = "";
@@ -25,13 +28,23 @@ export function initLiveUI() {
         } else if (type === 'orientshow' && currentActivite === 'orientshow') {
             renderOrientShowLive();
         } else if (type === 'badminton' && currentActivite === 'badminton') {
-    import('../../modules/badminton/badminton-live.js').then(module => module.renderBadmintonLive());
-}
+            // On appelle le module qui gère son propre écouteur Firebase
+            renderBadmintonLive();
+        }
     });
 
+    // ✅ CRUCIAL : Ceci permet d'afficher le Live Badminton dès que la config est chargée
+    // ou lorsque l'on clique sur l'onglet Live.
     window.addEventListener('live-config-updated', () => {
-        document.getElementById('live-content').innerHTML = '<p class="text-slate-500 text-center">En attente des données...</p>';
-        if (isTVVisible() && getConfigData().activite === 'escalade') renderEscaladeTV();
+        const currentActivite = getConfigData().activite || 'multi';
+        
+        if (currentActivite === 'badminton') {
+            // On lance le rendu Badminton directement
+            renderBadmintonLive();
+        } else {
+            document.getElementById('live-content').innerHTML = '<p class="text-slate-500 text-center">En attente des données...</p>';
+            if (isTVVisible() && currentActivite === 'escalade') renderEscaladeTV();
+        }
     });
 }
 
@@ -39,6 +52,19 @@ function isTVVisible() {
     const tvView = document.getElementById('viewTV');
     return tvView && !tvView.classList.contains('hidden');
 }
+
+// Export du CSV Badminton (pour le bouton HTML)
+window.exportBadmintonImpactCSV = function() {
+    // On délègue simplement au module Badminton qui a accès à toutes les données
+    import('../../modules/badminton/badminton-live.js').then(module => {
+        if (module.exportBadmintonImpactCSV) {
+            module.exportBadmintonImpactCSV();
+        } else {
+            alert("Fonction d'export Badminton non trouvée dans le module.");
+        }
+    });
+};
+
 window.exportCOiDoceo = function() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe.");
@@ -48,9 +74,7 @@ window.exportCOiDoceo = function() {
     if (eleves.length === 0) return alert("Aucun élève.");
 
     // 2. Récupérer les données de la CO depuis Firebase (ou depuis votre état local)
-    // Note : Ici, on suppose que `getConfigData()` ou `listenToActivityData` vous donne les balises validées.
-    // Pour CO, la structure est souvent : { code: { circuitKey: { pts, total, time, details } } }
-    const sessionData = window.lastLiveSnap || {}; // Si vous stockez les données en direct
+    const sessionData = window.lastLiveSnap || {}; 
     
     // On prépare un objet "results" pour le module d'export
     const results = {};
