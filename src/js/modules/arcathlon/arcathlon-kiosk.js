@@ -1,6 +1,8 @@
 // src/js/modules/arcathlon/arcathlon-kiosk.js
-// Flux : Série 1 (Course → Tir → Pénalités) → ... → Série N → Course finale (auto)
-// Chronos continus, vitesse sur les courses uniquement
+// Flux validé :
+// Série 1 : Clic "Démarrer" → Course → (auto) Tir → (auto) Pénalités → (auto) Série 2...
+// Série N : (auto) Course → (auto) Tir → (auto) Pénalités → (auto) Course finale
+// Course finale : (auto) Course → Clic "Arrivée" → Fin
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -18,17 +20,14 @@ const state = {
     phase: 'course',          // 'course' | 'tir' | 'penalite' | 'finale' | 'termine'
     running: false,
     phaseStart: null,
-    phaseAccum: 0,            // temps écoulé dans la phase en cours
-    tempsSerie: 0,            // temps total de la série en cours (course + tir + pénalités)
-    tempsCourse: 0,           // temps de la grande boucle de la série en cours
-    tempsPenalites: 0,        // temps total des pénalités de la série en cours
-    tempsGlobal: 0,           // temps cumulé depuis le début de l'épreuve
+    phaseAccum: 0,
+    tempsPhase: 0,            // temps de la phase en cours (course / tir / penalite)
+    tempsTotalGlobal: 0,      // temps cumulé depuis le début de l'épreuve
     nbFleches: 2,
     shots: [],
-    penReq: 0,                // nombre de tours de pénalité requis
-    penDone: 0,               // nombre de tours de pénalité effectués
-    tempsPetitesBoucles: [],  // tableau des temps de chaque petite boucle
-    departSignal: false,
+    penReq: 0,
+    penDone: 0,
+    tempsPenalites: [],       // temps de chaque tour de pénalité
     handicapMs: 0,
     vmaRef: 0,
     distanceCourse: 0,
@@ -42,8 +41,10 @@ const state = {
     cumulPointsTir: 0,
     cumulTemps: 0,
     seriesTerminees: 0,
-    // Pour la détection de fraude
-    vitesseCourse: 0
+    // Données de la série en cours pour l'enregistrement
+    tempsCourse: 0,
+    tempsTir: 0,
+    tempsTotalSerie: 0
 };
 
 let configListener = null;
@@ -61,15 +62,15 @@ export function initArcathlonKiosk(classe, code) {
     state.phase = 'course';
     state.running = false;
     state.phaseAccum = 0;
-    state.tempsSerie = 0;
+    state.tempsPhase = 0;
+    state.tempsTotalGlobal = 0;
     state.tempsCourse = 0;
-    state.tempsPenalites = 0;
-    state.tempsGlobal = 0;
+    state.tempsTir = 0;
+    state.tempsTotalSerie = 0;
     state.shots = [];
     state.penReq = 0;
     state.penDone = 0;
-    state.tempsPetitesBoucles = [];
-    state.departSignal = false;
+    state.tempsPenalites = [];
     state.alerteTriche = false;
     state.reussitesTir = 0;
     state.cumulDistance = 0;
@@ -77,7 +78,6 @@ export function initArcathlonKiosk(classe, code) {
     state.cumulPointsTir = 0;
     state.cumulTemps = 0;
     state.seriesTerminees = 0;
-    state.vitesseCourse = 0;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/config`);
@@ -157,16 +157,14 @@ function renderPhase() {
     let btnDisabled = false;
 
     if (state.phase === 'course') {
-        phaseLabel = `COURSE SÉRIE ${state.serieActuelle}`;
+        phaseLabel = state.serieActuelle === 1 ? 'DÉPART DE LA COURSE' : `COURSE SÉRIE ${state.serieActuelle}`;
         panelClass = 'panel-course';
         btnClass = 'btn-course';
-        // Pour la première série, on affiche "Démarrer" ; pour les suivantes, la course démarre auto
         if (state.serieActuelle === 1 && !state.running) {
-            btnText = state.mode === 'poursuite' && !state.departSignal ? '⏳ Attente départ...' : 'Démarrer la course';
+            btnText = 'Démarrer la course';
         } else if (state.running) {
             btnText = '🏁 Arrivée';
         } else {
-            // Course déjà en cours (démarrage auto) mais pas encore running ?
             btnText = 'Course en cours...';
             showBtn = false;
         }
@@ -179,9 +177,9 @@ function renderPhase() {
         phaseLabel = `PÉNALITÉ SÉRIE ${state.serieActuelle}`;
         panelClass = 'panel-pen';
         btnClass = 'btn-pen';
-        btnText = 'Effectuer les tours';
-        // Désactiver le bouton pendant les pénalités (on utilise les boutons de tours)
+        btnText = 'Cliquez sur chaque tour de pénalité quand il est réalisé';
         btnDisabled = true;
+        showBtn = true;
     } else if (state.phase === 'finale') {
         phaseLabel = '🏁 DERNIÈRE COURSE';
         panelClass = 'panel-course';
@@ -189,18 +187,12 @@ function renderPhase() {
         if (state.running) {
             btnText = '🏁 Arrivée';
         } else {
-            // La finale démarre automatiquement, pas de bouton "Démarrer"
+            btnText = 'Course finale en cours...';
             showBtn = false;
         }
     } else if (state.phase === 'termine') {
         terminerEpreuve();
         return;
-    }
-
-    // Si on est en course et que ce n'est pas la première série, et que la course n'a pas encore démarré
-    // on cache le bouton car elle démarre automatiquement
-    if (state.phase === 'course' && state.serieActuelle > 1 && !state.running) {
-        showBtn = false;
     }
 
     container.innerHTML = `
@@ -209,7 +201,7 @@ function renderPhase() {
                 <div><span class="text-xs uppercase text-slate-400 font-bold">Équipe</span><div class="text-xl font-black text-white">${state.equipeId}</div></div>
                 <div class="text-center"><span class="text-xs uppercase text-slate-400 font-bold">Maillot</span><div class="text-xl font-black ${colorClass}">${state.maillot}</div></div>
                 <div class="text-right">
-                    <span class="text-xs uppercase text-slate-400 font-bold">Progression</span>
+                    <span class="text-xs uppercase text-slate-400 font-bold">Série</span>
                     <div class="text-xl font-black text-yellow-400">${state.phase === 'finale' ? 'Finale' : `${state.serieActuelle} / ${state.nbSeries}`}</div>
                 </div>
             </div>
@@ -218,11 +210,11 @@ function renderPhase() {
                 <div class="flex justify-between items-center">
                     <div>
                         <div class="phase-title text-2xl font-black uppercase tracking-wider">${phaseLabel}</div>
-                        <div id="phaseClock" class="text-4xl font-mono font-black mt-1">${formatTime(state.tempsSerie)}</div>
+                        <div id="phaseClock" class="text-4xl font-mono font-black mt-1">${formatTime(state.tempsPhase)}</div>
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-slate-600 font-bold">Temps total épreuve</div>
-                        <div id="totalClock" class="text-xl font-mono font-bold text-slate-700">${formatTime(state.tempsGlobal)}</div>
+                        <div id="totalClock" class="text-xl font-mono font-bold text-slate-700">${formatTime(state.tempsTotalGlobal)}</div>
                         ${state.handicapMs > 0 ? `<div class="text-xs text-amber-600 font-bold">Handicap +${(state.handicapMs/1000).toFixed(1)}s</div>` : ''}
                     </div>
                 </div>
@@ -238,23 +230,28 @@ function renderPhase() {
     `;
 
     injectStyles();
-    if (showBtn) {
+    if (showBtn && !btnDisabled) {
         const btn = document.getElementById('giantBtn');
         if (btn) btn.addEventListener('click', onGiantAction);
     }
     updateClockDisplay();
 
-    // Démarrage automatique pour les courses suivantes (sauf la première)
-    if (state.phase === 'course' && state.serieActuelle > 1 && !state.running && state.mode !== 'poursuite') {
+    // --- DÉMARRAGES AUTOMATIQUES ---
+
+    // 1. Course série 2, 3, … (sauf série 1) → démarrage auto immédiat
+    if (state.phase === 'course' && state.serieActuelle > 1 && !state.running) {
         if (transitionTimer) clearTimeout(transitionTimer);
-        transitionTimer = setTimeout(() => startCourse(), 300);
+        transitionTimer = setTimeout(() => startCourse(), 100);
     }
 
-    // Démarrage automatique de la course finale
+    // 2. Course finale → démarrage auto immédiat
     if (state.phase === 'finale' && !state.running) {
         if (transitionTimer) clearTimeout(transitionTimer);
-        transitionTimer = setTimeout(() => startCourse(), 300);
+        transitionTimer = setTimeout(() => startCourse(), 100);
     }
+
+    // 3. Tir → automatique après la course (déclenché dans finishCourse)
+    // 4. Pénalités → automatique après le tir (déclenché dans finishTir)
 }
 
 function renderPhaseContent() {
@@ -338,12 +335,13 @@ function updateClockDisplay(phaseMs) {
     const phaseEl = document.getElementById('phaseClock');
     const totalEl = document.getElementById('totalClock');
     if (phaseEl) {
-        const totalSerie = state.tempsSerie + (state.running ? pMs : state.phaseAccum);
-        phaseEl.textContent = formatTime(totalSerie);
+        // Chrono de phase = temps de la phase en cours
+        phaseEl.textContent = formatTime(pMs);
     }
     if (totalEl) {
-        const totalGlobal = state.tempsGlobal + (state.running ? pMs : state.phaseAccum);
-        totalEl.textContent = formatTime(totalGlobal);
+        // Chrono total = temps cumulé depuis le début
+        const total = state.tempsTotalGlobal + (state.running ? pMs : state.phaseAccum);
+        totalEl.textContent = formatTime(total);
     }
 }
 
@@ -375,6 +373,7 @@ function onGiantAction() {
 
 function startCourse() {
     if (state.running) return;
+    // Handicap : uniquement sur la 1ère course
     if (state.serieActuelle === 1 && state.handicapMs > 0) {
         state.phaseAccum = state.handicapMs;
     }
@@ -390,11 +389,10 @@ function startCourse() {
 
 function finishCourse() {
     stopClock();
-    // Ajouter le temps de course au temps de la série
-    const courseTime = state.phaseAccum;
-    state.tempsSerie += courseTime;
-    state.tempsCourse += courseTime;     // pour la vitesse
-    state.tempsGlobal += courseTime;     // pour le temps total de l'épreuve
+    const tempsCourse = state.phaseAccum;
+    state.tempsCourse = tempsCourse;      // sauvegarde pour l'enregistrement
+    state.tempsPhase = 0;                 // réinitialiser l'affichage de la phase
+    state.tempsTotalGlobal += tempsCourse;
     state.phaseAccum = 0;
 
     // Si c'est la course finale, on enregistre et on termine
@@ -403,11 +401,11 @@ function finishCourse() {
         return;
     }
 
-    // Sinon, on passe au tir
+    // Sinon, on passe automatiquement au tir
     state.phase = 'tir';
     state.shots = Array(state.nbFleches).fill(0);
     renderPhase();
-    startClock(); // le chrono continue
+    startClock(); // le chrono continue (pour le tir)
     const btn = document.getElementById('giantBtn');
     if (btn) {
         btn.textContent = 'Fin de tir';
@@ -439,27 +437,25 @@ window.undoShot = function() {
 
 function finishTir() {
     stopClock();
-    // Ajouter le temps de tir au temps de la série
-    const tirTime = state.phaseAccum;
-    state.tempsSerie += tirTime;
-    state.tempsGlobal += tirTime;
+    const tempsTir = state.phaseAccum;
+    state.tempsTir = tempsTir;
+    state.tempsTotalGlobal += tempsTir;
     state.phaseAccum = 0;
 
     const reussites = state.shots.filter(s => s === 1).length;
     state.reussitesTir = reussites;
-    state.penReq = state.shots.filter(s => s === -1).length; // 1 tour par flèche manquée
+    state.penReq = state.shots.filter(s => s === -1).length;
     state.penDone = 0;
-    state.tempsPetitesBoucles = [];
+    state.tempsPenalites = [];
 
     if (state.penReq > 0) {
         // Passer aux pénalités
         state.phase = 'penalite';
         renderPhase();
-        startClock(); // le chrono continue
-        // Désactiver le bouton principal, on utilise les boutons de tours
+        startClock(); // le chrono continue pour les pénalités
         const btn = document.getElementById('giantBtn');
         if (btn) {
-            btn.textContent = 'Effectuer les tours';
+            btn.textContent = 'Cliquez sur chaque tour de pénalité quand il est réalisé';
             btn.className = 'btn-action btn-pen w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform';
             btn.disabled = true;
         }
@@ -479,9 +475,8 @@ window.validatePenalty = function(index) {
     // Arrêter le chrono pour mesurer le temps de cette petite boucle
     stopClock();
     const tempsBoucle = state.phaseAccum;
-    state.tempsPetitesBoucles.push(tempsBoucle);
-    state.tempsSerie += tempsBoucle;
-    state.tempsGlobal += tempsBoucle;
+    state.tempsPenalites.push(tempsBoucle);
+    state.tempsTotalGlobal += tempsBoucle;
     state.phaseAccum = 0;
 
     state.penDone++;
@@ -498,7 +493,7 @@ window.validatePenalty = function(index) {
 
     if (state.penDone >= state.penReq) {
         // Toutes les pénalités sont effectuées
-        // Le chrono reste arrêté, on passe à la série suivante ou finale
+        // On passe à la série suivante ou finale
         terminerSerie();
     } else {
         // Il reste des pénalités → démarrage automatique de la prochaine petite boucle
@@ -522,29 +517,23 @@ function terminerSerie() {
     state.serieActuelle++;
 
     if (state.serieActuelle > state.nbSeries) {
-        // Toutes les séries sont faites → passer à la course finale
+        // Toutes les séries sont faites → passer à la course finale (auto)
         state.phase = 'finale';
         state.phaseAccum = 0;
-        state.tempsSerie = 0;
-        state.tempsCourse = 0;
-        state.tempsPenalites = 0;
-        state.tempsPetitesBoucles = [];
         state.shots = [];
         state.penReq = 0;
         state.penDone = 0;
+        state.tempsPenalites = [];
         renderPhase();
         // La finale démarre automatiquement dans renderPhase()
     } else {
-        // Prochaine série → on repart en course (démarrage automatique)
+        // Prochaine série → on repart en course (démarrage auto)
         state.phase = 'course';
         state.phaseAccum = 0;
-        state.tempsSerie = 0;
-        state.tempsCourse = 0;
-        state.tempsPenalites = 0;
-        state.tempsPetitesBoucles = [];
         state.shots = [];
         state.penReq = 0;
         state.penDone = 0;
+        state.tempsPenalites = [];
         renderPhase();
         // La course démarre automatiquement dans renderPhase()
     }
@@ -579,7 +568,8 @@ function savePassage(isFinale) {
         else if (scoreTir < 16) bonus = -15;
         else bonus = -20;
     }
-    const tempsBonifie = (state.tempsSerie / 1000) + bonus;
+    const tempsTotalSerie = state.tempsCourse + state.tempsTir + state.tempsPenalites.reduce((a, b) => a + b, 0);
+    const tempsBonifie = (tempsTotalSerie / 1000) + bonus;
 
     // Détection de fraude
     state.alerteTriche = false;
@@ -587,10 +577,10 @@ function savePassage(isFinale) {
         state.alerteTriche = true;
     }
 
-    // Calcul de la vitesse moyenne des petites boucles
+    // Vitesse moyenne des pénalités
     let vitesseMoyennePenalites = 0;
-    if (state.tempsPetitesBoucles.length > 0) {
-        const totalTempsPenalites = state.tempsPetitesBoucles.reduce((a, b) => a + b, 0);
+    if (state.tempsPenalites.length > 0) {
+        const totalTempsPenalites = state.tempsPenalites.reduce((a, b) => a + b, 0);
         const distancePenaliteKm = state.longueurPenalite / 1000;
         const tempsPenaliteHeures = totalTempsPenalites / 1000 / 3600;
         vitesseMoyennePenalites = tempsPenaliteHeures > 0 ? distancePenaliteKm / tempsPenaliteHeures : 0;
@@ -603,9 +593,10 @@ function savePassage(isFinale) {
         serie: state.serieActuelle,
         isFinale: isFinale,
         mode: state.mode,
-        tempsGrandeBoucle: Math.round(state.tempsCourse),
-        tempsPetitesBoucles: state.tempsPetitesBoucles.map(t => Math.round(t)),
-        tempsTotalSerie: Math.round(state.tempsSerie),
+        tempsCourse: Math.round(state.tempsCourse),
+        tempsTir: Math.round(state.tempsTir),
+        tempsPenalites: state.tempsPenalites.map(t => Math.round(t)),
+        tempsTotalSerie: Math.round(tempsTotalSerie),
         tempsBonifie: Math.round(tempsBonifie * 10) / 10,
         vitesseGrandeBoucle: Math.round(vitesse * 10) / 10,
         vitesseMoyennePenalites: Math.round(vitesseMoyennePenalites * 10) / 10,
@@ -624,7 +615,7 @@ function savePassage(isFinale) {
     state.cumulDistance += distanceTotaleSerie;
     state.cumulPointsVMA += ptsVMA;
     state.cumulPointsTir += scoreTir;
-    state.cumulTemps += state.tempsSerie;
+    state.cumulTemps += tempsTotalSerie;
     state.seriesTerminees++;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -634,7 +625,8 @@ function savePassage(isFinale) {
             if (isFinale) {
                 terminerEpreuve();
             } else {
-                showBilan(passageData);
+                // Toast discret
+                showToast(`✅ Série ${state.serieActuelle} terminée`, 1500);
             }
         })
         .catch(err => {
@@ -668,36 +660,9 @@ function terminerEpreuve() {
 }
 
 // --------------------------------------------------------------
-// BILAN D'UNE SÉRIE
-// --------------------------------------------------------------
-function showBilan(data) {
-    const totalPts = data.ptsVMA + data.scoreTir;
-    const overlay = document.createElement('div');
-    overlay.className = 'fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50 p-4';
-    overlay.innerHTML = `
-        <div class="bg-slate-900 p-8 rounded-3xl border-2 border-emerald-500 max-w-md w-full text-center">
-            <div class="text-5xl mb-4">✅</div>
-            <h2 class="text-2xl font-black text-white mb-2">Série ${data.serie} terminée</h2>
-            <div class="space-y-2 text-left text-sm">
-                <p class="flex justify-between"><span class="text-slate-400">Temps total</span><span class="font-bold text-white">${formatTime(data.tempsTotalSerie)}</span></p>
-                <p class="flex justify-between"><span class="text-slate-400">Distance parcourue</span><span class="font-bold text-white">${data.distanceTotale}m</span></p>
-                <p class="flex justify-between"><span class="text-slate-400">Vitesse (grande boucle)</span><span class="font-bold text-white">${data.vitesseGrandeBoucle} km/h</span></p>
-                ${data.penalites > 0 ? `<p class="flex justify-between"><span class="text-slate-400">Vitesse moyenne (pénalités)</span><span class="font-bold text-white">${data.vitesseMoyennePenalites} km/h</span></p>` : ''}
-                ${data.alerteTriche ? '<p class="flex justify-between"><span class="text-slate-400">⚠️ Alerte</span><span class="font-bold text-red-400">Vitesse suspecte</span></p>' : ''}
-                <p class="flex justify-between"><span class="text-slate-400">Points VMA</span><span class="font-bold text-yellow-400">${data.ptsVMA}</span></p>
-                <p class="flex justify-between"><span class="text-slate-400">Points Tir</span><span class="font-bold text-blue-400">${data.scoreTir}</span></p>
-                <p class="flex justify-between border-t border-slate-700 pt-2"><span class="font-bold text-emerald-400">Total</span><span class="font-bold text-emerald-400">${totalPts} pts</span></p>
-            </div>
-            <button onclick="this.parentElement.parentElement.remove();" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95 w-full">Continuer →</button>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-}
-
-// --------------------------------------------------------------
 // UTILITAIRES
 // --------------------------------------------------------------
-function showToast(message, duration = 3000) {
+function showToast(message, duration = 1500) {
     const existing = document.querySelector('.arcathlon-toast');
     if (existing) existing.remove();
     const toast = document.createElement('div');
@@ -760,4 +725,4 @@ window.undoShot = window.undoShot;
 window.validatePenalty = window.validatePenalty;
 window.retourMenuArcathlon = window.retourMenuArcathlon;
 
-console.log('✅ Arcathlon kiosque chargé (version finale validée)');
+console.log('✅ Arcathlon kiosque chargé (flux validé)');
