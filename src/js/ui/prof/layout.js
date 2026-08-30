@@ -88,16 +88,18 @@ export function initLayout() {
         }
 
         if (tabName === 'tv') {
-            const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
-            setTimeout(() => {
-                const renderer = discipline === 'orientshow'
-                    ? import('../../modules/orientshow/orientshow-tv.js')
-                    : import('../../modules/escalade/escalade-tv-ui.js');
-                renderer
-                    .then(module => module[discipline === 'orientshow' ? 'renderOrientShowTV' : 'renderEscaladeTV']())
-                    .catch(err => console.error('Erreur TV:', err));
-            }, 100);
+    const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
+    setTimeout(() => {
+        if (discipline === 'badminton') {
+            // Import dynamique du module TV Badminton
+            import('../../modules/badminton/badminton-tv.js').then(module => module.renderBadmintonTV());
+        } else if (discipline === 'orientshow') {
+            import('../../modules/orientshow/orientshow-tv.js').then(module => module.renderOrientShowTV());
+        } else {
+            import('../../modules/escalade/escalade-tv-ui.js').then(module => module.renderEscaladeTV());
         }
+    }, 100);
+}
 
         if (tabName === 'live') {
             setTimeout(() => {
