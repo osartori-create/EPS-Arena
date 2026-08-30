@@ -1,4 +1,8 @@
 // src/js/modules/badminton/badminton-kiosk.js
+// Interface élève : Sélection Terrain -> Liste Round Robin -> Terrain 3D
+// Inspiré et adapté de BadZ Impact (Webjéjé) et du module EPS-Arena.
+// Licence Creative Commons Attribution (CC BY).
+
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -117,7 +121,14 @@ function renderMatchSetup() {
         return;
     }
 
-    generateRoundRobin();
+    // ✅ CORRECTION ICI : On ne régénère les matchs que s'ils n'existent pas déjà !
+    // Cela évite d'effacer les scores venus de Firebase.
+    if (matchSchedule.length === 0) {
+        console.log("🛠️ Génération du Round Robin...");
+        generateRoundRobin();
+    } else {
+        console.log("♻️ Round Robin existant conservé, scores :", matchSchedule.map(m => `${m.p1}-${m.p2}: ${m.s1}-${m.s2}`));
+    }
 
     let html = `
         <div class="flex flex-col lg:flex-row gap-6 w-full max-w-7xl mx-auto">
@@ -176,14 +187,16 @@ window.selectMatchFromList = function(matchId) {
     renderCourtInterface();
 };
 
-// --- ÉCOUTE FIREBASE ET MISE À JOUR COMPLÈTE DE L'INTERFACE ---
+// --- ÉCOUTE FIREBASE ET MISE À JOUR ---
 function listenForScoreUpdates() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
     
     onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
-        // On met à jour les données locales
+        console.log("📡 Firebase a envoyé :", data);
+
+        // On met à jour les scores des matchs déjà joués
         matchSchedule.forEach(m => {
             const result = data[m.id];
             if (result && result.terrain === currentTerrain) {
@@ -192,11 +205,12 @@ function listenForScoreUpdates() {
             }
         });
 
-        // Reconstruit TOUTE l'interface (Liste + Classement) avec les données à jour
-        // Si on est en train de regarder un match, on ne reconstruit pas la page entière,
-        // mais on met à jour la liste et le classement en arrière-plan.
+        // Si on est sur l'écran de sélection (pas en train de jouer), on redessine la liste
         if (document.getElementById('court-zone') && !document.getElementById('court')) {
             renderMatchSetup();
+        } else {
+            // Si on est en train de jouer, on met à jour juste le classement s'il est présent
+            renderClassement();
         }
     });
 }
