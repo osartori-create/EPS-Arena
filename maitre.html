@@ -47,8 +47,6 @@
     <nav class="flex border-b border-slate-800 mb-6 font-bold text-xs uppercase tracking-widest overflow-x-auto">
         <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
         <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
-        <button id="btnTab3" onclick="switchTab('live')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📊 Résultats Live</button>
-        <button id="btnTab4" onclick="switchTab('tv')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📺 TV</button>
         <button id="btnTab5" onclick="switchTab('tools')" class="px-4 py-2 text-slate-500 whitespace-nowrap">🧰 Outils</button>
     </nav>
 
@@ -86,6 +84,14 @@
                     <button onclick="switchDiscipline('badminton')" id="btnDisc-badminton" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏸 Badminton</button>
                 </div>
             </div>
+            <!-- Dans viewActivities, après le sélecteur de discipline -->
+<div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 mb-4">
+    <div class="flex gap-2 font-black text-xs uppercase">
+        <button id="subtab-settings" onclick="switchActivitySubTab('settings')" class="px-4 py-2 rounded-lg bg-blue-600 text-white">⚙️ Réglages</button>
+        <button id="subtab-live" onclick="switchActivitySubTab('live')" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-300">📊 Live</button>
+        <button id="subtab-tv" onclick="switchActivitySubTab('tv')" class="px-4 py-2 rounded-lg bg-slate-700 text-slate-300">📺 TV</button>
+    </div>
+</div>
 
             <!-- PARAMÈTRES MULTI-ACTIVITÉS -->
             <div id="viewMultiSettings" class="space-y-4">

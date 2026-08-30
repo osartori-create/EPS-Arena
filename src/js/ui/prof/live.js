@@ -1,67 +1,51 @@
 // src/js/ui/prof/live.js
-import { initLiveEngine, getConfigData, getStudentsMap, getLocalMapping } from '../../core/live-engine.js';
-import { renderEscaladeLive } from '../../modules/escalade/escalade-live.js';
-import { renderCOLive } from '../../modules/co/co-live.js';
-import { renderMultiLive } from '../../modules/multi/multi-live.js';
-import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
-import { renderOrientShowLive } from '../../modules/orientshow/orientshow-live.js';
-import { exportIDoceo } from '../../services/export-idocéo.js';
+import { getConfigData } from '../../core/live-engine.js';
+import { getStudentsMap, getLocalMapping } from '../../core/live-engine.js'; // Pour exports
 
 let currentClasse = "";
 
-export function initLiveUI() {
-    initLiveEngine();
+// Fonction principale appelée par le sous-onglet "Live" (via activities.js)
+export function renderLive(discipline) {
+    const container = document.getElementById('live-content');
+    if (!container) return;
 
-    window.addEventListener('live-data-updated', (e) => {
-        const { type, data } = e.detail;
-        const currentActivite = getConfigData().activite || 'multi';
+    const activeClasse = document.getElementById('selectClasse').value;
+    currentClasse = activeClasse;
 
-        if (type === 'escalade' && currentActivite === 'escalade') {
-            renderEscaladeLive(data);
-            if (isTVVisible()) renderEscaladeTV();
-        } else if (type === 'co' && currentActivite === 'co') {
-            renderCOLive(data);
-        } else if (type === 'multi' && currentActivite === 'multi') {
-            renderMultiLive(data);
-        } else if (type === 'orientshow' && currentActivite === 'orientshow') {
-            renderOrientShowLive();
-        } else if (type === 'badminton' && currentActivite === 'badminton') {
-            // Import dynamique pour éviter de faire planter toute l'application
-            import('../../modules/badminton/badminton-live.js')
-                .then(module => module.renderBadmintonLive())
-                .catch(err => console.error("Erreur Live Badminton :", err));
-        }
-    });
+    // On vide le conteneur avant chargement pour éviter les résidus
+    container.innerHTML = '<p class="text-slate-500 text-center">Chargement du Live...</p>';
 
-    window.addEventListener('live-config-updated', () => {
-        const currentActivite = getConfigData().activite || 'multi';
+    // Réinitialiser l'ancien écouteur si un module précédent tournait (via un flag global)
+    if (window.currentLiveUnsub) {
+        window.currentLiveUnsub();
+        window.currentLiveUnsub = null;
+    }
 
-        if (currentActivite === 'badminton') {
-            import('../../modules/badminton/badminton-live.js')
-                .then(module => module.renderBadmintonLive())
-                .catch(err => console.error("Erreur Live Badminton :", err));
-        } else {
-            document.getElementById('live-content').innerHTML = '<p class="text-slate-500 text-center">En attente des données...</p>';
-            if (currentActivite === 'escalade' && isTVVisible()) {
-                renderEscaladeTV();
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+
+    // ROUTAGE DYNAMIQUE (on utilise le nom de la discipline pour charger le bon module)
+    import(`../../modules/${discipline}/${discipline}-live.js`)
+        .then(module => {
+            if (typeof module.renderLive === 'function') {
+                module.renderLive(); // Les modules ont leur propre écouteur interne
+            } else if (typeof module.renderDefault === 'function') {
+                module.renderDefault(container);
+            } else {
+                container.innerHTML = '<p class="text-red-400">Module Live non trouvé pour cette discipline.</p>';
             }
-        }
-    });
+        })
+        .catch(err => {
+            console.error("Erreur chargement Live :", err);
+            // Fallback pour les activités n'ayant pas encore de module dédié (Multi, etc.)
+            if (discipline === 'multi' || discipline === 'sprint' || discipline === 'poursuite') {
+                container.innerHTML = `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">⏱️ Résultats ${discipline}</h3><div class="space-y-2">En attente des données élèves...</div>`;
+            } else {
+                container.innerHTML = '<p class="text-red-400">Erreur : module Live non chargé. Vérifiez la console.</p>';
+            }
+        });
 }
 
-function isTVVisible() {
-    const tvView = document.getElementById('viewTV');
-    return tvView && !tvView.classList.contains('hidden');
-}
-
-// Export du CSV Badminton
-window.exportBadmintonImpactCSV = function() {
-    import('../../modules/badminton/badminton-live.js').then(module => {
-        if (module.exportBadmintonImpactCSV) {
-            module.exportBadmintonImpactCSV();
-        }
-    });
-};
+// --- ANCIENNES FONCTIONS D'EXPORT CONSERVÉES ---
 
 window.exportCOiDoceo = function() {
     const activeClasse = document.getElementById('selectClasse').value;
@@ -114,3 +98,6 @@ window.exportResultsLive = function() {
     a.download = `Live_${currentClasse}.csv`;
     a.click();
 };
+
+// (Import nécessaire pour l'export)
+import { exportIDoceo } from '../../services/export-idocéo.js';

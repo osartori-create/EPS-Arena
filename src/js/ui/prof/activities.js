@@ -67,6 +67,77 @@ export function initActivities() {
             try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
         }
     };
+    // Dans initActivities(), après switchDiscipline :
+
+window.switchActivitySubTab = function(subTab) {
+    const disc = currentDiscipline;
+    
+    // Mettre à jour les boutons
+    ['settings', 'live', 'tv'].forEach(tab => {
+        const btn = document.getElementById(`subtab-${tab}`);
+        if (btn) {
+            if (tab === subTab) {
+                btn.classList.remove('bg-slate-700', 'text-slate-300');
+                btn.classList.add('bg-blue-600', 'text-white');
+            } else {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-slate-700', 'text-slate-300');
+            }
+        }
+    });
+
+    // Cacher les paramètres et afficher Live/TV selon le cas
+    const multiView = document.getElementById('viewMultiSettings');
+    const coView = document.getElementById('viewCOSettings');
+    const osView = document.getElementById('viewOrientShowSettings');
+    const escView = document.getElementById('viewEscaladeSettings');
+    const bmtView = document.getElementById('viewBadmintonSettings');
+    
+    // On masque TOUTES les vues de réglages
+    [multiView, coView, osView, escView, bmtView].forEach(el => {
+        if (el) el.classList.add('hidden');
+    });
+
+    // Cacher les anciennes vues Live et TV globales pour réutiliser leurs conteneurs
+    const viewLive = document.getElementById('viewLive');
+    const viewTV = document.getElementById('viewTV');
+    if (viewLive) viewLive.classList.add('hidden');
+    if (viewTV) viewTV.style.display = 'none';
+
+    if (subTab === 'settings') {
+        // Afficher la vue de réglages correspondante
+        if (disc === 'multi') multiView.classList.remove('hidden');
+        else if (disc === 'co') coView.classList.remove('hidden');
+        else if (disc === 'orientshow') osView.classList.remove('hidden');
+        else if (disc === 'escalade') escView.classList.remove('hidden');
+        else if (disc === 'badminton') bmtView.classList.remove('hidden');
+    } 
+    else if (subTab === 'live') {
+        // Afficher le conteneur Live et appeler le bon module
+        if (viewLive) viewLive.classList.remove('hidden');
+        const container = document.getElementById('live-content');
+        container.innerHTML = '<p>Chargement du Live...</p>';
+        import('../../ui/prof/live.js').then(module => module.renderLive(disc));
+    } 
+    else if (subTab === 'tv') {
+        // Afficher le conteneur TV et appeler le bon module
+        const tvViewEl = document.getElementById('viewTV');
+        if (tvViewEl) {
+            tvViewEl.style.display = 'block';
+            tvViewEl.style.height = '100vh'; // Plein écran pour la TV
+            // Le conteneur tvGlobe est déjà dans le HTML
+            setTimeout(() => {
+                if (disc === 'badminton') {
+                    import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV());
+                } else if (disc === 'orientshow') {
+                    import('../../modules/orientshow/orientshow-tv.js').then(m => m.renderOrientShowTV());
+                } else {
+                    import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV());
+                }
+            }, 100);
+        }
+    }
+};
 
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;

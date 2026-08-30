@@ -81,30 +81,6 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Appels spéciaux pour TV et Live
-        if (tabName === 'tv') {
-            const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
-            setTimeout(() => {
-                const renderer = discipline === 'orientshow'
-                    ? import('../../modules/orientshow/orientshow-tv.js')
-                    : import('../../modules/escalade/escalade-tv-ui.js');
-                renderer
-                    .then(module => module[discipline === 'orientshow' ? 'renderOrientShowTV' : 'renderEscaladeTV']())
-                    .catch(err => console.error('Erreur TV:', err));
-            }, 100);
-        }
-
-        if (tabName === 'live') {
-            setTimeout(() => {
-                import('../../ui/prof/live.js')
-                    .then(module => {
-                        if (typeof module.renderLive === 'function') {
-                            module.renderLive();
-                        }
-                    })
-                    .catch(err => console.error("Erreur import Live:", err));
-            }, 100);
-        }
     };
 
     // 2. Gestion des classes
