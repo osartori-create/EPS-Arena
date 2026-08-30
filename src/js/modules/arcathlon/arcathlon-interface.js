@@ -44,6 +44,7 @@ export function generateArcathlonTeams() {
 
     const equipes = [];
     for (let i = 0; i < nbEquipes; i++) {
+        // On garde la couleur associée au quartile (0=Rouge, 1=Jaune, 2=Bleu)
         const membres = [
             { ...quartiles[0][i], maillot: 'Rouge', absent: false, inapte: false },
             { ...quartiles[1][i], maillot: 'Jaune', absent: false, inapte: false },
@@ -69,6 +70,10 @@ export function generateArcathlonTeams() {
 export async function renderArcathlonTeams() {
     const container = document.getElementById('teamsGridArcathlon');
     if (!container) return;
+
+    // Sauvegarder la position de défilement
+    const scrollParent = container.closest('.overflow-y-auto') || container.parentElement;
+    const scrollTop = scrollParent.scrollTop || 0;
 
     const activeClasse = document.getElementById('selectClasse').value;
     const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${activeClasse}`) || '[]');
@@ -123,6 +128,11 @@ export async function renderArcathlonTeams() {
         container.innerHTML += html;
     }
 
+    // Restaurer la position de défilement
+    setTimeout(() => {
+        scrollParent.scrollTop = scrollTop;
+    }, 10);
+
     // Attacher les événements aux cases à cocher
     document.querySelectorAll('.absent-check, .inapte-check').forEach(cb => {
         cb.addEventListener('change', (e) => {
@@ -153,7 +163,7 @@ export async function renderArcathlonTeams() {
 }
 
 // --------------------------------------------------------------
-// 3. GLISSER-DÉPOSER (SORTABLE)
+// 3. GLISSER-DÉPOSER (SORTABLE) – sans réattribution de couleur
 // --------------------------------------------------------------
 let sortableInstances = [];
 
@@ -182,13 +192,8 @@ export function initSortableArcathlon() {
                 const idx = fromEq.membres.findIndex(m => m.id === itemId);
                 if (idx === -1) return;
                 const moved = fromEq.membres.splice(idx, 1)[0];
-                // Réattribuer une couleur si besoin (pour garder un équilibre)
-                const couleurs = ['Rouge', 'Jaune', 'Bleu'];
+                // On ne réattribue PAS la couleur : on laisse celle que l'élève avait (basée sur sa VMA)
                 toEq.membres.push(moved);
-                // Rééquilibrer les couleurs dans l'équipe d'arrivée
-                toEq.membres.forEach((m, i) => {
-                    m.maillot = couleurs[i % couleurs.length];
-                });
 
                 localStorage.setItem(`arcathlon_equipes_${activeClasse}`, JSON.stringify(equipes));
                 renderArcathlonTeams();
@@ -199,7 +204,7 @@ export function initSortableArcathlon() {
 }
 
 // --------------------------------------------------------------
-// 4. TRANSMISSION VERS FIREBASE
+// 4. TRANSMISSION VERS FIREBASE (avec nbFleches)
 // --------------------------------------------------------------
 export function transmettreArcathlonConfig() {
     const activeClasse = document.getElementById('selectClasse').value;
@@ -214,11 +219,12 @@ export function transmettreArcathlonConfig() {
     const longueurPiste = parseInt(document.getElementById('arcathlonLongueurPiste')?.value) || 100;
     const nbToursCourse = parseInt(document.getElementById('arcathlonNbToursCourse')?.value) || 2;
     const longueurPenalite = parseInt(document.getElementById('arcathlonLongueurPenalite')?.value) || 30;
+    const nbFleches = parseInt(document.getElementById('arcathlonNbFleches')?.value) || 2;
 
     const configData = {
         mode: mode,
         nbSeries: nbSeries,
-        nbFleches: 2,
+        nbFleches: nbFleches,
         longueurPiste: longueurPiste,
         nbToursCourse: nbToursCourse,
         longueurPenalite: longueurPenalite,
@@ -247,7 +253,6 @@ export function transmettreArcathlonConfig() {
 
     // Handicaps (si mode poursuite, on les charge depuis une autre fonction)
     if (mode === 'poursuite') {
-        // On peut appeler une fonction pour charger les handicaps depuis les sprints précédents
         // Par défaut, on met 0
         Object.keys(configData.vmaReference).forEach(key => {
             configData.handicaps[key] = 0;
@@ -283,7 +288,7 @@ export function initArcathlonInterface() {
                     <h3 class="font-black text-blue-400 uppercase text-sm">🏹 Arcathlon – Équipes de 3</h3>
                     <button onclick="window.generateArcathlonTeams()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">🔄 Générer Équipes</button>
                 </div>
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Mode</label>
                         <select id="arcathlonMode" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
@@ -297,6 +302,10 @@ export function initArcathlonInterface() {
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Nb séries</label>
                         <input type="number" id="arcathlonNbSeries" value="3" min="1" max="5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase">Nb flèches</label>
+                        <input type="number" id="arcathlonNbFleches" value="2" min="1" max="3" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
                     </div>
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Longueur piste (m)</label>
