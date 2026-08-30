@@ -1,7 +1,7 @@
 // src/js/modules/arcathlon/arcathlon-kiosk.js
 // Interface élève – Sélection équipe, phases, chrono, tirs, pénalités, enregistrement Firebase
 
-import { db, ref, onValue, push, set } from '../../core/firebase-service.js';
+import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
 // --------------------------------------------------------------
 // ÉTAT LOCAL
@@ -27,7 +27,7 @@ const state = {
     shots: [],
     penReq: 0,
     penDone: 0,
-    departSignal: false,   // pour mode poursuite
+    departSignal: false,
     handicapMs: 0,
     vmaRef: 0,
     distanceTotale: 0,
@@ -36,6 +36,7 @@ const state = {
 };
 
 let configListener = null;
+let departListener = null;
 
 // --------------------------------------------------------------
 // 1. INITIALISATION (appelée par eleve-app.js)
@@ -83,21 +84,24 @@ export function initArcathlonKiosk(classe, code) {
                 }
             }
 
-            // Afficher l'interface
             renderPhase();
         } else {
-            document.getElementById('arcathlon-module').innerHTML = `
-                <div class="text-center py-10 text-slate-400">
-                    <p class="text-2xl">⏳ En attente de la configuration...</p>
-                </div>
-            `;
+            const container = document.getElementById('arcathlon-module');
+            if (container) {
+                container.innerHTML = `
+                    <div class="text-center py-10 text-slate-400">
+                        <p class="text-2xl">⏳ En attente de la configuration...</p>
+                    </div>
+                `;
+            }
         }
     });
 
     // Écoute du départ (mode poursuite)
     if (state.mode === 'poursuite') {
         const departRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/commandes/depart`);
-        onValue(departRef, (snap) => {
+        if (departListener) departListener();
+        departListener = onValue(departRef, (snap) => {
             const data = snap.val();
             if (data && data.timestamp) {
                 state.departSignal = true;
@@ -127,7 +131,6 @@ function renderPhase() {
     const container = document.getElementById('arcathlon-module');
     if (!container) return;
 
-    // Déterminer la couleur du maillot pour le style
     const colorMap = {
         'Rouge': 'text-red-400 border-red-600',
         'Jaune': 'text-yellow-400 border-yellow-600',
@@ -140,7 +143,6 @@ function renderPhase() {
     };
     const colorClass = colorMap[state.maillot] || 'text-slate-400 border-slate-600';
 
-    // Panneau de phase
     const phaseLabels = {
         'course': { label: 'COURSE', panel: 'panel-course', btn: 'btn-course', btnText: state.mode === 'poursuite' && !state.departSignal ? '⏳ Attente départ...' : 'Démarrer la course' },
         'tir': { label: 'TIR', panel: 'panel-tir', btn: 'btn-tir', btnText: 'Fin de tir' },
@@ -150,7 +152,7 @@ function renderPhase() {
 
     container.innerHTML = `
         <div class="flex flex-col gap-4 max-w-4xl mx-auto">
-            <!-- En-tête : Équipe / Maillot / Série -->
+            <!-- En-tête -->
             <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
                 <div>
                     <span class="text-xs uppercase text-slate-400 font-bold">Équipe</span>
@@ -198,19 +200,14 @@ function renderPhase() {
         </div>
     `;
 
-    // Ajouter les styles CSS manquants
     injectStyles();
 
-    // Attacher les événements
     document.getElementById('giantBtn').addEventListener('click', onGiantAction);
 
-    // Démarrer le chrono si on est en phase course et que le mode est sprint
     if (state.phase === 'course' && state.mode === 'sprint' && !state.running) {
-        // En sprint, on démarre immédiatement
         startCourse();
     }
 
-    // Mettre à jour le chrono
     updateClock();
 }
 
@@ -298,12 +295,10 @@ function stopClock() {
         cancelAnimationFrame(clockInterval);
         clockInterval = null;
     }
-    // Sauvegarder le temps écoulé
     if (state.phaseStart) {
         const now = performance.now();
         state.phaseAccum += (now - state.phaseStart);
         state.phaseStart = null;
-        // Accumuler dans le temps total de la phase
         if (state.phase === 'course') {
             state.tempsCourse = state.phaseAccum;
         } else if (state.phase === 'penalite') {
@@ -374,12 +369,15 @@ function onGiantAction() {
 
 function startCourse() {
     if (state.running) return;
-    // Appliquer le handicap (décalage du chrono)
     if (state.handicapMs > 0) {
         state.phaseAccum = state.handicapMs;
     }
     startClock();
-    updateGiantButton('course', '🏁 Arrivée');
+    const btn = document.getElementById('giantBtn');
+    if (btn) {
+        btn.textContent = '🏁 Arrivée';
+        btn.className = 'btn-action btn-course w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform';
+    }
 }
 
 function finishCourse() {
@@ -387,21 +385,22 @@ function finishCourse() {
     state.tempsCourse = state.phaseAccum;
     state.tempsTotal = state.tempsCourse + state.tempsPenalite;
 
-    // Vérifier si c'est la dernière série (pas de tir)
     if (state.serieActuelle >= state.nbSeries) {
-        // Dernière série : on enregistre directement
         savePassage();
         return;
     }
 
-    // Passer au tir
     state.phase = 'tir';
     state.shots = Array(state.nbFleches).fill(0);
     state.phaseAccum = 0;
     state.phaseStart = null;
     renderPhase();
     startClock();
-    updateGiantButton('tir', 'Fin de tir');
+    const btn = document.getElementById('giantBtn');
+    if (btn) {
+        btn.textContent = 'Fin de tir';
+        btn.className = 'btn-action btn-tir w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform';
+    }
 }
 
 // --------------------------------------------------------------
@@ -410,12 +409,12 @@ function finishCourse() {
 window.toggleShot = function(index) {
     if (state.phase !== 'tir') return;
     if (index < 0 || index >= state.shots.length) return;
-    // Cycle : 0 → 1 → -1 → 0
     const current = state.shots[index];
     if (current === 0) state.shots[index] = 1;
     else if (current === 1) state.shots[index] = -1;
     else state.shots[index] = 0;
-    renderPhaseContent(); // rafraîchir les cases
+    const phaseContent = document.getElementById('phaseContent');
+    if (phaseContent) phaseContent.innerHTML = renderPhaseContent();
 };
 
 window.undoShot = function() {
@@ -423,7 +422,8 @@ window.undoShot = function() {
     for (let i = state.shots.length - 1; i >= 0; i--) {
         if (state.shots[i] !== 0) {
             state.shots[i] = 0;
-            renderPhaseContent();
+            const phaseContent = document.getElementById('phaseContent');
+            if (phaseContent) phaseContent.innerHTML = renderPhaseContent();
             return;
         }
     }
@@ -431,7 +431,6 @@ window.undoShot = function() {
 };
 
 function calculateTirScore() {
-    // Les flèches réussies valent 5, manquées 0
     return state.shots.filter(s => s === 1).length * 5;
 }
 
@@ -439,7 +438,6 @@ function finishTir() {
     stopClock();
     const score = calculateTirScore();
 
-    // Calcul des pénalités selon barème
     if (score < 7) state.penReq = 3;
     else if (score < 12) state.penReq = 2;
     else if (score < 16) state.penReq = 1;
@@ -453,9 +451,12 @@ function finishTir() {
         state.phaseStart = null;
         renderPhase();
         startClock();
-        updateGiantButton('penalite', 'Effectuer les tours');
+        const btn = document.getElementById('giantBtn');
+        if (btn) {
+            btn.textContent = 'Effectuer les tours';
+            btn.className = 'btn-action btn-pen w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform';
+        }
     } else {
-        // Pas de pénalité → fin de série
         savePassage();
     }
 }
@@ -467,7 +468,7 @@ window.validatePenalty = function(index) {
     if (state.phase !== 'penalite') return;
     if (index >= state.penReq || index < state.penDone) return;
     state.penDone++;
-    // Mettre à jour l'affichage des boutons
+    // Mettre à jour l'affichage
     const btns = document.querySelectorAll('.penalty-btn');
     if (btns[index]) {
         btns[index].classList.remove('bg-slate-700', 'border-slate-600');
@@ -475,12 +476,9 @@ window.validatePenalty = function(index) {
         btns[index].textContent = '✓';
         btns[index].disabled = true;
     }
-    // Mettre à jour le compteur
-    const counter = document.querySelector('.text-sm.text-slate-400');
-    if (counter) {
-        counter.textContent = `${state.penDone} / ${state.penReq} tours effectués`;
-    }
-    // Si tous les tours sont faits
+    const phaseContent = document.getElementById('phaseContent');
+    if (phaseContent) phaseContent.innerHTML = renderPhaseContent();
+
     if (state.penDone >= state.penReq) {
         stopClock();
         state.tempsPenalite = state.phaseAccum;
@@ -495,18 +493,15 @@ window.validatePenalty = function(index) {
 function savePassage() {
     stopClock();
 
-    // Calcul de la vitesse
     const distanceKm = (state.distanceTotale + (state.penDone * state.longueurPenalite)) / 1000;
     const tempsHeures = state.tempsTotal / 1000 / 3600;
     const vitesse = tempsHeures > 0 ? distanceKm / tempsHeures : 0;
 
-    // Points VMA
     let ptsVMA = 0;
     if (vitesse >= state.vmaRef + 1) ptsVMA = 3;
     else if (vitesse >= state.vmaRef - 0.5) ptsVMA = 2;
     else if (vitesse >= state.vmaRef - 1) ptsVMA = 1;
 
-    // Bonus de tir
     const score = calculateTirScore();
     let bonus = 0;
     if (score < 7) bonus = 0;
@@ -535,14 +530,12 @@ function savePassage() {
         timestamp: Date.now()
     };
 
-    // Envoi Firebase
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/arcathlon/passages/${state.mode}`;
     const passageRef = ref(db, path);
     push(passageRef, passageData)
         .then(() => {
             showToast(`✅ Série ${state.serieActuelle} enregistrée !`, 2000);
-            // Passer à la série suivante ou terminer
             if (state.serieActuelle < state.nbSeries) {
                 state.serieActuelle++;
                 state.phase = 'course';
@@ -558,20 +551,26 @@ function savePassage() {
                 if (state.mode === 'sprint') {
                     startCourse();
                 } else {
-                    updateGiantButton('course', state.departSignal ? 'Démarrer la course' : '⏳ Attente départ...');
+                    const btn = document.getElementById('giantBtn');
+                    if (btn) {
+                        btn.textContent = state.departSignal ? 'Démarrer la course' : '⏳ Attente départ...';
+                        btn.className = 'btn-action btn-course w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform';
+                    }
                 }
             } else {
-                // Fin de toutes les séries
-                document.getElementById('arcathlon-module').innerHTML = `
-                    <div class="text-center py-20">
-                        <div class="text-6xl mb-6">🏆</div>
-                        <p class="text-3xl font-black text-emerald-400">Terminé !</p>
-                        <p class="text-slate-400 mt-2">Bravo, toutes les séries sont effectuées.</p>
-                        <button onclick="window.retourMenuArcathlon()" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">
-                            ← Retour
-                        </button>
-                    </div>
-                `;
+                const container = document.getElementById('arcathlon-module');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="text-center py-20">
+                            <div class="text-6xl mb-6">🏆</div>
+                            <p class="text-3xl font-black text-emerald-400">Terminé !</p>
+                            <p class="text-slate-400 mt-2">Bravo, toutes les séries sont effectuées.</p>
+                            <button onclick="window.retourMenuArcathlon()" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">
+                                ← Retour
+                            </button>
+                        </div>
+                    `;
+                }
             }
         })
         .catch(err => {
@@ -583,13 +582,6 @@ function savePassage() {
 // --------------------------------------------------------------
 // 9. UTILITAIRES
 // --------------------------------------------------------------
-function updateGiantButton(phase, text) {
-    const btn = document.getElementById('giantBtn');
-    if (!btn) return;
-    btn.textContent = text;
-    btn.className = `btn-action ${phase === 'course' ? 'btn-course' : phase === 'tir' ? 'btn-tir' : 'btn-pen'} w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform`;
-}
-
 function showToast(message, duration = 3000) {
     const existing = document.querySelector('.arcathlon-toast');
     if (existing) existing.remove();
@@ -659,29 +651,23 @@ function injectStyles() {
 // 10. RETOUR
 // --------------------------------------------------------------
 window.retourMenuArcathlon = function() {
-    // Nettoyer les listeners
     if (configListener) {
         configListener();
         configListener = null;
+    }
+    if (departListener) {
+        departListener();
+        departListener = null;
     }
     stopClock();
     if (clockInterval) {
         cancelAnimationFrame(clockInterval);
         clockInterval = null;
     }
-    // Retour à l'écran de sélection
     const module = document.getElementById('arcathlon-module');
     if (module) {
-        module.innerHTML = `
-            <div class="text-center py-10 text-slate-400">
-                <p class="text-2xl">↩ Retour au choix du maillot</p>
-                <button onclick="window.resetToLogin()" class="mt-4 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">
-                    Choisir un maillot
-                </button>
-            </div>
-        `;
+        module.classList.add('hidden');
     }
-    // Dans eleve-app.js, on a une fonction resetToLogin pour revenir à l'écran de sélection
     if (typeof window.resetToLogin === 'function') {
         window.resetToLogin();
     }

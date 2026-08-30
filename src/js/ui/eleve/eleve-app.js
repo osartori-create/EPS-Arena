@@ -93,23 +93,18 @@ function showLogin() {
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
         
-        // Cacher les autres modules
         escaladeModule.classList.add('hidden');
         coModule.classList.add('hidden');
         multiModule.classList.add('hidden');
         if (osModule) osModule.classList.add('hidden');
 
-        // Gérer les boutons du haut
         document.getElementById('code-info').classList.add('hidden');
         document.getElementById('btn-quit').classList.add('hidden');
         document.getElementById('btn-back-terrain').classList.remove('hidden');
 
-        if (config.activite === 'badminton') {
-            // Élargit le conteneur principal pour le Badminton
-            document.getElementById('main-container').classList.remove('max-w-md');
-            document.getElementById('main-container').classList.add('max-w-7xl');
-        }
-        // Afficher le module Badminton et lancer le kiosque
+        document.getElementById('main-container').classList.remove('max-w-md');
+        document.getElementById('main-container').classList.add('max-w-7xl');
+
         badmintonModule.classList.remove('hidden');
         console.log('Lancement Badminton pour classe :', selectedClass);
         initBadmintonKiosk(selectedClass);
@@ -121,19 +116,16 @@ function showLogin() {
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
 
-        // Cacher les autres modules
         escaladeModule.classList.add('hidden');
         coModule.classList.add('hidden');
         multiModule.classList.add('hidden');
         if (osModule) osModule.classList.add('hidden');
         badmintonModule.classList.add('hidden');
 
-        // Gérer les boutons du haut
         document.getElementById('code-info').classList.add('hidden');
         document.getElementById('btn-quit').classList.add('hidden');
         document.getElementById('btn-back-terrain').classList.remove('hidden');
 
-        // Créer le module Arcathlon s'il n'existe pas
         let arcModule = document.getElementById('arcathlon-module');
         if (!arcModule) {
             arcModule = document.createElement('div');
@@ -143,14 +135,12 @@ function showLogin() {
         }
         arcModule.classList.remove('hidden');
 
-        // Générer les codes à partir des équipes
         const equipes = config.equipes || {};
         let html = '';
         let hasCodes = false;
         for (const [eqId, eqData] of Object.entries(equipes)) {
             const membres = eqData.membres || [];
             for (const m of membres) {
-                // Ne pas afficher les absents ou inaptes
                 if (m.absent || m.inapte) continue;
                 const code = `${eqId}_${m.maillot}`;
                 html += `<button class="bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform" onclick="window.selectArcathlonCode('${code}')">${code}</button>`;
@@ -172,35 +162,31 @@ function showLogin() {
             </div>
         `;
 
-        // Exposer la fonction de sélection pour ce contexte
         window.selectArcathlonCode = (code) => {
             selectedCode = code;
-            // Cacher le module de sélection et afficher le kiosque
             arcModule.innerHTML = '<div class="text-center py-10 text-slate-400"><p>Chargement...</p></div>';
-            // Lancer le kiosque
-            import('../../modules/arcathlon/arcathlon-kiosk.js').then(m => {
-                m.initArcathlonKiosk(selectedClass, selectedCode);
-            }).catch(err => {
-                console.error('Erreur chargement Arcathlon :', err);
-                arcModule.innerHTML = `
-                    <div class="text-center py-10 text-red-400">
-                        <p>❌ Erreur de chargement du module.</p>
-                        <button onclick="window.retourClasseArcathlon()" class="mt-4 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
-                            ← Retour
-                        </button>
-                    </div>
-                `;
-            });
+            import('../../modules/arcathlon/arcathlon-kiosk.js')
+                .then(m => {
+                    m.initArcathlonKiosk(selectedClass, selectedCode);
+                })
+                .catch(err => {
+                    console.error('Erreur chargement Arcathlon :', err);
+                    arcModule.innerHTML = `
+                        <div class="text-center py-10 text-red-400">
+                            <p>❌ Erreur de chargement du module.</p>
+                            <p class="text-xs text-slate-500 mt-2">${err.message}</p>
+                            <button onclick="window.retourClasseArcathlon()" class="mt-4 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                                ← Retour
+                            </button>
+                        </div>
+                    `;
+                });
         };
 
-        // Fonction retour pour ce contexte
         window.retourClasseArcathlon = () => {
-            // Revenir à l'écran de sélection de classe
             activityScreen.classList.add('hidden');
             loginScreen.classList.remove('hidden');
-            // Réinitialiser le module
             if (arcModule) arcModule.classList.add('hidden');
-            // Réafficher les codes de login
             showLogin();
         };
 
@@ -213,7 +199,6 @@ function showLogin() {
     document.getElementById('btn-quit').classList.remove('hidden');
     document.getElementById('btn-back-terrain').classList.add('hidden');
 
-    // Génération normale des codes pour les autres activités
     Object.keys(config).forEach(key => {
         if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
         let count = 0;
@@ -253,8 +238,7 @@ function selectCode(code) {
             initOrientShowKiosk(selectedClass, selectedCode);
         }
     } else if (currentConfig.activite === 'arcathlon') {
-        // Le cas Arcathlon est déjà traité dans showLogin, mais au cas où
-        // on pourrait relancer le module
+        // Cas de secours (si on arrive ici via un appel direct)
         let arcModule = document.getElementById('arcathlon-module');
         if (!arcModule) {
             arcModule = document.createElement('div');
@@ -264,19 +248,21 @@ function selectCode(code) {
         }
         arcModule.classList.remove('hidden');
         arcModule.innerHTML = '<div class="text-center py-10 text-slate-400"><p>Chargement...</p></div>';
-        import('../../modules/arcathlon/arcathlon-kiosk.js').then(m => {
-            m.initArcathlonKiosk(selectedClass, selectedCode);
-        }).catch(err => {
-            console.error('Erreur chargement Arcathlon :', err);
-            arcModule.innerHTML = `
-                <div class="text-center py-10 text-red-400">
-                    <p>❌ Erreur de chargement du module.</p>
-                    <button onclick="window.resetToLogin()" class="mt-4 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
-                        ← Retour
-                    </button>
-                </div>
-            `;
-        });
+        import('../../modules/arcathlon/arcathlon-kiosk.js')
+            .then(m => {
+                m.initArcathlonKiosk(selectedClass, selectedCode);
+            })
+            .catch(err => {
+                console.error('Erreur chargement Arcathlon :', err);
+                arcModule.innerHTML = `
+                    <div class="text-center py-10 text-red-400">
+                        <p>❌ Erreur de chargement du module.</p>
+                        <button onclick="window.resetToLogin()" class="mt-4 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                            ← Retour
+                        </button>
+                    </div>
+                `;
+            });
     } else {
         multiModule.classList.remove('hidden');
     }
