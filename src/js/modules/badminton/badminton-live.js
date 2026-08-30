@@ -5,9 +5,6 @@ import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
-// Exposer la fonction pour le HTML
-window.openBadmintonPlayerStats = openBadmintonPlayerStats;
-
 let currentClasse = '';
 let currentUnsub = null;
 
@@ -24,7 +21,6 @@ export function renderBadmintonLive() {
     currentClasse = activeClasse;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
 
-    // 1. Écouter la config (nombre de terrains, joueurs par terrain)
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
     onValue(configRef, (snap) => {
         const config = snap.val() || {};
@@ -37,7 +33,6 @@ export function renderBadmintonLive() {
             }
         }
 
-        // 2. Écouter les résultats
         if (currentUnsub) currentUnsub();
         const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
         currentUnsub = onValue(resultsRef, (snap) => {
@@ -55,7 +50,6 @@ async function renderGrid(terrainsConfig, data) {
     let html = '<h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏸 Badminton - Live Impacts</h3>';
     html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
 
-    // Pour chaque terrain
     for (let t in terrainsConfig) {
         const terrain = t;
         const nbPlayers = terrainsConfig[t];
@@ -67,7 +61,6 @@ async function renderGrid(terrainsConfig, data) {
         Object.values(data).forEach(m => {
             if (String(m.terrain) !== String(terrain)) return;
 
-            // Mise à jour des scores
             if (m.s1 > m.s2) {
                 terrainData[m.p1].pts += 3; terrainData[m.p1].wins++; terrainData[m.p1].diff += (m.s1 - m.s2);
                 terrainData[m.p2].losses++; terrainData[m.p2].diff -= (m.s1 - m.s2);
@@ -76,7 +69,6 @@ async function renderGrid(terrainsConfig, data) {
                 terrainData[m.p1].losses++; terrainData[m.p1].diff -= (m.s2 - m.s1);
             }
 
-            // Mise à jour des stats impacts
             if (m.stats) {
                 let p1Stats = m.stats.p1 || { extreme: 0, middle: 0, total: 0 };
                 let p2Stats = m.stats.p2 || { extreme: 0, middle: 0, total: 0 };
@@ -91,10 +83,8 @@ async function renderGrid(terrainsConfig, data) {
             }
         });
 
-        // Tri du classement du terrain
         const sortedPlayers = Object.entries(terrainData).sort((a, b) => b[1].pts - a[1].pts || b[1].diff - a[1].diff);
 
-        // Création de la carte (avec récupération des photos)
         html += `<div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
             <h4 class="font-black text-yellow-400 text-xl mb-3">Terrain ${terrain}</h4>
             <div class="space-y-2">
@@ -143,7 +133,6 @@ async function renderGrid(terrainsConfig, data) {
 
     html += '</div>';
     
-    // Bouton Export
     html += `<div class="mt-6">
         <button onclick="window.exportBadmintonImpactCSV()" class="bg-green-600 px-6 py-3 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (Stats Impacts)</button>
     </div>`;
@@ -151,16 +140,16 @@ async function renderGrid(terrainsConfig, data) {
     container.innerHTML = html;
 }
 
+// Chargement dynamique de la fiche élève (évite les erreurs de cascade)
 window.loadPlayerStats = async function(player, terrain, classe) {
     try {
-        // Import dynamique du module stats
         const module = await import('./badminton-stats.js');
         module.openBadmintonPlayerStats(player, terrain, classe);
     } catch (err) {
         console.error("Erreur chargement Stats Badminton :", err);
     }
-}
-// Export iDoceo enrichi
+};
+
 window.exportBadmintonImpactCSV = function() {
     alert("Export des stats Impacts en préparation !");
 };

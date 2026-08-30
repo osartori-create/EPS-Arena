@@ -26,14 +26,13 @@ export function initLiveUI() {
         } else if (type === 'orientshow' && currentActivite === 'orientshow') {
             renderOrientShowLive();
         } else if (type === 'badminton' && currentActivite === 'badminton') {
-            // Import dynamique : ne casse pas l'app si le module a une erreur
+            // Import dynamique pour éviter de faire planter toute l'application
             import('../../modules/badminton/badminton-live.js')
                 .then(module => module.renderBadmintonLive())
                 .catch(err => console.error("Erreur Live Badminton :", err));
         }
     });
 
-    // Import dynamique au changement de config
     window.addEventListener('live-config-updated', () => {
         const currentActivite = getConfigData().activite || 'multi';
 
