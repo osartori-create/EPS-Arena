@@ -43,9 +43,7 @@ export function initLayout() {
     };
 
     // 1. Gestion des onglets
-    window.switchTab = function(tabName) {
-        
-        // On cache TOUTES les vues, y compris Activities (pour éviter les réapparitions)
+    window.switchTab = function(tabName) { // <-- C'est ICI que tabName est défini !
         ['admin', 'activities', 'live', 'tv', 'tools'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
@@ -55,7 +53,6 @@ export function initLayout() {
             }
         });
 
-        // Cas spécial TV (pour gérer le plein écran)
         const tvView = document.getElementById('viewTV');
         if (tabName === 'tv') {
             tvView.style.display = 'block';

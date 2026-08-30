@@ -12,10 +12,6 @@ export async function openBadmintonPlayerStats(player, terrain, classe) {
         try { photoUrl = await getPhotoUrl(eleveId); } catch(e) {}
     }
 
-    // Ici, il faudrait récupérer les données des matchs joués par ce joueur pour calculer les stats
-    // Pour l'exemple, on simule des données (à remplacer par une vraie requête Firebase)
-    // matchsGagnes, matchsPerdus, totalPoints, pointsBonus, pointsCentre
-    
     const modalHtml = `
         <div class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4" id="statsModal">
             <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-lg">
@@ -31,24 +27,8 @@ export async function openBadmintonPlayerStats(player, terrain, classe) {
                         <p class="text-sm text-slate-400">Code : ${player}</p>
                     </div>
                 </div>
-
-                <!-- Graphique Radar -->
-                <div class="bg-slate-900 p-4 rounded-2xl mb-4">
-                    <h3 class="text-sm font-bold text-slate-400 uppercase mb-3">Profil de jeu</h3>
-                    <canvas id="playerRadar" width="300" height="300"></canvas>
-                </div>
             </div>
         </div>`;
 
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
-    // Rendu du graphique (exemple simple avec Canvas, sans librairie externe pour l'instant)
-    const canvas = document.getElementById('playerRadar');
-    const ctx = canvas.getContext('2d');
-    // ... code pour dessiner le radar (matchs gagnés, bonus, centre, etc.)
-    // Vous pouvez utiliser Chart.js en l'incluant dans maitre.html pour plus de simplicité.
-    // Pour l'instant, on affiche un texte indiquant la fonctionnalité.
-    ctx.fillStyle = 'white';
-    ctx.font = '14px sans-serif';
-    ctx.fillText("Graphique à venir (librairie requise)", 50, 150);
 }
