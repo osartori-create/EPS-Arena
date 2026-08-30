@@ -79,11 +79,10 @@ function showLogin() {
     activityScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     codeList.innerHTML = '';
-    
     const config = currentConfig;
     activityTitle.innerText = "Choisis ton code";
     
-    // 1. Si pas de config, on affiche un message d'attente
+    // 1. Si pas de config, on affiche le message d'attente
     if (!config || Object.keys(config).length === 0) {
         codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
         return;
@@ -104,6 +103,12 @@ function showLogin() {
         // On montre et initialise le module badminton
         const badmintonModule = document.getElementById('badminton-module');
         badmintonModule.classList.remove('hidden');
+        
+        // Mise à jour des boutons "Quitter" / "Retour Terrains"
+        document.getElementById('code-info').classList.add('hidden');
+        document.getElementById('btn-quit').classList.add('hidden');
+        document.getElementById('btn-back-terrain').classList.remove('hidden');
+
         initBadmintonKiosk(selectedClass);
         return;
     }
@@ -113,6 +118,11 @@ function showLogin() {
     const badmintonModule = document.getElementById('badminton-module');
     if (badmintonModule) badmintonModule.classList.add('hidden');
     
+    // Boutons Quitter / Retour
+    document.getElementById('code-info').classList.remove('hidden');
+    document.getElementById('btn-quit').classList.remove('hidden');
+    document.getElementById('btn-back-terrain').classList.add('hidden');
+
     // On génère les codes normalement
     Object.keys(config).forEach(key => {
         if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
@@ -128,6 +138,20 @@ function showLogin() {
             codeList.appendChild(btn);
         }
     });
+}
+
+function selectCode(code) {
+    selectedCode = code;
+    document.getElementById('selected-code').innerText = code;
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    if (badmintonModule) badmintonModule.classList.add('hidden');
+
+    // ... (Le reste de votre selectCode existant)
 }
 
 function selectCode(code) {
