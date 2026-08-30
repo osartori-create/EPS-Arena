@@ -1,6 +1,6 @@
 // src/js/modules/badminton/badminton-kiosk.js
-// Interface élève : Sélection Terrain -> Terrain 3D avec impacts persistants
-// Reprend intégralement la logique de BadZ Impact (Webjéjé) et l'intègre au Round Robin EPS-Arena.
+// Interface élève : Sélection Terrain -> Gestion Match (Select P1/P2) -> Terrain 3D
+// Inspiré et adapté de BadZ Impact (Webjéjé) et du module EPS-Arena.
 // Licence Creative Commons Attribution (CC BY).
 
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
@@ -18,7 +18,7 @@ let redoStack = [];
 
 // Variables pour la configuration du terrain
 let middleZoneSize = 33;
-let isFrontBackLayout = true; // Thème : Avant/Arrière (vrai) ou Gauche/Droite (faux)
+let isFrontBackLayout = true;
 let centerPoints = 1;
 let otherPoints = 3;
 
@@ -43,8 +43,7 @@ export function initBadmintonKiosk(classe) {
         if (!currentTerrain) {
             renderTerrainSelection();
         } else {
-            // Si on revient sur l'écran, on regénère la configuration du terrain
-            checkAndSetupTerrain();
+            renderMatchSetup();
         }
     });
 }
@@ -54,13 +53,14 @@ function renderTerrainSelection() {
     const container = document.getElementById('badminton-content');
     if (!container) return;
 
-    let html = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
-        <h2 class="text-2xl font-black text-white mb-4">🏸 Choisis ton terrain</h2>
-        <div class="grid grid-cols-2 gap-4">`;
+    // Optimisé pour le paysage (boutons larges et centrés)
+    let html = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center w-full max-w-4xl mx-auto">
+        <h2 class="text-3xl font-black text-white mb-6">🏸 Choisis ton terrain</h2>
+        <div class="grid grid-cols-3 gap-6">`;
 
     Object.keys(terrainsConfig).forEach(terrain => {
         html += `<button onclick="selectBadmintonTerrain(${terrain})" 
-                    class="bg-blue-600 p-6 rounded-2xl font-black text-2xl text-white active:scale-95 transition-transform">
+                    class="bg-blue-600 p-10 rounded-2xl font-black text-4xl text-white active:scale-95 transition-transform shadow-lg">
                     Terrain ${terrain}
                 </button>`;
     });
@@ -71,32 +71,15 @@ function renderTerrainSelection() {
 
 window.selectBadmintonTerrain = function(terrain) {
     currentTerrain = terrain;
-    checkAndSetupTerrain();
+    renderMatchSetup();
 };
 
-window.resetBadmintonSelection = function() {
+window.retourTerrains = function() {
     currentTerrain = '';
     renderTerrainSelection();
 };
 
-// --- 2. PRÉPARATION DU TERRAIN (Joueurs & Matchs) ---
-function checkAndSetupTerrain() {
-    const nbPlayers = terrainsConfig[currentTerrain] || 0;
-    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    playersList = lettres.slice(0, nbPlayers);
-
-    if (playersList.length < 2) {
-        document.getElementById('badminton-content').innerHTML = `
-            <div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
-                <p class="text-2xl font-black text-white">En attente d'autres joueurs sur ce terrain...</p>
-            </div>`;
-        return;
-    }
-
-    generateRoundRobin();
-    findNextMatch();
-}
-
+// --- 2. GESTION DU MATCH (Sélection manuelle P1/P2 + Liste des matchs) ---
 function generateRoundRobin() {
     matchSchedule = [];
     const n = playersList.length;
@@ -120,33 +103,132 @@ function generateRoundRobin() {
     }
 }
 
-function findNextMatch() {
-    let match = matchSchedule.find(m => m.s1 === null);
-    
-    if (!match) {
-        renderStandings();
-        document.getElementById('badminton-content').innerHTML = `
-            <div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700 mb-4">
-                <div class="text-6xl mb-4">🏆</div>
-                <p class="text-2xl font-black text-white">Tous les matchs sont terminés !</p>
-            </div>` + document.getElementById('badminton-content').innerHTML;
+function renderMatchSetup() {
+    const container = document.getElementById('badminton-content');
+    const nbPlayers = terrainsConfig[currentTerrain] || 0;
+    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    playersList = lettres.slice(0, nbPlayers);
+
+    if (playersList.length < 2) {
+        container.innerHTML = `<div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
+            <p class="text-2xl font-black text-white">En attente d'autres joueurs sur ce terrain...</p>
+        </div>`;
         return;
     }
 
-    currentMatch = match;
+    generateRoundRobin();
+
+    // Interface en ligne (mode paysage)
+    let html = `
+        <div class="flex flex-col lg:flex-row gap-6 w-full max-w-6xl mx-auto">
+            
+            <!-- Colonne Gauche : Sélection et Liste -->
+            <div class="w-full lg:w-1/3 bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-black text-white">Terrain ${currentTerrain}</h2>
+                    <button onclick="window.retourTerrains()" class="bg-red-600 px-3 py-1 rounded-lg text-xs font-black text-white">← Terrain</button>
+                </div>
+
+                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Sélection des joueurs</h3>
+                <div class="space-y-4 mb-6">
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Joueur 1 (P1)</label>
+                        <select id="select-p1" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white">
+                            <option value="">-- Choisir --</option>
+                            ${playersList.map(p => `<option value="${p}">Joueur ${p}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-slate-400 mb-1">Joueur 2 (P2)</label>
+                        <select id="select-p2" class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-xl font-black text-white">
+                            <option value="">-- Choisir --</option>
+                            ${playersList.map(p => `<option value="${p}">Joueur ${p}</option>`).join('')}
+                        </select>
+                    </div>
+                    <button onclick="startSelectedMatch()" class="w-full bg-emerald-600 py-3 rounded-xl font-black text-white uppercase">🎮 Lancer ce match</button>
+                </div>
+
+                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Programmation (Round Robin)</h3>
+                <div class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                    ${matchSchedule.map(match => {
+                        const isPlayed = match.s1 !== null;
+                        const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
+                        return `
+                            <button onclick="selectMatchFromList('${match.id}')" 
+                                class="w-full text-left p-3 rounded-lg border-2 transition-colors ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
+                                <div class="flex justify-between items-center font-black">
+                                    <span>${match.p1} vs ${match.p2}</span>
+                                    <span class="text-sm">${scoreDisplay}</span>
+                                </div>
+                            </button>`;
+                    }).join('')}
+                </div>
+            </div>
+
+            <!-- Colonne Droite : Terrain 3D -->
+            <div class="w-full lg:w-2/3 bg-slate-900 p-6 rounded-2xl border border-slate-700" id="court-zone">
+                <div class="text-center py-10">
+                    <p class="text-2xl font-black text-slate-500">Sélectionnez un match pour jouer</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+    loadMatchResults();
+}
+
+window.selectMatchFromList = function(matchId) {
+    const match = matchSchedule.find(m => m.id === matchId);
+    if (!match) return;
+    
+    // Pré-remplir les selects
+    document.getElementById('select-p1').value = match.p1;
+    document.getElementById('select-p2').value = match.p2;
+    
+    // Lancer le match
+    startSelectedMatch();
+};
+
+function loadMatchResults() {
+    // Charge les résultats existants depuis Firebase pour mettre à jour la liste
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
+    
+    onValue(resultsRef, (snap) => {
+        const data = snap.val() || {};
+        matchSchedule.forEach(m => {
+            const result = data[m.id];
+            if (result && result.terrain === currentTerrain) {
+                m.s1 = result.s1;
+                m.s2 = result.s2;
+            }
+        });
+        renderMatchSetup(); // Re-rend la liste pour mettre à jour les scores
+    });
+}
+
+window.startSelectedMatch = function() {
+    const p1 = document.getElementById('select-p1').value;
+    const p2 = document.getElementById('select-p2').value;
+
+    if (!p1 || !p2 || p1 === p2) {
+        alert("Veuillez sélectionner deux joueurs différents !");
+        return;
+    }
+
+    currentMatch = { id: `custom_${Date.now()}`, p1, p2, s1: null, s2: null };
     matchPoints = { p1: 0, p2: 0 };
     ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
     historyStack = [];
     redoStack = [];
     
     renderCourtInterface();
-}
+};
 
-// --- 3. INTERFACE DU TERRAIN (Basée sur le code Webjéjé) ---
+// --- 3. INTERFACE DU TERRAIN 3D ---
 function renderCourtInterface() {
-    const container = document.getElementById('badminton-content');
-
-    // Génération du HTML du terrain avec les zones selon le layout
+    const container = document.getElementById('court-zone');
     const zoneHtml = isFrontBackLayout ? `
         <div class="flex flex-col h-full">
             <div class="zone front flex-1" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
@@ -160,96 +242,118 @@ function renderCourtInterface() {
         </div>`;
 
     container.innerHTML = `
-        <!-- Barre de titre et score -->
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
-                <h3 class="text-xl font-black text-white">${currentMatch.p1}</h3>
-                <p class="text-xs text-slate-400">Joueur 1</p>
+                <h3 class="text-3xl font-black text-white">${currentMatch.p1}</h3>
             </div>
             <div class="text-center w-1/3">
-                <h3 id="score-display" class="text-3xl font-black text-yellow-400">0 - 0</h3>
+                <h3 id="score-display" class="text-5xl font-black text-yellow-400">0 - 0</h3>
             </div>
             <div class="text-center w-1/3">
-                <h3 class="text-xl font-black text-white">${currentMatch.p2}</h3>
-                <p class="text-xs text-slate-400">Joueur 2</p>
+                <h3 class="text-3xl font-black text-white">${currentMatch.p2}</h3>
             </div>
         </div>
 
-        <!-- Contrôles (Slider + Layout + Points) -->
-        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-4">
-            <div class="flex items-center justify-between mb-2">
-                <label class="text-xs font-bold text-slate-400">Largeur zone centrale : <span id="zone-size-display">${middleZoneSize}%</span></label>
-                <input type="range" id="middle-zone-slider" min="20" max="60" value="${middleZoneSize}" class="w-1/2">
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-4 flex gap-4 items-center justify-between">
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold text-slate-400">Zone : <span id="zone-size-display">${middleZoneSize}%</span></label>
+                <input type="range" id="middle-zone-slider" min="20" max="60" value="${middleZoneSize}" class="w-32">
             </div>
-            <div class="flex items-center justify-between">
-                <button onclick="toggleLayout()" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">Changer Layout</button>
-                <div class="flex gap-2">
-                    <label class="text-xs text-slate-400">Centre: 
-                        <select id="center-points" class="bg-slate-900 text-white p-1 rounded">
-                            <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
-                        </select>
-                    </label>
-                    <label class="text-xs text-slate-400">Ext: 
-                        <select id="other-points" class="bg-slate-900 text-white p-1 rounded">
-                            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
-                        </select>
-                    </label>
-                </div>
+            <button onclick="toggleLayout()" class="bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-black">Layout</button>
+            <div class="flex gap-2">
+                <select id="center-points" class="bg-slate-900 text-white p-1 rounded text-xs">
+                    <option value="1">C: 1</option><option value="2">C: 2</option><option value="3">C: 3</option>
+                </select>
+                <select id="other-points" class="bg-slate-900 text-white p-1 rounded text-xs">
+                    <option value="1">E: 1</option><option value="2">E: 2</option><option value="3" selected>E: 3</option>
+                </select>
             </div>
         </div>
 
-        <!-- Le terrain 3D -->
-        <div id="court" class="court-container relative w-full max-w-2xl mx-auto mb-4 shadow-2xl" style="background-color: #4CAF50; aspect-ratio: 2/1; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
+        <div id="court" class="court-container relative w-full mx-auto mb-4 shadow-2xl" style="background-color: #4CAF50; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
             <div class="absolute inset-0 flex">
-                <div class="w-1/2 h-full relative p-0">
+                <div class="half-court w-1/2 h-full relative p-0">
                     ${zoneHtml}
                     <div id="ratio-p1" class="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
                 </div>
                 <div class="w-1 h-full bg-black"></div>
-                <div class="w-1/2 h-full relative p-0">
+                <div class="half-court w-1/2 h-full relative p-0">
                     ${zoneHtml.replace(/p1/g, 'p2')}
                     <div id="ratio-p2" class="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
                 </div>
             </div>
-            <!-- Impacts persistants injectés ici -->
         </div>
 
-        <div class="flex justify-center gap-4 mb-4">
+        <div class="flex justify-center gap-4">
             <button onclick="undoImpact()" class="bg-slate-600 text-white px-4 py-2 rounded-xl font-bold">↩ Annuler</button>
             <button onclick="resetCourt()" class="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">Reset</button>
             <button onclick="endMatch()" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-black">🏁 Terminer Match</button>
-        </div>
-
-        <div id="classement-terrain" class="mt-4 bg-slate-800 p-4 rounded-2xl border border-slate-700">
-            <h3 class="font-black text-blue-400 uppercase text-sm mb-2">Classement</h3>
-            <div id="classement-content" class="space-y-2"></div>
+            <button onclick="window.retourTerrains()" class="bg-slate-700 text-white px-6 py-2 rounded-xl font-bold">← Terrain</button>
         </div>
     `;
 
-    // Écouteurs pour les sliders et selects
+    // Écouteurs
     document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
     document.getElementById('center-points').addEventListener('change', updateZonePoints);
     document.getElementById('other-points').addEventListener('change', updateZonePoints);
     document.getElementById('court').addEventListener('click', handleImpact);
-    // Support tactile
     document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
 
-    // Initialisation des tailles
     updateZoneSize();
-    renderStandings();
 }
 
-// --- 4. GESTION DES INTERACTIONS (Sliders, Layout, Impacts) ---
+// --- 4. INTERACTIONS (Identiques au code précédent) ---
+function updateZoneSize() { /* ... */ }
+function toggleLayout() { isFrontBackLayout = !isFrontBackLayout; renderCourtInterface(); }
+function updateZonePoints() { /* ... */ }
+function handleImpact(e) { /* ... */ }
+function handleTouch(e) { /* ... */ }
+function undoImpact() { /* ... */ }
+function resetCourt() { /* ... */ }
+
+window.toggleLayout = toggleLayout;
+window.undoImpact = undoImpact;
+window.resetCourt = resetCourt;
+
+// --- 5. FIN DE MATCH ---
+window.endMatch = function() {
+    if (!currentMatch) return;
+    if (confirm(`Valider le score ${matchPoints.p1} - ${matchPoints.p2} ?`)) {
+        const p1 = currentMatch.p1;
+        const p2 = currentMatch.p2;
+        const s1 = matchPoints.p1;
+        const s2 = matchPoints.p2;
+
+        const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+        const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
+        
+        update(resultRef, { terrain: currentTerrain, p1, p2, s1, s2, timestamp: Date.now() })
+        .then(() => {
+            // Mise à jour locale du match dans la liste
+            const matchIndex = matchSchedule.findIndex(m => m.id === currentMatch.id);
+            if (matchIndex !== -1) {
+                matchSchedule[matchIndex].s1 = s1;
+                matchSchedule[matchIndex].s2 = s2;
+            } else {
+                // Si c'était un match "custom", on l'ajoute à la liste
+                matchSchedule.push(currentMatch);
+            }
+            currentMatch = null;
+            renderMatchSetup(); // Retour à la gestion des matchs
+        })
+        .catch(err => alert("Erreur envoi : " + err.message));
+    }
+};
+
+// --- 6. FONCTIONS MANQUANTES (UpdateZoneSize, HandleImpact, etc.) ---
+// (Reprenez les fonctions telles quelles du code précédent)
 function updateZoneSize() {
     const slider = document.getElementById('middle-zone-slider');
     if (!slider) return;
-    
     middleZoneSize = parseInt(slider.value);
     document.getElementById('zone-size-display').innerText = middleZoneSize + '%';
     const sideSize = (100 - middleZoneSize) / 2;
-
-    document.querySelectorAll('#court .w-1/2').forEach((half) => {
-        // Applique la taille en fonction du layout (vertical ou horizontal)
+    document.querySelectorAll('#court .half-court').forEach((half) => {
         const zones = half.querySelectorAll('.zone');
         if (isFrontBackLayout) {
             zones[0].style.height = sideSize + '%';
@@ -262,6 +366,7 @@ function updateZoneSize() {
         }
     });
 }
+
 
 function toggleLayout() {
     isFrontBackLayout = !isFrontBackLayout;

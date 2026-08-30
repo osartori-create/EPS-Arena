@@ -1,5 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr">
+    <style>
+    body { overflow-x: hidden; }
+    #activity-screen { min-height: 100vh; }
+</style>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
@@ -34,12 +38,13 @@
         </div>
         <div id="activity-screen" class="hidden">
             <div class="flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <div>
-                    <h2 class="text-xs uppercase text-slate-400 font-bold">Code sélectionné</h2>
-                    <span id="selected-code" class="text-3xl font-black text-blue-400">--</span>
-                </div>
-                <button onclick="location.reload()" class="bg-red-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">✖ Quitter</button>
-            </div>
+    <div id="code-info">
+        <h2 class="text-xs uppercase text-slate-400 font-bold">Code sélectionné</h2>
+        <span id="selected-code" class="text-3xl font-black text-blue-400">--</span>
+    </div>
+    <button onclick="location.reload()" id="btn-quit" class="bg-red-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">✖ Quitter</button>
+    <button onclick="window.retourTerrains()" id="btn-back-terrain" class="hidden bg-slate-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">← Retour Terrains</button>
+</div>
             <!-- MODULE ORIENTSHOW -->
 <div id="orientshow-module" class="hidden space-y-4">
     <div id="os-identity-selector" class="bg-slate-800 p-4 rounded-2xl border border-slate-700">

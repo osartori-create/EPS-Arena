@@ -126,9 +126,14 @@ function selectCode(code) {
     if (osModule) osModule.classList.add('hidden');
 
      if (currentConfig.activite === 'badminton') {
-        badmintonModule.classList.remove('hidden');
-        initBadmintonKiosk(selectedClass); // On ne passe plus le code, le module gère tout
-    }
+    document.getElementById('code-info').classList.add('hidden');
+    document.getElementById('btn-quit').classList.add('hidden');
+    document.getElementById('btn-back-terrain').classList.remove('hidden');
+} else {
+    document.getElementById('code-info').classList.remove('hidden');
+    document.getElementById('btn-quit').classList.remove('hidden');
+    document.getElementById('btn-back-terrain').classList.add('hidden');
+}
 
     if (currentConfig.activite === 'escalade') {
         escaladeModule.classList.remove('hidden');
