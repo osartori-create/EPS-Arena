@@ -15,7 +15,7 @@ import { initCalculateur } from '../../modules/commun/calculateur.js';
 
 export function initLayout() {
 
-    // Exposer les fonctions du Timer pour le HTML (onclick)
+    // Exposer les fonctions du Timer
     window.startTimer = startTimer;
     window.stopTimer = stopTimer;
     window.resetTimer = resetTimer;
@@ -24,7 +24,6 @@ export function initLayout() {
     window.loadPreset = loadPreset;
     window.deletePreset = deletePreset;
 
-    // Gestion de l'ouverture des outils depuis le menu
     window.openTool = function(toolName) {
         document.getElementById('tools-menu').classList.add('hidden');
         if (toolName === 'timer') {
@@ -42,26 +41,27 @@ export function initLayout() {
         document.getElementById('tools-menu').classList.remove('hidden');
     };
 
-    // 1. Gestion des onglets
+    // 1. Gestion des onglets (Corrigé !)
     window.switchTab = function(tabName) {
-        // Cacher TOUTES les vues
+        
+        // On cache TOUTES les vues standard
         ['admin', 'activities', 'live', 'tools'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
             if (el) {
                 el.classList.add('hidden');
-                el.style.display = 'none';
+                el.style.display = 'none'; // On force le masquage CSS
             }
         });
 
-        // Gestion spéciale pour TV (plein écran)
+        // Cas spécial TV (plein écran)
         const tvView = document.getElementById('viewTV');
         if (tvView) {
             if (tabName === 'tv') tvView.style.display = 'block';
             else tvView.style.display = 'none';
         }
 
-        // Activation des boutons
+        // Mise à jour des boutons
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
@@ -71,8 +71,8 @@ export function initLayout() {
         });
 
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
-        
-        // Affichage de la vue demandée
+
+        // Afficher la vue demandée
         if (tabName !== 'tv') {
             const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
             if (targetView) targetView.classList.remove('hidden');
@@ -81,7 +81,7 @@ export function initLayout() {
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Logique TV / Live spécifique
+        // Appels spéciaux pour TV et Live
         if (tabName === 'tv') {
             const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
             setTimeout(() => {
@@ -98,7 +98,9 @@ export function initLayout() {
             setTimeout(() => {
                 import('../../ui/prof/live.js')
                     .then(module => {
-                        if (typeof module.renderLive === 'function') module.renderLive();
+                        if (typeof module.renderLive === 'function') {
+                            module.renderLive();
+                        }
                     })
                     .catch(err => console.error("Erreur import Live:", err));
             }, 100);
@@ -127,7 +129,6 @@ export function initLayout() {
             if (!classes.includes(nom)) {
                 classes.push(nom);
                 localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
-                
                 const select = document.getElementById('selectClasse');
                 if (select) {
                     const option = document.createElement('option');
