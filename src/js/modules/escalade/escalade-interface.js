@@ -6,28 +6,30 @@ export function initEscaladeInterface(nbGroupes = 6, force = false) {
     if (!container) return;
 
     const activeClasse = document.getElementById('selectClasse').value;
-    let nbGroupesCalcule = nbGroupes;
-
-    // Si on force, on utilise nbGroupes sans regarder la sauvegarde
-    if (!force && activeClasse) {
-        const saved = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
-        const savedGroupes = Object.keys(saved).filter(k => k !== 'reserve' && Array.isArray(saved[k]) && saved[k].length > 0).length;
-        if (savedGroupes > 0) {
-            nbGroupesCalcule = savedGroupes;
+    
+    // Récupérer le nombre de groupes enregistré
+    let savedGroupes = 0;
+    const savedData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+    
+    // Calculer le nombre de groupes à afficher
+    if (force && nbGroupes) {
+        savedGroupes = nbGroupes; // On impose le nombre demandé
+        // On ne supprime PAS la sauvegarde pour éviter de vider les groupes
+    } else if (savedData.nbGroupes) {
+        savedGroupes = savedData.nbGroupes; // On utilise le nombre sauvegardé
+    } else {
+        // Estimation par défaut (1 élève = 1 groupe max 6, min 1)
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+        if (eleves.length > 0) {
+            savedGroupes = Math.max(1, Math.min(6, Math.ceil(eleves.length / 3)));
         } else {
-            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-            if (eleves.length > 0) {
-                nbGroupesCalcule = Math.ceil(eleves.length / 3);
-            }
+            savedGroupes = 6; // Par défaut
         }
-    } else if (force && activeClasse) {
-        // On force le nombre de groupes, on peut aussi vider la sauvegarde ici
-        localStorage.removeItem(`eps_arena_escalade_assignments_${activeClasse}`);
     }
 
     // Construire le HTML avec le bon nombre de groupes
     let html = '';
-    for (let i = 0; i < nbGroupesCalcule; i++) {
+    for (let i = 0; i < savedGroupes; i++) {
         const lettre = String.fromCharCode(65 + i);
         html += `
             <div class="flex flex-col">
@@ -40,8 +42,14 @@ export function initEscaladeInterface(nbGroupes = 6, force = false) {
     }
     container.innerHTML = html;
 
-    window.currentEscaladeGroupes = nbGroupesCalcule;
-    // Réinitialiser Sortable après construction
+    // Sauvegarder le nombre de groupes pour le prochain chargement
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+    assignments.nbGroupes = savedGroupes;
+    localStorage.setItem(`eps_arena_escalade_assignments_${activeClasse}`, JSON.stringify(assignments));
+
+    window.currentEscaladeGroupes = savedGroupes;
+    
+    // Initialiser les interactions
     setTimeout(() => initSortableEscalade(), 100);
 }
 
@@ -70,14 +78,21 @@ export function initSortableEscalade() {
         garconsContainer.__sortable = new Sortable(garconsContainer, {
             group: 'escalade',
             animation: 150,
-            onEnd: saveEscaladeAssignments
+            onEnd: () => {
+                saveEscaladeAssignments();
+                updateRanks(); // <--- AJOUT
+            }
         });
     }
+
     if (fillesContainer) {
         fillesContainer.__sortable = new Sortable(fillesContainer, {
             group: 'escalade',
             animation: 150,
-            onEnd: saveEscaladeAssignments
+            onEnd: () => {
+                saveEscaladeAssignments();
+                updateRanks(); // <--- AJOUT
+            }
         });
     }
 
@@ -85,7 +100,10 @@ export function initSortableEscalade() {
         el.__sortable = new Sortable(el, {
             group: 'escalade',
             animation: 150,
-            onEnd: saveEscaladeAssignments
+            onEnd: () => {
+                saveEscaladeAssignments();
+                updateRanks(); // <--- AJOUT
+            }
         });
     });
 }
@@ -166,6 +184,9 @@ export function saveEscaladeAssignments() {
         reserveIds.push(el.dataset.id);
     });
     if (reserveIds.length > 0) assignments.reserve = reserveIds;
+
+    // Sauvegarder le nombre total de groupes créés (pour ne pas les perdre)
+    assignments.nbGroupes = window.currentEscaladeGroupes || 6;
 
     document.querySelectorAll('[data-groupe]').forEach(colDiv => {
         const groupe = colDiv.dataset.groupe;
