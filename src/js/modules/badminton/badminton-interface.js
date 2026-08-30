@@ -87,26 +87,25 @@ export function generateBadmintonTeams(eleves) {
 
 // --- GLISSER-DÉPOSER ET AFFICHAGE ---
 export function initSortableBadminton() {
-    const reserveContainer = document.getElementById('reserveBadminton');
-    if (!reserveContainer) return;
+    const gContainer = document.getElementById('reserveBadmintonGarcons');
+    const fContainer = document.getElementById('reserveBadmintonFilles');
+    
+    if (!gContainer || !fContainer) return;
 
-    if (reserveContainer.__sortable) reserveContainer.__sortable.destroy();
+    // Détruire les anciennes instances
+    if (gContainer.__sortable) gContainer.__sortable.destroy();
+    if (fContainer.__sortable) fContainer.__sortable.destroy();
     document.querySelectorAll('.terrain-members').forEach(el => {
         if (el.__sortable) el.__sortable.destroy();
     });
 
-    reserveContainer.__sortable = new Sortable(reserveContainer, {
-        group: 'badminton',
-        animation: 150,
-        onEnd: () => { saveBadmintonAssignments(); updateCodes(); }
-    });
+    const onEnd = () => { saveBadmintonAssignments(); updateCodes(); };
+
+    gContainer.__sortable = new Sortable(gContainer, { group: 'badminton', animation: 150, onEnd });
+    fContainer.__sortable = new Sortable(fContainer, { group: 'badminton', animation: 150, onEnd });
 
     document.querySelectorAll('.terrain-members').forEach(el => {
-        el.__sortable = new Sortable(el, {
-            group: 'badminton',
-            animation: 150,
-            onEnd: () => { saveBadmintonAssignments(); updateCodes(); }
-        });
+        el.__sortable = new Sortable(el, { group: 'badminton', animation: 150, onEnd });
     });
 }
 
@@ -151,8 +150,12 @@ export async function loadBadmintonAssignments() {
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     
-    const reserveContainer = document.getElementById('reserveBadminton');
-    reserveContainer.innerHTML = '';
+    const gContainer = document.getElementById('reserveBadmintonGarcons');
+    const fContainer = document.getElementById('reserveBadmintonFilles');
+    if (!gContainer || !fContainer) return;
+    
+    gContainer.innerHTML = '';
+    fContainer.innerHTML = '';
 
     const placedIds = new Set();
     const terrains = document.querySelectorAll('[data-terrain]');
@@ -171,10 +174,18 @@ export async function loadBadmintonAssignments() {
         }
     }
 
+    // Répartition des non placés par sexe
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
-    for (const eleve of nonPlaces) {
-        reserveContainer.appendChild(await createEleveCard(eleve));
-    }
+    const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
+    const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+    const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+
+    for (const eleve of garcons) gContainer.appendChild(await createEleveCard(eleve));
+    for (const eleve de filles) fContainer.appendChild(await createEleveCard(eleve));
+    for (const eleve of autres) gContainer.appendChild(await createEleveCard(eleve));
+
+    if (gContainer.children.length === 0) gContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+    if (fContainer.children.length === 0) fContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
 
     updateCodes();
     setTimeout(() => initSortableBadminton(), 100);
@@ -184,7 +195,12 @@ export function saveBadmintonAssignments() {
     const activeClasse = document.getElementById('selectClasse').value;
     const assignments = { reserve: [], nbTerrains: window.currentBadmintonTerrains || 6 };
 
-    document.querySelectorAll('#reserveBadminton [data-id]').forEach(el => assignments.reserve.push(el.dataset.id));
+    const gContainer = document.getElementById('reserveBadmintonGarcons');
+    const fContainer = document.getElementById('reserveBadmintonFilles');
+    
+    if (gContainer) gContainer.querySelectorAll('[data-id]').forEach(el => assignments.reserve.push(el.dataset.id));
+    if (fContainer) fContainer.querySelectorAll('[data-id]').forEach(el => assignments.reserve.push(el.dataset.id));
+
     document.querySelectorAll('[data-terrain]').forEach(terrainDiv => {
         const membersDiv = terrainDiv.querySelector('.terrain-members');
         const ids = [];
