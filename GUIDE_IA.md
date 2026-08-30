@@ -9,82 +9,110 @@ Application web EPS (Éducation Physique et Sportive) pour gérer des activités
 ## 2. Architecture des dossiers (Exhaustive)
 ```text
 C:.
-|   eleve.html
-|   eleve_ancien.html
-|   GUIDE_IA.md
-|   icon.svg
-|   maitre.html
-|   maitre_ancien.html
-|   manifest.json
-|   
-\---src
-    |   index.html
-    |   
-    +---css
-    |       style.css
-    |       
-    \---js
-        |   app.js
-        |   
-        +---config
-        |       constants.js
-        |       firebase-config.js
-        |       index.js
-        |       
-        +---core
-        |       firebase-service.js
-        |       index.js
-        |       live-engine.js
-        |       state.js
-        |       
-        +---modules
-        |   |   index.js
-        |   |   
-        |   +---co
-        |   |       circuit-manager.js
-        |   |       co-interface.js
-        |   |       co-live.js
-        |   |       matrice.js
-        |   |       
-        |   +---commun
-        |   |       penalite.js
-        |   |       timer.js
-        |   |       tir.js
-        |   |       
-        |   +---eleve
-        |   |       escalade-kiosk.js
-        |   |       orientshow-kiosk.js
-        |   |       
-        |   +---escalade
-        |   |       escalade-calculations.js
-        |   |       escalade-controller.js
-        |   |       escalade-interface.js
-        |   |       escalade-live.js
-        |   |       escalade-tv-ui.js
-        |   |       
-        |   +---multi
-        |   |       multi-controller.js
-        |   |       multi-live.js
-        |   |       
-        |   +---orientshow
-        |   |       orientshow-interface.js
-        |   |       orientshow-live.js
-        |   |       orientshow-tv.js
-        |   |       
-        |   +---poursuite
-        |   |       poursuite-controller.js
-        |   |       
-        |   +---sprint
-        |   \---teams
-        |           team-generator.js
-        |           
-        +---services
-        |       admin-service.js
-        |       index.js
-        |       photo-service.js
-        |       toast-service.js
-        |       
-        +---ui
+│   eleve.html
+│   GUIDE_IA.md
+│   hub-icon.svg
+│   icon.svg
+│   maitre.html
+│   manifest.json
+│   
+└───src
+    │   index.html
+    │   
+    ├───css
+    │       style.css
+    │       
+    └───js
+        │   app.js
+        │   
+        ├───config
+        │       constants.js
+        │       firebase-config.js
+        │       index.js
+        │       orientshow-default-codes.js
+        │       
+        ├───core
+        │       firebase-service.js
+        │       index.js
+        │       live-engine.js
+        │       state.js
+        │       
+        ├───modules
+        │   │   index.js
+        │   │   
+        │   ├───badminton
+        │   │       badminton-interface.js
+        │   │       badminton-kiosk.js
+        │   │       badminton-live.js
+        │   │       badminton-stats.js
+        │   │       badminton-tv.js
+        │   │       
+        │   ├───co
+        │   │       circuit-manager.js
+        │   │       co-interface.js
+        │   │       co-live.js
+        │   │       matrice.js
+        │   │       
+        │   ├───commun
+        │   │       calculateur.js
+        │   │       convertisseur.js
+        │   │       penalite.js
+        │   │       timer.js
+        │   │       tir.js
+        │   │       
+        │   ├───eleve
+        │   │       escalade-kiosk.js
+        │   │       orientshow-kiosk.js
+        │   │       
+        │   ├───escalade
+        │   │       escalade-calculations.js
+        │   │       escalade-controller.js
+        │   │       escalade-interface.js
+        │   │       escalade-live.js
+        │   │       escalade-tv-ui.js
+        │   │       
+        │   ├───multi
+        │   │       multi-controller.js
+        │   │       multi-live.js
+        │   │       
+        │   ├───orientshow
+        │   │       orientshow-interface.js
+        │   │       orientshow-live.js
+        │   │       orientshow-tv.js
+        │   │       
+        │   ├───poursuite
+        │   │       poursuite-controller.js
+        │   │       
+        │   ├───sprint
+        │   └───teams
+        │           team-generator.js
+        │           
+        ├───services
+        │       admin-service.js
+        │       export-idocéo.js
+        │       index.js
+        │       photo-service.js
+        │       toast-service.js
+        │       
+        ├───ui
+        │   │   action-ui.js
+        │   │   dashboard-ui.js
+        │   │   index.js
+        │   │   login-ui.js
+        │   │   
+        │   ├───eleve
+        │   │       eleve-actions.js
+        │   │       eleve-app.js
+        │   │       
+        │   └───prof
+        │           activities.js
+        │           layout.js
+        │           live.js
+        │           
+        └───utils
+                format.js
+                index.js
+                validation.js
 
 3. Structure Firebase (TRÈS IMPORTANT - RGPD)
 Chemin hiérarchique exact :
