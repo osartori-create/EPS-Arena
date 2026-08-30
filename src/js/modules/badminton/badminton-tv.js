@@ -3,6 +3,7 @@
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
+import { getPhotoUrl } from '../../services/admin-service.js'; // Import pour les photos
 
 let currentClasse = '';
 let currentUnsub = null;
@@ -11,7 +12,6 @@ export function renderBadmintonTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // Force le mode plein écran TV
     const tvView = document.getElementById('viewTV');
     if (tvView) {
         tvView.style.display = 'block';
@@ -20,11 +20,12 @@ export function renderBadmintonTV() {
         tvView.style.margin = '0';
     }
 
+    // Permettre le défilement si nécessaire (au lieu de couper)
     container.style.height = '100vh';
     container.style.width = '100%';
     container.style.backgroundColor = '#0f172a';
-    container.style.overflow = 'hidden';
-    container.style.padding = '20px';
+    container.style.overflowY = 'auto'; 
+    container.style.padding = '10px';
 
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) {
@@ -56,13 +57,15 @@ export function renderBadmintonTV() {
     });
 }
 
-function renderTVGrid(terrainsConfig, data) {
+async function renderTVGrid(terrainsConfig, data) {
     const container = document.getElementById('tvGlobe');
     const mapping = getLocalMapping(currentClasse) || {};
     const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-    // Grille adaptative pour grand écran (2, 3 ou 4 colonnes selon la taille)
-    let html = '<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full w-full">';
+    // Grille adaptative et compacte : elle essaie de mettre 4 colonnes, et passe à 3 si l'écran est plus petit
+    let html = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; width: 100%; height: 100%;">
+    `;
 
     for (let t in terrainsConfig) {
         const terrain = t;
@@ -97,39 +100,67 @@ function renderTVGrid(terrainsConfig, data) {
 
         const sortedPlayers = Object.entries(terrainData).sort((a, b) => b[1].pts - a[1].pts || b[1].diff - a[1].diff);
 
-        // Cartes géantes pour la TV
+        // Début de la carte Terrain
         html += `
-            <div class="bg-slate-800 rounded-3xl border-4 border-slate-600 p-6 flex flex-col shadow-2xl">
-                <div class="bg-blue-600 rounded-2xl p-3 text-center mb-6">
-                    <h3 class="text-5xl font-black text-white">TERRAIN ${terrain}</h3>
+            <div class="bg-slate-800 rounded-2xl border-4 border-slate-600 p-3 flex flex-col shadow-xl" style="max-height: 48vh;">
+                <div class="bg-blue-600 rounded-xl p-2 text-center mb-2">
+                    <h3 style="font-size: 1.8rem; font-weight: 900; color: white; margin: 0;">TERRAIN ${terrain}</h3>
                 </div>
-                <div class="flex-1 space-y-3">
-                    ${sortedPlayers.map(([player, stats], idx) => {
-                        const pctBonus = stats.total > 0 ? Math.round((stats.extreme / stats.total) * 100) : 0;
-                        let bonusColor = 'text-red-400';
-                        if (pctBonus > 60) bonusColor = 'text-emerald-400';
-                        else if (pctBonus > 40) bonusColor = 'text-amber-400';
+                <div class="flex-1 space-y-1">
+        `;
 
-                        const mappingKey = `${currentClasse}_${terrain}_${player}`;
-                        const eleveId = mapping[mappingKey];
-                        const nomEleve = eleveId ? (JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]').find(e => e.id === eleveId)?.prenom || player) : player;
+        for (let i = 0; i < sortedPlayers.length; i++) {
+            const [player, stats] = sortedPlayers[i];
+            const pctBonus = stats.total > 0 ? Math.round((stats.extreme / stats.total) * 100) : 0;
+            let bonusColor = 'text-red-400';
+            if (pctBonus > 60) bonusColor = 'text-emerald-400';
+            else if (pctBonus > 40) bonusColor = 'text-amber-400';
 
-                        return `
-                            <div class="flex justify-between items-center bg-slate-900 rounded-xl p-4 ${idx === 0 ? 'border-4 border-yellow-500' : 'border border-slate-700'}">
-                                <div class="flex items-center gap-4 text-2xl font-bold">
-                                    <span class="text-slate-500">${idx + 1}.</span>
-                                    <span class="text-white">${nomEleve}</span>
-                                    <span class="text-sm text-blue-400">(${player})</span>
-                                </div>
-                                <div class="flex items-center gap-6 text-2xl font-black">
-                                    <span class="text-yellow-400">${stats.pts} pts</span>
-                                    <span class="text-blue-400">${stats.wins}V - ${stats.losses}D</span>
-                                    <span class="${bonusColor}">🎯 ${pctBonus}%</span>
-                                </div>
-                            </div>`;
-                    }).join('')}
-                </div>
-            </div>`;
+            const mappingKey = `${currentClasse}_${terrain}_${player}`;
+            const eleveId = mapping[mappingKey];
+            
+            // Récupération de la photo
+            let photoUrl = null;
+            if (eleveId) {
+                try {
+                    photoUrl = await getPhotoUrl(eleveId);
+                } catch(e) { photoUrl = null; }
+            }
+            
+            const photoHtml = photoUrl 
+                ? `<img src="${photoUrl}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">` 
+                : `<div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm">👤</div>`;
+
+            let podiumClass = 'border border-slate-700';
+            if (i === 0) podiumClass = 'border-4 border-yellow-500';
+            else if (i === 1) podiumClass = 'border-2 border-gray-400';
+            else if (i === 2) podiumClass = 'border-2 border-amber-700';
+
+            // On récupère le nom
+            let nomEleve = player;
+            if (eleveId) {
+                const localEleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+                const eleve = localEleves.find(e => e.id === eleveId);
+                nomEleve = eleve ? eleve.prenom : player;
+            }
+
+            html += `
+                <div class="flex justify-between items-center bg-slate-900 rounded-lg p-2 ${podiumClass}" style="height: 44px;">
+                    <div class="flex items-center gap-2 text-sm font-bold">
+                        ${photoHtml}
+                        <span style="color: #94a3b8; font-weight: 900;">${i + 1}.</span>
+                        <span style="color: white;">${nomEleve}</span>
+                        <span style="color: #3b82f6; font-size: 10px;">(${player})</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs font-black">
+                        <span style="color: #facc15;">${stats.pts} pts</span>
+                        <span style="color: #60a5fa;">${stats.wins}V - ${stats.losses}D</span>
+                        <span style="color: ${pctBonus > 60 ? '#34d399' : pctBonus > 40 ? '#fbbf24' : '#f87171'};">🎯 ${pctBonus}%</span>
+                    </div>
+                </div>`;
+        }
+        
+        html += `</div></div>`; // Fin de la carte
     }
 
     html += '</div>';
