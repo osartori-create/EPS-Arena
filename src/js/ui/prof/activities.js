@@ -137,6 +137,7 @@ window.switchActivitySubTab = function(subTab) {
             }, 100);
         }
     }
+     window.switchDiscipline('multi');
 };
 
     window.generateTeams = async function() {

@@ -41,16 +41,16 @@ export function initLayout() {
         document.getElementById('tools-menu').classList.remove('hidden');
     };
 
-    // 1. Gestion des onglets (Corrigé !)
+    // 1. Gestion des onglets (CORRIGÉ : on n'utilise plus el.style.display pour les vues standard)
     window.switchTab = function(tabName) {
         
-        // On cache TOUTES les vues standard
+        // On cache TOUTES les vues standard en utilisant UNIQUEMENT la classe 'hidden'
         ['admin', 'activities', 'live', 'tools'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
             if (el) {
-                el.classList.add('hidden');
-                el.style.display = 'none'; // On force le masquage CSS
+                el.classList.add('hidden'); 
+                // ⚠️ NE PAS TOUCHER à el.style.display ici, sinon ça écrase la classe Tailwind !
             }
         });
 
@@ -61,7 +61,7 @@ export function initLayout() {
             else tvView.style.display = 'none';
         }
 
-        // Mise à jour des boutons
+        // Mise à jour des boutons d'onglets
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
             const btn = document.getElementById(id);
             if (btn) {
@@ -75,12 +75,14 @@ export function initLayout() {
         // Afficher la vue demandée
         if (tabName !== 'tv') {
             const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-            if (targetView) targetView.classList.remove('hidden');
+            if (targetView) {
+                targetView.classList.remove('hidden');
+                targetView.style.display = ''; // Réinitialiser le style pour être sûr
+            }
         }
 
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
-
     };
 
     // 2. Gestion des classes
