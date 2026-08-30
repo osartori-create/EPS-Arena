@@ -1,7 +1,8 @@
 // src/js/modules/badminton/badminton-live.js
 // Sous-module "Impacts" - Live Professeur
 
-import { ref, onValue } from '../../core/firebase-service.js';
+// ✅ CORRECTION : Importation de "db" obligatoire pour Firebase
+import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
 
 let currentClasse = '';
@@ -73,7 +74,7 @@ function renderGrid(terrainsConfig, data) {
                 terrainData[m.p1].losses++; terrainData[m.p1].diff -= (m.s2 - m.s1);
             }
 
-            // Mise à jour des stats impacts (données "stats" collectées par l'élève)
+            // Mise à jour des stats impacts
             if (m.stats) {
                 let p1Stats = m.stats.p1 || { extreme: 0, middle: 0, total: 0 };
                 let p2Stats = m.stats.p2 || { extreme: 0, middle: 0, total: 0 };
@@ -99,7 +100,7 @@ function renderGrid(terrainsConfig, data) {
                     // Calcul du % Bonus (Extérieur)
                     const pctBonus = stats.total > 0 ? Math.round((stats.extreme / stats.total) * 100) : 0;
                     
-                    // Couleur du % Bonus (Vert > 60, Orange 40-60, Rouge < 40)
+                    // Couleur du % Bonus
                     let bonusColor = 'text-red-400';
                     if (pctBonus > 60) bonusColor = 'text-emerald-400';
                     else if (pctBonus > 40) bonusColor = 'text-amber-400';
@@ -128,24 +129,17 @@ function renderGrid(terrainsConfig, data) {
 
     html += '</div>';
     
-    // Bouton Export iDoceo enrichi (avec le % Bonus)
+    // Bouton Export iDoceo enrichi
     html += `<div class="mt-6">
-        <button onclick="exportBadmintonImpactCSV()" class="bg-green-600 px-6 py-3 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (Stats Impacts)</button>
+        <button onclick="window.exportBadmintonImpactCSV()" class="bg-green-600 px-6 py-3 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (Stats Impacts)</button>
     </div>`;
 
     container.innerHTML = html;
 }
 
-// Export iDoceo enrichi
+// Export iDoceo enrichi (Fonction appelée par le bouton)
 window.exportBadmintonImpactCSV = function() {
-    // (Vous pouvez reprendre la structure de base de l'export précédent, en ajoutant la colonne "Bonus %")
-    // Exemple simple :
-    let csv = "\uFEFF\"!groupe\",\"Nom\",\"Pts\",\"Victoires\",\"Défaites\",\"Bonus %\",\"Total Points\"\n";
-    // ... Logique de calcul et d'écriture du CSV (similaire à l'ancien)
-    
-    // Pour un export complet, il faudrait récupérer les données exactes (faire un snapshot de results)
-    // et utiliser getLocalMapping pour les noms.
-    // Je peux vous fournir ce bloc spécifique si vous voulez.
-    
+    // Ici, vous pouvez ajouter le code d'export CSV complet (avec la colonne Bonus %)
+    // Pour l'instant, on simule une alerte pour confirmer que le bouton fonctionne.
     alert("Export des stats Impacts en préparation !");
 };
