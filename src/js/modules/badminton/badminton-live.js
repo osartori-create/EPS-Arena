@@ -96,29 +96,40 @@ function renderGrid(terrainsConfig, data) {
             <h4 class="font-black text-yellow-400 text-xl mb-3">Terrain ${terrain}</h4>
             <div class="space-y-2">
                 ${sortedPlayers.map(([player, stats], idx) => {
-                    const pctBonus = stats.total > 0 ? Math.round((stats.extreme / stats.total) * 100) : 0;
-                    
-                    let bonusColor = 'text-red-400';
-                    if (pctBonus > 60) bonusColor = 'text-emerald-400';
-                    else if (pctBonus > 40) bonusColor = 'text-amber-400';
+    const pctBonus = stats.total > 0 ? Math.round((stats.extreme / stats.total) * 100) : 0;
+    let bonusColor = 'text-red-400';
+    if (pctBonus > 60) bonusColor = 'text-emerald-400';
+    else if (pctBonus > 40) bonusColor = 'text-amber-400';
 
-                    const mappingKey = `${currentClasse}_${terrain}_${player}`;
-                    const eleveId = mapping[mappingKey];
-                    const nomEleve = eleveId ? (JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]').find(e => e.id === eleveId)?.prenom || player) : player;
+    const mappingKey = `${currentClasse}_${terrain}_${player}`;
+    const eleveId = mapping[mappingKey];
+    let nomEleve = player;
+    let photoUrl = '';
+    
+    if (eleveId) {
+        const localEleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        const eleve = localEleves.find(e => e.id === eleveId);
+        nomEleve = eleve ? eleve.prenom : player;
+        
+        // Récupération asynchrone de la photo
+        // (Attention : dans ce contexte async, il faudrait faire une promesse)
+        // Pour simplifier, on peut afficher un placeholder.
+    }
 
-                    return `<div class="flex justify-between items-center bg-slate-900 p-2 rounded-xl border border-slate-700">
-                        <div class="flex items-center gap-2">
-                            <span class="text-slate-500 w-5 font-black">${idx + 1}</span>
-                            <span class="font-black text-white">${nomEleve}</span>
-                            <span class="text-[10px] text-blue-400">(${player})</span>
-                        </div>
-                        <div class="flex gap-3 text-xs font-bold">
-                            <span class="text-yellow-400">${stats.pts} pts</span>
-                            <span class="text-blue-400">${stats.wins}V - ${stats.losses}D</span>
-                            <span class="${bonusColor}">🎯 ${pctBonus}%</span>
-                        </div>
-                    </div>`;
-                }).join('')}
+    return `<div onclick="openBadmintonPlayerStats('${player}', '${terrain}', '${currentClasse}')" 
+                class="flex justify-between items-center bg-slate-900 p-2 rounded-xl border border-slate-700 cursor-pointer hover:border-blue-500">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-500 w-5 font-black">${idx + 1}</span>
+                    <span class="font-black text-white">${nomEleve}</span>
+                    <span class="text-[10px] text-blue-400">(${player})</span>
+                </div>
+                <div class="flex gap-3 text-xs font-bold">
+                    <span class="text-yellow-400">${stats.pts} pts</span>
+                    <span class="text-blue-400">${stats.wins}V - ${stats.losses}D</span>
+                    <span class="${bonusColor}">🎯 ${pctBonus}%</span>
+                </div>
+            </div>`;
+}).join('')}
             </div>
         </div>`;
     }

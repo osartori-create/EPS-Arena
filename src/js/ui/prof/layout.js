@@ -46,29 +46,34 @@ export function initLayout() {
 
     // 1. Gestion des onglets
     window.switchTab = function(tabName) {
-        
-        ['admin', 'activities', 'live', 'tools'].forEach(t => {
-            const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
-            const el = document.getElementById(viewId);
-            if (el) {
-                el.classList.add('hidden');
-                el.style.display = ''; 
-            }
-        });
-
-        const tvView = document.getElementById('viewTV');
-        if (tvView) {
-            if (tabName === 'tv') tvView.style.display = 'block';
-            else tvView.style.display = 'none';
+    // On cache TOUTES les vues, y compris Activities
+    ['admin', 'activities', 'live', 'tv', 'tools'].forEach(t => {
+        const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
+        const el = document.getElementById(viewId);
+        if (el) {
+            el.classList.add('hidden');
+            el.style.display = 'none';
         }
+    });
 
-        ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.classList.remove('tab-active', 'text-blue-500');
-                btn.classList.add('text-slate-500');
-            }
-        });
+    // Cas spécial TV (pour gérer le plein écran)
+    const tvView = document.getElementById('viewTV');
+    if (tabName === 'tv') {
+        tvView.style.display = 'block';
+    }
+
+    // Activation des boutons d'onglet
+    ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.remove('tab-active', 'text-blue-500');
+    });
+
+    // Affichage de la vue demandée
+    const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+    if (targetView) targetView.classList.remove('hidden');
+
+    // ... le reste de votre logique (appels TV, etc.)
+};
 
         const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
 
