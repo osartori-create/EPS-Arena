@@ -179,4 +179,3 @@ export function initLayout() {
             label.textContent = snap.val() ? "En ligne" : "Hors ligne";
         }
     });
-}
