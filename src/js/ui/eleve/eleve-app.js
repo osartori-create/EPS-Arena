@@ -87,25 +87,14 @@ function showLogin() {
         return;
     }
 
-    // --- SPÉCIAL BADMINTON : Affiche "Terrain_Lettre" (ex: 1_A, 2_B) ---
+    // --- SPÉCIAL BADMINTON : On saute la sélection de codes et on lance l'assistant ---
     if (config.activite === 'badminton') {
-        const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        Object.keys(config).forEach(key => {
-            // On ignore les clés non numériques
-            if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
-            
-            const count = parseInt(config[key]) || 0;
-            for (let i = 0; i < count; i++) {
-                // Code au format "Terrain_Lettre" (ex: "1_A")
-                const code = `${key}_${lettres[i]}`;
-                const btn = document.createElement('button');
-                btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl";
-                btn.innerText = code;
-                btn.onclick = () => selectCode(code);
-                codeList.appendChild(btn);
-            }
-        });
-        return; // On sort de la fonction pour ne pas exécuter le code générique
+        loginScreen.classList.add('hidden'); // Cache l'écran de login
+        activityScreen.classList.remove('hidden'); // Affiche l'activité
+        const badmintonModule = document.getElementById('badminton-module');
+        badmintonModule.classList.remove('hidden');
+        initBadmintonKiosk(selectedClass); // Lance l'assistant (Terrain -> Joueur)
+        return;
     }
 
     // --- AUTRES ACTIVITÉS (Escalade, CO, etc. - Code actuel) ---
@@ -138,8 +127,7 @@ function selectCode(code) {
 
      if (currentConfig.activite === 'badminton') {
         badmintonModule.classList.remove('hidden');
-        // On passe le code au module (code = "1_A" ou "2_B")
-        initBadmintonKiosk(selectedClass, code);
+        initBadmintonKiosk(selectedClass); // On ne passe plus le code, le module gère tout
     }
 
     if (currentConfig.activite === 'escalade') {
