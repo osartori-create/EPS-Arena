@@ -6,9 +6,10 @@ import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade
 import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
-// Nouvel import pour OrientShow
+import { initBadmintonKiosk } from '../../modules/badminton/badminton-kiosk.js';
 import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 
+const badmintonModule = document.getElementById('badminton-module');
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
@@ -108,7 +109,14 @@ function selectCode(code) {
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
     if (osModule) osModule.classList.add('hidden');
+
+     if (currentConfig.activite === 'badminton') {
+        badmintonModule.classList.remove('hidden');
+        // On passe le code au module (code = "1_A" ou "2_B")
+        initBadmintonKiosk(selectedClass, code);
+    }
 
     if (currentConfig.activite === 'escalade') {
         escaladeModule.classList.remove('hidden');
