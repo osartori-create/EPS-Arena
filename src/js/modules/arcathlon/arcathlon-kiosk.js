@@ -165,15 +165,22 @@ function renderPhase() {
         } else if (state.running) {
             btnText = '🏁 Arrivée';
         } else {
-            // Normalement pas possible pour les séries suivantes
             btnText = 'Démarrer la course';
         }
-        showBtn = true; // Toujours afficher le bouton en phase course
+        showBtn = true;
     } else if (state.phase === 'tir') {
         phaseLabel = `TIR SÉRIE ${state.serieActuelle}`;
         panelClass = 'panel-tir';
         btnClass = 'btn-tir';
-        btnText = 'Fin de tir';
+        // Vérifier si toutes les flèches ont été cliquées
+        const allShotsDone = state.shots.every(s => s !== 0);
+        if (!allShotsDone) {
+            btnText = 'Indiquez toutes les flèches';
+            btnDisabled = true;
+        } else {
+            btnText = 'Fin de tir';
+            btnDisabled = false;
+        }
     } else if (state.phase === 'penalite') {
         phaseLabel = `PÉNALITÉ SÉRIE ${state.serieActuelle}`;
         panelClass = 'panel-pen';
@@ -187,10 +194,12 @@ function renderPhase() {
         btnClass = 'btn-course';
         if (state.running) {
             btnText = '🏁 Arrivée';
+            btnDisabled = false;
         } else {
-            btnText = 'Course finale en cours...';
-            showBtn = false;
+            btnText = 'Démarrage...';
+            btnDisabled = true;
         }
+        showBtn = true; // Toujours afficher le bouton en finale
     } else if (state.phase === 'termine') {
         terminerEpreuve();
         return;
@@ -250,9 +259,6 @@ function renderPhase() {
         if (transitionTimer) clearTimeout(transitionTimer);
         transitionTimer = setTimeout(() => startCourse(), 100);
     }
-
-    // 3. Tir → automatique après la course (déclenché dans finishCourse)
-    // 4. Pénalités → automatique après le tir (déclenché dans finishTir)
 }
 
 function renderPhaseContent() {
@@ -270,18 +276,21 @@ function renderPhaseContent() {
     if (state.phase === 'tir') {
         const shotsHtml = state.shots.map((s, i) => `
             <button class="shot-btn ${s === 1 ? 'bg-emerald-600' : s === -1 ? 'bg-red-600' : 'bg-slate-700'} w-16 h-16 rounded-xl font-black text-2xl border-2 border-slate-600 active:scale-95 transition-all"
-                    data-index="${i}" onclick="window.toggleShot(${i})">${s === 1 ? '✓' : s === -1 ? '✗' : i + 1}</button>
+                    data-index="${i}" onclick="window.toggleShot(${i})">${s === 1 ? '✓' : s === -1 ? '✗' : '?'}</button>
         `).join('');
         const reussites = state.shots.filter(s => s === 1).length;
+        const manques = state.shots.filter(s => s === -1).length;
+        const totalIndiques = reussites + manques;
         return `
             <div class="flex flex-col items-center gap-3">
                 <div class="flex gap-3 flex-wrap justify-center">${shotsHtml}</div>
                 <div class="flex gap-4 text-sm">
                     <span class="text-emerald-400">✅ ${reussites}</span>
-                    <span class="text-red-400">❌ ${state.shots.filter(s => s === -1).length}</span>
-                    <span class="text-slate-400">Réussite : <strong class="text-yellow-400">${Math.round((reussites / state.nbFleches) * 100)}%</strong></span>
+                    <span class="text-red-400">❌ ${manques}</span>
+                    <span class="text-slate-400">${totalIndiques} / ${state.nbFleches} indiquées</span>
                 </div>
                 <button onclick="window.undoShot()" class="bg-slate-700 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">↩ Annuler dernière</button>
+                ${totalIndiques === state.nbFleches ? '<p class="text-emerald-400 font-bold text-sm">✅ Toutes les flèches sont indiquées</p>' : '<p class="text-yellow-400 font-bold text-sm">⚠️ Cliquez sur chaque flèche (réussi ou raté)</p>'}
             </div>
         `;
     }
@@ -336,11 +345,9 @@ function updateClockDisplay(phaseMs) {
     const phaseEl = document.getElementById('phaseClock');
     const totalEl = document.getElementById('totalClock');
     if (phaseEl) {
-        // Chrono de phase = temps de la phase en cours
         phaseEl.textContent = formatTime(pMs);
     }
     if (totalEl) {
-        // Chrono total = temps cumulé depuis le début
         const total = state.tempsTotalGlobal + (state.running ? pMs : state.phaseAccum);
         totalEl.textContent = formatTime(total);
     }
@@ -366,6 +373,12 @@ function onGiantAction() {
         if (!state.running) startCourse();
         else finishCourse();
     } else if (state.phase === 'tir') {
+        // Vérifier que toutes les flèches sont indiquées
+        const allShotsDone = state.shots.every(s => s !== 0);
+        if (!allShotsDone) {
+            showToast('⚠️ Veuillez indiquer le résultat de chaque flèche (réussi ou raté)', 2000);
+            return;
+        }
         finishTir();
     } else if (state.phase === 'penalite') {
         showToast('Cliquez sur les tours de pénalité', 1500);
@@ -374,14 +387,15 @@ function onGiantAction() {
 
 function startCourse() {
     if (state.running) return;
-    // Handicap : uniquement sur la 1ère course
     if (state.serieActuelle === 1 && state.handicapMs > 0) {
         state.phaseAccum = state.handicapMs;
     }
     startClock();
-    // Mettre à jour le bouton (il existe car showBtn = true en phase course)
     const btn = document.getElementById('giantBtn');
-    if (btn) btn.textContent = '🏁 Arrivée';
+    if (btn) {
+        btn.textContent = '🏁 Arrivée';
+        btn.disabled = false;
+    }
     const content = document.getElementById('phaseContent');
     if (content) content.innerHTML = renderPhaseContent();
 }
@@ -389,26 +403,26 @@ function startCourse() {
 function finishCourse() {
     stopClock();
     const tempsCourse = state.phaseAccum;
-    state.tempsCourse = tempsCourse;      // sauvegarde pour l'enregistrement
-    state.tempsPhase = 0;                 // réinitialiser l'affichage de la phase
+    state.tempsCourse = tempsCourse;
+    state.tempsPhase = 0;
     state.tempsTotalGlobal += tempsCourse;
     state.phaseAccum = 0;
 
-    // Si c'est la course finale, on enregistre et on termine
     if (state.phase === 'finale') {
         savePassage(true);
         return;
     }
 
-    // Sinon, on passe automatiquement au tir
+    // Passage automatique au tir
     state.phase = 'tir';
     state.shots = Array(state.nbFleches).fill(0);
     renderPhase();
-    startClock(); // le chrono continue (pour le tir)
+    startClock();
     const btn = document.getElementById('giantBtn');
     if (btn) {
         btn.textContent = 'Fin de tir';
         btn.className = 'btn-action btn-tir w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform';
+        btn.disabled = true; // désactivé tant que toutes les flèches ne sont pas cliquées
     }
 }
 
@@ -421,6 +435,18 @@ window.toggleShot = function(index) {
     const current = state.shots[index];
     state.shots[index] = current === 0 ? 1 : (current === 1 ? -1 : 0);
     document.getElementById('phaseContent').innerHTML = renderPhaseContent();
+    // Mettre à jour le bouton selon que toutes les flèches sont indiquées
+    const allShotsDone = state.shots.every(s => s !== 0);
+    const btn = document.getElementById('giantBtn');
+    if (btn) {
+        if (allShotsDone) {
+            btn.textContent = 'Fin de tir';
+            btn.disabled = false;
+        } else {
+            btn.textContent = 'Indiquez toutes les flèches';
+            btn.disabled = true;
+        }
+    }
 };
 window.undoShot = function() {
     if (state.phase !== 'tir') return;
@@ -428,6 +454,12 @@ window.undoShot = function() {
         if (state.shots[i] !== 0) {
             state.shots[i] = 0;
             document.getElementById('phaseContent').innerHTML = renderPhaseContent();
+            // Désactiver le bouton
+            const btn = document.getElementById('giantBtn');
+            if (btn) {
+                btn.textContent = 'Indiquez toutes les flèches';
+                btn.disabled = true;
+            }
             return;
         }
     }
@@ -448,10 +480,9 @@ function finishTir() {
     state.tempsPenalites = [];
 
     if (state.penReq > 0) {
-        // Passer aux pénalités
         state.phase = 'penalite';
         renderPhase();
-        startClock(); // le chrono continue pour les pénalités
+        startClock();
         const btn = document.getElementById('giantBtn');
         if (btn) {
             btn.textContent = 'Cliquez sur chaque tour de pénalité quand il est réalisé';
@@ -459,7 +490,6 @@ function finishTir() {
             btn.disabled = true;
         }
     } else {
-        // Pas de pénalité → passer à la série suivante ou finale
         terminerSerie();
     }
 }
@@ -471,7 +501,6 @@ window.validatePenalty = function(index) {
     if (state.phase !== 'penalite') return;
     if (index >= state.penReq || index < state.penDone) return;
 
-    // Arrêter le chrono pour mesurer le temps de cette petite boucle
     stopClock();
     const tempsBoucle = state.phaseAccum;
     state.tempsPenalites.push(tempsBoucle);
@@ -480,7 +509,6 @@ window.validatePenalty = function(index) {
 
     state.penDone++;
 
-    // Mettre à jour l'affichage
     const btns = document.querySelectorAll('.penalty-btn');
     if (btns[index]) {
         btns[index].classList.remove('bg-slate-700', 'border-slate-600');
@@ -491,13 +519,9 @@ window.validatePenalty = function(index) {
     document.getElementById('phaseContent').innerHTML = renderPhaseContent();
 
     if (state.penDone >= state.penReq) {
-        // Toutes les pénalités sont effectuées
-        // On passe à la série suivante ou finale
         terminerSerie();
     } else {
-        // Il reste des pénalités → démarrage automatique de la prochaine petite boucle
-        startClock(); // le chrono continue
-        // Mettre à jour le libellé du prochain bouton
+        startClock();
         const nextBtn = document.querySelector(`.penalty-btn:not(.disabled)`);
         if (nextBtn) {
             nextBtn.textContent = `Tour ${state.penDone + 1}`;
@@ -509,14 +533,10 @@ window.validatePenalty = function(index) {
 // TERMINER UNE SÉRIE
 // --------------------------------------------------------------
 function terminerSerie() {
-    // Sauvegarder la série (sans la finale)
     savePassage(false);
-
-    // Passer à la série suivante
     state.serieActuelle++;
 
     if (state.serieActuelle > state.nbSeries) {
-        // Toutes les séries sont faites → passer à la course finale (auto)
         state.phase = 'finale';
         state.phaseAccum = 0;
         state.shots = [];
@@ -524,9 +544,7 @@ function terminerSerie() {
         state.penDone = 0;
         state.tempsPenalites = [];
         renderPhase();
-        // La finale démarre automatiquement dans renderPhase()
     } else {
-        // Prochaine série → on repart en course (démarrage auto)
         state.phase = 'course';
         state.phaseAccum = 0;
         state.shots = [];
@@ -534,31 +552,26 @@ function terminerSerie() {
         state.penDone = 0;
         state.tempsPenalites = [];
         renderPhase();
-        // La course démarre automatiquement dans renderPhase()
     }
 }
 
 // --------------------------------------------------------------
-// SAUVEGARDE D'UN PASSAGE
+// SAUVEGARDE
 // --------------------------------------------------------------
 function savePassage(isFinale) {
     stopClock();
 
-    // Calcul de la vitesse UNIQUEMENT sur la grande boucle
     const distanceKm = state.distanceCourse / 1000;
     const tempsCourseHeures = state.tempsCourse / 1000 / 3600;
     const vitesse = tempsCourseHeures > 0 ? distanceKm / tempsCourseHeures : 0;
 
-    // Distance totale (course + pénalités) pour le bilan
     const distanceTotaleSerie = state.distanceCourse + (state.penDone * state.longueurPenalite);
 
-    // Points VMA
     let ptsVMA = 0;
     if (vitesse >= state.vmaRef + 1) ptsVMA = 3;
     else if (vitesse >= state.vmaRef - 0.5) ptsVMA = 2;
     else if (vitesse >= state.vmaRef - 1) ptsVMA = 1;
 
-    // Score de tir (5 pts par flèche réussie) – 0 pour la finale
     const scoreTir = isFinale ? 0 : state.reussitesTir * 5;
     let bonus = 0;
     if (scoreTir > 0) {
@@ -570,13 +583,11 @@ function savePassage(isFinale) {
     const tempsTotalSerie = state.tempsCourse + state.tempsTir + state.tempsPenalites.reduce((a, b) => a + b, 0);
     const tempsBonifie = (tempsTotalSerie / 1000) + bonus;
 
-    // Détection de fraude
     state.alerteTriche = false;
     if (vitesse > 0 && (vitesse > 25 || vitesse > state.vmaRef * 1.5)) {
         state.alerteTriche = true;
     }
 
-    // Vitesse moyenne des pénalités
     let vitesseMoyennePenalites = 0;
     if (state.tempsPenalites.length > 0) {
         const totalTempsPenalites = state.tempsPenalites.reduce((a, b) => a + b, 0);
@@ -610,7 +621,6 @@ function savePassage(isFinale) {
         timestamp: Date.now()
     };
 
-    // Cumuls pour le bilan final
     state.cumulDistance += distanceTotaleSerie;
     state.cumulPointsVMA += ptsVMA;
     state.cumulPointsTir += scoreTir;
@@ -624,7 +634,6 @@ function savePassage(isFinale) {
             if (isFinale) {
                 terminerEpreuve();
             } else {
-                // Toast discret
                 showToast(`✅ Série ${state.serieActuelle} terminée`, 1500);
             }
         })
@@ -648,7 +657,7 @@ function terminerEpreuve() {
             <p class="text-slate-400 mt-2">Bravo, toutes les ${state.nbSeries} séries sont effectuées.</p>
             <div class="mt-6 bg-slate-800 p-6 rounded-2xl border border-slate-700 max-w-md mx-auto text-left">
                 <p class="text-lg font-bold text-white">Temps total : ${formatTime(state.cumulTemps)}</p>
-                <p class="text-lg font-bold text-white">Distance totale parcourue : ${Math.round(state.cumulDistance)}m</p>
+                <p class="text-lg font-bold text-white">Distance totale : ${Math.round(state.cumulDistance)}m</p>
                 <p class="text-lg font-bold text-yellow-400">Points VMA : ${state.cumulPointsVMA}</p>
                 <p class="text-lg font-bold text-blue-400">Points Tir : ${state.cumulPointsTir}</p>
                 <p class="text-lg font-bold text-emerald-400">Total : ${totalPts} pts</p>
@@ -724,4 +733,4 @@ window.undoShot = window.undoShot;
 window.validatePenalty = window.validatePenalty;
 window.retourMenuArcathlon = window.retourMenuArcathlon;
 
-console.log('✅ Arcathlon kiosque chargé (bouton Arrivée présent)');
+console.log('✅ Arcathlon kiosque chargé (version finale)');
