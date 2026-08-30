@@ -148,20 +148,6 @@ function selectCode(code) {
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    if (badmintonModule) badmintonModule.classList.add('hidden');
-
-    // ... (Le reste de votre selectCode existant)
-}
-
-function selectCode(code) {
-    selectedCode = code;
-    document.getElementById('selected-code').innerText = code;
-    loginScreen.classList.add('hidden');
-    activityScreen.classList.remove('hidden');
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
     badmintonModule.classList.add('hidden');
     if (osModule) osModule.classList.add('hidden');
 
