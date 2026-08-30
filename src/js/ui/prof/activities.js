@@ -7,6 +7,7 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
 import { initOrientShowInterface, loadOrientShowAssignments, exportOrientShowConfig, importOrientShowConfig, startOrientShow, stopOrientShow } from '../../modules/orientshow/orientshow-interface.js';
 import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
+import { initArcathlonInterface } from '../modules/arcathlon/index.js';
 
 let currentDiscipline = 'multi';
 
@@ -22,6 +23,7 @@ export function initActivities() {
     try { console.log("→ Initialisation Escalade..."); initEscaladeInterface(6); console.log("✅ Escalade OK"); } catch (e) { console.error("❌ Erreur Escalade :", e); }
     try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
     try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
+    try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
 
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
@@ -66,6 +68,10 @@ export function initActivities() {
         if (disc === 'badminton') {
             try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
         }
+        if (disc === 'arcathlon') {
+    const viewArcathlon = document.getElementById('viewArcathlonSettings');
+    if (viewArcathlon) viewArcathlon.classList.remove('hidden');
+}
     };
     // Dans initActivities(), après switchDiscipline :
 
@@ -402,7 +408,8 @@ export function initActivities() {
     window.startOrientShow = startOrientShow;
     window.stopOrientShow = stopOrientShow;
     window.exportBadmintonConfig = exportBadmintonConfig;
-window.importBadmintonConfig = importBadmintonConfig;
+
+    window.importBadmintonConfig = importBadmintonConfig;
 
     try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}
