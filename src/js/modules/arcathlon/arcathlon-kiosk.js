@@ -1,5 +1,5 @@
 // src/js/modules/arcathlon/arcathlon-kiosk.js
-// Flux : Série 1 (Course → Tir → Pénalités) → ... → Série N → Course finale (démarrage auto)
+// Flux : Série 1 (Course → Tir → Pénalités) → ... → Série N → Course finale (démarrage auto, sans bilan pour la dernière série)
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -164,7 +164,7 @@ function renderPhase() {
         phaseLabel = '🏁 DERNIÈRE COURSE';
         panelClass = 'panel-course';
         hideBtn = true; // Pas de bouton, la course démarre automatiquement
-        btnText = ''; // inutile
+        btnText = '';
     } else if (state.phase === 'termine') {
         terminerEpreuve();
         return;
@@ -212,7 +212,6 @@ function renderPhase() {
 
     // Si on est en phase finale et que la course n'a pas encore démarré, on la lance automatiquement
     if (state.phase === 'finale' && !state.running) {
-        // Petit délai pour que l'interface se mette à jour
         setTimeout(() => startCourse(), 300);
     }
 }
@@ -337,11 +336,9 @@ function startCourse() {
     if (state.running) return;
     if (state.handicapMs > 0) state.phaseAccum = state.handicapMs;
     startClock();
-    // Si on est en phase finale, on n'affiche pas de bouton (déjà masqué)
     if (state.phase !== 'finale') {
         updateButton('course', '🏁 Arrivée');
     } else {
-        // On met à jour l'affichage du contenu
         document.getElementById('phaseContent').innerHTML = renderPhaseContent();
     }
 }
@@ -351,8 +348,7 @@ function finishCourse() {
     state.tempsTotal = state.tempsCourse + state.tempsPenalite;
 
     if (state.phase === 'finale') {
-        // C'était la finale, on sauvegarde et on termine
-        savePassage(true);
+        savePassage(true, false); // finale, pas de bilan
         return;
     }
 
@@ -435,14 +431,15 @@ window.validatePenalty = function(index) {
 // TERMINER UNE SÉRIE
 // --------------------------------------------------------------
 function terminerSerie() {
-    // Sauvegarder la série
-    savePassage(false);
+    // Déterminer si on doit afficher le bilan pour cette série
+    const showBilan = state.serieActuelle < state.nbSeries; // pas de bilan pour la dernière série
+    savePassage(false, showBilan);
 
     // Passer à la série suivante
     state.serieActuelle++;
 
     if (state.serieActuelle > state.nbSeries) {
-        // Toutes les séries sont faites → on passe à la course finale (démarrage auto)
+        // Toutes les séries sont faites → on passe à la course finale
         state.phase = 'finale';
         state.phaseAccum = 0;
         state.phaseStart = null;
@@ -452,9 +449,8 @@ function terminerSerie() {
         state.shots = [];
         state.penReq = 0;
         state.penDone = 0;
-        // Afficher la phase finale (sans bouton)
         renderPhase();
-        // La course finale démarrera automatiquement dans renderPhase() via un setTimeout
+        // La course finale démarrera automatiquement dans renderPhase()
     } else {
         // Prochaine série : on repart en course
         state.phase = 'course';
@@ -475,7 +471,7 @@ function terminerSerie() {
 // --------------------------------------------------------------
 // SAUVEGARDE
 // --------------------------------------------------------------
-function savePassage(isFinale) {
+function savePassage(isFinale, showBilan = true) {
     stopClock();
     const distanceKm = state.distanceCourse / 1000;
     const tempsHeures = state.tempsCourse / 1000 / 3600;
@@ -529,9 +525,10 @@ function savePassage(isFinale) {
         .then(() => {
             if (isFinale) {
                 terminerEpreuve();
-            } else {
+            } else if (showBilan) {
                 showBilan(passageData);
             }
+            // Si showBilan === false, on n'affiche rien, la transition est déjà gérée par terminerSerie()
         })
         .catch(err => {
             console.error('❌ Erreur enregistrement :', err);
@@ -662,4 +659,4 @@ window.undoShot = window.undoShot;
 window.validatePenalty = window.validatePenalty;
 window.retourMenuArcathlon = window.retourMenuArcathlon;
 
-console.log('✅ Arcathlon kiosque chargé (finale automatique)');
+console.log('✅ Arcathlon kiosque chargé (finale auto, sans bilan pour la dernière série)');
