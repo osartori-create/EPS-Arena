@@ -79,25 +79,41 @@ function showLogin() {
     activityScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     codeList.innerHTML = '';
+    
     const config = currentConfig;
     activityTitle.innerText = "Choisis ton code";
     
-    if (!config) {
+    // 1. Si pas de config, on affiche un message d'attente
+    if (!config || Object.keys(config).length === 0) {
         codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
         return;
     }
 
-    // --- SPÉCIAL BADMINTON : On saute la sélection de codes et on lance l'assistant ---
+    // 2. SPÉCIAL BADMINTON : On saute la sélection de codes et on lance l'assistant
     if (config.activite === 'badminton') {
-        loginScreen.classList.add('hidden'); // Cache l'écran de login
-        activityScreen.classList.remove('hidden'); // Affiche l'activité
+        // On masque l'écran de login, on montre l'écran d'activité
+        loginScreen.classList.add('hidden');
+        activityScreen.classList.remove('hidden');
+        
+        // On cache tous les autres modules
+        escaladeModule.classList.add('hidden');
+        coModule.classList.add('hidden');
+        multiModule.classList.add('hidden');
+        if (osModule) osModule.classList.add('hidden');
+
+        // On montre et initialise le module badminton
         const badmintonModule = document.getElementById('badminton-module');
         badmintonModule.classList.remove('hidden');
-        initBadmintonKiosk(selectedClass); // Lance l'assistant (Terrain -> Joueur)
+        initBadmintonKiosk(selectedClass);
         return;
     }
 
-    // --- AUTRES ACTIVITÉS (Escalade, CO, etc. - Code actuel) ---
+    // 3. POUR LES AUTRES ACTIVITÉS (Escalade, CO, etc.)
+    // On cache le module badminton s'il existe
+    const badmintonModule = document.getElementById('badminton-module');
+    if (badmintonModule) badmintonModule.classList.add('hidden');
+    
+    // On génère les codes normalement
     Object.keys(config).forEach(key => {
         if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
         let count = 0;
