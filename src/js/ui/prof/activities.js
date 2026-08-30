@@ -5,15 +5,8 @@ import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
-import { 
-    initOrientShowInterface,
-    loadOrientShowAssignments,
-    exportOrientShowConfig,
-    importOrientShowConfig,
-    startOrientShow,
-    stopOrientShow
-} from '../../modules/orientshow/orientshow-interface.js';
-import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes } from '../../modules/badminton/badminton-interface.js';
+import { initOrientShowInterface, loadOrientShowAssignments, exportOrientShowConfig, importOrientShowConfig, startOrientShow, stopOrientShow } from '../../modules/orientshow/orientshow-interface.js';
+import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
 
 let currentDiscipline = 'multi';
 
@@ -490,6 +483,8 @@ export function initActivities() {
     window.importOrientShowConfig = importOrientShowConfig;
     window.startOrientShow = startOrientShow;
     window.stopOrientShow = stopOrientShow;
+    window.exportBadmintonConfig = exportBadmintonConfig;
+window.importBadmintonConfig = importBadmintonConfig;
 
     try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}

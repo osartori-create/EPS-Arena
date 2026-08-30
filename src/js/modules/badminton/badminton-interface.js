@@ -4,7 +4,7 @@
 
 import { getPhotoUrl } from '../../services/admin-service.js';
 
-const MAX_PAR_TERRAIN = 5; // Capacité max par terrain pour la génération auto
+const MAX_PAR_TERRAIN = 5;
 
 export function initBadmintonInterface(nbTerrains = 6, force = false) {
     const container = document.getElementById('postesGridBadminton');
@@ -18,8 +18,7 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
         nbTerrainsCalcule = savedData.nbTerrains;
     } else {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-        // On ne compte que les joueurs "jouant" (force > 0 ou sexe défini) pour estimer le nombre de terrains
-        const joueurs = eleves.filter(e => e.code !== 'INAPTE');
+        const joueurs = eleves.filter(e => e.code !== 'INAPTE' && e.code !== 'ABS');
         if (joueurs.length > 0) {
             nbTerrainsCalcule = Math.max(1, Math.ceil(joueurs.length / MAX_PAR_TERRAIN));
         }
@@ -50,31 +49,28 @@ export function generateBadmintonTeams(eleves) {
     const activeClasse = document.getElementById('selectClasse').value;
     const nbTerrains = window.currentBadmintonTerrains || 6;
 
-    // SÉPARATION : Les inaptes sont mis de côté pour être répartis numériquement à la fin
-    const joueurs = eleves.filter(e => e.code !== 'INAPTE');
+    const absents = eleves.filter(e => e.code === 'ABS');
     const inaptes = eleves.filter(e => e.code === 'INAPTE');
+    const joueurs = eleves.filter(e => e.code !== 'ABS' && e.code !== 'INAPTE');
 
-    // 1. Tri par force (étoiles) décroissante, puis aléatoire pour départager
     joueurs.sort((a, b) => (b.force || 0) - (a.force || 0) || Math.random() - 0.5);
 
-    // 2. Répartition par BLOCS (Tous les forts ensemble au Terrain 1, puis les suivants au Terrain 2...)
     const perTerrain = Math.ceil(joueurs.length / nbTerrains);
     const terrains = Array.from({ length: nbTerrains }, () => []);
 
     joueurs.forEach((eleve, index) => {
-        const terrainIndex = Math.floor(index / perTerrain); // Bloc
+        const terrainIndex = Math.floor(index / perTerrain);
         terrains[terrainIndex].push(eleve);
     });
 
-    // 3. Ajout des inaptes (ils sont répartis, mais marqués comme non jouants)
+    // Les inaptes sont répartis équitablement sur les terrains (pour le décompte)
     inaptes.forEach((eleve, index) => {
-        const terrainIndex = index % nbTerrains; // Tourniquet
-        eleve.isPlaying = false; // Indispensable pour le Round Robin
+        const terrainIndex = index % nbTerrains;
+        eleve.isPlaying = false;
         terrains[terrainIndex].push(eleve);
     });
 
-    // 4. Sauvegarde
-    const assignments = { reserve: [], nbTerrains: nbTerrains };
+    const assignments = { reserveAbsents: absents.map(e => e.id), reserveInaptes: inaptes.map(e => e.id), nbTerrains: nbTerrains };
     terrains.forEach((terrain, idx) => {
         const terrainNum = idx + 1;
         assignments[terrainNum] = terrain.map(e => e.id);
@@ -85,24 +81,22 @@ export function generateBadmintonTeams(eleves) {
     setTimeout(() => loadBadmintonAssignments(), 100);
 }
 
-// --- GLISSER-DÉPOSER ET AFFICHAGE ---
+// --- GLISSER-DÉPOSER ---
 export function initSortableBadminton() {
-    const gContainer = document.getElementById('reserveBadmintonGarcons');
-    const fContainer = document.getElementById('reserveBadmintonFilles');
-    
-    if (!gContainer || !fContainer) return;
+    const absContainer = document.getElementById('reserveBadmintonAbsents');
+    const inaptContainer = document.getElementById('reserveBadmintonInaptes');
+    if (!absContainer || !inaptContainer) return;
 
-    // Détruire les anciennes instances
-    if (gContainer.__sortable) gContainer.__sortable.destroy();
-    if (fContainer.__sortable) fContainer.__sortable.destroy();
+    if (absContainer.__sortable) absContainer.__sortable.destroy();
+    if (inaptContainer.__sortable) inaptContainer.__sortable.destroy();
     document.querySelectorAll('.terrain-members').forEach(el => {
         if (el.__sortable) el.__sortable.destroy();
     });
 
     const onEnd = () => { saveBadmintonAssignments(); updateCodes(); };
 
-    gContainer.__sortable = new Sortable(gContainer, { group: 'badminton', animation: 150, onEnd });
-    fContainer.__sortable = new Sortable(fContainer, { group: 'badminton', animation: 150, onEnd });
+    absContainer.__sortable = new Sortable(absContainer, { group: 'badminton', animation: 150, onEnd });
+    inaptContainer.__sortable = new Sortable(inaptContainer, { group: 'badminton', animation: 150, onEnd });
 
     document.querySelectorAll('.terrain-members').forEach(el => {
         el.__sortable = new Sortable(el, { group: 'badminton', animation: 150, onEnd });
@@ -115,7 +109,6 @@ async function createEleveCard(eleve) {
     if (eleve.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
     else if (eleve.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
     
-    // Style spécial pour les inaptes
     let statut = '';
     if (eleve.code === 'INAPTE') {
         bgClass = 'bg-orange-200 border-orange-400 opacity-60';
@@ -126,7 +119,6 @@ async function createEleveCard(eleve) {
     }
 
     const photoHtml = url ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">` : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-
     let stars = '';
     for (let i = 1; i <= (eleve.force || 0); i++) stars += '★';
 
@@ -150,12 +142,12 @@ export async function loadBadmintonAssignments() {
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     
-    const gContainer = document.getElementById('reserveBadmintonGarcons');
-    const fContainer = document.getElementById('reserveBadmintonFilles');
-    if (!gContainer || !fContainer) return;
+    const absContainer = document.getElementById('reserveBadmintonAbsents');
+    const inaptContainer = document.getElementById('reserveBadmintonInaptes');
+    if (!absContainer || !inaptContainer) return;
     
-    gContainer.innerHTML = '';
-    fContainer.innerHTML = '';
+    absContainer.innerHTML = '';
+    inaptContainer.innerHTML = '';
 
     const placedIds = new Set();
     const terrains = document.querySelectorAll('[data-terrain]');
@@ -174,18 +166,30 @@ export async function loadBadmintonAssignments() {
         }
     }
 
-    // Répartition des non placés par sexe
-    const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
-    const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
-    const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
-    const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+    // Remplir les réserves spécifiques
+    const absents = assignments.reserveAbsents || [];
+    const inaptes = assignments.reserveInaptes || [];
 
-    for (const eleve of garcons) gContainer.appendChild(await createEleveCard(eleve));
-    for (const eleve of filles) fContainer.appendChild(await createEleveCard(eleve));
-    for (const eleve of autres) gContainer.appendChild(await createEleveCard(eleve));
+    for (const id of absents) {
+        const eleve = eleves.find(e => e.id === id);
+        if (eleve) absContainer.appendChild(await createEleveCard(eleve));
+    }
+    for (const id of inaptes) {
+        const eleve = eleves.find(e => e.id === id);
+        if (eleve) inaptContainer.appendChild(await createEleveCard(eleve));
+    }
 
-    if (gContainer.children.length === 0) gContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
-    if (fContainer.children.length === 0) fContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
+    // Les élèves non placés ailleurs (sans statut) sont mis dans les inaptes par défaut? Non, on les laisse dans la réserve principale ? On les met en "non classés". 
+    // Ici, pour simplifier, on les laisse dans les inaptes s'ils ont été oubliés.
+    // (Option: on pourrait les mettre dans les "absents" ou les laisser dans la liste générale, mais pour l'instant on les ignore ou on les met en inaptes).
+    // On va plutôt créer une réserve "générale" non utilisée ? Non, on va les ajouter aux inaptes si non placés.
+    const nonPlaces = eleves.filter(e => !placedIds.has(e.id) && !absents.includes(e.id) && !inaptes.includes(e.id));
+    for (const eleve of nonPlaces) {
+        inaptContainer.appendChild(await createEleveCard(eleve));
+    }
+
+    if (absContainer.children.length === 0) absContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun absent</p>';
+    if (inaptContainer.children.length === 0) inaptContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun inapte</p>';
 
     updateCodes();
     setTimeout(() => initSortableBadminton(), 100);
@@ -193,13 +197,13 @@ export async function loadBadmintonAssignments() {
 
 export function saveBadmintonAssignments() {
     const activeClasse = document.getElementById('selectClasse').value;
-    const assignments = { reserve: [], nbTerrains: window.currentBadmintonTerrains || 6 };
+    const assignments = { reserveAbsents: [], reserveInaptes: [], nbTerrains: window.currentBadmintonTerrains || 6 };
 
-    const gContainer = document.getElementById('reserveBadmintonGarcons');
-    const fContainer = document.getElementById('reserveBadmintonFilles');
+    const absContainer = document.getElementById('reserveBadmintonAbsents');
+    const inaptContainer = document.getElementById('reserveBadmintonInaptes');
     
-    if (gContainer) gContainer.querySelectorAll('[data-id]').forEach(el => assignments.reserve.push(el.dataset.id));
-    if (fContainer) fContainer.querySelectorAll('[data-id]').forEach(el => assignments.reserve.push(el.dataset.id));
+    if (absContainer) absContainer.querySelectorAll('[data-id]').forEach(el => assignments.reserveAbsents.push(el.dataset.id));
+    if (inaptContainer) inaptContainer.querySelectorAll('[data-id]').forEach(el => assignments.reserveInaptes.push(el.dataset.id));
 
     document.querySelectorAll('[data-terrain]').forEach(terrainDiv => {
         const membersDiv = terrainDiv.querySelector('.terrain-members');
@@ -211,7 +215,6 @@ export function saveBadmintonAssignments() {
     localStorage.setItem(`eps_arena_badminton_assignments_${activeClasse}`, JSON.stringify(assignments));
 }
 
-// Attribution des lettres A, B, C... sur chaque terrain
 export function updateCodes() {
     document.querySelectorAll('[data-terrain]').forEach(terrainDiv => {
         const membersDiv = terrainDiv.querySelector('.terrain-members');
@@ -228,4 +231,47 @@ export function updateCodes() {
             badge.textContent = lettres[index] || '?';
         });
     });
+}
+
+// --- IMPORT / EXPORT JSON ---
+export function exportBadmintonConfig() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
+    
+    const date = new Date();
+    const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+
+    const data = { version: 1, classe: activeClasse, activite: 'badminton', date: dateStr, ...assignments };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${activeClasse}_badminton_${dateStr}.json`;
+    a.click();
+}
+
+export function importBadmintonConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.nbTerrains) throw new Error("Format de fichier invalide");
+            localStorage.setItem(`eps_arena_badminton_assignments_${data.classe}`, JSON.stringify(data));
+            
+            const select = document.getElementById('selectClasse');
+            if (select.value !== data.classe) {
+                select.value = data.classe;
+                select.dispatchEvent(new Event('change'));
+            } else {
+                initBadmintonInterface(data.nbTerrains, true);
+                await loadBadmintonAssignments();
+            }
+            alert("✅ Configuration Badminton importée !");
+        } catch (err) {
+            alert("❌ Erreur import : " + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
 }
