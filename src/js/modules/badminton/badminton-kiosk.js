@@ -1,5 +1,5 @@
 // src/js/modules/badminton/badminton-kiosk.js
-// Interface élève : Sélection Terrain -> Sélection manuelle des joueurs -> Terrain 3D
+// Interface élève : Sélection Terrain -> Liste Round Robin -> Terrain 3D
 // Inspiré et adapté de BadZ Impact (Webjéjé) et du module EPS-Arena.
 // Licence Creative Commons Attribution (CC BY).
 
@@ -48,6 +48,7 @@ export function initBadmintonKiosk(classe) {
         }
     });
 
+    // IMPORTANT : On n'attache l'écouteur qu'une seule fois
     if (!resultsListenerAttached) {
         listenForScoreUpdates();
         resultsListenerAttached = true;
@@ -84,7 +85,7 @@ window.retourTerrains = function() {
     renderTerrainSelection();
 };
 
-// --- 2. GESTION DU MATCH (Sélection manuelle P1/P2 + Liste des matchs) ---
+// --- 2. GESTION DU MATCH (Liste Round Robin) ---
 function generateRoundRobin() {
     matchSchedule = [];
     const n = playersList.length;
@@ -139,7 +140,6 @@ function renderMatchSetup() {
                         const isPlayed = match.s1 !== null;
                         const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
                         const playedStyle = isPlayed ? 'line-through opacity-60' : '';
-                        // On désactive le clic si le match est déjà joué
                         const clickAction = isPlayed ? '' : `onclick="selectMatchFromList('${match.id}')"`;
                         return `
                             <button ${clickAction} 
@@ -170,10 +170,14 @@ function renderMatchSetup() {
 }
 
 window.selectMatchFromList = function(matchId) {
+    console.log("🎮 Match sélectionné :", matchId);
     const match = matchSchedule.find(m => m.id === matchId);
-    if (!match || match.s1 !== null) return; // Empêche de relancer un match déjà joué
+    if (!match || match.s1 !== null) {
+        console.warn("⚠️ Match déjà joué ou introuvable !");
+        return;
+    }
     
-    currentMatch = match; // On définit le match réel, pas un "custom"
+    currentMatch = match;
     matchPoints = { p1: 0, p2: 0 };
     ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
     historyStack = [];
@@ -182,22 +186,15 @@ window.selectMatchFromList = function(matchId) {
     renderCourtInterface();
 };
 
-// Lancement automatique du match dès que les deux joueurs sont choisis
-window.checkAndStartMatch = function() {
-    const p1 = document.getElementById('select-p1').value;
-    const p2 = document.getElementById('select-p2').value;
-    if (p1 && p2 && p1 !== p2) {
-        startSelectedMatch();
-    }
-};
-
-// ÉCOUTE DES RÉSULTATS
+// ÉCOUTE DES RÉSULTATS (Mise à jour de la liste et du classement)
 function listenForScoreUpdates() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
     
     onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
+        console.log("📡 Données Firebase reçues :", data);
+
         matchSchedule.forEach(m => {
             const result = data[m.id];
             if (result && result.terrain === currentTerrain) {
@@ -206,13 +203,15 @@ function listenForScoreUpdates() {
             }
         });
 
+        // Mise à jour de la liste des matchs
         const list = document.querySelector('#badminton-content .space-y-2');
         if (list) {
             list.innerHTML = matchSchedule.map(match => {
                 const isPlayed = match.s1 !== null;
                 const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
                 const playedStyle = isPlayed ? 'line-through opacity-60' : '';
-                return `<button onclick="selectMatchFromList('${match.id}')" 
+                const clickAction = isPlayed ? '' : `onclick="selectMatchFromList('${match.id}')"`;
+                return `<button ${clickAction} 
                             class="w-full text-left p-3 rounded-lg border-2 transition-colors ${playedStyle} ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
                             <div class="flex justify-between items-center font-black">
                                 <span>${match.p1} vs ${match.p2}</span>
@@ -221,7 +220,7 @@ function listenForScoreUpdates() {
                         </button>`;
             }).join('');
         }
-        renderClassement(); // Mise à jour du classement
+        renderClassement();
     });
 }
 
@@ -257,23 +256,6 @@ function renderClassement() {
     html += `</div>`;
     container.innerHTML = html;
 }
-
-window.startSelectedMatch = function() {
-    const p1 = document.getElementById('select-p1').value;
-    const p2 = document.getElementById('select-p2').value;
-
-    if (!p1 || !p2 || p1 === p2) {
-        return;
-    }
-
-    currentMatch = { id: `custom_${Date.now()}`, p1, p2, s1: null, s2: null };
-    matchPoints = { p1: 0, p2: 0 };
-    ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
-    historyStack = [];
-    redoStack = [];
-    
-    renderCourtInterface();
-};
 
 // --- 3. INTERFACE DU TERRAIN 3D ---
 function renderCourtInterface() {
@@ -470,7 +452,6 @@ function handleImpact(e) {
     matchPoints[player] += points;
     ratioData[player][isMiddle ? 'middle' : 'extreme']++;
 
-    // Inversion de l'affichage des scores (p2 - p1) pour correspondre à la demande
     document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
     
     const p1Total = ratioData.p1.extreme + ratioData.p1.middle;
@@ -525,30 +506,41 @@ function resetCourt() {
 window.undoImpact = undoImpact;
 window.resetCourt = resetCourt;
 
-// --- 5. FIN DE MATCH ---
+// --- 5. FIN DE MATCH (ENVOI FIREBASE) ---
 window.endMatch = function() {
-    if (!currentMatch) return;
-    if (confirm(`Valider le score ${matchPoints.p2} - ${matchPoints.p1} ?`)) {
-        const p1 = currentMatch.p1;
-        const p2 = currentMatch.p2;
-        const s1 = matchPoints.p2;
-        const s2 = matchPoints.p1;
+    if (!currentMatch) {
+        console.error("❌ Aucun match en cours !");
+        return;
+    }
+    
+    // On inverse les scores (p2 - p1) comme demandé pour l'affichage
+    const p1 = currentMatch.p1;
+    const p2 = currentMatch.p2;
+    const s1 = matchPoints.p2;
+    const s2 = matchPoints.p1;
+
+    if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
+        console.log("📤 Envoi du résultat à Firebase :", { terrain: currentTerrain, p1, p2, s1, s2 });
 
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
         
         update(resultRef, { terrain: currentTerrain, p1, p2, s1, s2, timestamp: Date.now() })
         .then(() => {
+            console.log("✅ Résultat envoyé avec succès !");
+            
+            // Mise à jour locale
             const matchIndex = matchSchedule.findIndex(m => m.id === currentMatch.id);
             if (matchIndex !== -1) {
                 matchSchedule[matchIndex].s1 = s1;
                 matchSchedule[matchIndex].s2 = s2;
             } else {
-                matchSchedule.push(currentMatch);
+                matchSchedule.push({ ...currentMatch, s1, s2 });
             }
+            
             currentMatch = null;
-            renderMatchSetup();
+            renderMatchSetup(); // Retour à la liste, qui se grisera grâce à l'écoute Firebase
         })
-        .catch(err => alert("Erreur envoi : " + err.message));
+        .catch(err => console.error("❌ Erreur envoi Firebase :", err));
     }
 };
