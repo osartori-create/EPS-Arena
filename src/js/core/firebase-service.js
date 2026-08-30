@@ -89,3 +89,7 @@ export function setOrientShowConfig(classe, configData) {
     const refConfig = ref(db, getOrientShowConfigPath(classe));
     return set(refConfig, configData);
 }
+// Ajoutez cette fonction dans firebase-service.js
+export function getBadmintonResultsPath(classe) {
+    return `${getProfBasePath()}/${classe}/badminton/results`;
+}
