@@ -1,10 +1,10 @@
 // src/js/modules/arcathlon/arcathlon-kiosk.js
-// Flux : Série 1 (Course → Tir → Pénalités) → Série 2 (...) → ... → Série N → Course finale
+// Flux : Série 1 (Course → Tir → Pénalités) → ... → Série N → Course finale (démarrage auto)
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
 // --------------------------------------------------------------
-// ÉTAT LOCAL
+// ÉTAT
 // --------------------------------------------------------------
 const state = {
     classe: '',
@@ -14,7 +14,7 @@ const state = {
     config: null,
     nbSeries: 3,
     serieActuelle: 1,
-    phase: 'course',           // course | tir | penalite | finale | termine
+    phase: 'course',          // 'course' | 'tir' | 'penalite' | 'finale' | 'termine'
     running: false,
     phaseStart: null,
     phaseAccum: 0,
@@ -33,7 +33,6 @@ const state = {
     mode: 'sprint',
     alerteTriche: false,
     reussitesTir: 0,
-    // Cumuls
     cumulDistance: 0,
     cumulPointsVMA: 0,
     cumulPointsTir: 0,
@@ -46,7 +45,7 @@ let departListener = null;
 let clockInterval = null;
 
 // --------------------------------------------------------------
-// 1. INITIALISATION
+// INIT
 // --------------------------------------------------------------
 export function initArcathlonKiosk(classe, code) {
     state.classe = classe;
@@ -95,17 +94,13 @@ export function initArcathlonKiosk(classe, code) {
                     break;
                 }
             }
-
             renderPhase();
         } else {
             const container = document.getElementById('arcathlon-module');
-            if (container) {
-                container.innerHTML = `<div class="text-center py-10 text-slate-400"><p class="text-2xl">⏳ En attente de la configuration...</p></div>`;
-            }
+            if (container) container.innerHTML = `<div class="text-center py-10 text-slate-400"><p class="text-2xl">⏳ En attente de la configuration...</p></div>`;
         }
     });
 
-    // Départ différé (mode poursuite)
     if (state.mode === 'poursuite') {
         const departRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/commandes/depart`);
         if (departListener) departListener();
@@ -117,11 +112,8 @@ export function initArcathlonKiosk(classe, code) {
                 const now = Date.now();
                 const departTime = data.timestamp + (delai * 1000);
                 const remaining = Math.max(0, Math.round((departTime - now) / 1000));
-                if (remaining > 0) {
-                    showDepartCountdown(remaining);
-                } else {
-                    startCourse();
-                }
+                if (remaining > 0) showDepartCountdown(remaining);
+                else startCourse();
             }
         });
     }
@@ -132,7 +124,7 @@ export function initArcathlonKiosk(classe, code) {
 }
 
 // --------------------------------------------------------------
-// 2. AFFICHAGE DE LA PHASE
+// AFFICHAGE
 // --------------------------------------------------------------
 function renderPhase() {
     const container = document.getElementById('arcathlon-module');
@@ -150,10 +142,8 @@ function renderPhase() {
     };
     const colorClass = colorMap[state.maillot] || 'text-slate-400 border-slate-600';
 
-    let phaseLabel = '';
-    let panelClass = '';
-    let btnClass = '';
-    let btnText = '';
+    let phaseLabel = '', panelClass = '', btnClass = '', btnText = '';
+    let hideBtn = false;
 
     if (state.phase === 'course') {
         phaseLabel = `COURSE SÉRIE ${state.serieActuelle}`;
@@ -171,30 +161,21 @@ function renderPhase() {
         btnClass = 'btn-pen';
         btnText = 'Effectuer les tours';
     } else if (state.phase === 'finale') {
-        phaseLabel = 'COURSE FINALE';
+        phaseLabel = '🏁 DERNIÈRE COURSE';
         panelClass = 'panel-course';
-        btnClass = 'btn-course';
-        btnText = state.running ? '🏁 Arrivée' : 'Démarrer la course finale';
+        hideBtn = true; // Pas de bouton, la course démarre automatiquement
+        btnText = ''; // inutile
     } else if (state.phase === 'termine') {
-        // Affichage final géré dans terminerEpreuve()
+        terminerEpreuve();
         return;
     }
 
     container.innerHTML = `
         <div class="flex flex-col gap-4 max-w-4xl mx-auto">
             <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
-                <div>
-                    <span class="text-xs uppercase text-slate-400 font-bold">Équipe</span>
-                    <div class="text-xl font-black text-white">${state.equipeId}</div>
-                </div>
-                <div class="text-center">
-                    <span class="text-xs uppercase text-slate-400 font-bold">Maillot</span>
-                    <div class="text-xl font-black ${colorClass}">${state.maillot}</div>
-                </div>
-                <div class="text-right">
-                    <span class="text-xs uppercase text-slate-400 font-bold">Progression</span>
-                    <div class="text-xl font-black text-yellow-400">${state.phase === 'finale' ? 'Finale' : `${state.serieActuelle} / ${state.nbSeries}`}</div>
-                </div>
+                <div><span class="text-xs uppercase text-slate-400 font-bold">Équipe</span><div class="text-xl font-black text-white">${state.equipeId}</div></div>
+                <div class="text-center"><span class="text-xs uppercase text-slate-400 font-bold">Maillot</span><div class="text-xl font-black ${colorClass}">${state.maillot}</div></div>
+                <div class="text-right"><span class="text-xs uppercase text-slate-400 font-bold">Progression</span><div class="text-xl font-black text-yellow-400">${state.phase === 'finale' ? 'Finale' : `${state.serieActuelle} / ${state.nbSeries}`}</div></div>
             </div>
 
             <div class="phase-panel ${panelClass} p-4 rounded-2xl">
@@ -211,28 +192,29 @@ function renderPhase() {
                 </div>
             </div>
 
-            <button id="giantBtn" class="btn-action ${btnClass} w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform">
-                ${btnText}
-            </button>
+            ${!hideBtn ? `<button id="giantBtn" class="btn-action ${btnClass} w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform">${btnText}</button>` : `
+                <div class="text-center text-emerald-400 font-bold text-xl bg-slate-900 py-4 rounded-xl border border-emerald-500">
+                    🏃 Dernière course en cours...
+                </div>
+            `}
 
-            <div id="phaseContent" class="bg-slate-800 p-4 rounded-2xl border border-slate-700 min-h-[180px]">
-                ${renderPhaseContent()}
-            </div>
+            <div id="phaseContent" class="bg-slate-800 p-4 rounded-2xl border border-slate-700 min-h-[180px]">${renderPhaseContent()}</div>
 
-            <button onclick="window.retourMenuArcathlon()" class="bg-slate-700 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">
-                ← Retour
-            </button>
+            <button onclick="window.retourMenuArcathlon()" class="bg-slate-700 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">← Retour</button>
         </div>
     `;
 
     injectStyles();
-
-    const btn = document.getElementById('giantBtn');
-    if (btn) {
-        btn.addEventListener('click', onGiantAction);
+    if (!hideBtn) {
+        document.getElementById('giantBtn').addEventListener('click', onGiantAction);
     }
-
     updateClockDisplay();
+
+    // Si on est en phase finale et que la course n'a pas encore démarré, on la lance automatiquement
+    if (state.phase === 'finale' && !state.running) {
+        // Petit délai pour que l'interface se mette à jour
+        setTimeout(() => startCourse(), 300);
+    }
 }
 
 function renderPhaseContent() {
@@ -243,95 +225,66 @@ function renderPhaseContent() {
                 <p class="text-slate-400">${label} : ${state.distanceCourse}m</p>
                 <p class="text-xs text-slate-500 mt-2">Objectif VMA : ${state.vmaRef} km/h</p>
                 ${state.handicapMs > 0 ? `<p class="text-xs text-amber-400 mt-1">⏱ Handicap de ${(state.handicapMs/1000).toFixed(1)}s</p>` : ''}
-                ${state.running ? '<p class="text-emerald-400 font-bold mt-2">⏱ Course en cours...</p>' : '<p class="text-slate-500 mt-2">Cliquez sur "Démarrer" pour commencer</p>'}
+                ${state.running ? '<p class="text-emerald-400 font-bold mt-2">⏱ Course en cours...</p>' : '<p class="text-slate-500 mt-2">Préparez-vous...</p>'}
             </div>
         `;
     }
-
     if (state.phase === 'tir') {
         const shotsHtml = state.shots.map((s, i) => `
             <button class="shot-btn ${s === 1 ? 'bg-emerald-600' : s === -1 ? 'bg-red-600' : 'bg-slate-700'} w-16 h-16 rounded-xl font-black text-2xl border-2 border-slate-600 active:scale-95 transition-all"
-                    data-index="${i}"
-                    onclick="window.toggleShot(${i})">
-                ${s === 1 ? '✓' : s === -1 ? '✗' : i + 1}
-            </button>
+                    data-index="${i}" onclick="window.toggleShot(${i})">${s === 1 ? '✓' : s === -1 ? '✗' : i + 1}</button>
         `).join('');
-
         const reussites = state.shots.filter(s => s === 1).length;
-        const manques = state.shots.filter(s => s === -1).length;
-
         return `
             <div class="flex flex-col items-center gap-3">
-                <div class="flex gap-3 flex-wrap justify-center">
-                    ${shotsHtml}
-                </div>
+                <div class="flex gap-3 flex-wrap justify-center">${shotsHtml}</div>
                 <div class="flex gap-4 text-sm">
                     <span class="text-emerald-400">✅ ${reussites}</span>
-                    <span class="text-red-400">❌ ${manques}</span>
+                    <span class="text-red-400">❌ ${state.shots.filter(s => s === -1).length}</span>
                     <span class="text-slate-400">Réussite : <strong class="text-yellow-400">${Math.round((reussites / state.nbFleches) * 100)}%</strong></span>
                 </div>
-                <button onclick="window.undoShot()" class="bg-slate-700 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">
-                    ↩ Annuler dernière
-                </button>
+                <button onclick="window.undoShot()" class="bg-slate-700 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">↩ Annuler dernière</button>
             </div>
         `;
     }
-
     if (state.phase === 'penalite') {
         const penButtons = Array.from({ length: state.penReq }, (_, i) => `
             <button class="penalty-btn ${i < state.penDone ? 'bg-emerald-600 border-emerald-400' : 'bg-slate-700 border-slate-600'} w-20 h-14 rounded-xl font-black text-sm border-2 active:scale-95 transition-all"
-                    data-index="${i}"
-                    onclick="window.validatePenalty(${i})"
-                    ${i < state.penDone ? 'disabled' : ''}>
+                    data-index="${i}" onclick="window.validatePenalty(${i})" ${i < state.penDone ? 'disabled' : ''}>
                 ${i < state.penDone ? '✓' : `Tour ${i+1}`}
             </button>
         `).join('');
-
         return `
             <div class="flex flex-col items-center gap-3">
                 <p class="text-sm text-slate-400">Cliquez sur chaque tour après l'avoir couru</p>
-                <div class="flex gap-2 flex-wrap justify-center">
-                    ${penButtons}
-                </div>
-                <div class="text-sm text-slate-400">
-                    ${state.penDone} / ${state.penReq} tours effectués
-                </div>
+                <div class="flex gap-2 flex-wrap justify-center">${penButtons}</div>
+                <div class="text-sm text-slate-400">${state.penDone} / ${state.penReq} tours effectués</div>
             </div>
         `;
     }
-
     return '<p class="text-slate-400 text-center">Phase en cours...</p>';
 }
 
 // --------------------------------------------------------------
-// 3. CHRONO (inchangé)
+// CHRONO
 // --------------------------------------------------------------
 function startClock() {
     if (state.running) return;
     state.running = true;
     state.phaseStart = performance.now();
-    if (!clockInterval) {
-        clockInterval = requestAnimationFrame(updateClock);
-    }
+    if (!clockInterval) clockInterval = requestAnimationFrame(updateClock);
 }
 
 function stopClock() {
     if (!state.running) return;
     state.running = false;
     if (state.phaseStart) {
-        const now = performance.now();
-        state.phaseAccum += (now - state.phaseStart);
+        state.phaseAccum += (performance.now() - state.phaseStart);
         state.phaseStart = null;
     }
-    if (clockInterval) {
-        cancelAnimationFrame(clockInterval);
-        clockInterval = null;
-    }
-    if (state.phase === 'course' || state.phase === 'finale') {
-        state.tempsCourse += state.phaseAccum;
-    } else if (state.phase === 'penalite') {
-        state.tempsPenalite += state.phaseAccum;
-    }
+    if (clockInterval) { cancelAnimationFrame(clockInterval); clockInterval = null; }
+    if (state.phase === 'course' || state.phase === 'finale') state.tempsCourse += state.phaseAccum;
+    else if (state.phase === 'penalite') state.tempsPenalite += state.phaseAccum;
     state.tempsTotal = state.tempsCourse + state.tempsPenalite;
 }
 
@@ -344,9 +297,9 @@ function updateClock() {
 }
 
 function updateClockDisplay(phaseMs) {
+    const pMs = phaseMs !== undefined ? phaseMs : state.phaseAccum;
     const phaseEl = document.getElementById('phaseClock');
     const totalEl = document.getElementById('totalClock');
-    const pMs = phaseMs !== undefined ? phaseMs : state.phaseAccum;
     if (phaseEl) phaseEl.textContent = formatTime(pMs);
     if (totalEl) {
         const total = state.tempsTotal + (state.running ? pMs : state.phaseAccum);
@@ -359,12 +312,11 @@ function formatTime(ms) {
     const cs = Math.floor((ms % 1000) / 10);
     const s = Math.floor(ms / 1000) % 60;
     const m = Math.floor(ms / 60000);
-    const pad = (n, l = 2) => String(n).padStart(l, '0');
-    return `${pad(m)}:${pad(s)}.${pad(cs)}`;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
 }
 
 // --------------------------------------------------------------
-// 4. ACTIONS PAR PHASE
+// ACTIONS
 // --------------------------------------------------------------
 function onGiantAction() {
     if (state.phase === 'course' || state.phase === 'finale') {
@@ -372,11 +324,8 @@ function onGiantAction() {
             showToast('⏳ En attente du départ du professeur...', 2000);
             return;
         }
-        if (!state.running) {
-            startCourse();
-        } else {
-            finishCourse();
-        }
+        if (!state.running) startCourse();
+        else finishCourse();
     } else if (state.phase === 'tir') {
         finishTir();
     } else if (state.phase === 'penalite') {
@@ -386,24 +335,28 @@ function onGiantAction() {
 
 function startCourse() {
     if (state.running) return;
-    if (state.handicapMs > 0) {
-        state.phaseAccum = state.handicapMs;
-    }
+    if (state.handicapMs > 0) state.phaseAccum = state.handicapMs;
     startClock();
-    updateButton('course', '🏁 Arrivée');
+    // Si on est en phase finale, on n'affiche pas de bouton (déjà masqué)
+    if (state.phase !== 'finale') {
+        updateButton('course', '🏁 Arrivée');
+    } else {
+        // On met à jour l'affichage du contenu
+        document.getElementById('phaseContent').innerHTML = renderPhaseContent();
+    }
 }
 
 function finishCourse() {
     stopClock();
     state.tempsTotal = state.tempsCourse + state.tempsPenalite;
 
-    // Si on est sur la course finale, on enregistre et on termine
     if (state.phase === 'finale') {
+        // C'était la finale, on sauvegarde et on termine
         savePassage(true);
         return;
     }
 
-    // Sinon, c'est une course de série → on passe au tir
+    // Sinon, on passe au tir
     state.phase = 'tir';
     state.shots = Array(state.nbFleches).fill(0);
     state.phaseAccum = 0;
@@ -414,26 +367,21 @@ function finishCourse() {
 }
 
 // --------------------------------------------------------------
-// 5. TIRS
+// TIRS
 // --------------------------------------------------------------
 window.toggleShot = function(index) {
     if (state.phase !== 'tir') return;
     if (index < 0 || index >= state.shots.length) return;
     const current = state.shots[index];
-    if (current === 0) state.shots[index] = 1;
-    else if (current === 1) state.shots[index] = -1;
-    else state.shots[index] = 0;
-    const phaseContent = document.getElementById('phaseContent');
-    if (phaseContent) phaseContent.innerHTML = renderPhaseContent();
+    state.shots[index] = current === 0 ? 1 : (current === 1 ? -1 : 0);
+    document.getElementById('phaseContent').innerHTML = renderPhaseContent();
 };
-
 window.undoShot = function() {
     if (state.phase !== 'tir') return;
     for (let i = state.shots.length - 1; i >= 0; i--) {
         if (state.shots[i] !== 0) {
             state.shots[i] = 0;
-            const phaseContent = document.getElementById('phaseContent');
-            if (phaseContent) phaseContent.innerHTML = renderPhaseContent();
+            document.getElementById('phaseContent').innerHTML = renderPhaseContent();
             return;
         }
     }
@@ -443,11 +391,8 @@ window.undoShot = function() {
 function finishTir() {
     stopClock();
     const reussites = state.shots.filter(s => s === 1).length;
-    const manques = state.shots.filter(s => s === -1).length;
     state.reussitesTir = reussites;
-
-    // 1 tour de pénalité par flèche manquée
-    state.penReq = manques;
+    state.penReq = state.shots.filter(s => s === -1).length;
     state.penDone = 0;
 
     if (state.penReq > 0) {
@@ -458,19 +403,17 @@ function finishTir() {
         startClock();
         updateButton('penalite', 'Effectuer les tours');
     } else {
-        // Pas de pénalité → on termine la série
         terminerSerie();
     }
 }
 
 // --------------------------------------------------------------
-// 6. PÉNALITÉS
+// PÉNALITÉS
 // --------------------------------------------------------------
 window.validatePenalty = function(index) {
     if (state.phase !== 'penalite') return;
     if (index >= state.penReq || index < state.penDone) return;
     state.penDone++;
-    // Mettre à jour l'affichage
     const btns = document.querySelectorAll('.penalty-btn');
     if (btns[index]) {
         btns[index].classList.remove('bg-slate-700', 'border-slate-600');
@@ -478,20 +421,18 @@ window.validatePenalty = function(index) {
         btns[index].textContent = '✓';
         btns[index].disabled = true;
     }
-    const phaseContent = document.getElementById('phaseContent');
-    if (phaseContent) phaseContent.innerHTML = renderPhaseContent();
+    document.getElementById('phaseContent').innerHTML = renderPhaseContent();
 
     if (state.penDone >= state.penReq) {
         stopClock();
         state.tempsPenalite += state.phaseAccum;
         state.tempsTotal = state.tempsCourse + state.tempsPenalite;
-        // Fin des pénalités → on termine la série
         terminerSerie();
     }
 };
 
 // --------------------------------------------------------------
-// 7. TERMINER UNE SÉRIE (après tir ou pénalités)
+// TERMINER UNE SÉRIE
 // --------------------------------------------------------------
 function terminerSerie() {
     // Sauvegarder la série
@@ -501,7 +442,7 @@ function terminerSerie() {
     state.serieActuelle++;
 
     if (state.serieActuelle > state.nbSeries) {
-        // Toutes les séries sont faites → on passe à la course finale
+        // Toutes les séries sont faites → on passe à la course finale (démarrage auto)
         state.phase = 'finale';
         state.phaseAccum = 0;
         state.phaseStart = null;
@@ -511,8 +452,9 @@ function terminerSerie() {
         state.shots = [];
         state.penReq = 0;
         state.penDone = 0;
+        // Afficher la phase finale (sans bouton)
         renderPhase();
-        updateButton('course', 'Démarrer la course finale');
+        // La course finale démarrera automatiquement dans renderPhase() via un setTimeout
     } else {
         // Prochaine série : on repart en course
         state.phase = 'course';
@@ -525,26 +467,19 @@ function terminerSerie() {
         state.penReq = 0;
         state.penDone = 0;
         renderPhase();
-        if (state.mode === 'sprint') {
-            updateButton('course', 'Démarrer la course');
-        } else {
-            updateButton('course', '⏳ Attente départ...');
-        }
+        if (state.mode === 'sprint') updateButton('course', 'Démarrer la course');
+        else updateButton('course', '⏳ Attente départ...');
     }
 }
 
 // --------------------------------------------------------------
-// 8. SAUVEGARDE DU PASSAGE
+// SAUVEGARDE
 // --------------------------------------------------------------
 function savePassage(isFinale) {
     stopClock();
-
-    // Vitesse UNIQUEMENT sur la course
-    const distanceCourseKm = state.distanceCourse / 1000;
-    const tempsCourseHeures = state.tempsCourse / 1000 / 3600;
-    const vitesse = tempsCourseHeures > 0 ? distanceCourseKm / tempsCourseHeures : 0;
-
-    // Distance totale (course + pénalités) pour le bilan
+    const distanceKm = state.distanceCourse / 1000;
+    const tempsHeures = state.tempsCourse / 1000 / 3600;
+    const vitesse = tempsHeures > 0 ? distanceKm / tempsHeures : 0;
     const distanceTotaleSerie = state.distanceCourse + (state.penDone * state.longueurPenalite);
 
     let ptsVMA = 0;
@@ -552,7 +487,6 @@ function savePassage(isFinale) {
     else if (vitesse >= state.vmaRef - 0.5) ptsVMA = 2;
     else if (vitesse >= state.vmaRef - 1) ptsVMA = 1;
 
-    // Bonus de tir (5 pts par flèche réussie) – 0 pour la finale
     const scoreTir = isFinale ? 0 : state.reussitesTir * 5;
     let bonus = 0;
     if (scoreTir > 0) {
@@ -561,33 +495,20 @@ function savePassage(isFinale) {
         else if (scoreTir < 16) bonus = -15;
         else bonus = -20;
     }
-
     const tempsBonifie = (state.tempsTotal / 1000) + bonus;
 
-    // Détection de fraude
     state.alerteTriche = false;
-    if (vitesse > 0) {
-        const vitesseNum = parseFloat(vitesse);
-        if (vitesseNum > 25 || vitesseNum > state.vmaRef * 1.5) {
-            state.alerteTriche = true;
-        }
-    }
+    if (vitesse > 0 && (vitesse > 25 || vitesse > state.vmaRef * 1.5)) state.alerteTriche = true;
 
     const passageData = {
-        code: state.code,
-        equipe: state.equipeId,
-        maillot: state.maillot,
-        serie: state.serieActuelle,
-        isFinale: isFinale,
-        mode: state.mode,
+        code: state.code, equipe: state.equipeId, maillot: state.maillot,
+        serie: state.serieActuelle, isFinale, mode: state.mode,
         tempsCourse: Math.round(state.tempsCourse),
         tempsPenalite: Math.round(state.tempsPenalite),
         tempsTotal: Math.round(state.tempsTotal),
         tempsBonifie: Math.round(tempsBonifie * 10) / 10,
         vitesse: Math.round(vitesse * 10) / 10,
-        ptsVMA: ptsVMA,
-        scoreTir: scoreTir,
-        bonus: bonus,
+        ptsVMA, scoreTir, bonus,
         penalites: state.penDone,
         handicap: state.handicapMs,
         distanceTotale: Math.round(distanceTotaleSerie),
@@ -596,7 +517,6 @@ function savePassage(isFinale) {
         timestamp: Date.now()
     };
 
-    // Cumuls
     state.cumulDistance += distanceTotaleSerie;
     state.cumulPointsVMA += ptsVMA;
     state.cumulPointsTir += scoreTir;
@@ -605,31 +525,26 @@ function savePassage(isFinale) {
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/arcathlon/passages/${state.mode}`;
-    const passageRef = ref(db, path);
-
-    push(passageRef, passageData)
+    push(ref(db, path), passageData)
         .then(() => {
             if (isFinale) {
-                // La finale est enregistrée, on termine l'épreuve
                 terminerEpreuve();
             } else {
-                // Afficher le bilan de la série
                 showBilan(passageData);
             }
         })
         .catch(err => {
-            console.error('Erreur enregistrement :', err);
+            console.error('❌ Erreur enregistrement :', err);
             showToast('❌ Erreur réseau, réessayez', 3000);
         });
 }
 
 // --------------------------------------------------------------
-// 9. TERMINER L'ÉPREUVE (récapitulatif final)
+// FIN DE L'ÉPREUVE
 // --------------------------------------------------------------
 function terminerEpreuve() {
     const container = document.getElementById('arcathlon-module');
     if (!container) return;
-
     const totalPts = state.cumulPointsVMA + state.cumulPointsTir;
     container.innerHTML = `
         <div class="text-center py-10">
@@ -643,15 +558,13 @@ function terminerEpreuve() {
                 <p class="text-lg font-bold text-blue-400">Points Tir : ${state.cumulPointsTir}</p>
                 <p class="text-lg font-bold text-emerald-400">Total : ${totalPts} pts</p>
             </div>
-            <button onclick="window.retourMenuArcathlon()" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">
-                ← Retour
-            </button>
+            <button onclick="window.retourMenuArcathlon()" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">← Retour</button>
         </div>
     `;
 }
 
 // --------------------------------------------------------------
-// 10. BILAN D'UNE SÉRIE
+// BILAN D'UNE SÉRIE
 // --------------------------------------------------------------
 function showBilan(data) {
     const totalPts = data.ptsVMA + data.scoreTir;
@@ -670,27 +583,20 @@ function showBilan(data) {
                 <p class="flex justify-between"><span class="text-slate-400">Points Tir</span><span class="font-bold text-blue-400">${data.scoreTir}</span></p>
                 <p class="flex justify-between border-t border-slate-700 pt-2"><span class="font-bold text-emerald-400">Total</span><span class="font-bold text-emerald-400">${totalPts} pts</span></p>
             </div>
-            <button onclick="this.parentElement.parentElement.remove();" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95 w-full">
-                Continuer →
-            </button>
+            <button onclick="this.parentElement.parentElement.remove();" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95 w-full">Continuer →</button>
         </div>
     `;
     document.body.appendChild(overlay);
 }
 
 // --------------------------------------------------------------
-// 11. UTILITAIRES
+// UTILITAIRES
 // --------------------------------------------------------------
 function updateButton(phase, text) {
     const btn = document.getElementById('giantBtn');
     if (!btn) return;
     btn.textContent = text;
-    const phaseMap = {
-        'course': 'btn-course',
-        'finale': 'btn-course',
-        'tir': 'btn-tir',
-        'penalite': 'btn-pen'
-    };
+    const phaseMap = { 'course': 'btn-course', 'tir': 'btn-tir', 'penalite': 'btn-pen' };
     btn.className = `btn-action ${phaseMap[phase] || 'btn-course'} w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform`;
 }
 
@@ -707,25 +613,15 @@ function showToast(message, duration = 3000) {
 function showDepartCountdown(seconds) {
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 bg-black/80 flex flex-col items-center justify-center z-50';
-    overlay.innerHTML = `
-        <div class="text-8xl font-black text-yellow-400">${seconds}s</div>
-        <p class="text-xl text-slate-400 mt-4">Départ dans...</p>
-    `;
+    overlay.innerHTML = `<div class="text-8xl font-black text-yellow-400">${seconds}s</div><p class="text-xl text-slate-400 mt-4">Départ dans...</p>`;
     document.body.appendChild(overlay);
-
     let count = seconds;
     const interval = setInterval(() => {
         count--;
         if (count <= 0) {
             clearInterval(interval);
-            overlay.innerHTML = `
-                <div class="text-8xl font-black text-emerald-400">GO ! 🚀</div>
-            `;
-            setTimeout(() => {
-                overlay.remove();
-                state.departSignal = true;
-                startCourse();
-            }, 1000);
+            overlay.innerHTML = `<div class="text-8xl font-black text-emerald-400">GO ! 🚀</div>`;
+            setTimeout(() => { overlay.remove(); state.departSignal = true; startCourse(); }, 1000);
         } else {
             overlay.querySelector('.text-8xl').textContent = `${count}s`;
         }
@@ -742,50 +638,28 @@ function injectStyles() {
         .panel-tir { background: #ffe1b3; color: #0a0f1a; }
         .panel-pen { background: #e1d0ff; color: #0a0f1a; }
         .phase-title { animation: phasePulse 1.5s ease-in-out infinite; transform-origin: left center; }
-        @keyframes phasePulse {
-            0% { transform: scale(1); opacity: 0.95; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-            100% { transform: scale(1); opacity: 0.95; }
-        }
+        @keyframes phasePulse { 0% { transform: scale(1); opacity: 0.95; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 0.95; } }
         .btn-course { background: linear-gradient(180deg, #5b57f1, #4f46e5); color: #fff; }
         .btn-tir { background: linear-gradient(180deg, #ffcc80, #f59e0b); color: #1b1200; }
         .btn-pen { background: linear-gradient(180deg, #b197ff, #9f86ff); color: #1b1200; }
-        .shot-btn { transition: all 0.15s; cursor: pointer; }
-        .penalty-btn { transition: all 0.15s; cursor: pointer; }
+        .shot-btn, .penalty-btn { transition: all 0.15s; cursor: pointer; }
         .penalty-btn:disabled { opacity: 0.7; cursor: default; }
     `;
     document.head.appendChild(style);
 }
 
-// --------------------------------------------------------------
-// 12. RETOUR
-// --------------------------------------------------------------
 window.retourMenuArcathlon = function() {
-    if (configListener) {
-        configListener();
-        configListener = null;
-    }
-    if (departListener) {
-        departListener();
-        departListener = null;
-    }
+    if (configListener) configListener();
+    if (departListener) departListener();
     stopClock();
-    if (clockInterval) {
-        cancelAnimationFrame(clockInterval);
-        clockInterval = null;
-    }
+    if (clockInterval) cancelAnimationFrame(clockInterval);
     const module = document.getElementById('arcathlon-module');
-    if (module) {
-        module.classList.add('hidden');
-    }
-    if (typeof window.resetToLogin === 'function') {
-        window.resetToLogin();
-    }
+    if (module) module.classList.add('hidden');
+    if (typeof window.resetToLogin === 'function') window.resetToLogin();
 };
-
 window.toggleShot = window.toggleShot;
 window.undoShot = window.undoShot;
 window.validatePenalty = window.validatePenalty;
 window.retourMenuArcathlon = window.retourMenuArcathlon;
 
-console.log('✅ Arcathlon kiosque chargé (flux : Course → Tir → Pénalités → ... → Course finale)');
+console.log('✅ Arcathlon kiosque chargé (finale automatique)');
