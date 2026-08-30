@@ -43,8 +43,9 @@ export function initLayout() {
     };
 
     // 1. Gestion des onglets
-    window.switchTab = function(tabName) { // <-- C'est ICI que tabName est défini !
-        ['admin', 'activities', 'live', 'tv', 'tools'].forEach(t => {
+    window.switchTab = function(tabName) {
+        // Cacher TOUTES les vues
+        ['admin', 'activities', 'live', 'tools'].forEach(t => {
             const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
             const el = document.getElementById(viewId);
             if (el) {
@@ -53,58 +54,51 @@ export function initLayout() {
             }
         });
 
+        // Gestion spéciale pour TV (plein écran)
         const tvView = document.getElementById('viewTV');
-        if (tabName === 'tv') {
-            tvView.style.display = 'block';
+        if (tvView) {
+            if (tabName === 'tv') tvView.style.display = 'block';
+            else tvView.style.display = 'none';
         }
 
-        // Activation des boutons d'onglet
+        // Activation des boutons
         ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
             const btn = document.getElementById(id);
-            if (btn) btn.classList.remove('tab-active', 'text-blue-500');
+            if (btn) {
+                btn.classList.remove('tab-active', 'text-blue-500');
+                btn.classList.add('text-slate-500');
+            }
         });
 
+        const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
+        
         // Affichage de la vue demandée
-        const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-        if (targetView) {
-            targetView.classList.remove('hidden');
-            targetView.style.display = '';
+        if (tabName !== 'tv') {
+            const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+            if (targetView) targetView.classList.remove('hidden');
         }
 
-        // Activation du bouton correspondant
-        const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
         const targetBtn = document.getElementById('btnTab' + map[tabName]);
         if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-        // Logique spéciale lors de l'ouverture de l'onglet OUTILS
-        if (tabName === 'tools') {
-            document.getElementById('tools-menu').classList.remove('hidden');
-            document.getElementById('tools-timer').classList.add('hidden');
-            document.getElementById('tools-calculator').classList.add('hidden');
-        }
-
-        // Logique spéciale TV
+        // Logique TV / Live spécifique
         if (tabName === 'tv') {
             const discipline = localStorage.getItem('eps_arena_current_discipline') || 'multi';
             setTimeout(() => {
-                if (discipline === 'badminton') {
-                    import('../../modules/badminton/badminton-tv.js').then(module => module.renderBadmintonTV());
-                } else if (discipline === 'orientshow') {
-                    import('../../modules/orientshow/orientshow-tv.js').then(module => module.renderOrientShowTV());
-                } else {
-                    import('../../modules/escalade/escalade-tv-ui.js').then(module => module.renderEscaladeTV());
-                }
+                const renderer = discipline === 'orientshow'
+                    ? import('../../modules/orientshow/orientshow-tv.js')
+                    : import('../../modules/escalade/escalade-tv-ui.js');
+                renderer
+                    .then(module => module[discipline === 'orientshow' ? 'renderOrientShowTV' : 'renderEscaladeTV']())
+                    .catch(err => console.error('Erreur TV:', err));
             }, 100);
         }
 
-        // Logique spéciale Live
         if (tabName === 'live') {
             setTimeout(() => {
                 import('../../ui/prof/live.js')
                     .then(module => {
-                        if (typeof module.initLiveUI === 'function') {
-                            module.initLiveUI();
-                        }
+                        if (typeof module.renderLive === 'function') module.renderLive();
                     })
                     .catch(err => console.error("Erreur import Live:", err));
             }, 100);
