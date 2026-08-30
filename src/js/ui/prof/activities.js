@@ -10,147 +10,10 @@ import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignment
 
 let currentDiscipline = 'multi';
 
-// Fonction locale pour construire le chemin hiérarchique
 function getBaseProf() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     return `etablissements/0680013V/profs/${profCode}`;
 }
-
-// ==========================================
-// LISTE DES COULEURS ET FONCTIONS DE PALETTE
-// ==========================================
-const colorOptions = [
-    { name: "Rouge", hex: "#ef4444" },
-    { name: "Bleu", hex: "#3b82f6" },
-    { name: "Vert", hex: "#22c55e" },
-    { name: "Jaune", hex: "#eab308" },
-    { name: "Orange", hex: "#f97316" },
-    { name: "Violet", hex: "#a855f7" },
-    { name: "Rose", hex: "#ec4899" },
-    { name: "Cyan", hex: "#06b6d4" },
-    { name: "Blanc", hex: "#ffffff" },
-    { name: "Noir", hex: "#000000" }
-];
-
-// Fonction pour calculer la couleur du texte en fonction du fond
-function getContrastColor(hex) {
-    const r = parseInt(hex.substr(1,2), 16);
-    const g = parseInt(hex.substr(3,2), 16);
-    const b = parseInt(hex.substr(5,2), 16);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance > 0.5 ? '#000000' : '#ffffff';
-}
-
-// Fonction globale pour ouvrir la palette (appelée par le clic sur "Couleur")
-window.openColorPicker = function(teamId) {
-    const team = window.lastTeams.find(t => t.id === teamId);
-    if (!team) return;
-
-    // Récupérer les couleurs déjà choisies par les autres équipes
-    const usedColors = window.lastTeams
-        .filter(t => t.id !== teamId && t.color !== '#e2e8f0')
-        .map(t => t.color);
-    
-    // Créer la modale
-    const modal = document.createElement('div');
-    modal.id = 'colorPickerModal';
-    modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50';
-    modal.innerHTML = `
-        <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 w-full max-w-sm">
-            <h3 class="text-xl font-black text-blue-400 uppercase mb-4 text-center">Choisir la couleur</h3>
-            <div class="grid grid-cols-2 gap-3">
-                ${colorOptions.map(color => {
-                    const isUsed = usedColors.includes(color.hex);
-                    return `
-                    <button onclick="applyColor('${teamId}', '${color.name}', '${color.hex}')"
-                            class="p-4 rounded-2xl font-bold text-lg border-2 transition-all flex items-center justify-center gap-2 ${isUsed ? 'opacity-30 cursor-not-allowed border-slate-700' : 'border-slate-600 hover:border-white'}"
-                            style="background-color: ${color.hex}; color: ${getContrastColor(color.hex)}"
-                            ${isUsed ? 'disabled' : ''}>
-                        <span class="w-4 h-4 rounded-full border border-slate-500" style="background-color: ${color.hex}"></span>
-                        ${color.name}
-                        ${isUsed ? '<span class="text-red-400 font-black ml-1">✖</span>' : ''}
-                    </button>`;
-                }).join('')}
-            </div>
-            <button onclick="document.getElementById('colorPickerModal').remove()" 
-                    class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white text-sm uppercase">
-                Fermer
-            </button>
-        </div>
-    `;
-    document.body.appendChild(modal);
-};
-
-// Fonction pour appliquer la couleur choisie
-window.applyColor = function(teamId, colorName, colorHex) {
-    const team = window.lastTeams.find(t => t.id === teamId);
-    if (team) {
-        team.label = colorName;
-        team.color = colorHex;
-        team.textColor = getContrastColor(colorHex);
-    }
-
-    // Fermer la modale
-    document.getElementById('colorPickerModal').remove();
-
-    // Régénérer l'affichage avec le nouveau label
-    window.renderTeams();
-};
-
-// Fonction pour régénérer l'affichage (utilisée après un changement de couleur)
-window.renderTeams = async function() {
-    const container = document.getElementById('teamsGrid');
-    const options = window.lastOptions || {};
-    if (!container || !window.lastTeams) return;
-
-    const teamsHTML = await Promise.all(window.lastTeams.map(async (team) => {
-        const membersHTML = await Promise.all(team.members.map(async (m) => {
-            const url = await getPhotoUrl(m.id);
-            const photoHtml = url 
-                ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`
-                : `<div class="w-10 h-10 rounded-full bg-slate-400 flex items-center justify-center text-xl">👤</div>`;
-            
-            let bgClass = 'bg-slate-200 border-slate-400';
-            if (m.sexe === 'M') bgClass = 'bg-blue-200 border-blue-400';
-            else if (m.sexe === 'F') bgClass = 'bg-rose-200 border-rose-400';
-
-            let criteriaHtml = '';
-            if (options.critere === 'vma') {
-                criteriaHtml = `<span class="text-emerald-700">VMA: ${m.vma || '--'}</span>`;
-            } else if (options.critere === 'force') {
-                let stars = '';
-                for (let i = 1; i <= (m.force || 0); i++) stars += '★';
-                criteriaHtml = `<span class="text-yellow-600 font-black">${stars}</span>`;
-            } else {
-                criteriaHtml = `<span class="text-purple-700">V: ${m.vma || '--'} | L: ${m.longueur || '--'} | 30m: ${m.sprint30 || '--'}</span>`;
-            }
-
-            return `<div class="p-2 rounded-lg border-2 ${bgClass} flex items-center gap-3 text-sm font-bold text-slate-900">
-                        ${photoHtml}
-                        <div class="flex flex-col leading-tight">
-                            <span>${m.prenom} ${m.nom}</span>
-                            <span class="text-[10px] font-bold">${criteriaHtml}</span>
-                        </div>
-                    </div>`;
-        }));
-
-        return `<div class="bg-slate-900 rounded-2xl p-4 border-2 relative" style="border-color: ${team.color}">
-                    <div class="flex justify-between items-center mb-3">
-                        <button onclick="openColorPicker('${team.id}')" 
-                                class="font-black text-xl px-4 py-2 rounded-lg border-2 border-dashed border-slate-500 hover:border-white transition-colors"
-                                style="background-color: ${team.color}; color: ${team.textColor}">
-                            ${team.label}
-                        </button>
-                        <span class="text-xs text-slate-500">${team.members.length} joueurs</span>
-                    </div>
-                    <div class="team-members flex flex-col gap-2">
-                        ${membersHTML.join('')}
-                    </div>
-                </div>`;
-    }));
-    container.innerHTML = teamsHTML.join('');
-};
-
 
 export function initActivities() {
     try { initCOInterface(); } catch (e) {}
@@ -162,17 +25,20 @@ export function initActivities() {
         currentDiscipline = disc;
         localStorage.setItem('eps_arena_current_discipline', disc);
 
+        // Cacher toutes les vues de discipline
         const multiView = document.getElementById('viewMultiSettings');
         const coView = document.getElementById('viewCOSettings');
         const osView = document.getElementById('viewOrientShowSettings');
         const escView = document.getElementById('viewEscaladeSettings');
         const bmtView = document.getElementById('viewBadmintonSettings');
+
         if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
         if (coView) coView.classList.toggle('hidden', disc !== 'co');
         if (osView) osView.classList.toggle('hidden', disc !== 'orientshow');
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
         if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
 
+        // Mettre à jour les boutons
         const btnMulti = document.getElementById('btnDisc-multi');
         const btnCo = document.getElementById('btnDisc-co');
         const btnOs = document.getElementById('btnDisc-orientshow');
@@ -185,30 +51,18 @@ export function initActivities() {
         if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
         if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
 
+        // Initialisation spécifique
         if (disc === 'co') {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
         if (disc === 'escalade') {
-            try {
-                initEscaladeInterface();
-                initSortableEscalade();
-                loadEscaladeAssignments();
-            } catch (e) {}
+            try { initEscaladeInterface(); initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
         }
         if (disc === 'orientshow') {
-            try {
-                setTimeout(() => {
-                    initOrientShowInterface();
-                    loadOrientShowAssignments();
-                }, 100);
-            } catch (e) {}
+            try { setTimeout(() => { initOrientShowInterface(); loadOrientShowAssignments(); }, 100); } catch (e) {}
         }
         if (disc === 'badminton') {
-            try {
-                initBadmintonInterface();
-                initSortableBadminton();
-                loadBadmintonAssignments();
-            } catch (e) {}
+            try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
         }
     };
 
@@ -460,10 +314,7 @@ export function initActivities() {
         const activeClasse = document.getElementById('selectClasse').value;
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
-
-        // Lire le nombre de terrains sélectionné dans le menu
         const nbTerrains = parseInt(document.getElementById('badmintonNbTerrains').value) || 6;
-
         generateBadmintonTeams(eleves, nbTerrains);
         alert("✅ Terrains générés par niveau de force !");
     };
