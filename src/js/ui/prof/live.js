@@ -5,8 +5,6 @@ import { renderCOLive } from '../../modules/co/co-live.js';
 import { renderMultiLive } from '../../modules/multi/multi-live.js';
 import { renderEscaladeTV } from '../../modules/escalade/escalade-tv-ui.js';
 import { renderOrientShowLive } from '../../modules/orientshow/orientshow-live.js';
-// ✅ IMPORT DU MODULE BADMINTON
-import { renderBadmintonLive } from '../../modules/badminton/badminton-live.js';
 import { exportIDoceo } from '../../services/export-idocéo.js';
 
 let currentClasse = "";
@@ -28,24 +26,23 @@ export function initLiveUI() {
         } else if (type === 'orientshow' && currentActivite === 'orientshow') {
             renderOrientShowLive();
         } else if (type === 'badminton' && currentActivite === 'badminton') {
-            // ✅ On affiche le Live Badminton dès qu'une donnée est reçue
-            renderBadmintonLive();
+            // ✅ Import dynamique pour éviter de casser toute l'application si le module échoue
+            import('../../modules/badminton/badminton-live.js')
+                .then(module => module.renderBadmintonLive())
+                .catch(err => console.error("Erreur chargement Live Badminton :", err));
         }
     });
 
-    // ✅ CRUCIAL : Ceci empêche la montagne de s'afficher par erreur
-    // et impose l'affichage du Badminton dès que la config change.
+    // ✅ Même logique pour l'événement config
     window.addEventListener('live-config-updated', () => {
         const currentActivite = getConfigData().activite || 'multi';
 
         if (currentActivite === 'badminton') {
-            // On recharge la grille Badminton
-            renderBadmintonLive();
+            import('../../modules/badminton/badminton-live.js')
+                .then(module => module.renderBadmintonLive())
+                .catch(err => console.error("Erreur chargement Live Badminton :", err));
         } else {
-            // Pour les autres activités, on vide ou on affiche selon le cas
             document.getElementById('live-content').innerHTML = '<p class="text-slate-500 text-center">En attente des données...</p>';
-            
-            // La montagne Escalade ne doit s'afficher que pour l'Escalade
             if (currentActivite === 'escalade' && isTVVisible()) {
                 renderEscaladeTV();
             }
@@ -70,30 +67,23 @@ window.exportBadmintonImpactCSV = function() {
 window.exportCOiDoceo = function() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe.");
-
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     if (eleves.length === 0) return alert("Aucun élève.");
-
     const sessionData = window.lastLiveSnap || {}; 
-    
     const results = {};
     eleves.forEach(e => {
         const code = e.code;
         if (!code || code === 'ABS' || code === 'INAPTE') return;
-
         let score = 0;
         let max = 0;
         let temps = 0;
-
         Object.values(sessionData[code] || {}).forEach(circ => {
             score += circ.pts || 0;
             max += circ.total || 0;
             if (circ.time && circ.time > temps) temps = circ.time;
         });
-
         results[code] = { points: score, objectif: max, time: temps };
     });
-
     exportIDoceo({
         students: eleves,
         results: results,
@@ -107,12 +97,9 @@ window.exportResultsLive = function() {
         currentClasse = document.getElementById('selectClasse').value;
     }
     if (!currentClasse) return alert("Sélectionnez une classe.");
-
     const studentsMap = getStudentsMap();
     const localMap = getLocalMapping();
-
     let csv = "\uFEFFNom;Type;Valeur\n";
-
     const rows = document.querySelectorAll('#live-content .bg-slate-800');
     rows.forEach(row => {
         const nameSpan = row.querySelector('.text-white');
@@ -121,7 +108,6 @@ window.exportResultsLive = function() {
         const value = valueSpan ? valueSpan.innerText : '';
         csv += `${name};Performance;${value}\n`;
     });
-
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
