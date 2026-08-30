@@ -181,7 +181,7 @@ export async function loadBadmintonAssignments() {
     const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
 
     for (const eleve of garcons) gContainer.appendChild(await createEleveCard(eleve));
-    for (const eleve de filles) fContainer.appendChild(await createEleveCard(eleve));
+    for (const eleve of filles) fContainer.appendChild(await createEleveCard(eleve));
     for (const eleve of autres) gContainer.appendChild(await createEleveCard(eleve));
 
     if (gContainer.children.length === 0) gContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
