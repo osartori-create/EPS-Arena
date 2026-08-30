@@ -165,9 +165,10 @@ function renderPhase() {
         } else if (state.running) {
             btnText = '🏁 Arrivée';
         } else {
-            btnText = 'Course en cours...';
-            showBtn = false;
+            // Normalement pas possible pour les séries suivantes
+            btnText = 'Démarrer la course';
         }
+        showBtn = true; // Toujours afficher le bouton en phase course
     } else if (state.phase === 'tir') {
         phaseLabel = `TIR SÉRIE ${state.serieActuelle}`;
         panelClass = 'panel-tir';
@@ -378,11 +379,9 @@ function startCourse() {
         state.phaseAccum = state.handicapMs;
     }
     startClock();
-    // Mettre à jour le bouton
-    if (state.phase === 'course' || state.phase === 'finale') {
-        const btn = document.getElementById('giantBtn');
-        if (btn) btn.textContent = '🏁 Arrivée';
-    }
+    // Mettre à jour le bouton (il existe car showBtn = true en phase course)
+    const btn = document.getElementById('giantBtn');
+    if (btn) btn.textContent = '🏁 Arrivée';
     const content = document.getElementById('phaseContent');
     if (content) content.innerHTML = renderPhaseContent();
 }
@@ -725,4 +724,4 @@ window.undoShot = window.undoShot;
 window.validatePenalty = window.validatePenalty;
 window.retourMenuArcathlon = window.retourMenuArcathlon;
 
-console.log('✅ Arcathlon kiosque chargé (flux validé)');
+console.log('✅ Arcathlon kiosque chargé (bouton Arrivée présent)');
