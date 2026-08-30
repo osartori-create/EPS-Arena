@@ -282,7 +282,7 @@ export function initActivities() {
         window.renderTeams();
     };
     
-    window.transmettreConfig = async function() {
+        window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe.");
 
@@ -311,7 +311,6 @@ export function initActivities() {
             });
         } 
         else if (currentDiscipline === 'orientshow') {
-            // ... (Votre code existant pour OrientShow reste identique)
             const DEFAULT_OS_MATRIX = {
                 1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
                 2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
@@ -359,9 +358,7 @@ export function initActivities() {
             if (startTime !== null) configData.startTime = startTime;
             if (endTime !== null) configData.endTime = endTime;
         } 
-        else {
-
-                else if (currentDiscipline === 'badminton') {
+        else if (currentDiscipline === 'badminton') {
             // Récupération des affectations sauvegardées
             const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
             configData = { activite: 'badminton' };
@@ -380,7 +377,8 @@ export function initActivities() {
                 // Config pour les iPads : Nombre de joueurs par terrain
                 configData[t] = idsTerrain.length;
             }
-        }
+        } 
+        else {
             // Multi-activités (par défaut)
             configData.activite = 'multi';
             if (window.lastTeams) {
