@@ -4,6 +4,9 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 
+// Palette de couleurs disponibles pour les maillots
+const COULEURS_DISPONIBLES = ['Rouge', 'Jaune', 'Bleu', 'Vert', 'Orange', 'Violet', 'Rose', 'Cyan'];
+
 // --------------------------------------------------------------
 // 1. GÉNÉRATION DES ÉQUIPES (3 par équipe, quartiles de VMA)
 // --------------------------------------------------------------
@@ -24,7 +27,7 @@ export function generateArcathlonTeams() {
         sorted.slice(quartileSize, quartileSize * 2), // Jaune
         sorted.slice(quartileSize * 2)          // Bleu
     ];
-    const couleurs = ['Rouge', 'Jaune', 'Bleu'];
+    const couleursParDefaut = ['Rouge', 'Jaune', 'Bleu'];
 
     // 3. Mélanger chaque quartile pour répartir aléatoirement
     quartiles.forEach(q => {
@@ -44,7 +47,6 @@ export function generateArcathlonTeams() {
 
     const equipes = [];
     for (let i = 0; i < nbEquipes; i++) {
-        // On garde la couleur associée au quartile (0=Rouge, 1=Jaune, 2=Bleu)
         const membres = [
             { ...quartiles[0][i], maillot: 'Rouge', absent: false, inapte: false },
             { ...quartiles[1][i], maillot: 'Jaune', absent: false, inapte: false },
@@ -58,25 +60,73 @@ export function generateArcathlonTeams() {
     }
 
     // 5. Sauvegarder dans localStorage
-    localStorage.setItem(`arcathlon_equipes_${activeClasse}`, JSON.stringify(equipes));
+    sauvegarderEquipes(activeClasse, equipes);
     renderArcathlonTeams();
-    initSortableArcathlon();
     alert(`✅ ${equipes.length} équipes générées. Glissez-déposez pour ajuster.`);
 }
 
 // --------------------------------------------------------------
-// 2. AFFICHAGE DES ÉQUIPES (avec photos, cases absent/inapte)
+// 2. FONCTIONS DE SAUVEGARDE / CHARGEMENT
+// --------------------------------------------------------------
+function sauvegarderEquipes(classe, equipes) {
+    localStorage.setItem(`arcathlon_equipes_${classe}`, JSON.stringify(equipes));
+}
+
+function chargerEquipes(classe) {
+    return JSON.parse(localStorage.getItem(`arcathlon_equipes_${classe}`) || '[]');
+}
+
+// --------------------------------------------------------------
+// 3. REMPLACEMENT COLLECTIF DES COULEURS
+// --------------------------------------------------------------
+export function remplacerCouleurCollectif() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe.");
+
+    const source = document.getElementById('couleurSource')?.value;
+    const target = document.getElementById('couleurCible')?.value;
+    if (!source || !target) return alert("Veuillez sélectionner une couleur source et une couleur cible.");
+    if (source === target) return alert("Les couleurs source et cible sont identiques.");
+
+    const equipes = chargerEquipes(activeClasse);
+    let modifie = 0;
+
+    equipes.forEach(eq => {
+        eq.membres.forEach(m => {
+            if (m.maillot === source) {
+                m.maillot = target;
+                modifie++;
+            }
+        });
+    });
+
+    if (modifie === 0) {
+        alert(`Aucun élève ne porte la couleur "${source}".`);
+        return;
+    }
+
+    sauvegarderEquipes(activeClasse, equipes);
+    renderArcathlonTeams();
+    alert(`✅ ${modifie} élève(s) changé(s) de "${source}" vers "${target}".`);
+}
+
+// --------------------------------------------------------------
+// 4. AFFICHAGE DES ÉQUIPES (avec photos, cases absent/inapte, sélecteur de couleur)
 // --------------------------------------------------------------
 export async function renderArcathlonTeams() {
     const container = document.getElementById('teamsGridArcathlon');
     if (!container) return;
 
-    // Sauvegarder la position de défilement
-    const scrollParent = container.closest('.overflow-y-auto') || container.parentElement;
-    const scrollTop = scrollParent.scrollTop || 0;
+    // Sauvegarder l'ID de l'équipe qui est en haut de la zone visible
+    const scrollContainer = container.closest('.overflow-y-auto') || container.parentElement;
+    const firstVisibleCard = scrollContainer.querySelector('.bg-slate-900.rounded-2xl');
+    let targetId = null;
+    if (firstVisibleCard) {
+        targetId = firstVisibleCard.dataset.teamId;
+    }
 
     const activeClasse = document.getElementById('selectClasse').value;
-    const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${activeClasse}`) || '[]');
+    const equipes = chargerEquipes(activeClasse);
 
     container.innerHTML = '';
     for (const eq of equipes) {
@@ -94,15 +144,21 @@ export async function renderArcathlonTeams() {
                 ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover">`
                 : `<div class="w-8 h-8 rounded-full bg-slate-700"></div>`;
 
-            const styleMap = {
-                'Rouge': 'text-red-400 bg-red-950/40 border-red-800',
-                'Jaune': 'text-yellow-400 bg-yellow-950/40 border-yellow-800',
-                'Bleu': 'text-blue-400 bg-blue-950/40 border-blue-800'
-            };
+            const styleMap = {};
+            COULEURS_DISPONIBLES.forEach(c => {
+                const colorLower = c.toLowerCase();
+                styleMap[c] = `text-${colorLower}-400 bg-${colorLower}-950/40 border-${colorLower}-800`;
+            });
+            // Fallback pour les couleurs non définies
             const style = styleMap[m.maillot] || 'bg-slate-800 border-slate-600 text-white';
 
             const absentChecked = m.absent ? 'checked' : '';
             const inapteChecked = m.inapte ? 'checked' : '';
+
+            // Sélecteur de couleur individuel (pour les ajustements fins)
+            const colorOptions = COULEURS_DISPONIBLES.map(c =>
+                `<option value="${c}" ${c === m.maillot ? 'selected' : ''}>${c}</option>`
+            ).join('');
 
             html += `
                 <div class="flex items-center justify-between border border-slate-800 p-2 rounded-lg ${style} bg-slate-950" data-id="${m.id}">
@@ -110,15 +166,18 @@ export async function renderArcathlonTeams() {
                         ${photoHtml}
                         <div>
                             <div class="font-bold text-xs text-white">${m.prenom} ${m.nom.charAt(0)}.</div>
-                            <div class="text-[9px] uppercase font-bold tracking-widest text-slate-400">${m.maillot} | VMA ${m.vma}</div>
+                            <div class="text-[9px] uppercase font-bold tracking-widest text-slate-400">VMA ${m.vma}</div>
                         </div>
                     </div>
-                    <div class="flex gap-2 text-[10px]">
-                        <label class="flex items-center gap-1 text-slate-400">
-                            <input type="checkbox" class="absent-check" data-eq="${eq.id}" data-maillot="${m.maillot}" ${absentChecked}> Absent
+                    <div class="flex items-center gap-2 text-[10px]">
+                        <select class="couleur-select bg-slate-800 border border-slate-600 rounded px-1 py-0.5 text-white" data-eq="${eq.id}" data-id="${m.id}">
+                            ${colorOptions}
+                        </select>
+                        <label class="flex items-center gap-1 text-slate-400" title="Absent">
+                            <input type="checkbox" class="absent-check" data-eq="${eq.id}" data-id="${m.id}" ${absentChecked}> A
                         </label>
-                        <label class="flex items-center gap-1 text-slate-400">
-                            <input type="checkbox" class="inapte-check" data-eq="${eq.id}" data-maillot="${m.maillot}" ${inapteChecked}> Inapte
+                        <label class="flex items-center gap-1 text-slate-400" title="Inapte">
+                            <input type="checkbox" class="inapte-check" data-eq="${eq.id}" data-id="${m.id}" ${inapteChecked}> I
                         </label>
                     </div>
                 </div>
@@ -129,33 +188,53 @@ export async function renderArcathlonTeams() {
     }
 
     // Restaurer la position de défilement
-    setTimeout(() => {
-        scrollParent.scrollTop = scrollTop;
-    }, 10);
+    if (targetId) {
+        const targetCard = container.querySelector(`[data-team-id="${targetId}"]`);
+        if (targetCard) {
+            targetCard.scrollIntoView({ block: 'start', behavior: 'auto' });
+        }
+    }
 
-    // Attacher les événements aux cases à cocher
+    // Attacher les événements
+    document.querySelectorAll('.couleur-select').forEach(sel => {
+        sel.addEventListener('change', (e) => {
+            const eqId = e.target.dataset.eq;
+            const eleveId = e.target.dataset.id;
+            const nouvelleCouleur = e.target.value;
+            const classe = document.getElementById('selectClasse').value;
+            const equipes = chargerEquipes(classe);
+            const eq = equipes.find(e => e.id === eqId);
+            if (!eq) return;
+            const membre = eq.membres.find(m => m.id === eleveId);
+            if (!membre) return;
+            membre.maillot = nouvelleCouleur;
+            sauvegarderEquipes(classe, equipes);
+            renderArcathlonTeams();
+        });
+    });
+
     document.querySelectorAll('.absent-check, .inapte-check').forEach(cb => {
         cb.addEventListener('change', (e) => {
             const eqId = e.target.dataset.eq;
-            const maillot = e.target.dataset.maillot;
+            const eleveId = e.target.dataset.id;
             const isAbsent = e.target.classList.contains('absent-check');
             const value = e.target.checked;
-
-            const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${activeClasse}`) || '[]');
+            const classe = document.getElementById('selectClasse').value;
+            const equipes = chargerEquipes(classe);
             const eq = equipes.find(e => e.id === eqId);
             if (!eq) return;
-            const membre = eq.membres.find(m => m.maillot === maillot);
+            const membre = eq.membres.find(m => m.id === eleveId);
             if (!membre) return;
 
             if (isAbsent) {
                 membre.absent = value;
-                if (value) membre.inapte = false; // exclusif
+                if (value) membre.inapte = false;
             } else {
                 membre.inapte = value;
                 if (value) membre.absent = false;
             }
-            localStorage.setItem(`arcathlon_equipes_${activeClasse}`, JSON.stringify(equipes));
-            renderArcathlonTeams(); // rafraîchir
+            sauvegarderEquipes(classe, equipes);
+            renderArcathlonTeams();
         });
     });
 
@@ -163,7 +242,7 @@ export async function renderArcathlonTeams() {
 }
 
 // --------------------------------------------------------------
-// 3. GLISSER-DÉPOSER (SORTABLE) – sans réattribution de couleur
+// 5. GLISSER-DÉPOSER (SORTABLE) – sans réattribution de couleur
 // --------------------------------------------------------------
 let sortableInstances = [];
 
@@ -184,7 +263,7 @@ export function initSortableArcathlon() {
                 if (fromTeam === toTeam) return;
 
                 const activeClasse = document.getElementById('selectClasse').value;
-                const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${activeClasse}`) || '[]');
+                const equipes = chargerEquipes(activeClasse);
                 const fromEq = equipes.find(e => e.id === fromTeam);
                 const toEq = equipes.find(e => e.id === toTeam);
                 if (!fromEq || !toEq) return;
@@ -192,10 +271,10 @@ export function initSortableArcathlon() {
                 const idx = fromEq.membres.findIndex(m => m.id === itemId);
                 if (idx === -1) return;
                 const moved = fromEq.membres.splice(idx, 1)[0];
-                // On ne réattribue PAS la couleur : on laisse celle que l'élève avait (basée sur sa VMA)
+                // On conserve la couleur de l'élève (elle peut être modifiée manuellement)
                 toEq.membres.push(moved);
 
-                localStorage.setItem(`arcathlon_equipes_${activeClasse}`, JSON.stringify(equipes));
+                sauvegarderEquipes(activeClasse, equipes);
                 renderArcathlonTeams();
             }
         });
@@ -204,13 +283,13 @@ export function initSortableArcathlon() {
 }
 
 // --------------------------------------------------------------
-// 4. TRANSMISSION VERS FIREBASE (avec nbFleches)
+// 6. TRANSMISSION VERS FIREBASE
 // --------------------------------------------------------------
 export function transmettreArcathlonConfig() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe.");
 
-    const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${activeClasse}`) || '[]');
+    const equipes = chargerEquipes(activeClasse);
     if (equipes.length === 0) return alert("Générez d'abord les équipes.");
 
     // Récupérer les paramètres
@@ -234,7 +313,6 @@ export function transmettreArcathlonConfig() {
         equipes: {}
     };
 
-    // Construction des équipes et mapping VMA
     equipes.forEach(eq => {
         configData.equipes[eq.id] = {
             pin: eq.pin,
@@ -251,15 +329,12 @@ export function transmettreArcathlonConfig() {
         });
     });
 
-    // Handicaps (si mode poursuite, on les charge depuis une autre fonction)
     if (mode === 'poursuite') {
-        // Par défaut, on met 0
         Object.keys(configData.vmaReference).forEach(key => {
             configData.handicaps[key] = 0;
         });
     }
 
-    // Envoi à Firebase
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${activeClasse}/arcathlon/config`);
 
@@ -274,26 +349,94 @@ export function transmettreArcathlonConfig() {
 }
 
 // --------------------------------------------------------------
-// 5. INITIALISATION DU MODULE (appelée par activities.js)
+// 7. EXPORT / IMPORT JSON
+// --------------------------------------------------------------
+export function exportArcathlonConfig() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe.");
+
+    const equipes = chargerEquipes(activeClasse);
+    const data = {
+        version: 1,
+        classe: activeClasse,
+        activite: 'arcathlon',
+        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
+        equipes: equipes
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${activeClasse}_arcathlon_equipes_${data.date}.json`;
+    a.click();
+}
+
+export function importArcathlonConfig(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.equipes) throw new Error("Format invalide.");
+            const classe = data.classe;
+            sauvegarderEquipes(classe, data.equipes);
+            const select = document.getElementById('selectClasse');
+            if (select.value !== classe) {
+                select.value = classe;
+                select.dispatchEvent(new Event('change'));
+            } else {
+                renderArcathlonTeams();
+            }
+            alert("✅ Configuration Arcathlon importée !");
+        } catch (err) {
+            alert("❌ Erreur d'import : " + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+// --------------------------------------------------------------
+// 8. INITIALISATION DU MODULE
 // --------------------------------------------------------------
 export function initArcathlonInterface() {
     const container = document.getElementById('viewArcathlonSettings');
     if (!container) return;
 
-    // On injecte le HTML de l'interface si nécessaire
     if (!document.getElementById('teamsGridArcathlon')) {
         container.innerHTML = `
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                     <h3 class="font-black text-blue-400 uppercase text-sm">🏹 Arcathlon – Équipes de 3</h3>
-                    <button onclick="window.generateArcathlonTeams()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">🔄 Générer Équipes</button>
+                    <div class="flex gap-2 flex-wrap">
+                        <button onclick="window.generateArcathlonTeams()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">🔄 Générer</button>
+                        <button onclick="window.exportArcathlonConfig()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400">⬇️ Export JSON</button>
+                        <button onclick="document.getElementById('importArcathlonFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400">⬆️ Import JSON</button>
+                        <input type="file" id="importArcathlonFile" class="hidden" accept=".json" onchange="window.importArcathlonConfig(event)">
+                    </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+
+                <!-- Panneau de remplacement collectif des couleurs -->
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 mb-4 flex flex-wrap items-center gap-3">
+                    <span class="text-xs font-bold text-slate-400 uppercase">Remplacer les couleurs :</span>
+                    <select id="couleurSource" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white">
+                        ${COULEURS_DISPONIBLES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                    </select>
+                    <span class="text-xs text-slate-400">→</span>
+                    <select id="couleurCible" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white">
+                        ${COULEURS_DISPONIBLES.map(c => `<option value="${c}">${c}</option>`).join('')}
+                    </select>
+                    <button onclick="window.remplacerCouleurCollectif()" class="bg-purple-600 px-4 py-1.5 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400">🔄 Appliquer</button>
+                    <span class="text-[10px] text-slate-500 ml-2">(ex: tous les Rouges deviennent Verts)</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Mode</label>
-                        <select id="arcathlonMode" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                        <select id="arcathlonMode" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm">
                             <option value="sprint">Sprint</option>
-                            <option value="poursuite">Poursuite inversée</option>
+                            <option value="poursuite">Poursuite</option>
                             <option value="relais">Relais</option>
                             <option value="killbill">Kill Bill</option>
                             <option value="mille">Mille</option>
@@ -301,26 +444,26 @@ export function initArcathlonInterface() {
                     </div>
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Nb séries</label>
-                        <input type="number" id="arcathlonNbSeries" value="3" min="1" max="5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+                        <input type="number" id="arcathlonNbSeries" value="3" min="1" max="5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
                     </div>
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Nb flèches</label>
-                        <input type="number" id="arcathlonNbFleches" value="2" min="1" max="3" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+                        <input type="number" id="arcathlonNbFleches" value="2" min="1" max="3" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase">Longueur piste (m)</label>
-                        <input type="number" id="arcathlonLongueurPiste" value="100" min="50" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Piste (m)</label>
+                        <input type="number" id="arcathlonLongueurPiste" value="100" min="50" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase">Tours par course</label>
-                        <input type="number" id="arcathlonNbToursCourse" value="2" min="1" max="5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Tours/course</label>
+                        <input type="number" id="arcathlonNbToursCourse" value="2" min="1" max="5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
                     </div>
                     <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase">Longueur pénalité (m)</label>
-                        <input type="number" id="arcathlonLongueurPenalite" value="30" min="10" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+                        <label class="text-xs font-bold text-slate-400 uppercase">Pénalité (m)</label>
+                        <input type="number" id="arcathlonLongueurPenalite" value="30" min="10" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
                     </div>
                 </div>
-                <button onclick="window.transmettreArcathlonConfig()" class="w-full bg-blue-600 py-4 rounded-xl font-black text-lg uppercase tracking-widest text-white border-4 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-transform">
+                <button onclick="window.transmettreArcathlonConfig()" class="w-full bg-blue-600 py-3 rounded-xl font-black text-base uppercase tracking-widest text-white border-4 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-transform">
                     📡 Transmettre aux iPads Élèves
                 </button>
                 <div id="teamsGridArcathlon" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-6"></div>
@@ -328,10 +471,9 @@ export function initArcathlonInterface() {
         `;
     }
 
-    // Charger les équipes existantes
     const activeClasse = document.getElementById('selectClasse').value;
     if (activeClasse) {
-        const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${activeClasse}`) || '[]');
+        const equipes = chargerEquipes(activeClasse);
         if (equipes.length > 0) {
             renderArcathlonTeams();
         }
@@ -340,4 +482,7 @@ export function initArcathlonInterface() {
     // Exposer les fonctions globales
     window.generateArcathlonTeams = generateArcathlonTeams;
     window.transmettreArcathlonConfig = transmettreArcathlonConfig;
+    window.exportArcathlonConfig = exportArcathlonConfig;
+    window.importArcathlonConfig = importArcathlonConfig;
+    window.remplacerCouleurCollectif = remplacerCouleurCollectif;
 }
