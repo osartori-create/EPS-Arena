@@ -531,6 +531,18 @@ window.endMatch = function() {
             stats: stats, // <--- C'est ici que la donnée d'impact est collectée !
             timestamp: Date.now() 
         })
-        .then(() => { ... });
+        .then(() => {
+            // Mise à jour locale des scores pour le classement
+            const matchIndex = matchSchedule.findIndex(m => m.id === currentMatch.id);
+            if (matchIndex !== -1) {
+                matchSchedule[matchIndex].s1 = s1;
+                matchSchedule[matchIndex].s2 = s2;
+            }
+            
+            // Retour à la liste des matchs et au classement
+            currentMatch = null;
+            renderMatchSetup();
+        })
+        .catch(err => alert("Erreur envoi : " + err.message));
     }
 };
