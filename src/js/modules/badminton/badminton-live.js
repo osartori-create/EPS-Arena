@@ -1,7 +1,6 @@
 // src/js/modules/badminton/badminton-live.js
 // Sous-module "Impacts" - Live Professeur
 
-// ✅ CORRECTION : Importation de "db" obligatoire pour Firebase
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
 
@@ -34,7 +33,7 @@ export function renderBadmintonLive() {
             }
         }
 
-        // 2. Écouter les résultats (avec stats impacts)
+        // 2. Écouter les résultats
         if (currentUnsub) currentUnsub();
         const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
         currentUnsub = onValue(resultsRef, (snap) => {
@@ -49,7 +48,7 @@ function renderGrid(terrainsConfig, data) {
     const mapping = getLocalMapping(currentClasse) || {};
     const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-    let html = '<h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏸 Badminton - Sous-module Impacts</h3>';
+    let html = '<h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏸 Badminton - Live Impacts</h3>';
     html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
 
     // Pour chaque terrain
@@ -58,12 +57,12 @@ function renderGrid(terrainsConfig, data) {
         const nbPlayers = terrainsConfig[t];
         const playersList = lettres.slice(0, nbPlayers);
 
-        // Agréger les données du terrain
         let terrainData = {};
-        playersList.forEach(p => terrainData[p] = { pts: 0, wins: 0, losses: 0, diff: 0, bonus: 0, total: 0, middle: 0, extreme: 0 });
+        playersList.forEach(p => terrainData[p] = { pts: 0, wins: 0, losses: 0, diff: 0, total: 0, middle: 0, extreme: 0 });
 
         Object.values(data).forEach(m => {
-            if (m.terrain !== terrain) return;
+            // ✅ CORRECTION ICI ! On convertit les deux en texte pour comparer.
+            if (String(m.terrain) !== String(terrain)) return;
 
             // Mise à jour des scores
             if (m.s1 > m.s2) {
@@ -97,15 +96,12 @@ function renderGrid(terrainsConfig, data) {
             <h4 class="font-black text-yellow-400 text-xl mb-3">Terrain ${terrain}</h4>
             <div class="space-y-2">
                 ${sortedPlayers.map(([player, stats], idx) => {
-                    // Calcul du % Bonus (Extérieur)
                     const pctBonus = stats.total > 0 ? Math.round((stats.extreme / stats.total) * 100) : 0;
                     
-                    // Couleur du % Bonus
                     let bonusColor = 'text-red-400';
                     if (pctBonus > 60) bonusColor = 'text-emerald-400';
                     else if (pctBonus > 40) bonusColor = 'text-amber-400';
 
-                    // Récupérer le nom réel via le mapping local
                     const mappingKey = `${currentClasse}_${terrain}_${player}`;
                     const eleveId = mapping[mappingKey];
                     const nomEleve = eleveId ? (JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]').find(e => e.id === eleveId)?.prenom || player) : player;
@@ -129,7 +125,7 @@ function renderGrid(terrainsConfig, data) {
 
     html += '</div>';
     
-    // Bouton Export iDoceo enrichi
+    // Bouton Export
     html += `<div class="mt-6">
         <button onclick="window.exportBadmintonImpactCSV()" class="bg-green-600 px-6 py-3 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (Stats Impacts)</button>
     </div>`;
@@ -137,9 +133,7 @@ function renderGrid(terrainsConfig, data) {
     container.innerHTML = html;
 }
 
-// Export iDoceo enrichi (Fonction appelée par le bouton)
+// Export iDoceo enrichi
 window.exportBadmintonImpactCSV = function() {
-    // Ici, vous pouvez ajouter le code d'export CSV complet (avec la colonne Bonus %)
-    // Pour l'instant, on simule une alerte pour confirmer que le bouton fonctionne.
     alert("Export des stats Impacts en préparation !");
 };
