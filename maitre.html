@@ -80,10 +80,10 @@
                 <div id="disciplineSelector" class="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <button onclick="switchDiscipline('multi')" id="btnDisc-multi" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏋️ Multi-activités</button>
                     <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🧭 CO</button>
-                    <!-- NOUVEAU BOUTON ORIENTSHOW -->
                     <button onclick="switchDiscipline('orientshow')" id="btnDisc-orientshow" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏃‍♂️ OrientShow</button>
                     <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🎯 Arcathlon</button>
-                    <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button><button onclick="switchDiscipline('badminton')" id="btnDisc-badminton" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏸 Badminton</button>
+                    <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button>
+                    <button onclick="switchDiscipline('badminton')" id="btnDisc-badminton" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏸 Badminton</button>
                 </div>
             </div>
 
@@ -158,6 +158,20 @@
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                         
+                        <!-- RÉSERVE CO restaurée ici ! -->
+                        <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+                            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve</h4>
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <div class="text-xs font-bold text-blue-400 uppercase mb-1">👦 Garçons</div>
+                                    <div id="reserveCOGarcons" class="flex flex-col gap-1 min-h-[100px] border border-blue-800/30 rounded-lg p-1"></div>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="text-xs font-bold text-rose-400 uppercase mb-1">👩 Filles</div>
+                                    <div id="reserveCOFilles" class="flex flex-col gap-1 min-h-[100px] border border-rose-800/30 rounded-lg p-1"></div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="lg:col-span-2">
                             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Postes (A1, C4...)</h4>
                             <div id="postesGrid" class="grid grid-cols-3 md:grid-cols-4 gap-2"></div>
