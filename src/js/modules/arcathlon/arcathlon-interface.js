@@ -8,11 +8,23 @@ import { db, ref, set } from '../../core/firebase-service.js';
 const COULEURS_DISPONIBLES = ['Rouge', 'Jaune', 'Bleu', 'Vert', 'Orange', 'Violet', 'Rose', 'Cyan'];
 
 // --------------------------------------------------------------
-// 1. GÉNÉRATION DES ÉQUIPES (3 par équipe, quartiles de VMA)
+// 1. GÉNÉRATION DES ÉQUIPES (avec choix des couleurs par quartile)
 // --------------------------------------------------------------
 export function generateArcathlonTeams() {
     const activeClasse = document.getElementById('selectClasse').value;
     if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+
+    // Récupérer les couleurs choisies par le professeur
+    const couleurVMAplus = document.getElementById('couleurVMAplus')?.value || 'Rouge';
+    const couleurVMAinter = document.getElementById('couleurVMAinter')?.value || 'Jaune';
+    const couleurVMAmoins = document.getElementById('couleurVMAmoins')?.value || 'Bleu';
+    const couleursSelectionnees = [couleurVMAplus, couleurVMAinter, couleurVMAmoins];
+
+    // Vérifier l'unicité
+    if (new Set(couleursSelectionnees).size < 3) {
+        alert("Les trois couleurs doivent être différentes.");
+        return;
+    }
 
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     if (eleves.length < 3) return alert("Il faut au moins 3 élèves pour constituer des équipes.");
@@ -20,14 +32,13 @@ export function generateArcathlonTeams() {
     // 1. Trier par VMA décroissante
     const sorted = [...eleves].sort((a, b) => (b.vma || 0) - (a.vma || 0));
 
-    // 2. Répartir en 3 quartiles (Rouge = meilleurs, Jaune = intermédiaires, Bleu = moins bons)
+    // 2. Répartir en 3 quartiles
     const quartileSize = Math.ceil(sorted.length / 3);
     const quartiles = [
-        sorted.slice(0, quartileSize),          // Rouge
-        sorted.slice(quartileSize, quartileSize * 2), // Jaune
-        sorted.slice(quartileSize * 2)          // Bleu
+        sorted.slice(0, quartileSize),          // VMA+
+        sorted.slice(quartileSize, quartileSize * 2), // VMA±
+        sorted.slice(quartileSize * 2)          // VMA−
     ];
-    const couleursParDefaut = ['Rouge', 'Jaune', 'Bleu'];
 
     // 3. Mélanger chaque quartile pour répartir aléatoirement
     quartiles.forEach(q => {
@@ -37,7 +48,7 @@ export function generateArcathlonTeams() {
         }
     });
 
-    // 4. Construire les équipes : on prend un élève de chaque quartile
+    // 4. Construire les équipes
     const nbEquipes = Math.min(
         quartiles[0].length,
         quartiles[1].length,
@@ -48,9 +59,9 @@ export function generateArcathlonTeams() {
     const equipes = [];
     for (let i = 0; i < nbEquipes; i++) {
         const membres = [
-            { ...quartiles[0][i], maillot: 'Rouge', absent: false, inapte: false },
-            { ...quartiles[1][i], maillot: 'Jaune', absent: false, inapte: false },
-            { ...quartiles[2][i], maillot: 'Bleu', absent: false, inapte: false }
+            { ...quartiles[0][i], maillot: couleursSelectionnees[0], absent: false, inapte: false },
+            { ...quartiles[1][i], maillot: couleursSelectionnees[1], absent: false, inapte: false },
+            { ...quartiles[2][i], maillot: couleursSelectionnees[2], absent: false, inapte: false }
         ];
         equipes.push({
             id: `EQ${i + 1}`,
@@ -59,10 +70,9 @@ export function generateArcathlonTeams() {
         });
     }
 
-    // 5. Sauvegarder dans localStorage
     sauvegarderEquipes(activeClasse, equipes);
     renderArcathlonTeams();
-    alert(`✅ ${equipes.length} équipes générées. Glissez-déposez pour ajuster.`);
+    alert(`✅ ${equipes.length} équipes générées avec les couleurs : ${couleursSelectionnees.join(', ')}`);
 }
 
 // --------------------------------------------------------------
@@ -77,7 +87,7 @@ function chargerEquipes(classe) {
 }
 
 // --------------------------------------------------------------
-// 3. REMPLACEMENT COLLECTIF DES COULEURS
+// 3. REMPLACEMENT COLLECTIF DES COULEURS (corrigé)
 // --------------------------------------------------------------
 export function remplacerCouleurCollectif() {
     const activeClasse = document.getElementById('selectClasse').value;
@@ -111,13 +121,13 @@ export function remplacerCouleurCollectif() {
 }
 
 // --------------------------------------------------------------
-// 4. AFFICHAGE DES ÉQUIPES (avec photos, cases absent/inapte, sélecteur de couleur)
+// 4. AFFICHAGE DES ÉQUIPES (avec bandeau couleur + sexe)
 // --------------------------------------------------------------
 export async function renderArcathlonTeams() {
     const container = document.getElementById('teamsGridArcathlon');
     if (!container) return;
 
-    // Sauvegarder l'ID de l'équipe qui est en haut de la zone visible
+    // Sauvegarder la position de défilement
     const scrollContainer = container.closest('.overflow-y-auto') || container.parentElement;
     const firstVisibleCard = scrollContainer.querySelector('.bg-slate-900.rounded-2xl');
     let targetId = null;
@@ -144,41 +154,56 @@ export async function renderArcathlonTeams() {
                 ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover">`
                 : `<div class="w-8 h-8 rounded-full bg-slate-700"></div>`;
 
-            const styleMap = {};
-            COULEURS_DISPONIBLES.forEach(c => {
-                const colorLower = c.toLowerCase();
-                styleMap[c] = `text-${colorLower}-400 bg-${colorLower}-950/40 border-${colorLower}-800`;
-            });
-            // Fallback pour les couleurs non définies
-            const style = styleMap[m.maillot] || 'bg-slate-800 border-slate-600 text-white';
+            // Fond selon le sexe (comme dans les autres modules)
+            let bgSexe = 'bg-slate-200 border-slate-400';
+            if (m.sexe === 'M') bgSexe = 'bg-blue-200 border-blue-400';
+            else if (m.sexe === 'F') bgSexe = 'bg-rose-200 border-rose-400';
+
+            // Bandeau de couleur du maillot en haut de la carte
+            const colorMap = {
+                'Rouge': 'bg-red-600',
+                'Jaune': 'bg-yellow-500',
+                'Bleu': 'bg-blue-600',
+                'Vert': 'bg-green-600',
+                'Orange': 'bg-orange-500',
+                'Violet': 'bg-purple-600',
+                'Rose': 'bg-pink-500',
+                'Cyan': 'bg-cyan-500'
+            };
+            const bandeauCouleur = colorMap[m.maillot] || 'bg-slate-600';
 
             const absentChecked = m.absent ? 'checked' : '';
             const inapteChecked = m.inapte ? 'checked' : '';
 
-            // Sélecteur de couleur individuel (pour les ajustements fins)
+            // Sélecteur de couleur individuel
             const colorOptions = COULEURS_DISPONIBLES.map(c =>
                 `<option value="${c}" ${c === m.maillot ? 'selected' : ''}>${c}</option>`
             ).join('');
 
             html += `
-                <div class="flex items-center justify-between border border-slate-800 p-2 rounded-lg ${style} bg-slate-950" data-id="${m.id}">
-                    <div class="flex items-center gap-2">
-                        ${photoHtml}
-                        <div>
-                            <div class="font-bold text-xs text-white">${m.prenom} ${m.nom.charAt(0)}.</div>
-                            <div class="text-[9px] uppercase font-bold tracking-widest text-slate-400">VMA ${m.vma}</div>
+                <div class="relative rounded-lg border-2 ${bgSexe} bg-opacity-80" data-id="${m.id}">
+                    <!-- Bandeau de couleur du maillot -->
+                    <div class="${bandeauCouleur} h-1.5 rounded-t-lg"></div>
+                    <div class="flex items-center justify-between p-2">
+                        <div class="flex items-center gap-2">
+                            ${photoHtml}
+                            <div>
+                                <div class="font-black text-slate-900 text-sm">${m.prenom}</div>
+                                <div class="text-xs font-bold text-slate-600 uppercase">${m.nom}</div>
+                                <div class="text-[10px] font-bold text-slate-500">VMA ${m.vma}</div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="flex items-center gap-2 text-[10px]">
-                        <select class="couleur-select bg-slate-800 border border-slate-600 rounded px-1 py-0.5 text-white" data-eq="${eq.id}" data-id="${m.id}">
-                            ${colorOptions}
-                        </select>
-                        <label class="flex items-center gap-1 text-slate-400" title="Absent">
-                            <input type="checkbox" class="absent-check" data-eq="${eq.id}" data-id="${m.id}" ${absentChecked}> A
-                        </label>
-                        <label class="flex items-center gap-1 text-slate-400" title="Inapte">
-                            <input type="checkbox" class="inapte-check" data-eq="${eq.id}" data-id="${m.id}" ${inapteChecked}> I
-                        </label>
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <select class="couleur-select bg-slate-800 border border-slate-600 rounded px-1 py-0.5 text-white" data-eq="${eq.id}" data-id="${m.id}">
+                                ${colorOptions}
+                            </select>
+                            <label class="flex items-center gap-0.5 text-slate-600" title="Absent">
+                                <input type="checkbox" class="absent-check" data-eq="${eq.id}" data-id="${m.id}" ${absentChecked}> A
+                            </label>
+                            <label class="flex items-center gap-0.5 text-slate-600" title="Inapte">
+                                <input type="checkbox" class="inapte-check" data-eq="${eq.id}" data-id="${m.id}" ${inapteChecked}> I
+                            </label>
+                        </div>
                     </div>
                 </div>
             `;
@@ -242,7 +267,7 @@ export async function renderArcathlonTeams() {
 }
 
 // --------------------------------------------------------------
-// 5. GLISSER-DÉPOSER (SORTABLE) – sans réattribution de couleur
+// 5. GLISSER-DÉPOSER (SORTABLE)
 // --------------------------------------------------------------
 let sortableInstances = [];
 
@@ -271,7 +296,6 @@ export function initSortableArcathlon() {
                 const idx = fromEq.membres.findIndex(m => m.id === itemId);
                 if (idx === -1) return;
                 const moved = fromEq.membres.splice(idx, 1)[0];
-                // On conserve la couleur de l'élève (elle peut être modifiée manuellement)
                 toEq.membres.push(moved);
 
                 sauvegarderEquipes(activeClasse, equipes);
@@ -417,9 +441,26 @@ export function initArcathlonInterface() {
                     </div>
                 </div>
 
-                <!-- Panneau de remplacement collectif des couleurs -->
+                <!-- Choix des couleurs par quartile (avant génération) -->
                 <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 mb-4 flex flex-wrap items-center gap-3">
-                    <span class="text-xs font-bold text-slate-400 uppercase">Remplacer les couleurs :</span>
+                    <span class="text-xs font-bold text-slate-400 uppercase">Couleurs des maillots :</span>
+                    <label class="text-xs text-slate-400">VMA+</label>
+                    <select id="couleurVMAplus" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white">
+                        ${COULEURS_DISPONIBLES.map(c => `<option value="${c}" ${c==='Rouge'?'selected':''}>${c}</option>`).join('')}
+                    </select>
+                    <label class="text-xs text-slate-400">VMA±</label>
+                    <select id="couleurVMAinter" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white">
+                        ${COULEURS_DISPONIBLES.map(c => `<option value="${c}" ${c==='Jaune'?'selected':''}>${c}</option>`).join('')}
+                    </select>
+                    <label class="text-xs text-slate-400">VMA−</label>
+                    <select id="couleurVMAmoins" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white">
+                        ${COULEURS_DISPONIBLES.map(c => `<option value="${c}" ${c==='Bleu'?'selected':''}>${c}</option>`).join('')}
+                    </select>
+                </div>
+
+                <!-- Panneau de remplacement collectif -->
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 mb-4 flex flex-wrap items-center gap-3">
+                    <span class="text-xs font-bold text-slate-400 uppercase">Remplacer :</span>
                     <select id="couleurSource" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white">
                         ${COULEURS_DISPONIBLES.map(c => `<option value="${c}">${c}</option>`).join('')}
                     </select>
@@ -428,7 +469,6 @@ export function initArcathlonInterface() {
                         ${COULEURS_DISPONIBLES.map(c => `<option value="${c}">${c}</option>`).join('')}
                     </select>
                     <button onclick="window.remplacerCouleurCollectif()" class="bg-purple-600 px-4 py-1.5 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400">🔄 Appliquer</button>
-                    <span class="text-[10px] text-slate-500 ml-2">(ex: tous les Rouges deviennent Verts)</span>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
