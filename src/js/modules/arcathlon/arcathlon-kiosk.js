@@ -1,5 +1,5 @@
 // src/js/modules/arcathlon/arcathlon-kiosk.js
-// Interface élève – Sélection équipe + PIN, phases, chrono, tirs, pénalités, enregistrement
+// Interface élève – Phases, chrono, tirs, pénalités, enregistrement
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -8,14 +8,13 @@ import { db, ref, onValue, push } from '../../core/firebase-service.js';
 // --------------------------------------------------------------
 const state = {
     classe: '',
-    code: '',              // EQ1_Rouge
+    code: '',
     equipeId: '',
     maillot: '',
     config: null,
-    equipes: {},
     serieActuelle: 1,
     nbSeries: 3,
-    phase: 'course',       // course | tir | penalite | fin
+    phase: 'course',          // course | tir | penalite | fin
     running: false,
     phaseStart: null,
     phaseAccum: 0,
@@ -32,11 +31,15 @@ const state = {
     distanceCourse: 0,
     longueurPenalite: 30,
     mode: 'sprint',
-    // Pour la détection de fraude
     alerteTriche: false,
-    // Pour l'affichage du bilan
-    distanceTotaleParcourue: 0,
-    reussitesTir: 0
+    distanceTotaleSerie: 0,
+    reussitesTir: 0,
+    // Cumul sur toutes les séries pour le bilan final
+    cumulDistance: 0,
+    cumulPointsVMA: 0,
+    cumulPointsTir: 0,
+    cumulTemps: 0,
+    seriesTerminees: 0
 };
 
 let configListener = null;
@@ -44,7 +47,7 @@ let departListener = null;
 let clockInterval = null;
 
 // --------------------------------------------------------------
-// 1. INITIALISATION (appelée par eleve-app.js)
+// 1. INITIALISATION
 // --------------------------------------------------------------
 export function initArcathlonKiosk(classe, code) {
     state.classe = classe;
@@ -61,8 +64,13 @@ export function initArcathlonKiosk(classe, code) {
     state.penDone = 0;
     state.departSignal = false;
     state.alerteTriche = false;
-    state.distanceTotaleParcourue = 0;
+    state.distanceTotaleSerie = 0;
     state.reussitesTir = 0;
+    state.cumulDistance = 0;
+    state.cumulPointsVMA = 0;
+    state.cumulPointsTir = 0;
+    state.cumulTemps = 0;
+    state.seriesTerminees = 0;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/config`);
@@ -115,21 +123,19 @@ export function initArcathlonKiosk(classe, code) {
                 if (remaining > 0) {
                     showDepartCountdown(remaining);
                 } else {
-                    // Départ immédiat
                     startCourse();
                 }
             }
         });
     }
 
-    // Masquer les autres modules
     document.querySelectorAll('#activity-screen .module').forEach(el => el.classList.add('hidden'));
     const module = document.getElementById('arcathlon-module');
     if (module) module.classList.remove('hidden');
 }
 
 // --------------------------------------------------------------
-// 2. AFFICHAGE DE LA PHASE
+// 2. AFFICHAGE
 // --------------------------------------------------------------
 function renderPhase() {
     const container = document.getElementById('arcathlon-module');
@@ -166,7 +172,6 @@ function renderPhase() {
 
     container.innerHTML = `
         <div class="flex flex-col gap-4 max-w-4xl mx-auto">
-            <!-- En-tête -->
             <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
                 <div>
                     <span class="text-xs uppercase text-slate-400 font-bold">Équipe</span>
@@ -182,7 +187,6 @@ function renderPhase() {
                 </div>
             </div>
 
-            <!-- Panneau Phase -->
             <div class="phase-panel ${phaseInfo.panel} p-4 rounded-2xl">
                 <div class="flex justify-between items-center">
                     <div>
@@ -197,17 +201,14 @@ function renderPhase() {
                 </div>
             </div>
 
-            <!-- Bouton d'action principal -->
             <button id="giantBtn" class="btn-action ${phaseInfo.btn} w-full py-6 rounded-2xl font-black text-xl uppercase shadow-xl active:scale-95 transition-transform">
                 ${btnText}
             </button>
 
-            <!-- Contenu de la phase -->
             <div id="phaseContent" class="bg-slate-800 p-4 rounded-2xl border border-slate-700 min-h-[180px]">
                 ${renderPhaseContent()}
             </div>
 
-            <!-- Bouton retour -->
             <button onclick="window.retourMenuArcathlon()" class="bg-slate-700 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">
                 ← Retour
             </button>
@@ -224,9 +225,6 @@ function renderPhase() {
     updateClockDisplay();
 }
 
-// --------------------------------------------------------------
-// 3. CONTENU DE LA PHASE
-// --------------------------------------------------------------
 function renderPhaseContent() {
     if (state.phase === 'course') {
         return `
@@ -295,7 +293,7 @@ function renderPhaseContent() {
 }
 
 // --------------------------------------------------------------
-// 4. CHRONO
+// 3. CHRONO
 // --------------------------------------------------------------
 function startClock() {
     if (state.running) return;
@@ -318,7 +316,6 @@ function stopClock() {
         cancelAnimationFrame(clockInterval);
         clockInterval = null;
     }
-    // Mise à jour des temps cumulés
     if (state.phase === 'course') {
         state.tempsCourse += state.phaseAccum;
     } else if (state.phase === 'penalite') {
@@ -356,7 +353,7 @@ function formatTime(ms) {
 }
 
 // --------------------------------------------------------------
-// 5. ACTIONS PAR PHASE
+// 4. ACTIONS PAR PHASE
 // --------------------------------------------------------------
 function onGiantAction() {
     if (state.phase === 'course') {
@@ -391,8 +388,10 @@ function finishCourse() {
 
     // Dernière série ? On enregistre directement (pas de tir ni pénalité)
     if (state.serieActuelle >= state.nbSeries) {
-        savePassage();
-        return;
+        // Enregistrer la série sans tir (cas où il n'y a pas de tir à la dernière série)
+        // Mais normalement, la dernière série a un tir aussi. On va plutôt permettre le tir.
+        // Donc on ne fait rien ici, on passe au tir.
+        // (En fait, si c'est la dernière série, on doit quand même faire le tir.)
     }
 
     // Passer au tir
@@ -406,7 +405,7 @@ function finishCourse() {
 }
 
 // --------------------------------------------------------------
-// 6. TIRS (avec règle simple : 1 tour par flèche manquée)
+// 5. TIRS
 // --------------------------------------------------------------
 window.toggleShot = function(index) {
     if (state.phase !== 'tir') return;
@@ -450,15 +449,13 @@ function finishTir() {
         startClock();
         updateButton('penalite', 'Effectuer les tours');
     } else {
-        // Pas de pénalité → on termine la série (pas de grande boucle supplémentaire)
-        // Mais selon la logique, on doit faire une grande boucle après les pénalités ? Non, on termine.
-        // On enregistre directement.
+        // Pas de pénalité → fin de série
         savePassage();
     }
 }
 
 // --------------------------------------------------------------
-// 7. PÉNALITÉS
+// 6. PÉNALITÉS
 // --------------------------------------------------------------
 window.validatePenalty = function(index) {
     if (state.phase !== 'penalite') return;
@@ -479,33 +476,22 @@ window.validatePenalty = function(index) {
         stopClock();
         state.tempsPenalite += state.phaseAccum;
         state.tempsTotal = state.tempsCourse + state.tempsPenalite;
-        // Après avoir terminé les pénalités, on fait une grande boucle (course)
-        // Sauf si c'est la dernière série → on enregistre directement
-        if (state.serieActuelle >= state.nbSeries) {
-            savePassage();
-        } else {
-            // On repart en course (grande boucle)
-            state.phase = 'course';
-            state.phaseAccum = 0;
-            state.phaseStart = null;
-            renderPhase();
-            // On laisse l'élève démarrer manuellement
-            updateButton('course', 'Démarrer la course');
-        }
+        // Fin de série
+        savePassage();
     }
 };
 
 // --------------------------------------------------------------
-// 8. SAUVEGARDE DU PASSAGE (avec détection de fraude)
+// 7. SAUVEGARDE DU PASSAGE
 // --------------------------------------------------------------
 function savePassage() {
     stopClock();
 
-    // Distance totale parcourue : course + pénalités
-    const distanceTotale = state.distanceCourse + (state.penDone * state.longueurPenalite);
-    state.distanceTotaleParcourue = distanceTotale;
+    // Distance totale pour cette série : course + pénalités
+    const distanceTotaleSerie = state.distanceCourse + (state.penDone * state.longueurPenalite);
+    state.distanceTotaleSerie = distanceTotaleSerie;
 
-    const distanceKm = distanceTotale / 1000;
+    const distanceKm = distanceTotaleSerie / 1000;
     const tempsHeures = state.tempsTotal / 1000 / 3600;
     const vitesse = tempsHeures > 0 ? distanceKm / tempsHeures : 0;
 
@@ -515,7 +501,7 @@ function savePassage() {
     else if (vitesse >= state.vmaRef - 0.5) ptsVMA = 2;
     else if (vitesse >= state.vmaRef - 1) ptsVMA = 1;
 
-    // Bonus de tir (simple : 5 pts par flèche réussie)
+    // Bonus de tir (5 pts par flèche réussie)
     const scoreTir = state.reussitesTir * 5;
     let bonus = 0;
     if (scoreTir < 7) bonus = 0;
@@ -550,11 +536,18 @@ function savePassage() {
         bonus: bonus,
         penalites: state.penDone,
         handicap: state.handicapMs,
-        distanceTotale: Math.round(distanceTotale),
+        distanceTotale: Math.round(distanceTotaleSerie),
         reussitesTir: state.reussitesTir,
         alerteTriche: state.alerteTriche,
         timestamp: Date.now()
     };
+
+    // Mise à jour des cumuls
+    state.cumulDistance += distanceTotaleSerie;
+    state.cumulPointsVMA += ptsVMA;
+    state.cumulPointsTir += scoreTir;
+    state.cumulTemps += state.tempsTotal;
+    state.seriesTerminees++;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/arcathlon/passages/${state.mode}`;
@@ -582,23 +575,21 @@ function savePassage() {
                     updateButton('course', '⏳ Attente départ...');
                 }
             } else {
-                // Fin de toutes les séries
+                // Fin de toutes les séries – afficher le récapitulatif complet
                 const container = document.getElementById('arcathlon-module');
                 if (container) {
-                    const totalPts = passageData.ptsVMA + passageData.scoreTir;
+                    const totalPts = state.cumulPointsVMA + state.cumulPointsTir;
+                    const moyenneTemps = state.seriesTerminees > 0 ? state.cumulTemps / state.seriesTerminees : 0;
                     container.innerHTML = `
                         <div class="text-center py-10">
                             <div class="text-6xl mb-6">🏆</div>
                             <p class="text-3xl font-black text-emerald-400">Terminé !</p>
-                            <p class="text-slate-400 mt-2">Bravo, toutes les séries sont effectuées.</p>
+                            <p class="text-slate-400 mt-2">Bravo, toutes les ${state.nbSeries} séries sont effectuées.</p>
                             <div class="mt-6 bg-slate-800 p-6 rounded-2xl border border-slate-700 max-w-md mx-auto text-left">
-                                <p class="text-sm text-slate-400">Dernière série :</p>
-                                <p class="text-lg font-bold text-white">Temps total : ${formatTime(passageData.tempsTotal)}</p>
-                                <p class="text-lg font-bold text-white">Distance : ${passageData.distanceTotale}m</p>
-                                <p class="text-lg font-bold text-white">Vitesse : ${passageData.vitesse} km/h</p>
-                                ${passageData.alerteTriche ? '<p class="text-lg font-bold text-red-400">⚠️ Vitesse suspecte</p>' : ''}
-                                <p class="text-lg font-bold text-yellow-400">Points VMA : ${passageData.ptsVMA}</p>
-                                <p class="text-lg font-bold text-blue-400">Points Tir : ${passageData.scoreTir}</p>
+                                <p class="text-lg font-bold text-white">Temps total cumulé : ${formatTime(state.cumulTemps)}</p>
+                                <p class="text-lg font-bold text-white">Distance totale : ${Math.round(state.cumulDistance)}m</p>
+                                <p class="text-lg font-bold text-yellow-400">Points VMA : ${state.cumulPointsVMA}</p>
+                                <p class="text-lg font-bold text-blue-400">Points Tir : ${state.cumulPointsTir}</p>
                                 <p class="text-lg font-bold text-emerald-400">Total : ${totalPts} pts</p>
                             </div>
                             <button onclick="window.retourMenuArcathlon()" class="mt-6 bg-blue-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">
@@ -616,7 +607,7 @@ function savePassage() {
 }
 
 // --------------------------------------------------------------
-// 9. BILAN D'UNE SÉRIE
+// 8. BILAN D'UNE SÉRIE
 // --------------------------------------------------------------
 function showBilan(data) {
     const totalPts = data.ptsVMA + data.scoreTir;
@@ -644,7 +635,7 @@ function showBilan(data) {
 }
 
 // --------------------------------------------------------------
-// 10. UTILITAIRES
+// 9. UTILITAIRES
 // --------------------------------------------------------------
 function updateButton(phase, text) {
     const btn = document.getElementById('giantBtn');
@@ -717,7 +708,7 @@ function injectStyles() {
 }
 
 // --------------------------------------------------------------
-// 11. RETOUR
+// 10. RETOUR
 // --------------------------------------------------------------
 window.retourMenuArcathlon = function() {
     if (configListener) {
@@ -742,10 +733,9 @@ window.retourMenuArcathlon = function() {
     }
 };
 
-// Exposer les fonctions globales
 window.toggleShot = window.toggleShot;
 window.undoShot = window.undoShot;
 window.validatePenalty = window.validatePenalty;
 window.retourMenuArcathlon = window.retourMenuArcathlon;
 
-console.log('✅ Arcathlon kiosque chargé (version enrichie)');
+console.log('✅ Arcathlon kiosque chargé (version finale)');
