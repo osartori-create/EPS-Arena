@@ -8,6 +8,8 @@ import { db, ref, set, remove } from '../../core/firebase-service.js';
 import { initOrientShowInterface, loadOrientShowAssignments, exportOrientShowConfig, importOrientShowConfig, startOrientShow, stopOrientShow } from '../../modules/orientshow/orientshow-interface.js';
 import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
 import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
+// NOUVEAU : import du module Évaluation
+import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
 
 let currentDiscipline = 'multi';
 
@@ -24,6 +26,8 @@ export function initActivities() {
     try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
     try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
+    // NOUVEAU : Initialisation Évaluation
+    try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
 
     // Exposer les fonctions globales
     window.generateArcathlonTeams = generateArcathlonTeams;
@@ -40,6 +44,8 @@ export function initActivities() {
         const escView = document.getElementById('viewEscaladeSettings');
         const bmtView = document.getElementById('viewBadmintonSettings');
         const arcView = document.getElementById('viewArcathlonSettings');
+        // NOUVEAU
+        const evalView = document.getElementById('viewEvaluationSettings');
 
         if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
         if (coView) coView.classList.toggle('hidden', disc !== 'co');
@@ -47,6 +53,8 @@ export function initActivities() {
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
         if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
         if (arcView) arcView.classList.toggle('hidden', disc !== 'arcathlon');
+        // NOUVEAU
+        if (evalView) evalView.classList.toggle('hidden', disc !== 'evaluation');
 
         // Mettre à jour les boutons
         const btnMulti = document.getElementById('btnDisc-multi');
@@ -55,6 +63,7 @@ export function initActivities() {
         const btnEsc = document.getElementById('btnDisc-escalade');
         const btnBmt = document.getElementById('btnDisc-badminton');
         const btnArc = document.getElementById('btnDisc-arcathlon');
+        const btnEval = document.getElementById('btnDisc-evaluation'); // NOUVEAU
 
         if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
         if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
@@ -62,6 +71,7 @@ export function initActivities() {
         if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
         if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
         if (btnArc) btnArc.classList.toggle('border-blue-500', disc === 'arcathlon');
+        if (btnEval) btnEval.classList.toggle('border-blue-500', disc === 'evaluation'); // NOUVEAU
 
         // Initialisation spécifique
         if (disc === 'co') {
@@ -78,6 +88,10 @@ export function initActivities() {
         }
         if (disc === 'arcathlon') {
             try { initArcathlonInterface(); } catch (e) {}
+        }
+        // NOUVEAU
+        if (disc === 'evaluation') {
+            try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
         }
     };
 
@@ -105,9 +119,10 @@ export function initActivities() {
         const escView = document.getElementById('viewEscaladeSettings');
         const bmtView = document.getElementById('viewBadmintonSettings');
         const arcView = document.getElementById('viewArcathlonSettings');
+        const evalView = document.getElementById('viewEvaluationSettings'); // NOUVEAU
         
         // On masque TOUTES les vues de réglages
-        [multiView, coView, osView, escView, bmtView, arcView].forEach(el => {
+        [multiView, coView, osView, escView, bmtView, arcView, evalView].forEach(el => {
             if (el) el.classList.add('hidden');
         });
 
@@ -125,6 +140,14 @@ export function initActivities() {
             else if (disc === 'escalade') escView.classList.remove('hidden');
             else if (disc === 'badminton') bmtView.classList.remove('hidden');
             else if (disc === 'arcathlon') arcView.classList.remove('hidden');
+            // NOUVEAU : pour l'évaluation, on affiche sa vue
+            else if (disc === 'evaluation') {
+                if (evalView) {
+                    evalView.classList.remove('hidden');
+                    // Réinitialiser l'interface au cas où elle a été perdue
+                    setTimeout(() => initEvaluationInterface(), 50);
+                }
+            }
         } 
         else if (subTab === 'live') {
             // Afficher le conteneur Live et appeler le bon module
@@ -145,7 +168,6 @@ export function initActivities() {
                     } else if (disc === 'orientshow') {
                         import('../../modules/orientshow/orientshow-tv.js').then(m => m.renderOrientShowTV());
                     } else if (disc === 'arcathlon') {
-                        // Pour Arcathlon, on importera plus tard le module TV
                         import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV());
                     } else {
                         import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV());
@@ -185,7 +207,6 @@ export function initActivities() {
             return;
         }
         if (currentDiscipline === 'arcathlon') {
-            // Appel direct à la fonction du module
             generateArcathlonTeams();
             return;
         }
@@ -307,7 +328,6 @@ export function initActivities() {
             }
         } 
         else if (currentDiscipline === 'arcathlon') {
-            // On délègue au module Arcathlon
             transmettreArcathlonConfig();
             return;
         }

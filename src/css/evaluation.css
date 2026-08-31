@@ -1,0 +1,67 @@
+/* src/css/evaluation.css */
+/* Styles spécifiques au module d'évaluation */
+
+/* Slider personnalisé */
+.eval-slider-custom {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    background: #334155;
+    border-radius: 9999px;
+    outline: none;
+    touch-action: none;
+}
+
+.eval-slider-custom::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #facc15;
+    border: 3px solid #ffffff;
+    cursor: pointer;
+    box-shadow: 0 0 15px rgba(250, 204, 21, 0.5);
+}
+
+.eval-slider-custom::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #facc15;
+    border: 3px solid #ffffff;
+    cursor: pointer;
+}
+
+/* Animation de transition pour les fiches VMA */
+.eval-eleve-vma {
+    transition: all 0.3s ease;
+}
+
+.eval-eleve-vma.termine {
+    opacity: 0.7;
+    border-color: #22c55e !important;
+    background: rgba(34, 197, 94, 0.1);
+}
+
+/* Affichage du palier en cours */
+.eval-palier-display {
+    font-size: 4rem;
+    font-weight: 900;
+    text-align: center;
+    background: linear-gradient(135deg, #facc15, #f59e0b);
+    -webkit-background-clip: text;
+    background-clip: text;  /* <-- Ligne ajoutée pour corriger l'avertissement */
+    -webkit-text-fill-color: transparent;
+}
+
+/* Effet de pulsation pour le chrono */
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px rgba(250, 204, 21, 0.2); }
+    50% { box-shadow: 0 0 40px rgba(250, 204, 21, 0.5); }
+}
+
+.eval-chrono-active {
+    animation: pulse-glow 1.5s ease-in-out infinite;
+}
