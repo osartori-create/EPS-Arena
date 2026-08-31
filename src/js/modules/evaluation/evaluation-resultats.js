@@ -136,20 +136,33 @@ function toggleEdition() {
 }
 
 function sauvegarderFiche() {
+    console.log('🔍 Sauvegarde de la fiche...');
     const eleve = currentData.eleves[currentEleveId];
-    if (!eleve) return;
+    if (!eleve) {
+        console.error('❌ Élève introuvable');
+        return;
+    }
 
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
     let modifie = false;
 
     tests.forEach(testId => {
         const input = document.getElementById(`edit-${testId}`);
-        if (!input) return;
+        if (!input) {
+            console.log(`⚠️ Champ edit-${testId} non trouvé, ignoré.`);
+            return;
+        }
         const valeur = parseFloat(input.value);
-        if (isNaN(valeur)) return;
+        if (isNaN(valeur)) {
+            console.log(`⚠️ Valeur invalide pour ${testId}: "${input.value}"`);
+            return;
+        }
+
+        console.log(`📝 ${testId} = ${valeur}`);
 
         const resultatActuel = eleve.resultats[testId];
         if (!resultatActuel) {
+            // Créer un nouveau résultat
             const nouveauResultat = { groupe: null };
             switch (testId) {
                 case 'endurance': nouveauResultat.palier = valeur; break;
@@ -161,16 +174,24 @@ function sauvegarderFiche() {
                 case 'coordination': nouveauResultat.nb_lancers = valeur; break;
             }
             const groupeFn = FONCTIONS_GROUPE[testId];
-            if (groupeFn) nouveauResultat.groupe = groupeFn(valeur);
+            if (groupeFn) {
+                nouveauResultat.groupe = groupeFn(valeur);
+                console.log(`✅ Groupe calculé pour ${testId}: ${nouveauResultat.groupe}`);
+            }
             setResultat(currentData, currentEleveId, testId, nouveauResultat);
             modifie = true;
             return;
         }
 
+        // Mettre à jour le résultat existant
         let besoinMiseAJour = false;
         switch (testId) {
             case 'endurance':
-                if (resultatActuel.palier !== valeur) { resultatActuel.palier = valeur; besoinMiseAJour = true; }
+                if (resultatActuel.palier !== valeur) {
+                    resultatActuel.palier = valeur;
+                    besoinMiseAJour = true;
+                    console.log(`🔄 Mise à jour palier endurance: ${valeur}`);
+                }
                 break;
             case 'force':
             case 'souplesse':
@@ -179,6 +200,7 @@ function sauvegarderFiche() {
                     if (!resultatActuel.essais) resultatActuel.essais = [];
                     resultatActuel.essais.push(valeur);
                     besoinMiseAJour = true;
+                    console.log(`🔄 Mise à jour meilleur pour ${testId}: ${valeur}`);
                 }
                 break;
             case 'vitesse':
@@ -187,18 +209,28 @@ function sauvegarderFiche() {
                     if (!resultatActuel.essais) resultatActuel.essais = [];
                     resultatActuel.essais.push(valeur);
                     besoinMiseAJour = true;
+                    console.log(`🔄 Mise à jour meilleur pour ${testId}: ${valeur}`);
                 }
                 break;
             case 'equilibre':
             case 'endurance_musculaire':
-                if (resultatActuel.temps !== valeur) { resultatActuel.temps = valeur; besoinMiseAJour = true; }
+                if (resultatActuel.temps !== valeur) {
+                    resultatActuel.temps = valeur;
+                    besoinMiseAJour = true;
+                    console.log(`🔄 Mise à jour temps pour ${testId}: ${valeur}`);
+                }
                 break;
             case 'coordination':
-                if (resultatActuel.nb_lancers !== valeur) { resultatActuel.nb_lancers = valeur; besoinMiseAJour = true; }
+                if (resultatActuel.nb_lancers !== valeur) {
+                    resultatActuel.nb_lancers = valeur;
+                    besoinMiseAJour = true;
+                    console.log(`🔄 Mise à jour nb_lancers pour ${testId}: ${valeur}`);
+                }
                 break;
         }
 
         if (besoinMiseAJour) {
+            // Recalculer le groupe
             const groupeFn = FONCTIONS_GROUPE[testId];
             if (groupeFn) {
                 let val = valeur;
@@ -208,25 +240,31 @@ function sauvegarderFiche() {
                 else if (testId === 'equilibre' || testId === 'endurance_musculaire') val = resultatActuel.temps;
                 else if (testId === 'coordination') val = resultatActuel.nb_lancers;
                 resultatActuel.groupe = groupeFn(val);
+                console.log(`✅ Groupe recalculé pour ${testId}: ${resultatActuel.groupe}`);
             }
             setResultat(currentData, currentEleveId, testId, resultatActuel);
             modifie = true;
         }
     });
 
+    // Gérer le statut
     const statutSelect = document.getElementById('edit-statut');
     if (statutSelect && statutSelect.value !== eleve.statut) {
         setStatutEleve(currentData, currentEleveId, statutSelect.value);
         modifie = true;
+        console.log(`🔄 Statut modifié: ${statutSelect.value}`);
     }
 
     if (modifie) {
         sauvegarderDonnees(currentData.classe, currentData);
         alert('✅ Modifications sauvegardées !');
+        console.log('✅ Données sauvegardées dans localStorage.');
     } else {
         alert('ℹ️ Aucune modification détectée.');
+        console.log('ℹ️ Aucune modification détectée.');
     }
 
+    // Recharger la fiche en mode lecture
     modeEdition = false;
     const eleveMisAJour = currentData.eleves[currentEleveId];
     const container = document.getElementById('viewEvaluationSettings');
