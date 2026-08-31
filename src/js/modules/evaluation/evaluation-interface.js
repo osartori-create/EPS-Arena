@@ -12,7 +12,7 @@ import { initSaisieSaut } from './evaluation-saut.js';
 import { initSaisieSprint } from './evaluation-sprint.js';
 import { initSaisieVMA } from './evaluation-vma.js';
 import { initSaisieStandard } from './evaluation-saisie.js';
-import { afficherGraphiques } from './evaluation-graphiques.js';
+// SUPPRESSION de l'import inutile : import { afficherGraphiques } from './evaluation-graphiques.js';
 
 let currentData = null;
 let currentClasse = '';
