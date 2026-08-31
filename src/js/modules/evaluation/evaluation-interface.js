@@ -1,8 +1,8 @@
 // src/js/modules/evaluation/evaluation-interface.js
 // Interface principale du module d'évaluation
 
-import { 
-    loadOrCreateData, getElevesTries, getElevesActifs, 
+import {
+    loadOrCreateData, getElevesTries, getElevesActifs,
     setStatutEleve, setResultat, genererDonneesFactices,
     reinitialiserDonnees, sauvegarderDonnees
 } from './evaluation-stockage.js';
@@ -12,7 +12,6 @@ import { initSaisieSaut } from './evaluation-saut.js';
 import { initSaisieSprint } from './evaluation-sprint.js';
 import { initSaisieVMA } from './evaluation-vma.js';
 import { initSaisieStandard } from './evaluation-saisie.js';
-// SUPPRESSION de l'import inutile : import { afficherGraphiques } from './evaluation-graphiques.js';
 
 let currentData = null;
 let currentClasse = '';
@@ -20,53 +19,69 @@ let currentTestId = '';
 let currentEleves = [];
 let currentIndex = 0;
 let currentMode = 'menu'; // 'menu' | 'passation'
+let selectListenerAttached = false;
 
 /**
  * Point d'entrée du module
+ * - S'assure que le conteneur existe
+ * - Écoute les changements de classe
+ * - Charge les données si une classe est sélectionnée
  */
 export function initEvaluationInterface() {
     console.log('📊 Initialisation du module Évaluation');
-    
-    // S'assurer que le conteneur existe
+
     const container = document.getElementById('viewEvaluationSettings');
     if (!container) {
         console.error('Conteneur viewEvaluationSettings introuvable');
         return;
     }
 
-    const classe = document.getElementById('selectClasse')?.value;
-    if (!classe) {
-        container.innerHTML = '<p class="text-slate-500 text-center py-10">Veuillez sélectionner une classe.</p>';
+    const select = document.getElementById('selectClasse');
+    if (!select) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-10">Sélecteur de classe introuvable.</p>';
         return;
     }
 
-    currentClasse = classe;
-    chargerElevesEtAfficher();
-}
+    // Fonction qui charge les données pour la classe sélectionnée
+    function chargerDonneesClasse() {
+        const classe = select.value;
+        if (!classe) {
+            container.innerHTML = '<p class="text-slate-500 text-center py-10">Veuillez sélectionner une classe.</p>';
+            return;
+        }
 
-/**
- * Charge les élèves et affiche le menu
- */
-function chargerElevesEtAfficher() {
-    const classe = currentClasse;
-    const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-    
-    currentData = loadOrCreateData(classe, elevesData);
-    currentData.classe = classe;
-    
-    afficherMenu();
+        currentClasse = classe;
+        const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+        currentData = loadOrCreateData(classe, elevesData);
+        currentData.classe = classe;
+
+        // Si on était en mode passation, on revient au menu
+        if (currentMode === 'passation') {
+            currentMode = 'menu';
+        }
+        afficherMenu();
+    }
+
+    // Ajouter l'écouteur une seule fois
+    if (!selectListenerAttached) {
+        select.addEventListener('change', chargerDonneesClasse);
+        selectListenerAttached = true;
+    }
+
+    // Charger immédiatement si une classe est déjà sélectionnée
+    chargerDonneesClasse();
 }
 
 /**
  * Affiche le menu principal
  */
 function afficherMenu() {
-    currentMode = 'menu';
     const container = document.getElementById('viewEvaluationSettings');
-    if (!container) return;
+    if (!container || !currentData) return;
 
+    currentMode = 'menu';
     container.innerHTML = templateVuePrincipale(currentData, currentClasse);
-    
+
     // Exposer les fonctions globales
     window.evalLancerTest = lancerTest;
     window.evalGenererFactices = genererFactices;
@@ -78,18 +93,22 @@ function afficherMenu() {
  * Lance un test
  */
 function lancerTest(testId) {
+    if (!currentData) {
+        alert('Veuillez sélectionner une classe.');
+        return;
+    }
+
     currentTestId = testId;
     const eleves = getElevesActifs(currentData);
     currentEleves = eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
     currentIndex = 0;
-    
-    // Vérifier si des élèves ont déjà un résultat pour ce test
-    // On commence par le premier élève sans résultat, ou le premier si tous sont faits
+
+    // Trouver le premier élève sans résultat pour ce test
     const indexSansResultat = currentEleves.findIndex(e => e.resultats[testId] === null);
     if (indexSansResultat !== -1) {
         currentIndex = indexSansResultat;
     }
-    
+
     currentMode = 'passation';
     afficherPassation();
 }
@@ -99,16 +118,16 @@ function lancerTest(testId) {
  */
 function afficherPassation() {
     const container = document.getElementById('viewEvaluationSettings');
-    if (!container) return;
+    if (!container || !currentData) return;
 
     const eleveEnCours = currentEleves[currentIndex] || null;
     const eleveSuivant = currentEleves[currentIndex + 1] || null;
-    
+
     container.innerHTML = templatePassation(
-        currentTestId, 
-        eleveEnCours, 
-        eleveSuivant, 
-        currentEleves, 
+        currentTestId,
+        eleveEnCours,
+        eleveSuivant,
+        currentEleves,
         currentData
     );
 
@@ -118,7 +137,7 @@ function afficherPassation() {
         const testId = currentTestId;
         const eleve = eleveEnCours;
         const data = currentData;
-        
+
         switch (testId) {
             case 'force':
                 initSaisieSaut(zoneSaisie, eleve, data, testId);
@@ -145,13 +164,6 @@ function afficherPassation() {
  * Passe à l'élève suivant
  */
 function passerSuivant() {
-    // Vérifier si l'élève en cours a un résultat
-    const eleveEnCours = currentEleves[currentIndex];
-    if (eleveEnCours && currentData.eleves[eleveEnCours.id]?.resultats?.[currentTestId] === null) {
-        // Si l'élève n'a pas de résultat, on le force à passer
-        // On pourrait afficher une confirmation, mais on laisse faire
-    }
-    
     if (currentIndex < currentEleves.length - 1) {
         currentIndex++;
         afficherPassation();
@@ -187,6 +199,10 @@ function retourMenu() {
  * Génère des données factices
  */
 function genererFactices() {
+    if (!currentData) {
+        alert('Veuillez sélectionner une classe.');
+        return;
+    }
     if (confirm('Générer des données factices pour tous les tests ?')) {
         currentData = genererDonneesFactices(currentData);
         afficherMenu();
@@ -198,9 +214,14 @@ function genererFactices() {
  * Réinitialise toutes les données
  */
 function reinitialiser() {
+    if (!currentClasse) return;
     if (confirm('⚠️ Supprimer toutes les données d\'évaluation pour cette classe ?')) {
         reinitialiserDonnees(currentClasse);
-        chargerElevesEtAfficher();
+        // Recharger les données
+        const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        currentData = loadOrCreateData(currentClasse, elevesData);
+        currentData.classe = currentClasse;
+        afficherMenu();
         alert('✅ Données réinitialisées.');
     }
 }
@@ -209,5 +230,9 @@ function reinitialiser() {
  * Exporte les données en CSV
  */
 function exporterCSV() {
+    if (!currentData) {
+        alert('Aucune donnée à exporter.');
+        return;
+    }
     exporterVersIDoceo(currentData, currentClasse);
 }
