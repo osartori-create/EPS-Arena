@@ -241,3 +241,65 @@ function exporterCSV() {
     }
     exporterVersIDoceo(currentData, currentClasse);
 }
+export function templateVuePrincipale(data, classe) {
+    const stats = calculerStatistiques(data);
+    
+    return `
+        <div class="space-y-6">
+            <!-- En-tête -->
+            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <div>
+                    <h2 class="text-xl font-black text-blue-400">📊 Évaluation des aptitudes physiques</h2>
+                    <p class="text-xs text-slate-400">Classe : ${classe} | ${Object.keys(data.eleves).length} élèves</p>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="window.evalVoirResultats()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400">
+                        📊 Voir les résultats
+                    </button>
+                    <button onclick="window.evalGenererFactices()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400">
+                        🧪 Données factices
+                    </button>
+                    <button onclick="window.evalReinitialiser()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400">
+                        🗑️ Réinitialiser
+                    </button>
+                    <button onclick="window.evalExporterCSV()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">
+                        📥 Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistiques rapides -->
+            <div class="grid grid-cols-3 md:grid-cols-7 gap-2">
+                ${Object.keys(LIBELLES_TESTS).map(testId => {
+                    const statsTest = stats[testId] || { total: 0, a_besoins: 0, fragile: 0, satisfaisant: 0 };
+                    const pct = statsTest.total > 0 ? Math.round((statsTest.satisfaisant / statsTest.total) * 100) : 0;
+                    return `
+                        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">${LIBELLES_TESTS[testId].split('(')[0].trim()}</p>
+                            <p class="text-lg font-black text-white">${statsTest.total}</p>
+                            <div class="w-full h-1.5 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                                <div class="h-full bg-emerald-500 rounded-full" style="width:${pct}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
+            <!-- Tests principaux -->
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏆 Tests principaux (obligatoires)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    ${['endurance', 'force', 'vitesse'].map(testId => templateCarteTest(testId, data)).join('')}
+                </div>
+            </div>
+
+            <!-- Tests complémentaires -->
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🧪 Tests complémentaires (facultatifs)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    ${['equilibre', 'coordination', 'souplesse', 'endurance_musculaire'].map(testId => templateCarteTest(testId, data)).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
