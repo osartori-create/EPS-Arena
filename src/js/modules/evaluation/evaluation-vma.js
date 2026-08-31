@@ -9,36 +9,47 @@ let currentData = null;
 let currentTestId = 'endurance';
 let currentEleves = [];
 let player = null;
-let offset = 34; // secondes avant le début du test dans la vidéo
-let palierActuel = 0;
-let palierValide = 0;
+let offset = 34;
+let palierEnCours = 0;
+let palierValide = -1; // -1 = aucun palier validé (avant la fin de l'échauffement)
 let tempsRestant = 0;
 let isPlaying = false;
 let intervalId = null;
-let elevesResultats = {}; // { eleveId: palier }
+let elevesResultats = {}; // { eleveId: palierValide }
 let zoneSaisie = null;
 let youtubeLoaded = false;
-let historiquePaliers = []; // Pour le undo
+let historiquePaliers = [];
 
 // Durée des paliers : palier 0 (échauffement) = 2 minutes, paliers suivants = 1 minute
 const DUREE_PALIER_0 = 120; // secondes
 const DUREE_PALIER_SUIVANT = 60; // secondes
 
 /**
- * Calcule le palier et le temps restant à partir du temps de test écoulé
+ * Calcule le palier en cours et le dernier palier validé
  * @param {number} tempsTest - Temps écoulé depuis le début du test (en secondes)
- * @returns {{ palier: number, tempsRestant: number }}
+ * @returns {{ palierEnCours: number, palierValide: number, tempsRestant: number }}
  */
-function calculerPalierEtTemps(tempsTest) {
-    // Paliers 0 : 0 à 120s
+function calculerPaliers(tempsTest) {
+    // Palier 0 (échauffement) : de 0 à 120s
     if (tempsTest < DUREE_PALIER_0) {
-        return { palier: 0, tempsRestant: Math.floor(DUREE_PALIER_0 - tempsTest) };
+        return {
+            palierEnCours: 0,
+            palierValide: -1, // Aucun palier validé
+            tempsRestant: Math.floor(DUREE_PALIER_0 - tempsTest)
+        };
     }
-    // Paliers 1, 2, 3... : chaque palier dure 60s après l'échauffement
+    // Après l'échauffement, les paliers durent 60s
     const tempsApresPalier0 = tempsTest - DUREE_PALIER_0;
-    const palier = 1 + Math.floor(tempsApresPalier0 / DUREE_PALIER_SUIVANT);
+    const palierEnCours = 1 + Math.floor(tempsApresPalier0 / DUREE_PALIER_SUIVANT);
+    // Le palier validé est le précédent : si on est dans le palier 1, on a validé le palier 0
+    // Si on est dans le palier 2, on a validé le palier 1, etc.
+    const palierValide = palierEnCours - 1;
     const restant = DUREE_PALIER_SUIVANT - (tempsApresPalier0 % DUREE_PALIER_SUIVANT);
-    return { palier, tempsRestant: Math.floor(restant) };
+    return {
+        palierEnCours: palierEnCours,
+        palierValide: palierValide,
+        tempsRestant: Math.floor(restant)
+    };
 }
 
 export function initSaisieVMA(zone, eleve, data, testId, eleves) {
@@ -49,7 +60,6 @@ export function initSaisieVMA(zone, eleve, data, testId, eleves) {
     offset = data.config?.vma_offset || 34;
     historiquePaliers = [];
 
-    // Charger les résultats existants
     elevesResultats = {};
     currentEleves.forEach(e => {
         const r = getResultat(data, e.id, testId);
@@ -74,18 +84,17 @@ function chargerYouTube() {
 }
 
 function afficherVMA() {
-    // Mettre à jour le palier en cours si le lecteur est actif
     if (isPlaying && player && typeof player.getCurrentTime === 'function') {
         try {
             const tempsVideo = player.getCurrentTime();
             const tempsTest = Math.max(0, tempsVideo - offset);
-            const calc = calculerPalierEtTemps(tempsTest);
-            palierActuel = calc.palier;
-            tempsRestant = calc.tempsRestant;
+            const result = calculerPaliers(tempsTest);
+            palierEnCours = result.palierEnCours;
+            palierValide = result.palierValide;
+            tempsRestant = result.tempsRestant;
         } catch (e) { /* ignorer */ }
     }
 
-    // Répartir les élèves par sexe
     const garcons = currentEleves.filter(e => e.sexe === 'M' || e.sexe === 'm');
     const filles = currentEleves.filter(e => e.sexe === 'F' || e.sexe === 'f');
     const autres = currentEleves.filter(e => e.sexe !== 'M' && e.sexe !== 'm' && e.sexe !== 'F' && e.sexe !== 'f');
@@ -101,23 +110,18 @@ function afficherVMA() {
     };
     colonnes.g1 = [...colonnes.g1, ...autres];
 
-    // Compter les terminés
-    const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined).length;
+    const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined && elevesResultats[id] >= 0).length;
 
-    // Générer le HTML
-    zoneSaisie.innerHTML = templateVMA(colonnes, palierActuel, palierValide, tempsRestant, nbTermines, currentEleves.length);
+    zoneSaisie.innerHTML = templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, currentEleves.length);
 
-    // Exposer les fonctions
     window.evalVmaDemarrer = demarrerVMA;
     window.evalVmaPause = pauseVMA;
     window.evalVmaTerminer = terminerVMA;
     window.evalVmaClicEleve = clicEleveVMA;
     window.evalVmaUndo = undoVMA;
 
-    // Remplir les colonnes avec les cartes (asynchrone)
     remplirColonnesVMA(colonnes);
 
-    // Créer le lecteur YouTube
     if (typeof YT !== 'undefined' && YT.Player) {
         creerLecteur();
     } else {
@@ -145,32 +149,44 @@ async function createCarteVMA(eleve) {
     if (eleve.sexe === 'M' || eleve.sexe === 'm') bgClass = 'bg-blue-200 border-blue-400';
     else if (eleve.sexe === 'F' || eleve.sexe === 'f') bgClass = 'bg-rose-200 border-rose-400';
 
+    // PHOTO x3 : taille 24x24 au lieu de 8x8
     const photoHtml = url
-        ? `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">`
-        : `<div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm text-white">${eleve.prenom?.charAt(0) || '?'}</div>`;
+        ? `<img src="${url}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-500">`
+        : `<div class="w-12 h-12 rounded-full bg-slate-600 flex items-center justify-center text-2xl text-white">${eleve.prenom?.charAt(0) || '?'}</div>`;
 
     const div = document.createElement('div');
-    div.className = `eval-eleve-vma p-2 rounded-xl border-2 cursor-pointer hover:border-blue-500 active:scale-95 transition-all flex items-center gap-2 ${bgClass}`;
+    div.className = `eval-eleve-vma p-3 rounded-xl border-2 cursor-pointer hover:border-blue-500 active:scale-95 transition-all flex items-center gap-3 ${bgClass}`;
     div.dataset.id = eleve.id;
 
     const palier = elevesResultats[eleve.id];
-    const palierText = palier !== undefined ? `Palier ${palier}` : '--';
-    const palierClass = palier !== undefined ? 'text-emerald-400' : 'text-yellow-400';
+    let palierText = '--';
+    let palierClass = 'text-yellow-400';
+    if (palier !== undefined) {
+        if (palier === -1) {
+            palierText = '❌ Échauff.';
+            palierClass = 'text-red-400';
+        } else {
+            palierText = `Palier ${palier}`;
+            palierClass = 'text-emerald-400';
+        }
+    }
 
     div.innerHTML = `
         ${photoHtml}
         <div class="flex-1">
-            <p class="text-sm font-bold text-slate-900">${eleve.prenom} ${eleve.nom}</p>
-            <p class="text-[10px] text-slate-600">${eleve.id}</p>
+            <p class="text-base font-bold text-slate-900">${eleve.prenom} ${eleve.nom}</p>
+            <p class="text-xs text-slate-600">${eleve.id}</p>
         </div>
         <div class="text-right">
-            <span class="text-xs font-black ${palierClass}" id="vma-palier-${eleve.id}">${palierText}</span>
+            <span class="text-sm font-black ${palierClass}" id="vma-palier-${eleve.id}">${palierText}</span>
         </div>
     `;
 
-    // Marquer comme terminé si déjà enregistré
-    if (palier !== undefined) {
+    if (palier !== undefined && palier >= 0) {
         div.classList.add('border-emerald-500', 'bg-emerald-950/20');
+        div.classList.remove('hover:border-blue-500');
+    } else if (palier === -1) {
+        div.classList.add('border-red-400', 'bg-red-950/20');
         div.classList.remove('hover:border-blue-500');
     }
 
@@ -209,7 +225,6 @@ function creerLecteur() {
                 },
                 onError: (err) => {
                     console.warn('⚠️ Erreur YouTube :', err);
-                    // En cas d'erreur, on essaie de relancer
                     setTimeout(() => {
                         if (player) player.playVideo();
                     }, 2000);
@@ -228,16 +243,19 @@ function demarrerMiseAJourPaliers() {
         try {
             const tempsVideo = player.getCurrentTime();
             const tempsTest = Math.max(0, tempsVideo - offset);
-            const calc = calculerPalierEtTemps(tempsTest);
-            palierActuel = calc.palier;
-            tempsRestant = calc.tempsRestant;
+            const result = calculerPaliers(tempsTest);
+            palierEnCours = result.palierEnCours;
+            palierValide = result.palierValide;
+            tempsRestant = result.tempsRestant;
 
-            // Mettre à jour l'affichage
-            const palierCourantEl = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
-            if (palierCourantEl) palierCourantEl.textContent = `Palier ${palierActuel}`;
+            const elPalier = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
+            if (elPalier) elPalier.textContent = `Palier ${palierEnCours}`;
 
-            const tempsRestantEl = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
-            if (tempsRestantEl) tempsRestantEl.textContent = `${tempsRestant}s restantes`;
+            const elValid = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-emerald-400');
+            if (elValid) elValid.textContent = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+
+            const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
+            if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
         } catch (e) { /* ignore */ }
     }, 500);
 }
@@ -273,22 +291,32 @@ function terminerVMA() {
         if (intervalId) clearInterval(intervalId);
     }
 
-    // Vérifier que tous les élèves ont un palier
-    const tousValides = currentEleves.every(e => elevesResultats[e.id] !== undefined);
-    if (!tousValides) {
-        if (!confirm('Tous les élèves n\'ont pas encore de palier validé. Terminer quand même ?')) {
+    // On considère que seuls les élèves ayant un palier >= 0 (qui ont fini l'échauffement) sont évalués
+    const nonEvalues = currentEleves.filter(e => {
+        const palier = elevesResultats[e.id];
+        return palier === undefined || palier < 0;
+    });
+
+    if (nonEvalues.length > 0) {
+        if (!confirm(`${nonEvalues.length} élève(s) n'ont pas validé l'échauffement. Terminer quand même ?`)) {
             return;
         }
     }
 
-    // Sauvegarder les résultats
     currentEleves.forEach(e => {
-        if (elevesResultats[e.id] !== undefined) {
-            const palier = elevesResultats[e.id];
+        const palier = elevesResultats[e.id];
+        if (palier !== undefined && palier >= 0) {
             const groupe = groupeEndurance(palier);
             setResultat(currentData, e.id, currentTestId, {
                 palier: palier,
                 groupe: groupe
+            });
+        } else {
+            // Ceux qui n'ont pas validé l'échauffement : on ne sauvegarde rien ou on met palier -1 ?
+            // On peut sauvegarder -1 pour mémoire, mais le groupe sera null
+            setResultat(currentData, e.id, currentTestId, {
+                palier: palier !== undefined ? palier : -1,
+                groupe: null
             });
         }
     });
@@ -298,51 +326,55 @@ function terminerVMA() {
 }
 
 function clicEleveVMA(eleveId) {
-    // Ne pas attribuer si le test n'est pas en cours
     if (!isPlaying) {
         alert('▶️ Lancez d\'abord le test avec "Démarrer".');
         return;
     }
 
     const ancienPalier = elevesResultats[eleveId] !== undefined ? elevesResultats[eleveId] : null;
-    const nouveauPalier = palierActuel;
+    const nouveauPalier = palierValide; // On attribue le palier VALIDÉ, pas le palier en cours !
 
     // Vérifier qu'on ne remet pas le même palier
     if (ancienPalier === nouveauPalier) {
-        alert(`ℹ️ L'élève a déjà le palier ${nouveauPalier}.`);
+        alert(`ℹ️ L'élève a déjà le palier ${nouveauPalier >= 0 ? nouveauPalier : 'échauffement non validé'}.`);
         return;
     }
 
-    // Enregistrer dans l'historique pour undo
     historiquePaliers.push({ eleveId, ancienPalier, nouveauPalier });
-
-    // Attribuer
     elevesResultats[eleveId] = nouveauPalier;
 
-    // Mettre à jour l'affichage
+    // Mise à jour de l'affichage
     const el = document.querySelector(`#vma-palier-${eleveId}`);
     if (el) {
-        el.textContent = `Palier ${nouveauPalier}`;
-        el.className = 'text-xs font-black text-emerald-400';
+        if (nouveauPalier === -1) {
+            el.textContent = '❌ Échauff.';
+            el.className = 'text-sm font-black text-red-400';
+        } else {
+            el.textContent = `Palier ${nouveauPalier}`;
+            el.className = 'text-sm font-black text-emerald-400';
+        }
     }
     const parent = el?.closest('.eval-eleve-vma');
     if (parent) {
-        parent.classList.add('border-emerald-500', 'bg-emerald-950/20');
+        parent.classList.remove('border-emerald-500', 'bg-emerald-950/20', 'border-red-400', 'bg-red-950/20');
+        if (nouveauPalier >= 0) {
+            parent.classList.add('border-emerald-500', 'bg-emerald-950/20');
+        } else {
+            parent.classList.add('border-red-400', 'bg-red-950/20');
+        }
         parent.classList.remove('hover:border-blue-500');
     }
 
-    // Mettre à jour le compteur
     const span = document.querySelector('#eval-zone-saisie .text-xs.text-slate-400');
     if (span) {
-        const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined).length;
+        const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined && elevesResultats[id] >= 0).length;
         span.textContent = `${nbTermines}/${currentEleves.length} terminés`;
     }
 
-    // Vérifier si tous sont faits
-    const tousValides = currentEleves.every(e => elevesResultats[e.id] !== undefined);
+    const tousValides = currentEleves.every(e => elevesResultats[e.id] !== undefined && elevesResultats[e.id] >= 0);
     if (tousValides) {
         setTimeout(() => {
-            if (confirm('✅ Tous les élèves ont un palier ! Terminer le test ?')) {
+            if (confirm('✅ Tous les élèves ont un palier validé ! Terminer le test ?')) {
                 terminerVMA();
             }
         }, 500);
@@ -363,30 +395,44 @@ function undoVMA() {
         delete elevesResultats[eleveId];
     }
 
-    // Mettre à jour l'affichage
     const el = document.querySelector(`#vma-palier-${eleveId}`);
     if (el) {
-        el.textContent = ancienPalier !== null ? `Palier ${ancienPalier}` : '--';
-        el.className = `text-xs font-black ${ancienPalier !== null ? 'text-emerald-400' : 'text-yellow-400'}`;
+        if (ancienPalier !== null) {
+            if (ancienPalier === -1) {
+                el.textContent = '❌ Échauff.';
+                el.className = 'text-sm font-black text-red-400';
+            } else {
+                el.textContent = `Palier ${ancienPalier}`;
+                el.className = 'text-sm font-black text-emerald-400';
+            }
+        } else {
+            el.textContent = '--';
+            el.className = 'text-sm font-black text-yellow-400';
+        }
     }
     const parent = el?.closest('.eval-eleve-vma');
     if (parent) {
-        parent.classList.remove('border-emerald-500', 'bg-emerald-950/20');
-        parent.classList.add('hover:border-blue-500');
+        parent.classList.remove('border-emerald-500', 'bg-emerald-950/20', 'border-red-400', 'bg-red-950/20');
+        if (ancienPalier !== null) {
+            if (ancienPalier >= 0) {
+                parent.classList.add('border-emerald-500', 'bg-emerald-950/20');
+            } else {
+                parent.classList.add('border-red-400', 'bg-red-950/20');
+            }
+            parent.classList.remove('hover:border-blue-500');
+        } else {
+            parent.classList.add('hover:border-blue-500');
+        }
     }
 
-    // Mettre à jour le compteur
     const span = document.querySelector('#eval-zone-saisie .text-xs.text-slate-400');
     if (span) {
-        const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined).length;
+        const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined && elevesResultats[id] >= 0).length;
         span.textContent = `${nbTermines}/${currentEleves.length} terminés`;
     }
 }
 
-/**
- * Template de la vue VMA (4 colonnes)
- */
-function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, nbTermines, totalEleves) {
+function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
@@ -394,33 +440,30 @@ function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, nbTermi
     const htmlColonnes = colonnesIds.map((colId, idx) => `
         <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed ${classes[idx]} min-h-[200px]">
             <div class="text-xs font-bold text-slate-400 uppercase mb-2">${labels[idx]}</div>
-            <div id="eval-col-${colId}" class="space-y-2">
-                <!-- Rempli dynamiquement -->
-            </div>
+            <div id="eval-col-${colId}" class="space-y-2"></div>
         </div>
     `).join('');
 
+    const affichePalierValide = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+
     return `
         <div class="space-y-4">
-            <!-- Affichage des paliers -->
             <div class="grid grid-cols-2 gap-4 bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <div class="text-center">
                     <p class="text-xs text-slate-400">Palier en cours</p>
-                    <p class="text-4xl font-black text-yellow-400">Palier ${palierActuel}</p>
+                    <p class="text-4xl font-black text-yellow-400">Palier ${palierEnCours}</p>
                     <p class="text-sm text-slate-500">${tempsRestant}s restantes</p>
                 </div>
                 <div class="text-center border-l border-slate-700 pl-4">
                     <p class="text-xs text-slate-400">Dernier palier validé</p>
-                    <p class="text-4xl font-black text-emerald-400">Palier ${palierValide}</p>
+                    <p class="text-4xl font-black text-emerald-400">${affichePalierValide}</p>
                 </div>
             </div>
 
-            <!-- Compteur -->
             <div class="text-center text-xs text-slate-400">
                 ${nbTermines} / ${totalEleves} élèves ont un palier validé
             </div>
 
-            <!-- Contrôles vidéo -->
             <div class="flex flex-wrap gap-2">
                 <button onclick="window.evalVmaDemarrer()" id="eval-vma-start" class="flex-1 min-w-[100px] bg-emerald-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ▶ Démarrer
@@ -436,10 +479,8 @@ function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, nbTermi
                 </button>
             </div>
 
-            <!-- Lecteur YouTube invisible -->
             <div id="eval-youtube-player" class="w-full h-0"></div>
 
-            <!-- 4 colonnes -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 ${htmlColonnes}
             </div>
