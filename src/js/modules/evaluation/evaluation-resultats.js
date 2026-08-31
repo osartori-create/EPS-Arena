@@ -10,9 +10,6 @@ let currentData = null;
 let currentEleveId = null;
 let modeEdition = false;
 
-/**
- * Affiche le tableau de bord des résultats
- */
 export function afficherResultats(data) {
     currentData = data;
     const container = document.getElementById('viewEvaluationSettings');
@@ -20,7 +17,6 @@ export function afficherResultats(data) {
 
     container.innerHTML = templateTableauBord(data, data.classe);
 
-    // Exposer les fonctions globales
     window.evalRetourMenu = retourMenu;
     window.evalOuvrirFiche = ouvrirFiche;
     window.evalExporterCSV = exporterCSV;
@@ -30,16 +26,10 @@ export function afficherResultats(data) {
 }
 
 function retourMenu() {
-    // Revenir au menu principal du module
-    const container = document.getElementById('viewEvaluationSettings');
-    if (!container) return;
-
-    // Réimporter l'interface principale
     import('./evaluation-interface.js').then(module => {
         module.initEvaluationInterface();
     }).catch(err => {
         console.error('Erreur retour menu :', err);
-        // Fallback : recharger la page
         location.reload();
     });
 }
@@ -67,7 +57,6 @@ function reinitialiser() {
     if (confirm('⚠️ Supprimer toutes les données d\'évaluation pour cette classe ?')) {
         import('./evaluation-stockage.js').then(module => {
             module.reinitialiserDonnees(currentData.classe);
-            // Recharger les données
             const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
             currentData = module.loadOrCreateData(currentData.classe, elevesData);
             currentData.classe = currentData.classe;
@@ -77,9 +66,6 @@ function reinitialiser() {
     }
 }
 
-/**
- * Ouvre la fiche détaillée d'un élève
- */
 export function ouvrirFiche(eleveId) {
     currentEleveId = eleveId;
     modeEdition = false;
@@ -94,11 +80,8 @@ export function ouvrirFiche(eleveId) {
     }
 
     container.innerHTML = templateFicheEleve(eleve, currentData, false);
-
-    // Charger la photo
     chargerPhoto(eleveId);
 
-    // Charger le radar
     setTimeout(() => {
         const radarContainer = document.getElementById('eval-radar-canvas');
         if (radarContainer && currentData) {
@@ -106,7 +89,6 @@ export function ouvrirFiche(eleveId) {
         }
     }, 200);
 
-    // Exposer les fonctions pour la fiche
     window.evalToggleEdition = toggleEdition;
     window.evalSauvegarderFiche = sauvegarderFiche;
     window.evalRetourResultats = afficherResultats.bind(null, currentData);
@@ -116,7 +98,6 @@ export function ouvrirFiche(eleveId) {
 async function chargerPhoto(eleveId) {
     const container = document.getElementById('eval-photo-container');
     if (!container) return;
-
     try {
         const { getPhotoUrl } = await import('../../services/admin-service.js');
         const url = await getPhotoUrl(eleveId);
@@ -139,11 +120,8 @@ function toggleEdition() {
     if (!container || !eleve) return;
 
     container.innerHTML = templateFicheEleve(eleve, currentData, modeEdition);
-
-    // Recharger la photo
     chargerPhoto(currentEleveId);
 
-    // Recharger le radar
     setTimeout(() => {
         const radarContainer = document.getElementById('eval-radar-canvas');
         if (radarContainer && currentData) {
@@ -151,7 +129,6 @@ function toggleEdition() {
         }
     }, 200);
 
-    // Réexposer les fonctions
     window.evalToggleEdition = toggleEdition;
     window.evalSauvegarderFiche = sauvegarderFiche;
     window.evalRetourResultats = afficherResultats.bind(null, currentData);
@@ -162,43 +139,27 @@ function sauvegarderFiche() {
     const eleve = currentData.eleves[currentEleveId];
     if (!eleve) return;
 
-    // Récupérer les valeurs des champs
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
     let modifie = false;
 
     tests.forEach(testId => {
         const input = document.getElementById(`edit-${testId}`);
         if (!input) return;
-
         const valeur = parseFloat(input.value);
         if (isNaN(valeur)) return;
 
         const resultatActuel = eleve.resultats[testId];
         if (!resultatActuel) {
-            // Créer un nouveau résultat
             const nouveauResultat = { groupe: null };
             switch (testId) {
-                case 'endurance':
-                    nouveauResultat.palier = valeur;
-                    break;
+                case 'endurance': nouveauResultat.palier = valeur; break;
                 case 'force':
-                case 'souplesse':
-                    nouveauResultat.essais = [valeur];
-                    nouveauResultat.meilleur = valeur;
-                    break;
-                case 'vitesse':
-                    nouveauResultat.essais = [valeur];
-                    nouveauResultat.meilleur = valeur;
-                    break;
+                case 'souplesse': nouveauResultat.essais = [valeur]; nouveauResultat.meilleur = valeur; break;
+                case 'vitesse': nouveauResultat.essais = [valeur]; nouveauResultat.meilleur = valeur; break;
                 case 'equilibre':
-                case 'endurance_musculaire':
-                    nouveauResultat.temps = valeur;
-                    break;
-                case 'coordination':
-                    nouveauResultat.nb_lancers = valeur;
-                    break;
+                case 'endurance_musculaire': nouveauResultat.temps = valeur; break;
+                case 'coordination': nouveauResultat.nb_lancers = valeur; break;
             }
-            // Calculer le groupe
             const groupeFn = FONCTIONS_GROUPE[testId];
             if (groupeFn) nouveauResultat.groupe = groupeFn(valeur);
             setResultat(currentData, currentEleveId, testId, nouveauResultat);
@@ -206,14 +167,10 @@ function sauvegarderFiche() {
             return;
         }
 
-        // Mettre à jour le résultat existant
         let besoinMiseAJour = false;
         switch (testId) {
             case 'endurance':
-                if (resultatActuel.palier !== valeur) {
-                    resultatActuel.palier = valeur;
-                    besoinMiseAJour = true;
-                }
+                if (resultatActuel.palier !== valeur) { resultatActuel.palier = valeur; besoinMiseAJour = true; }
                 break;
             case 'force':
             case 'souplesse':
@@ -234,21 +191,14 @@ function sauvegarderFiche() {
                 break;
             case 'equilibre':
             case 'endurance_musculaire':
-                if (resultatActuel.temps !== valeur) {
-                    resultatActuel.temps = valeur;
-                    besoinMiseAJour = true;
-                }
+                if (resultatActuel.temps !== valeur) { resultatActuel.temps = valeur; besoinMiseAJour = true; }
                 break;
             case 'coordination':
-                if (resultatActuel.nb_lancers !== valeur) {
-                    resultatActuel.nb_lancers = valeur;
-                    besoinMiseAJour = true;
-                }
+                if (resultatActuel.nb_lancers !== valeur) { resultatActuel.nb_lancers = valeur; besoinMiseAJour = true; }
                 break;
         }
 
         if (besoinMiseAJour) {
-            // Recalculer le groupe
             const groupeFn = FONCTIONS_GROUPE[testId];
             if (groupeFn) {
                 let val = valeur;
@@ -259,13 +209,11 @@ function sauvegarderFiche() {
                 else if (testId === 'coordination') val = resultatActuel.nb_lancers;
                 resultatActuel.groupe = groupeFn(val);
             }
-            // Sauvegarder
             setResultat(currentData, currentEleveId, testId, resultatActuel);
             modifie = true;
         }
     });
 
-    // Gérer le statut
     const statutSelect = document.getElementById('edit-statut');
     if (statutSelect && statutSelect.value !== eleve.statut) {
         setStatutEleve(currentData, currentEleveId, statutSelect.value);
@@ -273,13 +221,12 @@ function sauvegarderFiche() {
     }
 
     if (modifie) {
-        sauvegarderDonnees(currentData.classe || currentData.classe, currentData);
+        sauvegarderDonnees(currentData.classe, currentData);
         alert('✅ Modifications sauvegardées !');
     } else {
         alert('ℹ️ Aucune modification détectée.');
     }
 
-    // Recharger la fiche en mode lecture
     modeEdition = false;
     const eleveMisAJour = currentData.eleves[currentEleveId];
     const container = document.getElementById('viewEvaluationSettings');
@@ -292,7 +239,6 @@ function sauvegarderFiche() {
                 renderRadar(radarContainer, currentData, currentEleveId);
             }
         }, 200);
-        // Réexposer les fonctions
         window.evalToggleEdition = toggleEdition;
         window.evalSauvegarderFiche = sauvegarderFiche;
         window.evalRetourResultats = afficherResultats.bind(null, currentData);

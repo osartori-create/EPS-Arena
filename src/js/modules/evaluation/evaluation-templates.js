@@ -1,24 +1,21 @@
 // src/js/modules/evaluation/evaluation-templates.js
 // Templates HTML pour le module d'évaluation
 
-// IMPORTS AJOUTÉS
 import { LIBELLES_TESTS, LIBELLES_GROUPES, COULEURS_GROUPES } from './evaluation-utils.js';
 
-/**
- * Template de la vue principale (liste des tests)
- */
 export function templateVuePrincipale(data, classe) {
     const stats = calculerStatistiques(data);
-    
     return `
         <div class="space-y-6">
-            <!-- En-tête -->
             <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <div>
                     <h2 class="text-xl font-black text-blue-400">📊 Évaluation des aptitudes physiques</h2>
                     <p class="text-xs text-slate-400">Classe : ${classe} | ${Object.keys(data.eleves).length} élèves</p>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="window.evalVoirResultats()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400">
+                        📊 Voir les résultats
+                    </button>
                     <button onclick="window.evalGenererFactices()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400">
                         🧪 Données factices
                     </button>
@@ -31,7 +28,6 @@ export function templateVuePrincipale(data, classe) {
                 </div>
             </div>
 
-            <!-- Statistiques rapides -->
             <div class="grid grid-cols-3 md:grid-cols-7 gap-2">
                 ${Object.keys(LIBELLES_TESTS).map(testId => {
                     const statsTest = stats[testId] || { total: 0, a_besoins: 0, fragile: 0, satisfaisant: 0 };
@@ -48,7 +44,6 @@ export function templateVuePrincipale(data, classe) {
                 }).join('')}
             </div>
 
-            <!-- Tests principaux -->
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏆 Tests principaux (obligatoires)</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -56,7 +51,6 @@ export function templateVuePrincipale(data, classe) {
                 </div>
             </div>
 
-            <!-- Tests complémentaires -->
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                 <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🧪 Tests complémentaires (facultatifs)</h3>
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -67,9 +61,6 @@ export function templateVuePrincipale(data, classe) {
     `;
 }
 
-/**
- * Template d'une carte de test
- */
 function templateCarteTest(testId, data) {
     const nbEleves = Object.values(data.eleves).filter(e => e.statut === 'present').length;
     const nbRemplis = Object.values(data.eleves).filter(e => e.resultats[testId] !== null).length;
@@ -96,17 +87,12 @@ function templateCarteTest(testId, data) {
     `;
 }
 
-/**
- * Template de la vue de passation
- */
 export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, data, mode = 'individuel') {
     const libelle = LIBELLES_TESTS[testId] || testId;
     const resultat = eleveEnCours ? data.eleves[eleveEnCours.id]?.resultats?.[testId] : null;
     const isCollectif = (mode === 'collectif');
-    
     return `
         <div class="space-y-4">
-            <!-- Barre de navigation -->
             <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
                     ← Retour
@@ -116,7 +102,6 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
             </div>
 
             ${!isCollectif ? `
-            <!-- Élève en cours (uniquement pour les tests individuels) -->
             <div class="bg-slate-800 p-6 rounded-2xl border-2 border-blue-500">
                 <div class="flex items-center gap-6">
                     <div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-4xl">
@@ -138,13 +123,11 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
             </div>
             ` : ''}
 
-            <!-- Zone de saisie spécifique au test -->
             <div id="eval-zone-saisie" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 min-h-[300px]">
-                <!-- Rempli dynamiquement par le module spécifique -->
+                <!-- Rempli dynamiquement -->
             </div>
 
             ${!isCollectif ? `
-            <!-- Actions (pour les tests individuels) -->
             <div class="flex gap-3">
                 <button onclick="window.evalPasserSuivant()" class="flex-1 bg-blue-600 py-4 rounded-xl font-black text-white text-lg active:scale-95">
                     ✅ Suivant
@@ -158,17 +141,11 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
     `;
 }
 
-/**
- * Template du slider géant pour le saut
- */
 export function templateSliderSaut(valeur, min = 50, max = 250, unite = 'cm') {
     const pct = Math.max(0, Math.min(100, ((valeur - min) / (max - min)) * 100));
-    
     return `
         <div class="space-y-6">
-            <!-- Représentation visuelle du tapis -->
             <div class="relative w-full h-48 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-4 border-slate-600 overflow-hidden">
-                <!-- Graduations -->
                 <div class="absolute bottom-0 left-0 right-0 h-12 bg-emerald-900/50 flex items-end">
                     ${Array.from({ length: Math.floor((max - min) / 10) + 1 }, (_, i) => {
                         const val = min + i * 10;
@@ -181,19 +158,16 @@ export function templateSliderSaut(valeur, min = 50, max = 250, unite = 'cm') {
                         `;
                     }).join('')}
                 </div>
-                <!-- Curseur -->
                 <div class="absolute bottom-0 w-2 h-32 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                      style="left:${pct}%">
                     <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
-                <!-- Affichage de la valeur -->
                 <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl">
                     <span class="text-4xl font-black text-yellow-400">${valeur}</span>
                     <span class="text-sm text-white/70">${unite}</span>
                 </div>
             </div>
 
-            <!-- Contrôles -->
             <div class="flex gap-4 items-center">
                 <div class="flex-1">
                     <input type="range" id="eval-slider" min="${min}" max="${max}" step="1" value="${valeur}"
@@ -220,9 +194,6 @@ export function templateSliderSaut(valeur, min = 50, max = 250, unite = 'cm') {
     `;
 }
 
-/**
- * Template du chrono pour le sprint
- */
 export function templateChronoSprint(temps) {
     const affichage = temps !== null ? temps.toFixed(1) : '--';
     return `
@@ -244,43 +215,22 @@ export function templateChronoSprint(temps) {
     `;
 }
 
-/**
- * Template de la vue VMA (4 colonnes)
- */
-export function templateVMA(elevesParColonne, palierActuel, palierValide, tempsRestant) {
-    const colonnes = [
-        { id: 'g1', label: '👦 Garçons', class: 'border-blue-800/30' },
-        { id: 'g2', label: '👦 Garçons', class: 'border-blue-800/30' },
-        { id: 'f1', label: '👩 Filles', class: 'border-rose-800/30' },
-        { id: 'f2', label: '👩 Filles', class: 'border-rose-800/30' }
-    ];
+export function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, nbTermines, totalEleves) {
+    const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
+    const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
+    const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
 
-    const htmlColonnes = colonnes.map((col, idx) => `
-        <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed ${col.class} min-h-[200px]">
-            <div class="text-xs font-bold text-slate-400 uppercase mb-2">${col.label}</div>
-            <div id="eval-col-${col.id}" class="space-y-2">
-                ${(elevesParColonne[col.id] || []).map(e => `
-                    <div class="eval-eleve-vma bg-slate-800 p-2 rounded-xl border border-slate-700 cursor-pointer hover:border-blue-500 active:scale-95 transition-all"
-                         data-id="${e.id}" onclick="window.evalVmaClicEleve('${e.id}')">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">${e.prenom?.charAt(0) || '?'}</div>
-                            <div class="flex-1">
-                                <p class="text-sm font-bold text-white">${e.prenom} ${e.nom}</p>
-                                <p class="text-[10px] text-slate-400">${e.id}</p>
-                            </div>
-                            <div class="text-right">
-                                <span class="text-xs font-black text-yellow-400" id="vma-palier-${e.id}">--</span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
+    const htmlColonnes = colonnesIds.map((colId, idx) => `
+        <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed ${classes[idx]} min-h-[200px]">
+            <div class="text-xs font-bold text-slate-400 uppercase mb-2">${labels[idx]}</div>
+            <div id="eval-col-${colId}" class="space-y-2"></div>
         </div>
     `).join('');
 
+    const affichePalierValide = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+
     return `
         <div class="space-y-4">
-            <!-- Affichage des paliers -->
             <div class="grid grid-cols-2 gap-4 bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <div class="text-center">
                     <p class="text-xs text-slate-400">Palier en cours</p>
@@ -289,38 +239,56 @@ export function templateVMA(elevesParColonne, palierActuel, palierValide, tempsR
                 </div>
                 <div class="text-center border-l border-slate-700 pl-4">
                     <p class="text-xs text-slate-400">Dernier palier validé</p>
-                    <p class="text-4xl font-black text-emerald-400">Palier ${palierValide}</p>
+                    <p class="text-4xl font-black text-emerald-400">${affichePalierValide}</p>
                 </div>
             </div>
 
-            <!-- Contrôles vidéo -->
-            <div class="flex gap-3">
-                <button onclick="window.evalVmaDemarrer()" id="eval-vma-start" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white active:scale-95">
-                    ▶ Démarrer le test
+            <div class="text-center text-xs text-slate-400">
+                ${nbTermines} / ${totalEleves} élèves ont un palier validé
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <button onclick="window.evalVmaDemarrer()" id="eval-vma-start" class="flex-1 min-w-[100px] bg-emerald-600 py-3 rounded-xl font-black text-white active:scale-95">
+                    ▶ Démarrer
                 </button>
-                <button onclick="window.evalVmaPause()" id="eval-vma-pause" class="hidden bg-yellow-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">
+                <button onclick="window.evalVmaPause()" id="eval-vma-pause" class="hidden flex-1 min-w-[100px] bg-yellow-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ⏸ Pause
                 </button>
-                <button onclick="window.evalVmaTerminer()" id="eval-vma-stop" class="hidden bg-red-600 px-6 py-3 rounded-xl font-black text-white active:scale-95">
+                <button onclick="window.evalVmaTerminer()" id="eval-vma-stop" class="hidden flex-1 min-w-[100px] bg-red-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ⏹ Terminer
+                </button>
+                <button onclick="window.evalVmaUndo()" class="bg-slate-600 px-4 py-3 rounded-xl font-black text-xs text-white active:scale-95">
+                    ↩ Annuler
                 </button>
             </div>
 
-            <!-- Lecture seule de la vidéo YouTube (audio) -->
             <div id="eval-youtube-player" class="w-full h-0"></div>
 
-            <!-- 4 colonnes -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 ${htmlColonnes}
             </div>
         </div>
     `;
 }
-// === NOUVEAUX TEMPLATES ===
 
-/**
- * Template du tableau de bord des résultats
- */
+function calculerStatistiques(data) {
+    const stats = {};
+    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
+    const eleves = Object.values(data.eleves).filter(e => e.statut === 'present');
+    tests.forEach(testId => {
+        const resultats = eleves.map(e => e.resultats[testId]).filter(r => r !== null);
+        stats[testId] = {
+            total: resultats.length,
+            a_besoins: resultats.filter(r => r.groupe === 'a_besoins').length,
+            fragile: resultats.filter(r => r.groupe === 'fragile').length,
+            satisfaisant: resultats.filter(r => r.groupe === 'satisfaisant').length
+        };
+    });
+    return stats;
+}
+
+// --- TABLEAU DE BORD ET FICHE ÉLÈVE ---
+
 export function templateTableauBord(data, classe) {
     const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
@@ -334,7 +302,6 @@ export function templateTableauBord(data, classe) {
         endurance_musculaire: 'EM'
     };
 
-    // Compter les résultats pour chaque test
     const stats = {};
     tests.forEach(testId => {
         const nb = eleves.filter(e => e.resultats[testId] !== null && e.resultats[testId]?.groupe !== null).length;
@@ -343,7 +310,6 @@ export function templateTableauBord(data, classe) {
 
     let html = `
         <div class="space-y-4">
-            <!-- En-tête -->
             <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
                 <div>
                     <h3 class="font-black text-blue-400 uppercase text-sm">📊 Résultats de la classe</h3>
@@ -365,7 +331,6 @@ export function templateTableauBord(data, classe) {
                 </div>
             </div>
 
-            <!-- Statistiques rapides -->
             <div class="grid grid-cols-7 gap-1">
                 ${tests.map(testId => `
                     <div class="bg-slate-800 p-2 rounded-xl text-center border border-slate-700">
@@ -376,7 +341,6 @@ export function templateTableauBord(data, classe) {
                 `).join('')}
             </div>
 
-            <!-- Tableau -->
             <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-x-auto">
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-900 text-slate-400 text-xs uppercase border-b border-slate-700">
@@ -405,7 +369,6 @@ export function templateTableauBord(data, classe) {
                                             return `<td class="p-3 text-center text-slate-500">--</td>`;
                                         }
                                         const couleur = COULEURS_GROUPES[r.groupe] || '#64748b';
-                                        const libelle = LIBELLES_GROUPES[r.groupe] || '';
                                         let valeur = '';
                                         switch (testId) {
                                             case 'endurance': valeur = r.palier !== undefined ? `Pal.${r.palier}` : '--'; break;
@@ -433,7 +396,6 @@ export function templateTableauBord(data, classe) {
                 </table>
             </div>
 
-            <!-- Légende -->
             <div class="flex justify-center gap-4 text-xs">
                 <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Satisfaisant</span>
                 <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Fragile</span>
@@ -442,13 +404,9 @@ export function templateTableauBord(data, classe) {
             </div>
         </div>
     `;
-
     return html;
 }
 
-/**
- * Template de la fiche élève détaillée
- */
 export function templateFicheEleve(eleve, data, modeEdition = false) {
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
     const libellesAffiches = {
@@ -470,24 +428,19 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
         endurance_musculaire: 's'
     };
 
-    // Déterminer les couleurs de sexe pour la photo
     let bgSexe = 'bg-slate-200 border-slate-400';
     if (eleve.sexe === 'M' || eleve.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
     else if (eleve.sexe === 'F' || eleve.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
 
-    // Vérifier si l'élève a des résultats
     const aDesResultats = tests.some(t => eleve.resultats[t] !== null && eleve.resultats[t]?.groupe !== null);
 
-    // Statut
     let statutLabel = '✅ Présent';
     let statutClass = 'text-emerald-400';
     if (eleve.statut === 'absent') { statutLabel = '🚫 Absent'; statutClass = 'text-red-400'; }
     else if (eleve.statut === 'inapte') { statutLabel = '⚠️ Inapte'; statutClass = 'text-amber-400'; }
 
-    // Construction de la fiche
     let html = `
         <div class="space-y-4">
-            <!-- En-tête -->
             <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <button onclick="window.evalRetourResultats()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
                     ← Retour
@@ -503,9 +456,7 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                 </div>
             </div>
 
-            <!-- Corps -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <!-- Colonne gauche : Photo + Infos -->
                 <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col items-center">
                     <div class="w-32 h-32 rounded-full ${bgSexe} border-4 border-slate-600 flex items-center justify-center text-6xl overflow-hidden">
                         <div id="eval-photo-container"></div>
@@ -515,8 +466,6 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                     <p class="text-sm ${statutClass} font-bold">${statutLabel}</p>
                     <p class="text-xs text-slate-500 mt-2">Sexe : ${eleve.sexe || 'Non renseigné'}</p>
                     ${!aDesResultats ? '<p class="text-xs text-amber-400 mt-2">⚠️ Aucun résultat enregistré</p>' : ''}
-                    
-                    <!-- Radar (si des résultats existent) -->
                     ${aDesResultats ? `
                         <div class="w-full mt-4">
                             <p class="text-xs font-bold text-slate-400 uppercase text-center mb-2">Profil</p>
@@ -525,7 +474,6 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                     ` : ''}
                 </div>
 
-                <!-- Colonne droite : Résultats -->
                 <div class="md:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700">
                     <h4 class="font-black text-slate-400 uppercase text-xs mb-4">Résultats détaillés</h4>
                     <div class="space-y-3">
@@ -622,7 +570,6 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                         }).join('')}
                     </div>
 
-                    <!-- Statut de l'élève (modifiable en mode édition) -->
                     <div class="mt-4 p-3 bg-slate-900 rounded-xl border border-slate-700">
                         <div class="flex items-center gap-4">
                             <span class="text-sm font-bold text-white">Statut :</span>
@@ -652,25 +599,5 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
             </div>
         </div>
     `;
-
     return html;
-}
-/**
- * Calcule les statistiques par test
- */
-function calculerStatistiques(data) {
-    const stats = {};
-    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
-    const eleves = Object.values(data.eleves).filter(e => e.statut === 'present');
-    
-    tests.forEach(testId => {
-        const resultats = eleves.map(e => e.resultats[testId]).filter(r => r !== null);
-        stats[testId] = {
-            total: resultats.length,
-            a_besoins: resultats.filter(r => r.groupe === 'a_besoins').length,
-            fragile: resultats.filter(r => r.groupe === 'fragile').length,
-            satisfaisant: resultats.filter(r => r.groupe === 'satisfaisant').length
-        };
-    });
-    return stats;
 }

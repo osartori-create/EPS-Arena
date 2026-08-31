@@ -3,17 +3,10 @@
 
 const PREFIX = 'eps_arena_evaluation_';
 
-/**
- * Récupère la clé de stockage pour une classe donnée
- */
 export function getStorageKey(classe) {
     return `${PREFIX}${classe}`;
 }
 
-/**
- * Charge les données d'évaluation pour une classe
- * Retourne un objet avec la structure par défaut si aucune donnée n'existe
- */
 export function chargerDonnees(classe) {
     if (!classe) return null;
     const key = getStorageKey(classe);
@@ -29,9 +22,6 @@ export function chargerDonnees(classe) {
     return null;
 }
 
-/**
- * Sauvegarde les données d'évaluation pour une classe
- */
 export function sauvegarderDonnees(classe, data) {
     if (!classe || !data) return;
     const key = getStorageKey(classe);
@@ -39,10 +29,6 @@ export function sauvegarderDonnees(classe, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-/**
- * Crée une structure de données vide pour une classe
- * À partir de la liste des élèves (mapping local)
- */
 export function creerStructureVide(classe, eleves) {
     const data = {
         eleves: {},
@@ -64,14 +50,13 @@ export function creerStructureVide(classe, eleves) {
         derniere_modification: Date.now()
     };
 
-    // Initialiser chaque élève avec une structure de résultats vide
     eleves.forEach(e => {
         data.eleves[e.id] = {
             id: e.id,
             nom: e.nom || '',
             prenom: e.prenom || '',
             sexe: e.sexe || '',
-            statut: 'present', // 'present' | 'absent' | 'inapte'
+            statut: 'present',
             resultats: {
                 endurance: null,
                 force: null,
@@ -88,15 +73,11 @@ export function creerStructureVide(classe, eleves) {
     return data;
 }
 
-/**
- * Charge ou crée les données pour une classe
- */
 export function loadOrCreateData(classe, eleves) {
     let data = chargerDonnees(classe);
     if (!data) {
         data = creerStructureVide(classe, eleves);
     } else {
-        // S'assurer que tous les élèves existent (mise à jour si nouveau mapping)
         let modifie = false;
         eleves.forEach(e => {
             if (!data.eleves[e.id]) {
@@ -118,7 +99,6 @@ export function loadOrCreateData(classe, eleves) {
                 };
                 modifie = true;
             } else {
-                // Mettre à jour nom/prénom/sexe si besoin
                 const el = data.eleves[e.id];
                 if (el.nom !== e.nom || el.prenom !== e.prenom || el.sexe !== e.sexe) {
                     el.nom = e.nom || el.nom;
@@ -133,31 +113,19 @@ export function loadOrCreateData(classe, eleves) {
     return data;
 }
 
-/**
- * Récupère la liste des élèves triée par nom
- */
 export function getElevesTries(data) {
     const eleves = Object.values(data.eleves);
     return eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 }
 
-/**
- * Récupère la liste des élèves pour un test donné (non absents/inaptes)
- */
 export function getElevesActifs(data) {
     return Object.values(data.eleves).filter(e => e.statut === 'present');
 }
 
-/**
- * Récupère la liste des élèves pour un test donné (tous)
- */
 export function getElevesTous(data) {
     return Object.values(data.eleves);
 }
 
-/**
- * Met à jour le statut d'un élève
- */
 export function setStatutEleve(data, eleveId, statut) {
     if (data.eleves[eleveId]) {
         data.eleves[eleveId].statut = statut;
@@ -167,9 +135,6 @@ export function setStatutEleve(data, eleveId, statut) {
     return false;
 }
 
-/**
- * Enregistre le résultat d'un test pour un élève
- */
 export function setResultat(data, eleveId, testId, resultat) {
     if (data.eleves[eleveId]) {
         data.eleves[eleveId].resultats[testId] = {
@@ -182,9 +147,6 @@ export function setResultat(data, eleveId, testId, resultat) {
     return false;
 }
 
-/**
- * Récupère le résultat d'un test pour un élève
- */
 export function getResultat(data, eleveId, testId) {
     if (data.eleves[eleveId]) {
         return data.eleves[eleveId].resultats[testId] || null;
@@ -192,17 +154,11 @@ export function getResultat(data, eleveId, testId) {
     return null;
 }
 
-/**
- * Réinitialise tous les résultats d'une classe
- */
 export function reinitialiserDonnees(classe) {
     const key = getStorageKey(classe);
     localStorage.removeItem(key);
 }
 
-/**
- * Génère des données factices pour les tests
- */
 export function genererDonneesFactices(data) {
     const eleves = getElevesActifs(data);
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
