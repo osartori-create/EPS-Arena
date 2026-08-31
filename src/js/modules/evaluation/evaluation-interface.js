@@ -11,6 +11,7 @@ import { initSaisieSaut } from './evaluation-saut.js';
 import { initSaisieSprint } from './evaluation-sprint.js';
 import { initSaisieVMA } from './evaluation-vma.js';
 import { initSaisieStandard } from './evaluation-saisie.js';
+import { afficherResultats } from './evaluation-resultats.js';
 
 let currentData = null;
 let currentClasse = '';
@@ -64,6 +65,9 @@ export function initEvaluationInterface() {
     chargerDonneesClasse();
 }
 
+/**
+ * Affiche le menu principal
+ */
 function afficherMenu() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
@@ -71,12 +75,18 @@ function afficherMenu() {
     currentMode = 'menu';
     container.innerHTML = templateVuePrincipale(currentData, currentClasse);
 
+    // Exposer les fonctions globales
     window.evalLancerTest = lancerTest;
+    window.evalVoirResultats = voirResultats;
     window.evalGenererFactices = genererFactices;
     window.evalReinitialiser = reinitialiser;
     window.evalExporterCSV = exporterCSV;
+    window.evalRetourMenu = retourMenu;
 }
 
+/**
+ * Lance un test
+ */
 function lancerTest(testId) {
     if (!currentData) {
         alert('Veuillez sélectionner une classe.');
@@ -97,6 +107,9 @@ function lancerTest(testId) {
     afficherPassation();
 }
 
+/**
+ * Affiche la vue de passation
+ */
 function afficherPassation() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
@@ -137,11 +150,15 @@ function afficherPassation() {
         }
     }
 
+    // Exposer les fonctions de navigation
     window.evalRetourMenu = retourMenu;
     window.evalPasserSuivant = passerSuivant;
     window.evalTerminerTest = terminerTest;
 }
 
+/**
+ * Passe à l'élève suivant
+ */
 function passerSuivant() {
     if (currentIndex < currentEleves.length - 1) {
         currentIndex++;
@@ -151,11 +168,17 @@ function passerSuivant() {
     }
 }
 
+/**
+ * Termine le test et retourne au menu
+ */
 function terminerTest() {
     currentMode = 'menu';
     afficherMenu();
 }
 
+/**
+ * Retourne au menu
+ */
 function retourMenu() {
     if (currentMode === 'passation') {
         if (confirm('Quitter la passation en cours ? Les données seront sauvegardées.')) {
@@ -167,6 +190,20 @@ function retourMenu() {
     }
 }
 
+/**
+ * Affiche la vue des résultats (tableau de bord)
+ */
+function voirResultats() {
+    if (!currentData) {
+        alert('Veuillez sélectionner une classe.');
+        return;
+    }
+    afficherResultats(currentData);
+}
+
+/**
+ * Génère des données factices
+ */
 function genererFactices() {
     if (!currentData) {
         alert('Veuillez sélectionner une classe.');
@@ -179,6 +216,9 @@ function genererFactices() {
     }
 }
 
+/**
+ * Réinitialise toutes les données
+ */
 function reinitialiser() {
     if (!currentClasse) return;
     if (confirm('⚠️ Supprimer toutes les données d\'évaluation pour cette classe ?')) {
@@ -191,6 +231,9 @@ function reinitialiser() {
     }
 }
 
+/**
+ * Exporte les données en CSV
+ */
 function exporterCSV() {
     if (!currentData) {
         alert('Aucune donnée à exporter.');

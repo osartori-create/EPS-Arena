@@ -2,7 +2,7 @@
 // Templates HTML pour le module d'évaluation
 
 // IMPORTS AJOUTÉS
-import { LIBELLES_TESTS, LIBELLES_GROUPES } from './evaluation-utils.js';
+import { LIBELLES_TESTS, LIBELLES_GROUPES, COULEURS_GROUPES } from './evaluation-utils.js';
 
 /**
  * Template de la vue principale (liste des tests)
@@ -316,7 +316,345 @@ export function templateVMA(elevesParColonne, palierActuel, palierValide, tempsR
         </div>
     `;
 }
+// === NOUVEAUX TEMPLATES ===
 
+/**
+ * Template du tableau de bord des résultats
+ */
+export function templateTableauBord(data, classe) {
+    const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
+    const libellesCourts = {
+        endurance: 'Endur.',
+        force: 'Force',
+        vitesse: 'Vit.',
+        equilibre: 'Éq.',
+        coordination: 'Coord.',
+        souplesse: 'Soupl.',
+        endurance_musculaire: 'EM'
+    };
+
+    // Compter les résultats pour chaque test
+    const stats = {};
+    tests.forEach(testId => {
+        const nb = eleves.filter(e => e.resultats[testId] !== null && e.resultats[testId]?.groupe !== null).length;
+        stats[testId] = nb;
+    });
+
+    let html = `
+        <div class="space-y-4">
+            <!-- En-tête -->
+            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
+                <div>
+                    <h3 class="font-black text-blue-400 uppercase text-sm">📊 Résultats de la classe</h3>
+                    <p class="text-xs text-slate-400">${eleves.length} élèves · ${Object.values(data.eleves).filter(e => e.statut === 'present').length} présents</p>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                        ← Retour
+                    </button>
+                    <button onclick="window.evalExporterCSV()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">
+                        📥 Export CSV
+                    </button>
+                    <button onclick="window.evalGenererFactices()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-purple-400 active:scale-95">
+                        🧪 Factices
+                    </button>
+                    <button onclick="window.evalReinitialiser()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-red-400 active:scale-95">
+                        🗑️ Réinit.
+                    </button>
+                </div>
+            </div>
+
+            <!-- Statistiques rapides -->
+            <div class="grid grid-cols-7 gap-1">
+                ${tests.map(testId => `
+                    <div class="bg-slate-800 p-2 rounded-xl text-center border border-slate-700">
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">${libellesCourts[testId]}</p>
+                        <p class="text-lg font-black text-white">${stats[testId]}</p>
+                        <p class="text-[9px] text-slate-500">/ ${eleves.length}</p>
+                    </div>
+                `).join('')}
+            </div>
+
+            <!-- Tableau -->
+            <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-900 text-slate-400 text-xs uppercase border-b border-slate-700">
+                        <tr>
+                            <th class="p-3 font-bold sticky left-0 bg-slate-900">Élève</th>
+                            ${tests.map(testId => `
+                                <th class="p-3 font-bold text-center">${libellesCourts[testId]}</th>
+                            `).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${eleves.map(e => {
+                            const bgRow = e.statut === 'absent' ? 'opacity-40' : '';
+                            const statutBadge = e.statut === 'absent' ? '🚫' : (e.statut === 'inapte' ? '⚠️' : '');
+                            return `
+                                <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer ${bgRow}" 
+                                    onclick="window.evalOuvrirFiche('${e.id}')">
+                                    <td class="p-3 font-bold text-white sticky left-0 bg-slate-800 flex items-center gap-2">
+                                        <span class="text-xs text-slate-400">${e.id}</span>
+                                        <span>${e.prenom} ${e.nom}</span>
+                                        ${statutBadge ? `<span class="text-xs">${statutBadge}</span>` : ''}
+                                    </td>
+                                    ${tests.map(testId => {
+                                        const r = e.resultats[testId];
+                                        if (!r || r.groupe === null) {
+                                            return `<td class="p-3 text-center text-slate-500">--</td>`;
+                                        }
+                                        const couleur = COULEURS_GROUPES[r.groupe] || '#64748b';
+                                        const libelle = LIBELLES_GROUPES[r.groupe] || '';
+                                        let valeur = '';
+                                        switch (testId) {
+                                            case 'endurance': valeur = r.palier !== undefined ? `Pal.${r.palier}` : '--'; break;
+                                            case 'force': 
+                                            case 'souplesse': valeur = r.meilleur !== undefined ? r.meilleur : '--'; break;
+                                            case 'vitesse': valeur = r.meilleur !== undefined ? r.meilleur.toFixed(1) : '--'; break;
+                                            case 'equilibre':
+                                            case 'endurance_musculaire': valeur = r.temps !== undefined ? r.temps : '--'; break;
+                                            case 'coordination': valeur = r.nb_lancers !== undefined ? r.nb_lancers : '--'; break;
+                                            default: valeur = '--';
+                                        }
+                                        return `
+                                            <td class="p-3 text-center">
+                                                <span class="px-2 py-1 rounded-full text-xs font-black text-white" 
+                                                      style="background-color:${couleur}">
+                                                    ${valeur}
+                                                </span>
+                                            </td>
+                                        `;
+                                    }).join('')}
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Légende -->
+            <div class="flex justify-center gap-4 text-xs">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Satisfaisant</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Fragile</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-red-500"></span> À besoins</span>
+                <span class="flex items-center gap-1 text-slate-500"><span class="w-3 h-3 rounded-full bg-slate-600"></span> Non évalué</span>
+            </div>
+        </div>
+    `;
+
+    return html;
+}
+
+/**
+ * Template de la fiche élève détaillée
+ */
+export function templateFicheEleve(eleve, data, modeEdition = false) {
+    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
+    const libellesAffiches = {
+        endurance: 'Endurance (Luc Léger)',
+        force: 'Force (saut en longueur)',
+        vitesse: 'Vitesse (30m)',
+        equilibre: 'Équilibre (Flamingo)',
+        coordination: 'Coordination (lancer/rattrapé)',
+        souplesse: 'Souplesse (sit and reach)',
+        endurance_musculaire: 'Endurance musculaire (chaise)'
+    };
+    const unites = {
+        endurance: 'palier',
+        force: 'cm',
+        vitesse: 's',
+        equilibre: 's',
+        coordination: 'lancers',
+        souplesse: 'cm',
+        endurance_musculaire: 's'
+    };
+
+    // Déterminer les couleurs de sexe pour la photo
+    let bgSexe = 'bg-slate-200 border-slate-400';
+    if (eleve.sexe === 'M' || eleve.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
+    else if (eleve.sexe === 'F' || eleve.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
+
+    // Vérifier si l'élève a des résultats
+    const aDesResultats = tests.some(t => eleve.resultats[t] !== null && eleve.resultats[t]?.groupe !== null);
+
+    // Statut
+    let statutLabel = '✅ Présent';
+    let statutClass = 'text-emerald-400';
+    if (eleve.statut === 'absent') { statutLabel = '🚫 Absent'; statutClass = 'text-red-400'; }
+    else if (eleve.statut === 'inapte') { statutLabel = '⚠️ Inapte'; statutClass = 'text-amber-400'; }
+
+    // Construction de la fiche
+    let html = `
+        <div class="space-y-4">
+            <!-- En-tête -->
+            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <button onclick="window.evalRetourResultats()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                    ← Retour
+                </button>
+                <h3 class="font-black text-blue-400 uppercase text-sm">Fiche élève</h3>
+                <div class="flex gap-2">
+                    <button onclick="window.evalToggleEdition()" class="${modeEdition ? 'bg-emerald-600' : 'bg-blue-600'} px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                        ${modeEdition ? '💾 Enregistrer' : '✏️ Modifier'}
+                    </button>
+                    <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                        ⏹ Quitter
+                    </button>
+                </div>
+            </div>
+
+            <!-- Corps -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Colonne gauche : Photo + Infos -->
+                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex flex-col items-center">
+                    <div class="w-32 h-32 rounded-full ${bgSexe} border-4 border-slate-600 flex items-center justify-center text-6xl overflow-hidden">
+                        <div id="eval-photo-container"></div>
+                    </div>
+                    <p class="text-2xl font-black text-white mt-4">${eleve.prenom} ${eleve.nom}</p>
+                    <p class="text-sm text-slate-400">Code : ${eleve.id}</p>
+                    <p class="text-sm ${statutClass} font-bold">${statutLabel}</p>
+                    <p class="text-xs text-slate-500 mt-2">Sexe : ${eleve.sexe || 'Non renseigné'}</p>
+                    ${!aDesResultats ? '<p class="text-xs text-amber-400 mt-2">⚠️ Aucun résultat enregistré</p>' : ''}
+                    
+                    <!-- Radar (si des résultats existent) -->
+                    ${aDesResultats ? `
+                        <div class="w-full mt-4">
+                            <p class="text-xs font-bold text-slate-400 uppercase text-center mb-2">Profil</p>
+                            <canvas id="eval-radar-canvas"></canvas>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <!-- Colonne droite : Résultats -->
+                <div class="md:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                    <h4 class="font-black text-slate-400 uppercase text-xs mb-4">Résultats détaillés</h4>
+                    <div class="space-y-3">
+                        ${tests.map(testId => {
+                            const r = eleve.resultats[testId];
+                            const libelle = libellesAffiches[testId];
+                            const unite = unites[testId];
+                            
+                            if (!r || r.groupe === null) {
+                                return `
+                                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
+                                        <span class="text-sm text-slate-400">${libelle}</span>
+                                        <span class="text-sm text-slate-500">Non évalué</span>
+                                    </div>
+                                `;
+                            }
+
+                            const couleur = COULEURS_GROUPES[r.groupe] || '#64748b';
+                            const libelleGroupe = LIBELLES_GROUPES[r.groupe] || '';
+                            
+                            let affichageValeur = '';
+                            let essaisHtml = '';
+                            let inputHtml = '';
+
+                            switch (testId) {
+                                case 'endurance':
+                                    affichageValeur = `Palier ${r.palier}`;
+                                    if (modeEdition) {
+                                        inputHtml = `
+                                            <input type="number" id="edit-${testId}" value="${r.palier}" min="-1" max="20" 
+                                                   class="w-20 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                        `;
+                                    }
+                                    break;
+                                case 'force':
+                                case 'souplesse':
+                                    affichageValeur = `${r.meilleur} ${unite}`;
+                                    essaisHtml = r.essais ? `Essais : ${r.essais.join(', ')} ${unite}` : '';
+                                    if (modeEdition) {
+                                        inputHtml = `
+                                            <input type="number" id="edit-${testId}" value="${r.meilleur}" step="1" 
+                                                   class="w-24 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                            <span class="text-xs text-slate-500">${unite}</span>
+                                        `;
+                                    }
+                                    break;
+                                case 'vitesse':
+                                    affichageValeur = `${r.meilleur.toFixed(1)} ${unite}`;
+                                    essaisHtml = r.essais ? `Essais : ${r.essais.map(e => e.toFixed(1)).join(', ')} ${unite}` : '';
+                                    if (modeEdition) {
+                                        inputHtml = `
+                                            <input type="number" id="edit-${testId}" value="${r.meilleur}" step="0.1" 
+                                                   class="w-24 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                            <span class="text-xs text-slate-500">${unite}</span>
+                                        `;
+                                    }
+                                    break;
+                                case 'equilibre':
+                                case 'endurance_musculaire':
+                                    affichageValeur = `${r.temps} ${unite}`;
+                                    if (modeEdition) {
+                                        inputHtml = `
+                                            <input type="number" id="edit-${testId}" value="${r.temps}" step="1" 
+                                                   class="w-24 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                            <span class="text-xs text-slate-500">${unite}</span>
+                                        `;
+                                    }
+                                    break;
+                                case 'coordination':
+                                    affichageValeur = `${r.nb_lancers} ${unite}`;
+                                    if (modeEdition) {
+                                        inputHtml = `
+                                            <input type="number" id="edit-${testId}" value="${r.nb_lancers}" step="1" 
+                                                   class="w-20 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                        `;
+                                    }
+                                    break;
+                                default:
+                                    affichageValeur = '--';
+                            }
+
+                            return `
+                                <div class="bg-slate-900 p-3 rounded-xl border-l-4 flex justify-between items-center" style="border-color:${couleur}">
+                                    <div>
+                                        <span class="text-sm font-bold text-white">${libelle}</span>
+                                        ${modeEdition ? inputHtml : `<span class="text-sm text-slate-300 ml-2">${affichageValeur}</span>`}
+                                        ${essaisHtml ? `<span class="text-xs text-slate-500 ml-2">${essaisHtml}</span>` : ''}
+                                    </div>
+                                    <span class="text-xs font-black px-2 py-1 rounded-full text-white" style="background-color:${couleur}">
+                                        ${libelleGroupe}
+                                    </span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <!-- Statut de l'élève (modifiable en mode édition) -->
+                    <div class="mt-4 p-3 bg-slate-900 rounded-xl border border-slate-700">
+                        <div class="flex items-center gap-4">
+                            <span class="text-sm font-bold text-white">Statut :</span>
+                            ${modeEdition ? `
+                                <select id="edit-statut" class="bg-slate-800 border border-slate-600 rounded p-1 text-white text-sm">
+                                    <option value="present" ${eleve.statut === 'present' ? 'selected' : ''}>Présent</option>
+                                    <option value="absent" ${eleve.statut === 'absent' ? 'selected' : ''}>Absent</option>
+                                    <option value="inapte" ${eleve.statut === 'inapte' ? 'selected' : ''}>Inapte</option>
+                                </select>
+                            ` : `
+                                <span class="text-sm ${statutClass}">${statutLabel}</span>
+                            `}
+                        </div>
+                    </div>
+
+                    ${modeEdition ? `
+                        <div class="mt-4 flex gap-2">
+                            <button onclick="window.evalSauvegarderFiche()" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                                💾 Sauvegarder les modifications
+                            </button>
+                            <button onclick="window.evalToggleEdition()" class="bg-slate-700 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                                ❌ Annuler
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    return html;
+}
 /**
  * Calcule les statistiques par test
  */

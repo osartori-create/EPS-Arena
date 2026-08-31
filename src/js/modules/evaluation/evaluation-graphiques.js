@@ -228,3 +228,80 @@ function getValeurPodium(resultat, testId) {
             return 0;
     }
 }
+ * Render le radar pour la fiche élève
+ */
+export function renderRadar(canvas, data, eleveId) {
+    const eleve = data.eleves[eleveId];
+    if (!eleve) return;
+
+    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
+    const labels = tests.map(t => LIBELLES_TESTS[t].split('(')[0].trim());
+    
+    const valeurs = tests.map(testId => {
+        const r = eleve.resultats[testId];
+        if (!r || r.groupe === null) return 0;
+        if (r.groupe === 'satisfaisant') return 3;
+        if (r.groupe === 'fragile') return 2;
+        if (r.groupe === 'a_besoins') return 1;
+        return 0;
+    });
+
+    // Utiliser Chart.js
+    if (typeof Chart === 'undefined') {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+        script.onload = () => renderRadarChart(canvas, labels, valeurs);
+        document.head.appendChild(script);
+    } else {
+        renderRadarChart(canvas, labels, valeurs);
+    }
+}
+
+function renderRadarChart(canvas, labels, valeurs) {
+    if (canvas.__chart) {
+        canvas.__chart.destroy();
+    }
+
+    const ctx = canvas.getContext('2d');
+    canvas.__chart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Niveau de maîtrise',
+                data: valeurs,
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                borderColor: '#3b82f6',
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                r: {
+                    min: 0,
+                    max: 3,
+                    ticks: {
+                        stepSize: 1,
+                        color: '#94a3b8',
+                        backdropColor: 'transparent',
+                        font: { size: 8 }
+                    },
+                    grid: { color: '#334155' },
+                    angleLines: { color: '#334155' },
+                    pointLabels: { 
+                        color: '#f1f5f9', 
+                        font: { weight: 'bold', size: 10 }
+                    }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+}
