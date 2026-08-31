@@ -99,9 +99,10 @@ function templateCarteTest(testId, data) {
 /**
  * Template de la vue de passation
  */
-export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, data) {
+export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, data, mode = 'individuel') {
     const libelle = LIBELLES_TESTS[testId] || testId;
     const resultat = eleveEnCours ? data.eleves[eleveEnCours.id]?.resultats?.[testId] : null;
+    const isCollectif = (mode === 'collectif');
     
     return `
         <div class="space-y-4">
@@ -114,7 +115,8 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
                 <span class="text-xs text-slate-400">${eleves.filter(e => e.resultats[testId] !== null).length}/${eleves.length} terminés</span>
             </div>
 
-            <!-- Élève en cours -->
+            ${!isCollectif ? `
+            <!-- Élève en cours (uniquement pour les tests individuels) -->
             <div class="bg-slate-800 p-6 rounded-2xl border-2 border-blue-500">
                 <div class="flex items-center gap-6">
                     <div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-4xl">
@@ -134,13 +136,15 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
                     ` : ''}
                 </div>
             </div>
+            ` : ''}
 
             <!-- Zone de saisie spécifique au test -->
             <div id="eval-zone-saisie" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 min-h-[300px]">
                 <!-- Rempli dynamiquement par le module spécifique -->
             </div>
 
-            <!-- Actions -->
+            ${!isCollectif ? `
+            <!-- Actions (pour les tests individuels) -->
             <div class="flex gap-3">
                 <button onclick="window.evalPasserSuivant()" class="flex-1 bg-blue-600 py-4 rounded-xl font-black text-white text-lg active:scale-95">
                     ✅ Suivant
@@ -149,6 +153,7 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
                     ⏹ Terminer
                 </button>
             </div>
+            ` : ''}
         </div>
     `;
 }

@@ -236,3 +236,13 @@ function exporterCSV() {
     }
     exporterVersIDoceo(currentData, currentClasse);
 }
+// Dans afficherPassation, remplacer l'appel à templatePassation par :
+const mode = (currentTestId === 'endurance') ? 'collectif' : 'individuel';
+container.innerHTML = templatePassation(
+    currentTestId,
+    eleveEnCours,
+    eleveSuivant,
+    currentEleves,
+    currentData,
+    mode
+);
