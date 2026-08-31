@@ -1,6 +1,9 @@
 // src/js/modules/evaluation/evaluation-templates.js
 // Templates HTML pour le module d'évaluation
 
+// IMPORTS AJOUTÉS
+import { LIBELLES_TESTS, LIBELLES_GROUPES } from './evaluation-utils.js';
+
 /**
  * Template de la vue principale (liste des tests)
  */
