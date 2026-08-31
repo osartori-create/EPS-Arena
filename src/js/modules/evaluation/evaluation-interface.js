@@ -2,9 +2,8 @@
 // Interface principale du module d'évaluation
 
 import {
-    loadOrCreateData, getElevesTries, getElevesActifs,
-    setStatutEleve, setResultat, genererDonneesFactices,
-    reinitialiserDonnees, sauvegarderDonnees
+    loadOrCreateData, getElevesActifs,
+    genererDonneesFactices, reinitialiserDonnees
 } from './evaluation-stockage.js';
 import { templateVuePrincipale, templatePassation } from './evaluation-templates.js';
 import { LIBELLES_TESTS, exporterVersIDoceo } from './evaluation-utils.js';
@@ -23,9 +22,6 @@ let selectListenerAttached = false;
 
 /**
  * Point d'entrée du module
- * - S'assure que le conteneur existe
- * - Écoute les changements de classe
- * - Charge les données si une classe est sélectionnée
  */
 export function initEvaluationInterface() {
     console.log('📊 Initialisation du module Évaluation');
@@ -42,7 +38,6 @@ export function initEvaluationInterface() {
         return;
     }
 
-    // Fonction qui charge les données pour la classe sélectionnée
     function chargerDonneesClasse() {
         const classe = select.value;
         if (!classe) {
@@ -55,26 +50,20 @@ export function initEvaluationInterface() {
         currentData = loadOrCreateData(classe, elevesData);
         currentData.classe = classe;
 
-        // Si on était en mode passation, on revient au menu
         if (currentMode === 'passation') {
             currentMode = 'menu';
         }
         afficherMenu();
     }
 
-    // Ajouter l'écouteur une seule fois
     if (!selectListenerAttached) {
         select.addEventListener('change', chargerDonneesClasse);
         selectListenerAttached = true;
     }
 
-    // Charger immédiatement si une classe est déjà sélectionnée
     chargerDonneesClasse();
 }
 
-/**
- * Affiche le menu principal
- */
 function afficherMenu() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
@@ -82,16 +71,12 @@ function afficherMenu() {
     currentMode = 'menu';
     container.innerHTML = templateVuePrincipale(currentData, currentClasse);
 
-    // Exposer les fonctions globales
     window.evalLancerTest = lancerTest;
     window.evalGenererFactices = genererFactices;
     window.evalReinitialiser = reinitialiser;
     window.evalExporterCSV = exporterCSV;
 }
 
-/**
- * Lance un test
- */
 function lancerTest(testId) {
     if (!currentData) {
         alert('Veuillez sélectionner une classe.');
@@ -103,7 +88,6 @@ function lancerTest(testId) {
     currentEleves = eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
     currentIndex = 0;
 
-    // Trouver le premier élève sans résultat pour ce test
     const indexSansResultat = currentEleves.findIndex(e => e.resultats[testId] === null);
     if (indexSansResultat !== -1) {
         currentIndex = indexSansResultat;
@@ -113,9 +97,6 @@ function lancerTest(testId) {
     afficherPassation();
 }
 
-/**
- * Affiche la vue de passation
- */
 function afficherPassation() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
@@ -123,15 +104,17 @@ function afficherPassation() {
     const eleveEnCours = currentEleves[currentIndex] || null;
     const eleveSuivant = currentEleves[currentIndex + 1] || null;
 
+    const mode = (currentTestId === 'endurance') ? 'collectif' : 'individuel';
+
     container.innerHTML = templatePassation(
         currentTestId,
         eleveEnCours,
         eleveSuivant,
         currentEleves,
-        currentData
+        currentData,
+        mode
     );
 
-    // Initialiser la zone de saisie selon le test
     const zoneSaisie = document.getElementById('eval-zone-saisie');
     if (zoneSaisie && eleveEnCours) {
         const testId = currentTestId;
@@ -154,36 +137,25 @@ function afficherPassation() {
         }
     }
 
-    // Exposer les fonctions
     window.evalRetourMenu = retourMenu;
     window.evalPasserSuivant = passerSuivant;
     window.evalTerminerTest = terminerTest;
 }
 
-/**
- * Passe à l'élève suivant
- */
 function passerSuivant() {
     if (currentIndex < currentEleves.length - 1) {
         currentIndex++;
         afficherPassation();
     } else {
-        // Tous les élèves ont été traités
         terminerTest();
     }
 }
 
-/**
- * Termine le test et retourne au menu
- */
 function terminerTest() {
     currentMode = 'menu';
     afficherMenu();
 }
 
-/**
- * Retourne au menu
- */
 function retourMenu() {
     if (currentMode === 'passation') {
         if (confirm('Quitter la passation en cours ? Les données seront sauvegardées.')) {
@@ -195,9 +167,6 @@ function retourMenu() {
     }
 }
 
-/**
- * Génère des données factices
- */
 function genererFactices() {
     if (!currentData) {
         alert('Veuillez sélectionner une classe.');
@@ -210,14 +179,10 @@ function genererFactices() {
     }
 }
 
-/**
- * Réinitialise toutes les données
- */
 function reinitialiser() {
     if (!currentClasse) return;
     if (confirm('⚠️ Supprimer toutes les données d\'évaluation pour cette classe ?')) {
         reinitialiserDonnees(currentClasse);
-        // Recharger les données
         const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
         currentData = loadOrCreateData(currentClasse, elevesData);
         currentData.classe = currentClasse;
@@ -226,9 +191,6 @@ function reinitialiser() {
     }
 }
 
-/**
- * Exporte les données en CSV
- */
 function exporterCSV() {
     if (!currentData) {
         alert('Aucune donnée à exporter.');
@@ -236,13 +198,3 @@ function exporterCSV() {
     }
     exporterVersIDoceo(currentData, currentClasse);
 }
-// Dans afficherPassation, remplacer l'appel à templatePassation par :
-const mode = (currentTestId === 'endurance') ? 'collectif' : 'individuel';
-container.innerHTML = templatePassation(
-    currentTestId,
-    eleveEnCours,
-    eleveSuivant,
-    currentEleves,
-    currentData,
-    mode
-);
