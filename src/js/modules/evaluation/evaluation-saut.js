@@ -253,18 +253,15 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                 <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
             </div>
 
-            <!-- Slider central -->
+            <!-- Slider central avec toise intégrée -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
                 <div class="text-center">
                     <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</span></p>
-                    <div class="text-6xl font-black text-yellow-400" id="saut-score-display">${valeurSlider}</div>
-                    <p class="text-sm text-slate-400">cm</p>
-                    <p class="text-xs text-slate-500 mt-1">Meilleur : <span class="font-bold text-yellow-400">${affichageMeilleur}</span></p>
                     <p class="text-xs text-slate-500">Essai ${nbEssais + 1} / ${maxEssais}</p>
                 </div>
 
-                <!-- Toise -->
-                <div class="relative w-full h-32 mt-3 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-2 border-slate-600 overflow-hidden">
+                <!-- TOISE AVEC SCORE INTÉGRÉ -->
+                <div class="relative w-full h-40 mt-2 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-2 border-slate-600 overflow-hidden">
                     <!-- Graduations -->
                     <div class="absolute bottom-0 left-0 right-0 h-8 bg-emerald-900/50 flex items-end">
                         ${Array.from({ length: 26 }, (_, i) => {
@@ -290,13 +287,18 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                         <div class="absolute top-0 w-px h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${(140 / maxSlider) * 100}%;"></div>
                     </div>
                     <!-- Curseur -->
-                    <div class="absolute bottom-0 w-1 h-20 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
+                    <div class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                          style="left:${(valeurSlider / maxSlider) * 100}%; transform: translateX(-50%);">
                         <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                     </div>
+                    <!-- SCORE AFFICHÉ EN JAUNE SUR LA TOISE -->
+                    <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10">
+                        <span class="text-3xl font-black text-yellow-400">${valeurSlider}</span>
+                        <span class="text-xs text-white/70">cm</span>
+                    </div>
                 </div>
 
-                <!-- Contrôles -->
+                <!-- Contrôles du slider -->
                 <div class="flex gap-3 mt-3 items-center">
                     <input type="range" id="saut-slider" min="${minSlider}" max="${maxSlider}" step="1" value="${Math.min(maxSlider, Math.max(minSlider, valeurSlider))}"
                            class="flex-1 h-2 bg-slate-700 rounded-full appearance-none cursor-pointer 
@@ -306,6 +308,15 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                     <input type="number" id="saut-input-manuel" value="${valeurSlider}" step="1" min="0"
                            class="w-24 bg-slate-900 border-2 border-slate-600 rounded-xl p-2 text-center text-xl font-black text-white">
                     <span class="text-sm text-slate-400">cm</span>
+                </div>
+
+                <!-- Affichage des essais : 114 / 122 / 110 (meilleur en jaune) -->
+                <div class="text-center mt-2 text-lg font-mono">
+                    ${essaisSel.length > 0 ? essaisSel.map((t, i) => {
+                        const isBest = (t === meilleurSel);
+                        return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
+                    }).join(' / ') : '<span class="text-slate-600">__ / __ / __</span>'}
+                    <span class="text-sm text-slate-500 ml-2">cm</span>
                 </div>
 
                 <!-- Boutons -->
@@ -321,13 +332,6 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                         ↩ Annuler
                     </button>
                 </div>
-                ${nbEssais > 0 ? `
-                    <div class="mt-2 text-xs text-slate-400 text-center">
-                        Essais : ${essaisSel.map((t, i) => `
-                            <span class="${t === meilleurSel ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t} cm</span>
-                        `).join(' / ')}
-                    </div>
-                ` : ''}
             </div>
 
             <!-- 4 colonnes -->
