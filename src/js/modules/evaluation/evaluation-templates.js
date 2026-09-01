@@ -192,7 +192,7 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
 
     return `
         <div class="space-y-4">
-            <!-- Toise avec curseur intégré -->
+            <!-- Toise avec curseur intégré et score en jaune -->
             <div class="relative w-full h-48 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-4 border-slate-600 overflow-hidden">
                 <!-- Graduations -->
                 <div class="absolute bottom-0 left-0 right-0 h-12 bg-emerald-900/50 flex items-end">
@@ -208,14 +208,14 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                     }).join('')}
                 </div>
 
-                <!-- Bandes de couleur -->
+                <!-- Bandes de couleur (groupes de maîtrise) -->
                 <div class="absolute inset-0 flex pointer-events-none" style="opacity:0.3;">
                     <div class="h-full bg-red-500" style="width:${((110 - min) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-amber-500" style="width:${((140 - 110) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-emerald-500" style="width:${((max - 140) / (max - min)) * 100}%;"></div>
                 </div>
 
-                <!-- Repères -->
+                <!-- Repères verticaux des seuils -->
                 <div class="absolute inset-0 pointer-events-none">
                     <div class="absolute top-0 w-0.5 h-full bg-red-500/50 border-l border-dashed border-red-400/50" style="left:${((110 - min) / (max - min)) * 100}%;"></div>
                     <div class="absolute top-0 w-0.5 h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${((140 - min) / (max - min)) * 100}%;"></div>
@@ -227,14 +227,14 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                     <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
 
-                <!-- Score (ID fixe) -->
+                <!-- SCORE UNIQUEMENT EN JAUNE SUR LA TOISE (pas de score blanc en dessous) -->
                 <div id="slider-score" class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl z-10">
                     <span class="text-4xl font-black text-yellow-400">${valeur}</span>
                     <span class="text-sm text-white/70">${unite}</span>
                 </div>
             </div>
 
-            <!-- Champ manuel -->
+            <!-- Champ de saisie manuelle (sous la toise) -->
             <div class="flex items-center justify-center gap-4">
                 <label class="text-sm text-slate-400">Saisie manuelle :</label>
                 <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
