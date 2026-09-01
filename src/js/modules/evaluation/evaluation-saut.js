@@ -100,7 +100,6 @@ function afficherSaut() {
         });
     });
 
-    // Attacher les événements des boutons menu
     document.querySelectorAll('.saut-menu-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -126,7 +125,7 @@ function afficherSaut() {
         document.querySelectorAll('.saut-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
 
-    // Attacher les événements du slider et du champ manuel
+    // Slider et input
     const slider = document.getElementById('saut-slider');
     const input = document.getElementById('saut-input-manuel');
     if (slider) {
@@ -151,6 +150,41 @@ function afficherSaut() {
     }
 
     setTimeout(() => chargerPhotos(), 100);
+}
+
+// ============================================================
+// MISE À JOUR DE L'AFFICHAGE DU SLIDER
+// ============================================================
+
+function updateSliderDisplay(valeur) {
+    // Mettre à jour le score sur la toise
+    const scoreDisplay = document.getElementById('saut-score-display');
+    if (scoreDisplay) {
+        scoreDisplay.textContent = valeur;
+    }
+    // Mettre à jour la position du curseur
+    const curseur = document.getElementById('saut-curseur');
+    if (curseur) {
+        const pct = (valeur / maxSlider) * 100;
+        curseur.style.left = Math.min(100, Math.max(0, pct)) + '%';
+    }
+    // Mettre à jour les essais (le meilleur reste jaune)
+    const essaisContainer = document.getElementById('saut-essais-display');
+    if (essaisContainer) {
+        const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
+        if (eleveSel) {
+            const essais = essaisParEleve[eleveSel.id] || [];
+            const meilleur = essais.length > 0 ? Math.max(...essais) : null;
+            if (essais.length > 0) {
+                essaisContainer.innerHTML = essais.map(t => {
+                    const isBest = (t === meilleur);
+                    return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
+                }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>';
+            } else {
+                essaisContainer.innerHTML = '<span class="text-slate-600">__ / __ / __</span>';
+            }
+        }
+    }
 }
 
 // ============================================================
@@ -248,14 +282,14 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                 <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
             </div>
 
-            <!-- Slider central avec toise intégrée -->
+            <!-- Slider central -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
                 <div class="text-center">
                     <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</span></p>
                     <p class="text-xs text-slate-500">Essai ${nbEssais + 1} / ${maxEssais}</p>
                 </div>
 
-                <!-- TOISE AVEC SCORE INTÉGRÉ -->
+                <!-- TOISE AVEC SCORE INTÉGRÉ (PAS DE SCORE BLANC À L'EXTÉRIEUR) -->
                 <div class="relative w-full h-40 mt-2 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-2 border-slate-600 overflow-hidden">
                     <!-- Graduations -->
                     <div class="absolute bottom-0 left-0 right-0 h-8 bg-emerald-900/50 flex items-end">
@@ -282,13 +316,13 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                         <div class="absolute top-0 w-px h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${(140 / maxSlider) * 100}%;"></div>
                     </div>
                     <!-- Curseur -->
-                    <div class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
+                    <div id="saut-curseur" class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                          style="left:${(valeurSlider / maxSlider) * 100}%; transform: translateX(-50%);">
                         <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                     </div>
-                    <!-- SCORE AFFICHÉ EN JAUNE SUR LA TOISE -->
-                    <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10" id="saut-score-on-toise">
-                        <span class="text-3xl font-black text-yellow-400" id="saut-score-value">${valeurSlider}</span>
+                    <!-- SCORE AFFICHÉ EN JAUNE SUR LA TOISE (UNIQUEMENT ICI) -->
+                    <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10">
+                        <span id="saut-score-display" class="text-3xl font-black text-yellow-400">${valeurSlider}</span>
                         <span class="text-xs text-white/70">cm</span>
                     </div>
                 </div>
@@ -305,13 +339,12 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                     <span class="text-sm text-slate-400">cm</span>
                 </div>
 
-                <!-- Affichage des essais : 114 / 122 / 110 (meilleur en jaune) -->
-                <div class="text-center mt-2 text-lg font-mono">
+                <!-- AFFICHAGE DES ESSAIS : 114 / 122 / 110 (meilleur en jaune) -->
+                <div id="saut-essais-display" class="text-center mt-2 text-lg font-mono">
                     ${essaisSel.length > 0 ? essaisSel.map((t, i) => {
                         const isBest = (t === meilleurSel);
                         return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
-                    }).join(' / ') : '<span class="text-slate-600">__ / __ / __</span>'}
-                    <span class="text-sm text-slate-500 ml-2">cm</span>
+                    }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>' : '<span class="text-slate-600">__ / __ / __</span>'}
                 </div>
 
                 <!-- Boutons -->
@@ -424,28 +457,6 @@ function annulerEssai() {
     essaisParEleve[eleveSelectionne] = essais;
     afficherSaut();
 }
-
-// ============================================================
-// MISE À JOUR DE L'AFFICHAGE DU SLIDER
-// ============================================================
-
-function updateSliderDisplay(value) {
-    // Mettre à jour le curseur
-    const bar = document.querySelector('#saut-score-on-toise .text-3xl.font-black.text-yellow-400');
-    if (bar) {
-        bar.textContent = value;
-    }
-    // Mettre à jour la position du curseur
-    const cursor = document.querySelector('.absolute.bottom-0.w-1.h-28');
-    if (cursor) {
-        const pct = (value / maxSlider) * 100;
-        cursor.style.left = Math.min(100, Math.max(0, pct)) + '%';
-    }
-}
-
-// ============================================================
-// STATUT
-// ============================================================
 
 function setStatut(eleveId, statut) {
     setStatutEleve(currentData, eleveId, statut);
