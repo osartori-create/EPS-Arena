@@ -1,5 +1,7 @@
 // src/js/modules/evaluation/evaluation-vma.js
 // Saisie de la VMA (Luc Léger) avec fichier audio local importé
+// Chrono indépendant basé sur performance.now()
+// Palier 0 = 154s (2min échauffement + 34s intro)
 
 import { setResultat, getResultat } from './evaluation-stockage.js';
 import { groupeEndurance } from './evaluation-utils.js';
@@ -9,7 +11,8 @@ let currentData = null;
 let currentTestId = 'endurance';
 let currentEleves = [];
 let audioElement = null;
-let offset = 34; // décalage en secondes (modifiable)
+let tempsTest = 0; // temps de test en secondes (commence à 0)
+let tempsTestStart = 0; // référence performance.now() au démarrage
 let palierEnCours = 0;
 let palierValide = -1;
 let tempsRestant = 0;
@@ -19,9 +22,9 @@ let elevesResultats = {};
 let zoneSaisie = null;
 let historiquePaliers = [];
 
-const DUREE_PALIER_0 = 120;
+// Palier 0 = 154s (2min + 34s d'intro), les suivants = 60s
+const DUREE_PALIER_0 = 154;
 const DUREE_PALIER_SUIVANT = 60;
-const AUDIO_STORAGE_KEY = 'eps_arena_luc_leger_audio';
 
 // ============================================================
 // GESTION DU FICHIER AUDIO EN INDEXEDDB
@@ -83,6 +86,29 @@ async function chargerAudioDepuisDB() {
 }
 
 // ============================================================
+// CALCUL DES PALIERS (avant utilisation)
+// ============================================================
+
+function calculerPaliers(tempsTest) {
+    if (tempsTest < DUREE_PALIER_0) {
+        return {
+            palierEnCours: 0,
+            palierValide: -1,
+            tempsRestant: Math.floor(DUREE_PALIER_0 - tempsTest)
+        };
+    }
+    const tempsApresPalier0 = tempsTest - DUREE_PALIER_0;
+    const palierEnCours = 1 + Math.floor(tempsApresPalier0 / DUREE_PALIER_SUIVANT);
+    const palierValide = palierEnCours - 1;
+    const restant = DUREE_PALIER_SUIVANT - (tempsApresPalier0 % DUREE_PALIER_SUIVANT);
+    return {
+        palierEnCours: palierEnCours,
+        palierValide: palierValide,
+        tempsRestant: Math.floor(restant)
+    };
+}
+
+// ============================================================
 // INITIALISATION
 // ============================================================
 
@@ -91,8 +117,13 @@ export function initSaisieVMA(zone, eleve, data, testId, eleves) {
     currentData = data;
     currentTestId = testId;
     currentEleves = eleves.filter(e => e.statut === 'present');
-    offset = data.config?.vma_offset || 34;
     historiquePaliers = [];
+
+    // Réinitialiser le chrono
+    tempsTest = 0;
+    palierEnCours = 0;
+    palierValide = -1;
+    tempsRestant = DUREE_PALIER_0;
 
     elevesResultats = {};
     currentEleves.forEach(e => {
@@ -112,17 +143,10 @@ export function initSaisieVMA(zone, eleve, data, testId, eleves) {
         audioElement.addEventListener('play', () => {
             console.log('🔊 Audio play event');
             isPlaying = true;
-            demarrerMiseAJourPaliers();
-        });
-        audioElement.addEventListener('pause', () => {
-            console.log('🔇 Audio pause event');
-            isPlaying = false;
-            if (intervalId) clearInterval(intervalId);
         });
         audioElement.addEventListener('ended', () => {
             console.log('🔚 Audio ended');
             isPlaying = false;
-            if (intervalId) clearInterval(intervalId);
         });
         audioElement.addEventListener('loadedmetadata', () => {
             console.log('📋 Audio metadata chargée, durée :', audioElement.duration);
@@ -168,17 +192,14 @@ function afficherVMA(hasAudio) {
         tempsRestant,
         nbTermines,
         currentEleves.length,
-        hasAudio || false,
-        offset
+        hasAudio || false
     );
 
     window.evalVmaDemarrer = demarrerVMA;
-    window.evalVmaPause = pauseVMA;
     window.evalVmaTerminer = terminerVMA;
     window.evalVmaClicEleve = clicEleveVMA;
     window.evalVmaUndo = undoVMA;
     window.evalVmaImporterAudio = importerAudio;
-    window.evalVmaSetOffset = setOffset;
 
     remplirColonnesVMA(colonnes);
 }
@@ -252,18 +273,15 @@ async function createCarteVMA(eleve) {
 }
 
 // ============================================================
-// IMPORT DU FICHIER AUDIO (compatible iPad)
+// IMPORT DU FICHIER AUDIO
 // ============================================================
 
 async function importerAudio() {
-    // Méthode 1 : input file avec accept large
     const input = document.createElement('input');
     input.type = 'file';
-    // Sur iPad, il faut accepter plusieurs types MIME
     input.accept = '.mp3,.m4a,.wav,.aac,audio/mpeg,audio/mp4,audio/x-m4a,audio/wav';
     input.multiple = false;
     
-    // Méthode 2 : drag & drop si l'utilisateur préfère
     input.onchange = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -281,35 +299,47 @@ async function importerAudio() {
             console.error(err);
             alert('❌ Erreur d\'import : ' + err.message);
         }
-        input.value = ''; // reset
+        input.value = '';
     };
     input.click();
 }
 
 // ============================================================
-// RÉGLAGE DE L'OFFSET
+// MISE À JOUR DU CHRONO
 // ============================================================
 
-function setOffset() {
-    const newOffset = prompt(`Entrez le décalage en secondes (actuel : ${offset}s) :`, offset);
-    if (newOffset !== null) {
-        const val = parseFloat(newOffset);
-        if (!isNaN(val) && val >= 0) {
-            offset = val;
-            // Sauvegarder dans la config
-            if (currentData && currentData.config) {
-                currentData.config.vma_offset = offset;
-            }
-            alert(`✅ Offset réglé à ${offset}s`);
-            afficherVMA(true);
-        } else {
-            alert('❌ Valeur invalide. Entrez un nombre de secondes (ex: 34).');
-        }
+function demarrerMiseAJourPaliers() {
+    if (intervalId) clearInterval(intervalId);
+    console.log('⏱️ Démarrage du chrono VMA');
+    intervalId = setInterval(() => {
+        mettreAJourPaliers();
+    }, 200);
+}
+
+function mettreAJourPaliers() {
+    if (tempsTestStart > 0) {
+        const elapsed = (performance.now() - tempsTestStart) / 1000;
+        tempsTest = elapsed;
     }
+    
+    const result = calculerPaliers(tempsTest);
+    palierEnCours = result.palierEnCours;
+    palierValide = result.palierValide;
+    tempsRestant = result.tempsRestant;
+
+    // Mettre à jour l'affichage
+    const elPalier = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
+    if (elPalier) elPalier.textContent = `Palier ${palierEnCours}`;
+
+    const elValid = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-emerald-400');
+    if (elValid) elValid.textContent = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+
+    const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
+    if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
 }
 
 // ============================================================
-// CONTROLES AUDIO (avec synchronisation robuste)
+// CONTROLES (Démarrer / Terminer)
 // ============================================================
 
 function demarrerVMA() {
@@ -323,46 +353,24 @@ function demarrerVMA() {
         return;
     }
 
-    // Forcer le démarrage à l'offset
-    audioElement.currentTime = offset;
-    
+    // Lancer le chrono
+    tempsTestStart = performance.now();
+    tempsTest = 0;
+    demarrerMiseAJourPaliers();
+    isPlaying = true;
+
     // Mettre à jour l'interface
     document.getElementById('eval-vma-start')?.classList.add('hidden');
-    document.getElementById('eval-vma-pause')?.classList.remove('hidden');
     document.getElementById('eval-vma-stop')?.classList.remove('hidden');
 
-    // 🔥 IMPORTANT : Démarrer le chrono IMMÉDIATEMENT
-    isPlaying = true;
-    demarrerMiseAJourPaliers();
-
-    // Puis lancer le son (ne bloque pas le chrono)
+    // Lancer le son au début (0s)
+    audioElement.currentTime = 0;
     const playPromise = audioElement.play();
     if (playPromise !== undefined) {
         playPromise.catch(err => {
             console.warn('❌ Erreur lecture audio :', err);
-            // Le chrono continue de tourner même si le son échoue
+            // Le chrono continue de tourner même sans son
         });
-    }
-}
-
-function pauseVMA() {
-    if (!audioElement) return;
-    if (audioElement.paused) {
-        // Reprendre
-        audioElement.play().catch(err => console.warn(err));
-        document.getElementById('eval-vma-start')?.classList.add('hidden');
-        document.getElementById('eval-vma-pause')?.classList.remove('hidden');
-        isPlaying = true;
-        demarrerMiseAJourPaliers();
-    } else {
-        audioElement.pause();
-        document.getElementById('eval-vma-start')?.classList.remove('hidden');
-        document.getElementById('eval-vma-start').textContent = '▶ Reprendre';
-        document.getElementById('eval-vma-pause')?.classList.add('hidden');
-        // On laisse le chrono tourner même en pause pour rester synchro
-        // Mais on ne l'arrête pas complètement, on garde isPlaying = true
-        // pour que le chrono continue de s'actualiser
-        // (l'enseignant peut toujours voir le temps écoulé)
     }
 }
 
@@ -370,9 +378,11 @@ function terminerVMA() {
     if (audioElement) {
         audioElement.pause();
         audioElement.currentTime = 0;
-        isPlaying = false;
-        if (intervalId) clearInterval(intervalId);
     }
+    isPlaying = false;
+    if (intervalId) clearInterval(intervalId);
+    tempsTestStart = 0;
+    tempsTest = 0;
 
     const nonEvalues = currentEleves.filter(e => {
         const palier = elevesResultats[e.id];
@@ -402,42 +412,10 @@ function terminerVMA() {
     });
 
     alert('✅ VMA terminée !');
+    // Revenir à l'état initial
+    document.getElementById('eval-vma-start')?.classList.remove('hidden');
+    document.getElementById('eval-vma-stop')?.classList.add('hidden');
     if (window.evalTerminerTest) window.evalTerminerTest();
-}
-
-// ============================================================
-// MISE À JOUR DES PALIERS (robuste)
-// ============================================================
-
-function demarrerMiseAJourPaliers() {
-    if (intervalId) clearInterval(intervalId);
-    intervalId = setInterval(() => {
-        mettreAJourPaliers();
-    }, 200); // mise à jour rapide (200ms)
-}
-
-function mettreAJourPaliers() {
-    if (!audioElement) return;
-    // On lit currentTime en continu, même si isPlaying est faux
-    // (ainsi le chrono avance même en pause)
-    const tempsVideo = audioElement.currentTime;
-    const tempsTest = Math.max(0, tempsVideo - offset);
-    const result = calculerPaliers(tempsTest);
-    palierEnCours = result.palierEnCours;
-    palierValide = result.palierValide;
-    tempsRestant = result.tempsRestant;
-
-    // Mettre à jour l'affichage
-    const elPalier = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
-    if (elPalier) elPalier.textContent = `Palier ${palierEnCours}`;
-
-    const elValid = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-emerald-400');
-    if (elValid) elValid.textContent = palierValide >= 0 ? `Palier ${palierValide}` : '--';
-
-    const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
-    if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
-
-    // Mettre à jour le compteur si besoin (pas de changement)
 }
 
 // ============================================================
@@ -550,10 +528,10 @@ function undoVMA() {
 }
 
 // ============================================================
-// TEMPLATE VMA
+// TEMPLATE VMA (sans pause, sans offset)
 // ============================================================
 
-function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves, hasAudio, offset) {
+function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves, hasAudio) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
@@ -590,14 +568,8 @@ function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTerm
                 <button onclick="window.evalVmaImporterAudio()" class="bg-purple-600 px-4 py-3 rounded-xl font-black text-xs text-white active:scale-95">
                     📁 Importer bande son ${audioStatus}
                 </button>
-                <button onclick="window.evalVmaSetOffset()" class="bg-slate-600 px-4 py-3 rounded-xl font-black text-xs text-white active:scale-95">
-                    ⏱️ Offset : ${offset}s
-                </button>
                 <button onclick="window.evalVmaDemarrer()" id="eval-vma-start" class="flex-1 min-w-[100px] bg-emerald-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ▶ Démarrer
-                </button>
-                <button onclick="window.evalVmaPause()" id="eval-vma-pause" class="hidden flex-1 min-w-[100px] bg-yellow-600 py-3 rounded-xl font-black text-white active:scale-95">
-                    ⏸ Pause
                 </button>
                 <button onclick="window.evalVmaTerminer()" id="eval-vma-stop" class="hidden flex-1 min-w-[100px] bg-red-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ⏹ Terminer
