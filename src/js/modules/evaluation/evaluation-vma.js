@@ -11,38 +11,28 @@ let currentEleves = [];
 let player = null;
 let offset = 34;
 let palierEnCours = 0;
-let palierValide = -1; // -1 = aucun palier validé (avant la fin de l'échauffement)
+let palierValide = -1;
 let tempsRestant = 0;
 let isPlaying = false;
 let intervalId = null;
-let elevesResultats = {}; // { eleveId: palierValide }
+let elevesResultats = {};
 let zoneSaisie = null;
 let youtubeLoaded = false;
 let historiquePaliers = [];
 
-// Durée des paliers : palier 0 (échauffement) = 2 minutes, paliers suivants = 1 minute
-const DUREE_PALIER_0 = 120; // secondes
-const DUREE_PALIER_SUIVANT = 60; // secondes
+const DUREE_PALIER_0 = 120;
+const DUREE_PALIER_SUIVANT = 60;
 
-/**
- * Calcule le palier en cours et le dernier palier validé
- * @param {number} tempsTest - Temps écoulé depuis le début du test (en secondes)
- * @returns {{ palierEnCours: number, palierValide: number, tempsRestant: number }}
- */
 function calculerPaliers(tempsTest) {
-    // Palier 0 (échauffement) : de 0 à 120s
     if (tempsTest < DUREE_PALIER_0) {
         return {
             palierEnCours: 0,
-            palierValide: -1, // Aucun palier validé
+            palierValide: -1,
             tempsRestant: Math.floor(DUREE_PALIER_0 - tempsTest)
         };
     }
-    // Après l'échauffement, les paliers durent 60s
     const tempsApresPalier0 = tempsTest - DUREE_PALIER_0;
     const palierEnCours = 1 + Math.floor(tempsApresPalier0 / DUREE_PALIER_SUIVANT);
-    // Le palier validé est le précédent : si on est dans le palier 1, on a validé le palier 0
-    // Si on est dans le palier 2, on a validé le palier 1, etc.
     const palierValide = palierEnCours - 1;
     const restant = DUREE_PALIER_SUIVANT - (tempsApresPalier0 % DUREE_PALIER_SUIVANT);
     return {
@@ -92,7 +82,7 @@ function afficherVMA() {
             palierEnCours = result.palierEnCours;
             palierValide = result.palierValide;
             tempsRestant = result.tempsRestant;
-        } catch (e) { /* ignorer */ }
+        } catch (e) { /* ignore */ }
     }
 
     const garcons = currentEleves.filter(e => e.sexe === 'M' || e.sexe === 'm');
@@ -149,7 +139,6 @@ async function createCarteVMA(eleve) {
     if (eleve.sexe === 'M' || eleve.sexe === 'm') bgClass = 'bg-blue-200 border-blue-400';
     else if (eleve.sexe === 'F' || eleve.sexe === 'f') bgClass = 'bg-rose-200 border-rose-400';
 
-    // PHOTO x3 : taille 24x24 au lieu de 8x8
     const photoHtml = url
         ? `<img src="${url}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-500">`
         : `<div class="w-12 h-12 rounded-full bg-slate-600 flex items-center justify-center text-2xl text-white">${eleve.prenom?.charAt(0) || '?'}</div>`;
@@ -215,6 +204,7 @@ function creerLecteur() {
             events: {
                 onReady: () => { console.log('📹 YouTube prêt'); },
                 onStateChange: (e) => {
+                    console.log('🎯 YouTube state changed:', e.data);
                     if (e.data === YT.PlayerState.PLAYING) {
                         isPlaying = true;
                         demarrerMiseAJourPaliers();
@@ -225,6 +215,7 @@ function creerLecteur() {
                 },
                 onError: (err) => {
                     console.warn('⚠️ Erreur YouTube :', err);
+                    // En cas d'erreur, on essaie de relancer
                     setTimeout(() => {
                         if (player) player.playVideo();
                     }, 2000);
@@ -262,10 +253,23 @@ function demarrerMiseAJourPaliers() {
 
 function demarrerVMA() {
     if (player) {
+        console.log('▶️ Tentative de lecture YouTube...');
+        // Forcer la lecture avec mute/unmute pour iPad
+        player.mute();
         player.playVideo();
+        // Démuter après un court délai
+        setTimeout(() => {
+            try {
+                player.unMute();
+                console.log('🔊 Son réactivé');
+            } catch (e) { console.warn('Erreur unmute:', e); }
+        }, 300);
+
         document.getElementById('eval-vma-start')?.classList.add('hidden');
         document.getElementById('eval-vma-pause')?.classList.remove('hidden');
         document.getElementById('eval-vma-stop')?.classList.remove('hidden');
+    } else {
+        console.warn('⚠️ Player YouTube non initialisé');
     }
 }
 
@@ -291,7 +295,6 @@ function terminerVMA() {
         if (intervalId) clearInterval(intervalId);
     }
 
-    // On considère que seuls les élèves ayant un palier >= 0 (qui ont fini l'échauffement) sont évalués
     const nonEvalues = currentEleves.filter(e => {
         const palier = elevesResultats[e.id];
         return palier === undefined || palier < 0;
@@ -312,8 +315,6 @@ function terminerVMA() {
                 groupe: groupe
             });
         } else {
-            // Ceux qui n'ont pas validé l'échauffement : on ne sauvegarde rien ou on met palier -1 ?
-            // On peut sauvegarder -1 pour mémoire, mais le groupe sera null
             setResultat(currentData, e.id, currentTestId, {
                 palier: palier !== undefined ? palier : -1,
                 groupe: null
@@ -332,9 +333,8 @@ function clicEleveVMA(eleveId) {
     }
 
     const ancienPalier = elevesResultats[eleveId] !== undefined ? elevesResultats[eleveId] : null;
-    const nouveauPalier = palierValide; // On attribue le palier VALIDÉ, pas le palier en cours !
+    const nouveauPalier = palierValide;
 
-    // Vérifier qu'on ne remet pas le même palier
     if (ancienPalier === nouveauPalier) {
         alert(`ℹ️ L'élève a déjà le palier ${nouveauPalier >= 0 ? nouveauPalier : 'échauffement non validé'}.`);
         return;
@@ -343,7 +343,6 @@ function clicEleveVMA(eleveId) {
     historiquePaliers.push({ eleveId, ancienPalier, nouveauPalier });
     elevesResultats[eleveId] = nouveauPalier;
 
-    // Mise à jour de l'affichage
     const el = document.querySelector(`#vma-palier-${eleveId}`);
     if (el) {
         if (nouveauPalier === -1) {
