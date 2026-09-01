@@ -1,5 +1,5 @@
 // src/js/modules/evaluation/evaluation-vma.js
-// Saisie de la VMA (Luc Léger) avec fichier audio local importé
+// Saisie de la VMA (Luc Léger) avec fichier audio local importé + offset réglable
 
 import { setResultat, getResultat } from './evaluation-stockage.js';
 import { groupeEndurance } from './evaluation-utils.js';
@@ -9,8 +9,7 @@ let currentData = null;
 let currentTestId = 'endurance';
 let currentEleves = [];
 let audioElement = null;
-let audioContext = null;
-let offset = 34; // pour la synchronisation si la bande son a une intro
+let offset = 0; // maintenant réglable par l'utilisateur
 let palierEnCours = 0;
 let palierValide = -1;
 let tempsRestant = 0;
@@ -91,7 +90,9 @@ export function initSaisieVMA(zone, eleve, data, testId, eleves) {
     currentData = data;
     currentTestId = testId;
     currentEleves = eleves.filter(e => e.statut === 'present');
-    offset = data.config?.vma_offset || 34;
+    // Récupérer l'offset depuis la config ou localStorage
+    const savedOffset = localStorage.getItem('eps_arena_vma_offset');
+    offset = savedOffset !== null ? parseFloat(savedOffset) : (data.config?.vma_offset || 0);
     historiquePaliers = [];
 
     elevesResultats = {};
@@ -157,6 +158,9 @@ function afficherVMA() {
 
     const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined && elevesResultats[id] >= 0).length;
 
+    // Vérifier si un fichier audio est chargé
+    const hasAudio = audioElement && audioElement.src && audioElement.src.length > 0;
+
     zoneSaisie.innerHTML = templateVMA(
         colonnes,
         palierEnCours,
@@ -164,7 +168,8 @@ function afficherVMA() {
         tempsRestant,
         nbTermines,
         currentEleves.length,
-        chargerAudioDepuisDB
+        hasAudio,
+        offset
     );
 
     window.evalVmaDemarrer = demarrerVMA;
@@ -173,6 +178,7 @@ function afficherVMA() {
     window.evalVmaClicEleve = clicEleveVMA;
     window.evalVmaUndo = undoVMA;
     window.evalVmaImporterAudio = importerAudio;
+    window.evalVmaSetOffset = setOffset;
 
     remplirColonnesVMA(colonnes);
 }
@@ -250,26 +256,67 @@ async function createCarteVMA(eleve) {
 // ============================================================
 
 async function importerAudio() {
+    // Sur iPad, le type MIME peut être mal reconnu, on utilise le plus permissif possible
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'audio/*';
+    input.accept = 'audio/*,.mp3,.m4a,.wav,.ogg,.aac';
     input.onchange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
+        if (!file) {
+            alert('Aucun fichier sélectionné.');
+            return;
+        }
+        console.log('📁 Fichier sélectionné :', file.name, file.type, file.size, 'bytes');
         try {
-            await saveAudioToDB(file);
+            // Lecture du fichier pour le stocker dans IndexedDB
+            const blob = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const blob = new Blob([ev.target.result], { type: file.type || 'audio/mpeg' });
+                    resolve(blob);
+                };
+                reader.onerror = (err) => reject(err);
+                reader.readAsArrayBuffer(file);
+            });
+            await saveAudioToDB(blob);
             const loaded = await chargerAudioDepuisDB();
             if (loaded) {
                 alert('✅ Fichier audio importé avec succès !');
+                // Appliquer l'offset actuel
+                if (audioElement) {
+                    audioElement.currentTime = offset;
+                }
                 afficherVMA();
             } else {
                 alert('❌ Erreur lors du chargement du fichier.');
             }
         } catch (err) {
+            console.error('Erreur import audio :', err);
             alert('❌ Erreur d\'import : ' + err.message);
         }
     };
     input.click();
+}
+
+// ============================================================
+// RÉGLAGE DE L'OFFSET
+// ============================================================
+
+function setOffset() {
+    const input = document.getElementById('vma-offset-input');
+    if (!input) return;
+    const newOffset = parseFloat(input.value);
+    if (!isNaN(newOffset) && newOffset >= 0) {
+        offset = newOffset;
+        localStorage.setItem('eps_arena_vma_offset', offset);
+        if (audioElement) {
+            audioElement.currentTime = offset;
+        }
+        alert(`✅ Décalage réglé à ${offset}s. Le son démarrera à cet endroit.`);
+        afficherVMA();
+    } else {
+        alert('Veuillez entrer une valeur positive (secondes).');
+    }
 }
 
 // ============================================================
@@ -294,7 +341,7 @@ function demarrerVMA() {
         document.getElementById('eval-vma-pause')?.classList.remove('hidden');
         document.getElementById('eval-vma-stop')?.classList.remove('hidden');
 
-        // Lire le son
+        // Lire le son à partir de l'offset
         audioElement.currentTime = offset;
         audioElement.play().catch(err => {
             console.warn('Erreur lecture audio :', err);
@@ -505,10 +552,10 @@ function undoVMA() {
 }
 
 // ============================================================
-// TEMPLATE VMA (avec bouton d'import)
+// TEMPLATE VMA (avec bouton d'import et offset)
 // ============================================================
 
-function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves, hasAudio) {
+function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves, hasAudio, offset) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
@@ -545,6 +592,17 @@ function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTerm
                 <button onclick="window.evalVmaImporterAudio()" class="bg-purple-600 px-4 py-3 rounded-xl font-black text-xs text-white active:scale-95">
                     📁 Importer bande son ${audioStatus}
                 </button>
+                <div class="flex items-center gap-2 bg-slate-700 px-3 py-2 rounded-xl">
+                    <span class="text-xs text-white font-bold">Décalage (s) :</span>
+                    <input type="number" id="vma-offset-input" value="${offset}" step="0.5" min="0"
+                           class="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm text-center font-bold">
+                    <button onclick="window.evalVmaSetOffset()" class="bg-blue-600 px-2 py-1 rounded-lg text-xs font-black text-white">
+                        OK
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2">
                 <button onclick="window.evalVmaDemarrer()" id="eval-vma-start" class="flex-1 min-w-[100px] bg-emerald-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ▶ Démarrer
                 </button>
