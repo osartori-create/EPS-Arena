@@ -17,6 +17,7 @@ import { initSaisieSprint } from './evaluation-sprint.js';
 import { initSaisieVMA } from './evaluation-vma.js';
 import { initSaisieStandard } from './evaluation-saisie.js';
 import { afficherResultats } from './evaluation-resultats.js';
+import { getPhotoUrl } from '../../services/admin-service.js';
 
 let currentData = null;
 let currentClasse = '';
@@ -102,7 +103,7 @@ function lancerTest(testId) {
     afficherPassation();
 }
 
-function afficherPassation() {
+async function afficherPassation() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
 
@@ -120,6 +121,14 @@ function afficherPassation() {
         mode
     );
 
+    // Charger les photos si on est en mode individuel
+    if (mode !== 'collectif' && eleveEnCours) {
+        await chargerPhotoEleve(eleveEnCours.id, 'eval-eleve-photo');
+        if (eleveSuivant) {
+            await chargerPhotoEleve(eleveSuivant.id, 'eval-prochain-photo');
+        }
+    }
+
     const zoneSaisie = document.getElementById('eval-zone-saisie');
     if (zoneSaisie && eleveEnCours) {
         const testId = currentTestId;
@@ -129,10 +138,10 @@ function afficherPassation() {
         switch (testId) {
             case 'force':
                 initSaisieSaut(zoneSaisie, eleve, data, testId, currentEleves);
-    break;
+                break;
             case 'vitesse':
                 initSaisieSprint(zoneSaisie, eleve, data, testId, currentEleves);
-    break;
+                break;
             case 'endurance':
                 initSaisieVMA(zoneSaisie, eleve, data, testId, currentEleves);
                 break;
@@ -146,6 +155,44 @@ function afficherPassation() {
     window.evalPasserSuivant = passerSuivant;
     window.evalTerminerTest = terminerTest;
 }
+
+// ============================================================
+// CHARGEMENT DES PHOTOS DANS L'EN-TÊTE
+// ============================================================
+
+async function chargerPhotoEleve(eleveId, elementId) {
+    const container = document.getElementById(elementId);
+    if (!container) return;
+    
+    const eleve = currentData?.eleves[eleveId];
+    if (eleve) {
+        // Déterminer la couleur de fond selon le sexe
+        let bgSexe = 'bg-slate-200 border-slate-400';
+        if (eleve.sexe === 'M' || eleve.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
+        else if (eleve.sexe === 'F' || eleve.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
+        container.className = `w-${elementId === 'eval-eleve-photo' ? '16' : '10'} h-${elementId === 'eval-eleve-photo' ? '16' : '10'} rounded-full border-2 flex items-center justify-center text-3xl overflow-hidden ${bgSexe}`;
+    }
+
+    try {
+        const url = await getPhotoUrl(eleveId);
+        if (url) {
+            container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
+        } else {
+            const initiale = eleve?.prenom?.charAt(0) || '👤';
+            const taille = elementId === 'eval-eleve-photo' ? '3xl' : 'sm';
+            container.innerHTML = `<span class="text-${taille}">${initiale}</span>`;
+        }
+    } catch (e) {
+        const initiale = eleve?.prenom?.charAt(0) || '👤';
+        const taille = elementId === 'eval-eleve-photo' ? '3xl' : 'sm';
+        container.innerHTML = `<span class="text-${taille}">${initiale}</span>`;
+    }
+}
+
+// ============================================================
+// GESTION DU STATUT (exposée globalement)
+// ============================================================
+
 window.evalSetStatut = function(statut) {
     if (!currentData || !currentEleves || currentIndex >= currentEleves.length) {
         alert('Aucun élève sélectionné.');
