@@ -1,9 +1,10 @@
 // src/js/modules/evaluation/evaluation-saut.js
-// Saisie du saut en longueur
+// Saisie du saut en longueur (slider + champ manuel + photo + statut)
 
 import { templateSliderSaut } from './evaluation-templates.js';
-import { setResultat, getResultat } from './evaluation-stockage.js';
-import { groupeForce } from './evaluation-utils.js';
+import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
+import { groupeForce, COULEURS_GROUPES } from './evaluation-utils.js';
+import { getPhotoUrl } from '../../services/admin-service.js';
 
 let currentEleve = null;
 let currentData = null;
@@ -14,6 +15,34 @@ let maxEssais = 3;
 let zoneSaisie = null;
 let valeurInitiale = 120;
 
+// ============================================================
+// FONCTIONS GLOBALES POUR LE SLIDER (définies UNE SEULE FOIS)
+// ============================================================
+if (!window.evalUpdateSlider) {
+    window.evalUpdateSlider = function(value, min, max) {
+        console.log('🔄 evalUpdateSlider appelée avec value=', value);
+        // Mettre à jour le champ manuel
+        const input = document.getElementById('eval-input-manuel');
+        if (input) input.value = value;
+
+        // Mettre à jour la barre du curseur
+        const bar = document.getElementById('slider-bar');
+        if (bar) {
+            const pct = ((parseFloat(value) - min) / (max - min)) * 100;
+            bar.style.left = Math.max(0, Math.min(100, pct)) + '%';
+        }
+
+        // Mettre à jour le score affiché
+        const score = document.getElementById('slider-score');
+        if (score) {
+            score.innerHTML = `<span class="text-4xl font-black text-yellow-400">${value}</span><span class="text-sm text-white/70">cm</span>`;
+        }
+    };
+}
+
+// ============================================================
+// INIT
+// ============================================================
 export function initSaisieSaut(zone, eleve, data, testId) {
     zoneSaisie = zone;
     currentEleve = eleve;
@@ -29,29 +58,25 @@ export function initSaisieSaut(zone, eleve, data, testId) {
         essaiCourant = 0;
     }
 
-    // Déterminer la valeur initiale du slider
-    if (essaiCourant === 0) {
-        valeurInitiale = 120;
-    } else if (essaiCourant === 1) {
-        valeurInitiale = essais[0];
-    } else {
-        valeurInitiale = Math.max(...essais);
-    }
+    // Valeur initiale du slider
+    if (essaiCourant === 0) valeurInitiale = 120;
+    else if (essaiCourant === 1) valeurInitiale = essais[0];
+    else valeurInitiale = Math.max(...essais);
 
     if (essaiCourant >= maxEssais) {
         afficherTermine();
-        setTimeout(() => {
-            if (window.evalPasserSuivant) window.evalPasserSuivant();
-        }, 1500);
+        setTimeout(() => { if (window.evalPasserSuivant) window.evalPasserSuivant(); }, 1500);
         return;
     }
 
     afficherSaisie();
 }
 
+// ============================================================
+// AFFICHAGE
+// ============================================================
 function afficherSaisie() {
     const meilleur = essais.length > 0 ? Math.max(...essais) : null;
-    const valeurInitiale = (essaiCourant === 0) ? 120 : (essaiCourant === 1 ? essais[0] : Math.max(...essais));
 
     const html = `
         <div class="space-y-4">
@@ -75,27 +100,37 @@ function afficherSaisie() {
     window.evalValiderEssai = validerEssai;
     window.evalEssaiSuivant = essaiSuivant;
 
-    // Synchroniser slider et champ manuel
-    const slider = document.getElementById('eval-slider');
+    // Synchroniser le champ manuel
     const input = document.getElementById('eval-input-manuel');
-    if (slider) {
-        slider.addEventListener('input', () => {
-            if (input) input.value = slider.value;
-        });
-    }
     if (input) {
-        input.addEventListener('input', () => {
-            let val = parseFloat(input.value);
+        input.addEventListener('input', function() {
+            let val = parseFloat(this.value);
             if (isNaN(val)) val = 0;
+            const slider = document.getElementById('eval-slider');
             if (slider) {
                 if (val < 0) slider.value = 0;
                 else if (val > 250) slider.value = 250;
                 else slider.value = val;
             }
+            // Mettre à jour le visuel
+            if (window.evalUpdateSlider) {
+                window.evalUpdateSlider(val, 0, 250);
+            }
         });
     }
+
+    // Forcer une première mise à jour du visuel
+    setTimeout(() => {
+        const slider = document.getElementById('eval-slider');
+        if (slider && window.evalUpdateSlider) {
+            window.evalUpdateSlider(slider.value, 0, 250);
+        }
+    }, 50);
 }
 
+// ============================================================
+// VALIDATION
+// ============================================================
 function validerEssai() {
     const input = document.getElementById('eval-input-manuel');
     if (!input) return;
@@ -119,9 +154,7 @@ function validerEssai() {
 
     if (essaiCourant >= maxEssais) {
         afficherTermine();
-        setTimeout(() => {
-            if (window.evalPasserSuivant) window.evalPasserSuivant();
-        }, 800);
+        setTimeout(() => { if (window.evalPasserSuivant) window.evalPasserSuivant(); }, 800);
     } else {
         valeurInitiale = essais.length === 1 ? essais[0] : Math.max(...essais);
         afficherSaisie();
@@ -129,13 +162,13 @@ function validerEssai() {
 }
 
 function essaiSuivant() {
-    alert('Veuillez d\'abord valider l\'essai en cours avec "✅ Valider l\'essai".');
+    alert('Veuillez d\'abord valider l\'essai en cours avec "✅ Valider l\'essai" ou ajuster la distance.');
 }
 
 function afficherTermine() {
     const meilleur = essais.length > 0 ? Math.max(...essais) : 0;
     const groupe = groupeForce(meilleur);
-    const couleur = groupe === 'satisfaisant' ? '#22c55e' : (groupe === 'fragile' ? '#f59e0b' : '#ef4444');
+    const couleur = COULEURS_GROUPES[groupe] || '#64748b';
     const libelleGroupe = groupe === 'satisfaisant' ? '✅ Satisfaisant' :
                           groupe === 'fragile' ? '⚠️ Fragile' :
                           '🔴 À besoins';
