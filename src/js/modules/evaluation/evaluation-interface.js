@@ -6,7 +6,11 @@ import {
     genererDonneesFactices, reinitialiserDonnees,
     purgerTest, purgerTousLesTests, purgerClasseEntiere
 } from './evaluation-stockage.js';
-import { templateVuePrincipale, templatePassation } from './evaluation-templates.js';
+import { 
+    templateVuePrincipale, 
+    templatePassation,
+    templateModalPurge 
+} from './evaluation-templates.js';
 import { LIBELLES_TESTS, exporterVersIDoceo } from './evaluation-utils.js';
 import { initSaisieSaut } from './evaluation-saut.js';
 import { initSaisieSprint } from './evaluation-sprint.js';
@@ -19,12 +23,9 @@ let currentClasse = '';
 let currentTestId = '';
 let currentEleves = [];
 let currentIndex = 0;
-let currentMode = 'menu'; // 'menu' | 'passation'
+let currentMode = 'menu';
 let selectListenerAttached = false;
 
-/**
- * Point d'entrée du module
- */
 export function initEvaluationInterface() {
     console.log('📊 Initialisation du module Évaluation');
 
@@ -66,9 +67,6 @@ export function initEvaluationInterface() {
     chargerDonneesClasse();
 }
 
-/**
- * Affiche le menu principal
- */
 function afficherMenu() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
@@ -76,19 +74,14 @@ function afficherMenu() {
     currentMode = 'menu';
     container.innerHTML = templateVuePrincipale(currentData, currentClasse);
 
-    // Exposer les fonctions globales
     window.evalLancerTest = lancerTest;
     window.evalVoirResultats = voirResultats;
     window.evalGenererFactices = genererFactices;
     window.evalOuvrirPurge = ouvrirPurge;
-    window.evalReinitialiser = reinitialiser;
     window.evalExporterCSV = exporterCSV;
     window.evalRetourMenu = retourMenu;
 }
 
-/**
- * Lance un test
- */
 function lancerTest(testId) {
     if (!currentData) {
         alert('Veuillez sélectionner une classe.');
@@ -109,10 +102,7 @@ function lancerTest(testId) {
     afficherPassation();
 }
 
-/**
- * Affiche la vue de passation
- */
-async function afficherPassation() {
+function afficherPassation() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
 
@@ -129,14 +119,6 @@ async function afficherPassation() {
         currentData,
         mode
     );
-
-    // Charger les photos si on est en mode individuel
-    if (mode !== 'collectif' && eleveEnCours) {
-        await chargerPhotoEleve(eleveEnCours.id, 'eval-eleve-photo');
-        if (eleveSuivant) {
-            await chargerPhotoEleve(eleveSuivant.id, 'eval-prochain-photo');
-        }
-    }
 
     const zoneSaisie = document.getElementById('eval-zone-saisie');
     if (zoneSaisie && eleveEnCours) {
@@ -160,46 +142,11 @@ async function afficherPassation() {
         }
     }
 
-    // Exposer les fonctions de navigation
     window.evalRetourMenu = retourMenu;
     window.evalPasserSuivant = passerSuivant;
     window.evalTerminerTest = terminerTest;
 }
 
-// Fonction utilitaire pour charger une photo
-async function chargerPhotoEleve(eleveId, elementId) {
-    const container = document.getElementById(elementId);
-    if (!container) return;
-    try {
-        const { getPhotoUrl } = await import('../../services/admin-service.js');
-        const url = await getPhotoUrl(eleveId);
-        // Récupérer l'élève pour connaître son sexe
-        const eleve = currentData.eleves[eleveId];
-        if (eleve) {
-            // Déterminer la couleur de fond selon le sexe
-            let bgSexe = 'bg-slate-200 border-slate-400';
-            if (eleve.sexe === 'M' || eleve.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
-            else if (eleve.sexe === 'F' || eleve.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
-            container.className = `w-${elementId === 'eval-eleve-photo' ? '16' : '10'} h-${elementId === 'eval-eleve-photo' ? '16' : '10'} rounded-full border-2 flex items-center justify-center text-3xl overflow-hidden ${bgSexe}`;
-        }
-        if (url) {
-            container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
-        } else {
-            // Conserver l'initiale si pas de photo
-            const initiale = eleve?.prenom?.charAt(0) || '👤';
-            container.innerHTML = `<span class="text-${elementId === 'eval-eleve-photo' ? '3xl' : 'sm'}">${initiale}</span>`;
-        }
-    } catch (e) {
-        // Fallback : garder l'initiale
-        const eleve = currentData.eleves[eleveId];
-        const initiale = eleve?.prenom?.charAt(0) || '👤';
-        container.innerHTML = `<span class="text-${elementId === 'eval-eleve-photo' ? '3xl' : 'sm'}">${initiale}</span>`;
-    }
-}
-
-/**
- * Passe à l'élève suivant
- */
 function passerSuivant() {
     if (currentIndex < currentEleves.length - 1) {
         currentIndex++;
@@ -209,23 +156,11 @@ function passerSuivant() {
     }
 }
 
-/**
- * Termine le test et retourne au menu
- */
 function terminerTest() {
     currentMode = 'menu';
     afficherMenu();
 }
-window.evalSetStatut = function(statut) {
-    if (!currentData || !currentEleves[currentIndex]) return;
-    const eleveId = currentEleves[currentIndex].id;
-    setStatutEleve(currentData, eleveId, statut);
-    // Recharger la passation pour mettre à jour l'affichage
-    afficherPassation();
-};
-/**
- * Retourne au menu
- */
+
 function retourMenu() {
     if (currentMode === 'passation') {
         if (confirm('Quitter la passation en cours ? Les données seront sauvegardées.')) {
@@ -237,9 +172,6 @@ function retourMenu() {
     }
 }
 
-/**
- * Affiche la vue des résultats (tableau de bord)
- */
 function voirResultats() {
     if (!currentData) {
         alert('Veuillez sélectionner une classe.');
@@ -248,66 +180,16 @@ function voirResultats() {
     afficherResultats(currentData);
 }
 
-/**
- * Génère des données factices
- */
-function genererFactices() {
-    if (!currentData) {
-        alert('Veuillez sélectionner une classe.');
-        return;
-    }
-    if (confirm('Générer des données factices pour tous les tests ?')) {
-        currentData = genererDonneesFactices(currentData);
-        afficherMenu();
-        alert('✅ Données factices générées !');
-    }
-}
+// ============================================================
+// MODALE DE PURGE
+// ============================================================
 
-/**
- * Réinitialise toutes les données
- */
-function reinitialiser() {
-    if (!currentClasse) return;
-    if (confirm('⚠️ Supprimer toutes les données d\'évaluation pour cette classe ?')) {
-        reinitialiserDonnees(currentClasse);
-        const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-        currentData = loadOrCreateData(currentClasse, elevesData);
-        currentData.classe = currentClasse;
-        afficherMenu();
-        alert('✅ Données réinitialisées.');
-    }
-}
-
-/**
- * Exporte les données en CSV
- */
-function exporterCSV() {
-    if (!currentData) {
-        alert('Aucune donnée à exporter.');
-        return;
-    }
-    exporterVersIDoceo(currentData, currentClasse);
-}
-async function chargerPhotoDansElement(eleveId, container) {
-    try {
-        const { getPhotoUrl } = await import('../../services/admin-service.js');
-        const url = await getPhotoUrl(eleveId);
-        if (url) {
-            container.innerHTML = `<img src="${url}" class="w-full h-full object-cover">`;
-        } else {
-            container.innerHTML = '👤';
-        }
-    } catch (e) {
-        container.innerHTML = '👤';
-    }
-}
 function ouvrirPurge() {
     if (!currentData || !currentClasse) {
         alert('Aucune classe sélectionnée.');
         return;
     }
     
-    // Compter les résultats pour chaque test
     const stats = {};
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
     const libelles = {
@@ -327,17 +209,14 @@ function ouvrirPurge() {
     
     const nbEleves = Object.keys(currentData.eleves).length;
     
-    // Créer la modale
     const modalHtml = templateModalPurge(currentClasse, stats, libelles, nbEleves);
     
-    // Ajouter la modale au DOM
     const modalContainer = document.createElement('div');
     modalContainer.id = 'eval-purge-modal';
     modalContainer.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
     modalContainer.innerHTML = modalHtml;
     document.body.appendChild(modalContainer);
     
-    // Gérer les événements
     modalContainer.querySelector('#eval-purge-close').addEventListener('click', () => {
         modalContainer.remove();
     });
@@ -353,7 +232,6 @@ function ouvrirPurge() {
             }
             if (confirm(`⚠️ Supprimer les ${count} résultat(s) pour "${libelle}" ?`)) {
                 purgerTest(currentClasse, testId);
-                // Recharger les données
                 const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
                 currentData = loadOrCreateData(currentClasse, elevesData);
                 currentData.classe = currentClasse;
@@ -372,7 +250,6 @@ function ouvrirPurge() {
         }
         if (confirm(`⚠️ Supprimer TOUS les résultats (${total} au total) ? Cette action est irréversible.`)) {
             purgerTousLesTests(currentClasse);
-            // Recharger les données
             const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
             currentData = loadOrCreateData(currentClasse, elevesData);
             currentData.classe = currentClasse;
@@ -386,21 +263,50 @@ function ouvrirPurge() {
         if (confirm(`⚠️ Supprimer TOUTES les données de la classe "${currentClasse}" (élèves + résultats) ? Cette action est irréversible.`)) {
             purgerClasseEntiere(currentClasse);
             modalContainer.remove();
-            // Recharger la page ou réinitialiser l'affichage
             const container = document.getElementById('viewEvaluationSettings');
             if (container) {
                 container.innerHTML = '<p class="text-slate-500 text-center py-10">Classe purgée. Veuillez sélectionner une classe.</p>';
             }
-            // Réinitialiser currentData
             currentData = null;
             alert(`✅ Toutes les données de la classe "${currentClasse}" ont été supprimées.`);
         }
     });
     
-    // Fermer la modale en cliquant à l'extérieur
     modalContainer.addEventListener('click', (e) => {
         if (e.target === modalContainer) {
             modalContainer.remove();
         }
     });
+}
+
+function genererFactices() {
+    if (!currentData) {
+        alert('Veuillez sélectionner une classe.');
+        return;
+    }
+    if (confirm('Générer des données factices pour tous les tests ?')) {
+        currentData = genererDonneesFactices(currentData);
+        afficherMenu();
+        alert('✅ Données factices générées !');
+    }
+}
+
+function reinitialiser() {
+    if (!currentClasse) return;
+    if (confirm('⚠️ Supprimer toutes les données d\'évaluation pour cette classe ?')) {
+        reinitialiserDonnees(currentClasse);
+        const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        currentData = loadOrCreateData(currentClasse, elevesData);
+        currentData.classe = currentClasse;
+        afficherMenu();
+        alert('✅ Données réinitialisées.');
+    }
+}
+
+function exporterCSV() {
+    if (!currentData) {
+        alert('Aucune donnée à exporter.');
+        return;
+    }
+    exporterVersIDoceo(currentData, currentClasse);
 }

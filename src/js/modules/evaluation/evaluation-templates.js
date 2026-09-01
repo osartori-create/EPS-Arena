@@ -24,8 +24,8 @@ export function templateVuePrincipale(data, classe) {
                         🧪 Données factices
                     </button>
                     <button onclick="window.evalOuvrirPurge()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400">
-    🗑️ Gérer les données
-</button>
+                        🗑️ Gérer les données
+                    </button>
                     <button onclick="window.evalExporterCSV()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">
                         📥 Export CSV
                     </button>
@@ -100,20 +100,6 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
     const resultat = eleveEnCours ? data.eleves[eleveEnCours.id]?.resultats?.[testId] : null;
     const isCollectif = (mode === 'collectif');
 
-    // Couleur de sexe pour l'élève en cours
-    let bgSexe = 'bg-slate-200 border-slate-400';
-    if (eleveEnCours) {
-        if (eleveEnCours.sexe === 'M' || eleveEnCours.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
-        else if (eleveEnCours.sexe === 'F' || eleveEnCours.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
-    }
-
-    // Couleur de sexe pour l'élève suivant
-    let bgSexeSuivant = 'bg-slate-200 border-slate-400';
-    if (eleveSuivant) {
-        if (eleveSuivant.sexe === 'M' || eleveSuivant.sexe === 'm') bgSexeSuivant = 'bg-blue-200 border-blue-400';
-        else if (eleveSuivant.sexe === 'F' || eleveSuivant.sexe === 'f') bgSexeSuivant = 'bg-rose-200 border-rose-400';
-    }
-
     // Statut de l'élève en cours
     const statut = eleveEnCours?.statut || 'present';
     let statutLabel = '✅ Présent';
@@ -133,48 +119,48 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
             </div>
 
             ${!isCollectif ? `
-<div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
-    <div class="flex items-center gap-4">
-        <!-- Photo de l'élève en cours -->
-        <div id="eval-eleve-photo" class="w-16 h-16 rounded-full border-2 flex items-center justify-center text-3xl overflow-hidden bg-slate-700 border-slate-500">
-            <span class="text-3xl">${eleveEnCours?.prenom?.charAt(0) || '👤'}</span>
-        </div>
-        <div class="flex-1">
-            <p class="text-xl font-black text-white">${eleveEnCours ? `${eleveEnCours.prenom} ${eleveEnCours.nom}` : '--'}</p>
-            <p class="text-sm text-slate-400">Code : ${eleveEnCours?.id || '--'}</p>
-            <div class="flex gap-2 mt-1 flex-wrap">
-                <span id="eval-statut-label" class="text-xs font-bold ${statutClass}">${statutLabel}</span>
-            </div>
-        </div>
-        <div class="flex flex-col gap-1">
-            <button onclick="window.evalSetStatut('absent')" 
-                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-red-600 hover:text-white transition-colors">
-                Absent
-            </button>
-            <button onclick="window.evalSetStatut('inapte')" 
-                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-amber-600 hover:text-white transition-colors">
-                Inapte
-            </button>
-            <button onclick="window.evalSetStatut('present')" 
-                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-emerald-600 hover:text-white transition-colors">
-                Présent
-            </button>
-        </div>
-        ${eleveSuivant ? `
-            <div class="text-right border-l border-slate-700 pl-4">
-                <p class="text-xs text-slate-400">Prochain :</p>
-                <div class="flex items-center gap-2 justify-end">
-                    <div id="eval-prochain-photo" class="w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm overflow-hidden bg-slate-700 border-slate-500">
-                        <span class="text-sm">${eleveSuivant.prenom?.charAt(0) || '👤'}</span>
+            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
+                <div class="flex items-center gap-4">
+                    <!-- Photo de l'élève en cours -->
+                    <div id="eval-eleve-photo" class="w-16 h-16 rounded-full border-2 flex items-center justify-center text-3xl overflow-hidden bg-slate-700 border-slate-500">
+                        <span class="text-3xl">${eleveEnCours?.prenom?.charAt(0) || '👤'}</span>
                     </div>
-                    <p class="font-bold text-white text-sm">${eleveSuivant.prenom} ${eleveSuivant.nom}</p>
+                    <div class="flex-1">
+                        <p class="text-xl font-black text-white">${eleveEnCours ? `${eleveEnCours.prenom} ${eleveEnCours.nom}` : '--'}</p>
+                        <p class="text-sm text-slate-400">Code : ${eleveEnCours?.id || '--'}</p>
+                        <div class="flex gap-2 mt-1 flex-wrap">
+                            <span id="eval-statut-label" class="text-xs font-bold ${statutClass}">${statutLabel}</span>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <button onclick="window.evalSetStatut('absent')" 
+                                class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-red-600 hover:text-white transition-colors">
+                            Absent
+                        </button>
+                        <button onclick="window.evalSetStatut('inapte')" 
+                                class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-amber-600 hover:text-white transition-colors">
+                            Inapte
+                        </button>
+                        <button onclick="window.evalSetStatut('present')" 
+                                class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-emerald-600 hover:text-white transition-colors">
+                            Présent
+                        </button>
+                    </div>
+                    ${eleveSuivant ? `
+                        <div class="text-right border-l border-slate-700 pl-4">
+                            <p class="text-xs text-slate-400">Prochain :</p>
+                            <div class="flex items-center gap-2 justify-end">
+                                <div id="eval-prochain-photo" class="w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm overflow-hidden bg-slate-700 border-slate-500">
+                                    <span class="text-sm">${eleveSuivant.prenom?.charAt(0) || '👤'}</span>
+                                </div>
+                                <p class="font-bold text-white text-sm">${eleveSuivant.prenom} ${eleveSuivant.nom}</p>
+                            </div>
+                            <p class="text-xs text-amber-400">👀 se prépare</p>
+                        </div>
+                    ` : ''}
                 </div>
-                <p class="text-xs text-amber-400">👀 se prépare</p>
             </div>
-        ` : ''}
-    </div>
-</div>
-` : ''}
+            ` : ''}
 
             <!-- Zone de saisie spécifique au test -->
             <div id="eval-zone-saisie" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 min-h-[300px]">
@@ -197,7 +183,7 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
 }
 
 // ============================================================
-// SAUT (slider + toise) – VERSION CORRECTE AVEC ID FIXES
+// SAUT (slider + toise)
 // ============================================================
 
 export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
@@ -306,7 +292,7 @@ export function templateChronoSprint(temps) {
 // VMA
 // ============================================================
 
-export function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, nbTermines, totalEleves) {
+export function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves, hasAudio) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
@@ -319,13 +305,14 @@ export function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, 
     `).join('');
 
     const affichePalierValide = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+    const audioStatus = hasAudio ? '✅' : '❌';
 
     return `
         <div class="space-y-4">
             <div class="grid grid-cols-2 gap-4 bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <div class="text-center">
                     <p class="text-xs text-slate-400">Palier en cours</p>
-                    <p class="text-4xl font-black text-yellow-400">Palier ${palierActuel}</p>
+                    <p class="text-4xl font-black text-yellow-400">Palier ${palierEnCours}</p>
                     <p class="text-sm text-slate-500">${tempsRestant}s restantes</p>
                 </div>
                 <div class="text-center border-l border-slate-700 pl-4">
@@ -339,11 +326,11 @@ export function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, 
             </div>
 
             <div class="flex flex-wrap gap-2">
+                <button onclick="window.evalVmaImporterAudio()" class="bg-purple-600 px-4 py-3 rounded-xl font-black text-xs text-white active:scale-95">
+                    📁 Importer bande son ${audioStatus}
+                </button>
                 <button onclick="window.evalVmaDemarrer()" id="eval-vma-start" class="flex-1 min-w-[100px] bg-emerald-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ▶ Démarrer
-                </button>
-                <button onclick="window.evalVmaPause()" id="eval-vma-pause" class="hidden flex-1 min-w-[100px] bg-yellow-600 py-3 rounded-xl font-black text-white active:scale-95">
-                    ⏸ Pause
                 </button>
                 <button onclick="window.evalVmaTerminer()" id="eval-vma-stop" class="hidden flex-1 min-w-[100px] bg-red-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ⏹ Terminer
@@ -352,8 +339,6 @@ export function templateVMA(colonnes, palierActuel, palierValide, tempsRestant, 
                     ↩ Annuler
                 </button>
             </div>
-
-            <div id="eval-youtube-player" class="w-full h-0"></div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 ${htmlColonnes}
@@ -402,8 +387,8 @@ export function templateTableauBord(data, classe) {
                     <button onclick="window.evalGenererFactices()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-purple-400 active:scale-95">
                         🧪 Factices
                     </button>
-                    <button onclick="window.evalReinitialiser()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-red-400 active:scale-95">
-                        🗑️ Réinit.
+                    <button onclick="window.evalOuvrirPurge()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-red-400 active:scale-95">
+                        🗑️ Gérer les données
                     </button>
                 </div>
             </div>
@@ -684,24 +669,9 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
 }
 
 // ============================================================
-// STATISTIQUES
+// MODALE DE PURGE
 // ============================================================
 
-function calculerStatistiques(data) {
-    const stats = {};
-    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
-    const eleves = Object.values(data.eleves).filter(e => e.statut === 'present');
-    tests.forEach(testId => {
-        const resultats = eleves.map(e => e.resultats[testId]).filter(r => r !== null);
-        stats[testId] = {
-            total: resultats.length,
-            a_besoins: resultats.filter(r => r.groupe === 'a_besoins').length,
-            fragile: resultats.filter(r => r.groupe === 'fragile').length,
-            satisfaisant: resultats.filter(r => r.groupe === 'satisfaisant').length
-        };
-    });
-    return stats;
-}
 export function templateModalPurge(classe, stats, libelles, nbEleves) {
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
     const total = Object.values(stats).reduce((a, b) => a + b, 0);
@@ -756,4 +726,24 @@ export function templateModalPurge(classe, stats, libelles, nbEleves) {
             </p>
         </div>
     `;
+}
+
+// ============================================================
+// STATISTIQUES
+// ============================================================
+
+function calculerStatistiques(data) {
+    const stats = {};
+    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
+    const eleves = Object.values(data.eleves).filter(e => e.statut === 'present');
+    tests.forEach(testId => {
+        const resultats = eleves.map(e => e.resultats[testId]).filter(r => r !== null);
+        stats[testId] = {
+            total: resultats.length,
+            a_besoins: resultats.filter(r => r.groupe === 'a_besoins').length,
+            fragile: resultats.filter(r => r.groupe === 'fragile').length,
+            satisfaisant: resultats.filter(r => r.groupe === 'satisfaisant').length
+        };
+    });
+    return stats;
 }
