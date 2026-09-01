@@ -17,6 +17,50 @@ const minSlider = 0;
 const maxSlider = 250;
 
 // ============================================================
+// FONCTION GLOBALE POUR METTRE À JOUR LE SLIDER
+// (doit être définie AVANT d'être utilisée)
+// ============================================================
+if (!window.evalUpdateSlider) {
+    window.evalUpdateSlider = function(value, min, max) {
+        console.log('🔄 evalUpdateSlider appelée avec value=', value);
+        // Mettre à jour le champ manuel
+        const input = document.getElementById('saut-input-manuel');
+        if (input) input.value = value;
+
+        // Mettre à jour la barre du curseur
+        const bar = document.getElementById('saut-curseur');
+        if (bar) {
+            const pct = ((parseFloat(value) - min) / (max - min)) * 100;
+            bar.style.left = Math.max(0, Math.min(100, pct)) + '%';
+        }
+
+        // Mettre à jour le score affiché sur la toise
+        const score = document.getElementById('saut-score-display');
+        if (score) {
+            score.textContent = value;
+        }
+
+        // Mettre à jour l'affichage des essais (si nécessaire)
+        const essaisContainer = document.getElementById('saut-essais-display');
+        if (essaisContainer && eleveSelectionne) {
+            const eleve = currentData?.eleves?.[eleveSelectionne];
+            if (eleve) {
+                const essais = essaisParEleve[eleveSelectionne] || [];
+                const meilleur = essais.length > 0 ? Math.max(...essais) : null;
+                if (essais.length > 0) {
+                    essaisContainer.innerHTML = essais.map(t => {
+                        const isBest = (t === meilleur);
+                        return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
+                    }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>';
+                } else {
+                    essaisContainer.innerHTML = '<span class="text-slate-600">__ / __ / __</span>';
+                }
+            }
+        }
+    };
+}
+
+// ============================================================
 // INITIALISATION
 // ============================================================
 
@@ -130,9 +174,15 @@ function afficherSaut() {
     const input = document.getElementById('saut-input-manuel');
     if (slider) {
         slider.addEventListener('input', () => {
-            valeurSlider = parseFloat(slider.value);
-            if (input) input.value = valeurSlider;
-            updateSliderDisplay(valeurSlider);
+            const val = parseFloat(slider.value);
+            valeurSlider = val;
+            if (input) input.value = val;
+            // Appeler la fonction de mise à jour
+            if (window.evalUpdateSlider) {
+                window.evalUpdateSlider(val, minSlider, maxSlider);
+            } else {
+                console.warn('⚠️ evalUpdateSlider non définie');
+            }
         });
     }
     if (input) {
@@ -145,50 +195,26 @@ function afficherSaut() {
                 else if (val > maxSlider) slider.value = maxSlider;
                 else slider.value = val;
             }
-            updateSliderDisplay(valeurSlider);
+            if (window.evalUpdateSlider) {
+                window.evalUpdateSlider(val, minSlider, maxSlider);
+            } else {
+                console.warn('⚠️ evalUpdateSlider non définie');
+            }
         });
     }
+
+    // Forcer une mise à jour initiale du slider
+    setTimeout(() => {
+        if (window.evalUpdateSlider) {
+            window.evalUpdateSlider(valeurSlider, minSlider, maxSlider);
+        }
+    }, 50);
 
     setTimeout(() => chargerPhotos(), 100);
 }
 
 // ============================================================
-// MISE À JOUR DE L'AFFICHAGE DU SLIDER
-// ============================================================
-
-function updateSliderDisplay(valeur) {
-    // Mettre à jour le score sur la toise
-    const scoreDisplay = document.getElementById('saut-score-display');
-    if (scoreDisplay) {
-        scoreDisplay.textContent = valeur;
-    }
-    // Mettre à jour la position du curseur
-    const curseur = document.getElementById('saut-curseur');
-    if (curseur) {
-        const pct = (valeur / maxSlider) * 100;
-        curseur.style.left = Math.min(100, Math.max(0, pct)) + '%';
-    }
-    // Mettre à jour les essais
-    const essaisContainer = document.getElementById('saut-essais-display');
-    if (essaisContainer) {
-        const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
-        if (eleveSel) {
-            const essais = essaisParEleve[eleveSel.id] || [];
-            const meilleur = essais.length > 0 ? Math.max(...essais) : null;
-            if (essais.length > 0) {
-                essaisContainer.innerHTML = essais.map(t => {
-                    const isBest = (t === meilleur);
-                    return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
-                }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>';
-            } else {
-                essaisContainer.innerHTML = '<span class="text-slate-600">__ / __ / __</span>';
-            }
-        }
-    }
-}
-
-// ============================================================
-// TEMPLATE
+// TEMPLATE (on utilise les IDs fixes : saut-curseur, saut-score-display, saut-essais-display)
 // ============================================================
 
 function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nbTermines, totalEleves, valeurSlider, essaisSel, meilleurSel) {
@@ -289,7 +315,7 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                     <p class="text-xs text-slate-500">Essai ${nbEssais + 1} / ${maxEssais}</p>
                 </div>
 
-                <!-- TOISE AVEC SCORE INTÉGRÉ (PAS DE SCORE BLANC À L'EXTÉRIEUR) -->
+                <!-- TOISE AVEC SCORE INTÉGRÉ -->
                 <div class="relative w-full h-40 mt-2 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-2 border-slate-600 overflow-hidden">
                     <!-- Graduations -->
                     <div class="absolute bottom-0 left-0 right-0 h-8 bg-emerald-900/50 flex items-end">
@@ -315,12 +341,12 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                         <div class="absolute top-0 w-px h-full bg-red-500/50 border-l border-dashed border-red-400/50" style="left:${(110 / maxSlider) * 100}%;"></div>
                         <div class="absolute top-0 w-px h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${(140 / maxSlider) * 100}%;"></div>
                     </div>
-                    <!-- Curseur -->
+                    <!-- Curseur (ID fixe) -->
                     <div id="saut-curseur" class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                          style="left:${(valeurSlider / maxSlider) * 100}%; transform: translateX(-50%);">
                         <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                     </div>
-                    <!-- SCORE AFFICHÉ EN JAUNE SUR LA TOISE (UNIQUEMENT ICI) -->
+                    <!-- SCORE (ID fixe) -->
                     <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10">
                         <span id="saut-score-display" class="text-3xl font-black text-yellow-400">${valeurSlider}</span>
                         <span class="text-xs text-white/70">cm</span>
@@ -339,7 +365,7 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                     <span class="text-sm text-slate-400">cm</span>
                 </div>
 
-                <!-- AFFICHAGE DES ESSAIS : 114 / 122 / 110 (meilleur en jaune) -->
+                <!-- AFFICHAGE DES ESSAIS (ID fixe) -->
                 <div id="saut-essais-display" class="text-center mt-2 text-lg font-mono">
                     ${essaisSel.length > 0 ? essaisSel.map((t, i) => {
                         const isBest = (t === meilleurSel);
