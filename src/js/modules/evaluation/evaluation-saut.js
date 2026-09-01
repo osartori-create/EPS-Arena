@@ -57,95 +57,66 @@ export function initSaisieSaut(zone, eleve, data, testId) {
 }
 
 function afficherSaisie() {
-    // Construire le HTML avec photo, statut, etc.
-    const photoPromise = getPhotoUrl(currentEleve.id);
-    photoPromise.then(photoUrl => {
-        const bgSexe = (currentEleve.sexe === 'M' || currentEleve.sexe === 'm') ? 'bg-blue-200 border-blue-400' :
-                        (currentEleve.sexe === 'F' || currentEleve.sexe === 'f') ? 'bg-rose-200 border-rose-400' :
-                        'bg-slate-200 border-slate-400';
+    // Déterminer la valeur initiale du slider
+    let valeurSlider;
+    if (essaiCourant === 0) {
+        valeurSlider = 120; // 1er essai
+    } else if (essaiCourant === 1) {
+        valeurSlider = essais[0]; // 2e essai = valeur du 1er
+    } else {
+        valeurSlider = Math.max(...essais); // 3e essai = meilleur
+    }
 
-        const photoHtml = photoUrl
-            ? `<img src="${photoUrl}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-500">`
-            : `<div class="w-16 h-16 rounded-full bg-slate-400 flex items-center justify-center text-3xl">${currentEleve.prenom?.charAt(0) || '👤'}</div>`;
+    // Meilleur performance à afficher
+    const meilleur = essais.length > 0 ? Math.max(...essais) : null;
 
-        // Statut actuel
-        const statut = currentEleve.statut || 'present';
-        const isAbsent = statut === 'absent';
-        const isInapte = statut === 'inapte';
-
-        const html = `
-            <div class="space-y-4">
-                <!-- En-tête élève -->
-                <div class="flex items-center gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-700">
-                    <div class="${bgSexe} p-1 rounded-full border-2 border-slate-600">
-                        ${photoHtml}
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-xl font-black text-white">${currentEleve.prenom} ${currentEleve.nom}</p>
-                        <p class="text-sm text-slate-400">Code : ${currentEleve.id}</p>
-                        <div class="flex gap-2 mt-1">
-                            <span class="text-xs font-bold ${isAbsent ? 'text-red-400' : 'text-slate-500'}">
-                                ${isAbsent ? '🚫 Absent' : (isInapte ? '⚠️ Inapte' : '✅ Présent')}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="flex flex-col gap-1">
-                        <button onclick="window.evalSetStatutSaut('absent')" 
-                                class="px-3 py-1 text-xs font-black rounded-lg ${isAbsent ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300'}">
-                            Absent
-                        </button>
-                        <button onclick="window.evalSetStatutSaut('inapte')" 
-                                class="px-3 py-1 text-xs font-black rounded-lg ${isInapte ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300'}">
-                            Inapte
-                        </button>
-                        ${(isAbsent || isInapte) ? `
-                            <button onclick="window.evalSetStatutSaut('present')" 
-                                    class="px-3 py-1 text-xs font-black rounded-lg bg-emerald-600 text-white">
-                                Présent
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-
-                <!-- Slider -->
-                <div id="eval-slider-container">
-                    ${templateSliderSaut(valeurInitiale, 0, 500, 'cm', true)}
-                </div>
-
-                <!-- Infos essais -->
-                <div class="text-center text-sm text-slate-400">
-                    Essai ${essaiCourant + 1} / ${maxEssais} 
-                    ${essais.length > 0 ? `| Meilleur : ${Math.max(...essais)} cm` : ''}
-                </div>
+    const html = `
+        <div class="space-y-4">
+            <!-- Meilleur performance -->
+            <div class="text-center">
+                <span class="text-sm text-slate-400">Meilleur performance</span>
+                <span class="text-2xl font-black text-yellow-400 block">${meilleur !== null ? `${meilleur} cm` : '--'}</span>
             </div>
-        `;
 
-        zoneSaisie.innerHTML = html;
+            <!-- Toise + curseur -->
+            <div id="eval-slider-container">
+                ${templateSliderSaut(valeurSlider, 0, 250, 'cm')}
+            </div>
 
-        // Exposer les fonctions
-        window.evalValiderEssai = validerEssai;
-        window.evalEssaiSuivant = essaiSuivant;
-        window.evalSetStatutSaut = setStatutSaut;
+            <!-- Infos essais -->
+            <div class="text-center text-sm text-slate-400">
+                Essai ${essaiCourant + 1} / ${maxEssais}
+                ${essais.length > 0 ? `| Essais : ${essais.join(' - ')} cm` : ''}
+            </div>
+        </div>
+    `;
 
-        // Écouter les changements du slider et du champ manuel
-        const slider = document.getElementById('eval-slider');
-        const input = document.getElementById('eval-input-manuel');
-        if (slider) {
-            slider.addEventListener('input', () => {
-                if (input) input.value = slider.value;
-            });
-        }
-        if (input) {
-            input.addEventListener('input', () => {
-                let val = parseFloat(input.value);
-                if (isNaN(val)) val = 0;
-                if (slider) slider.value = val;
-            });
-        }
-    }).catch(() => {
-        // Fallback si la photo échoue
-        afficherSaisieSansPhoto();
-    });
+    zoneSaisie.innerHTML = html;
+
+    // Exposer les fonctions
+    window.evalValiderEssai = validerEssai;
+    window.evalEssaiSuivant = essaiSuivant;
+
+    // Écouter les changements
+    const slider = document.getElementById('eval-slider');
+    const input = document.getElementById('eval-input-manuel');
+    if (slider) {
+        slider.addEventListener('input', () => {
+            if (input) input.value = slider.value;
+        });
+    }
+    if (input) {
+        input.addEventListener('input', () => {
+            let val = parseFloat(input.value);
+            if (isNaN(val)) val = 0;
+            // Le curseur reste dans 0-250, mais le champ peut afficher n'importe quelle valeur
+            if (slider) {
+                if (val < 0) slider.value = 0;
+                else if (val > 250) slider.value = 250;
+                else slider.value = val;
+            }
+        });
+    }
 }
 
 function afficherSaisieSansPhoto() {

@@ -101,27 +101,46 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
                 <span class="text-xs text-slate-400">${eleves.filter(e => e.resultats[testId] !== null).length}/${eleves.length} terminés</span>
             </div>
 
-            ${!isCollectif ? `
-            <div class="bg-slate-800 p-6 rounded-2xl border-2 border-blue-500">
-                <div class="flex items-center gap-6">
-                    <div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-4xl">
-                        ${eleveEnCours ? eleveEnCours.prenom?.charAt(0) || '👤' : '👤'}
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-2xl font-black text-white">${eleveEnCours ? `${eleveEnCours.prenom} ${eleveEnCours.nom}` : '--'}</p>
-                        <p class="text-sm text-slate-400">Code : ${eleveEnCours?.id || '--'}</p>
-                        ${resultat ? `<p class="text-xs text-emerald-400">✅ Test terminé</p>` : ''}
-                    </div>
-                    ${eleveSuivant ? `
-                        <div class="text-right border-l border-slate-700 pl-4">
-                            <p class="text-xs text-slate-400">Prochain :</p>
-                            <p class="font-bold text-white text-sm">${eleveSuivant.prenom} ${eleveSuivant.nom}</p>
-                            <p class="text-xs text-amber-400">👀 se prépare</p>
-                        </div>
-                    ` : ''}
-                </div>
+            // Dans templatePassation, remplacer le bloc "Élève en cours" par :
+
+${!isCollectif ? `
+<div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
+    <div class="flex items-center gap-4">
+        <!-- Photo + sexe -->
+        <div id="eval-eleve-photo-container" class="w-16 h-16 rounded-full border-2 border-slate-600 flex items-center justify-center text-3xl overflow-hidden">
+            <!-- Rempli par le script -->
+        </div>
+        <div class="flex-1">
+            <p class="text-xl font-black text-white">${eleveEnCours ? `${eleveEnCours.prenom} ${eleveEnCours.nom}` : '--'}</p>
+            <p class="text-sm text-slate-400">Code : ${eleveEnCours?.id || '--'}</p>
+            <div class="flex gap-2 mt-1 flex-wrap">
+                <span id="eval-statut-label" class="text-xs font-bold text-emerald-400">✅ Présent</span>
             </div>
-            ` : ''}
+        </div>
+        <div class="flex flex-col gap-1">
+            <button onclick="window.evalSetStatut('absent')" 
+                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-red-600 hover:text-white transition-colors">
+                Absent
+            </button>
+            <button onclick="window.evalSetStatut('inapte')" 
+                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-amber-600 hover:text-white transition-colors">
+                Inapte
+            </button>
+            <button onclick="window.evalSetStatut('present')" 
+                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-emerald-600 hover:text-white transition-colors">
+                Présent
+            </button>
+        </div>
+        ${eleveSuivant ? `
+            <div class="text-right border-l border-slate-700 pl-4 ml-auto">
+                <p class="text-xs text-slate-400">Prochain :</p>
+                <p class="font-bold text-white text-sm">${eleveSuivant.prenom} ${eleveSuivant.nom}</p>
+                <p class="text-xs text-amber-400">👀 se prépare</p>
+            </div>
+        ` : ''}
+    </div>
+</div>
+` : ''}
 
             <div id="eval-zone-saisie" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 min-h-[300px]">
                 <!-- Rempli dynamiquement -->
