@@ -65,35 +65,83 @@ function afficherSprint() {
 
     const nbTermines = currentEleves.filter(e => essaisParEleve[e.id]?.length >= maxEssais).length;
     const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
+    const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
+    const meilleurSel = essaisSel.length > 0 ? Math.min(...essaisSel) : null;
 
-    zoneSaisie.innerHTML = templateSprint(
-        colonnes,
-        eleveSelectionne,
-        eleveSel,
-        essaisParEleve,
-        nbTermines,
-        currentEleves.length,
-        chronoRunning,
-        chronoElapsed
-    );
+    zoneSaisie.innerHTML = `
+        <div class="space-y-4">
+            <!-- Header -->
+            <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
+                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">
+                    ← Retour
+                </button>
+                <h3 class="font-black text-blue-400 uppercase text-sm">🏃 Sprint 30m</h3>
+                <span class="text-xs text-slate-400">${nbTermines}/${currentEleves.length} terminés</span>
+            </div>
 
-    // Exposer les fonctions
-    window.evalSprintReset = resetChrono;
-    window.evalSprintSelectionner = selectionnerEleve;
+            <!-- Élève sélectionné : PHOTO + NOM EN ÉNORME -->
+            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
+                <div class="flex items-center gap-6">
+                    <div id="sprint-eleve-photo" class="w-24 h-24 rounded-full border-4 border-blue-500 overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-4xl">
+                        <span class="text-4xl">${eleveSel?.prenom?.charAt(0) || '👤'}</span>
+                    </div>
+                    <div>
+                        <p class="text-5xl font-black text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</p>
+                        <p class="text-sm text-slate-400">Code : ${eleveSel?.id || '--'}</p>
+                        ${essaisSel.length > 0 ? `<p class="text-xs text-yellow-400">Meilleur : ${meilleurSel?.toFixed(1)}s</p>` : ''}
+                    </div>
+                </div>
 
-    // BOUTON PRINCIPAL : attacher un écouteur dynamique
-    const mainBtn = document.getElementById('sprint-main-btn');
-    if (mainBtn) {
-        mainBtn.addEventListener('click', () => {
-            if (chronoRunning) {
-                arreterChrono();
-            } else {
-                demarrerChrono();
-            }
-        });
+                <!-- Chrono central -->
+                <div class="text-center mt-4">
+                    <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">
+                        ${chronoRunning ? (chronoElapsed / 1000).toFixed(1) : (essaisSel.length > 0 ? essaisSel[essaisSel.length - 1].toFixed(1) : '0.0')}
+                    </div>
+                    <p class="text-sm text-slate-400">secondes</p>
+                    <div class="flex justify-center gap-3 mt-2">
+                        ${essaisSel.length < maxEssais ? `
+                            <button id="sprint-main-btn" 
+                                    class="px-12 py-4 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
+                                ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
+                            </button>
+                        ` : `
+                            <div class="text-emerald-400 font-bold text-xl">✅ 3 essais terminés</div>
+                        `}
+                        <button onclick="window.evalSprintReset()" class="bg-slate-600 px-6 py-4 rounded-xl font-black text-white text-sm active:scale-95">
+                            ↺ Réinitialiser
+                        </button>
+                    </div>
+                    ${essaisSel.length > 0 ? `
+                        <div class="mt-2 text-xs text-slate-400">
+                            Essais : ${essaisSel.map((t, i) => `
+                                <span class="${t === meilleurSel ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
+                            `).join(' / ')}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+
+            <!-- 4 colonnes -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                ${templateColonnes(colonnes, eleveSelectionne, essaisParEleve)}
+            </div>
+
+            <!-- Légende -->
+            <div class="flex justify-center gap-4 text-xs text-slate-400 flex-wrap">
+                <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
+                <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
+                <span class="flex items-center gap-1">••• = changer statut</span>
+                <span class="flex items-center gap-1">🟡 Meilleur temps en jaune</span>
+            </div>
+        </div>
+    `;
+
+    // Charger la photo de l'élève sélectionné
+    if (eleveSelectionne) {
+        chargerPhotoEleveSprint(eleveSelectionne);
     }
 
-    // Attacher les événements des cartes
+    // Attacher les événements
     document.querySelectorAll('.sprint-eleve-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.sprint-menu-btn')) return;
@@ -102,7 +150,6 @@ function afficherSprint() {
         });
     });
 
-    // Attacher les événements des boutons menu
     document.querySelectorAll('.sprint-menu-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -128,19 +175,52 @@ function afficherSprint() {
         document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
 
-    setTimeout(() => chargerPhotos(), 100);
+    // Gestion du bouton principal (Démarrer / Arrêter)
+    const mainBtn = document.getElementById('sprint-main-btn');
+    if (mainBtn) {
+        mainBtn.addEventListener('click', () => {
+            if (chronoRunning) {
+                arreterChrono();
+            } else {
+                demarrerChrono();
+            }
+        });
+    }
+
+    setTimeout(() => chargerPhotosColonnes(), 100);
 }
 
 // ============================================================
-// TEMPLATE
+// CHARGEMENT DE LA PHOTO DE L'ÉLÈVE SÉLECTIONNÉ
 // ============================================================
 
-function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nbTermines, totalEleves, chronoRunning, chronoElapsed) {
+async function chargerPhotoEleveSprint(eleveId) {
+    const container = document.getElementById('sprint-eleve-photo');
+    if (!container) return;
+    try {
+        const url = await getPhotoUrl(eleveId);
+        if (url) {
+            container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
+        } else {
+            const eleve = currentData.eleves[eleveId];
+            container.innerHTML = `<span class="text-4xl">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
+        }
+    } catch (e) {
+        const eleve = currentData.eleves[eleveId];
+        container.innerHTML = `<span class="text-4xl">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
+    }
+}
+
+// ============================================================
+// TEMPLATE DES COLONNES
+// ============================================================
+
+function templateColonnes(colonnes, eleveSelectionneId, essaisParEleve) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
 
-    const htmlColonnes = colonnesIds.map((colId, idx) => `
+    return colonnesIds.map((colId, idx) => `
         <div class="bg-slate-900 p-2 rounded-2xl border-2 border-dashed ${classes[idx]} min-h-[200px]">
             <div class="text-xs font-bold text-slate-400 uppercase mb-2">${labels[idx]}</div>
             <div id="sprint-col-${colId}" class="space-y-2">
@@ -212,66 +292,6 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
             </div>
         </div>
     `).join('');
-
-    const affichageChrono = chronoElapsed > 0 ? (chronoElapsed / 1000).toFixed(1) : '0.0';
-    const nomEleveSel = eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun';
-    const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
-    const estTermineSel = essaisSel.length >= maxEssais;
-    const meilleurSel = essaisSel.length > 0 ? Math.min(...essaisSel) : null;
-
-    return `
-        <div class="space-y-4">
-            <!-- Barre de navigation -->
-            <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
-                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">
-                    ← Retour
-                </button>
-                <h3 class="font-black text-blue-400 uppercase text-sm">🏃 Sprint 30m</h3>
-                <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
-            </div>
-
-            <!-- Chrono central -->
-            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
-                <div class="text-center">
-                    <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${nomEleveSel}</span></p>
-                    <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">${affichageChrono}</div>
-                    <p class="text-sm text-slate-400">secondes</p>
-                    ${estTermineSel ? `
-                        <div class="mt-2 text-emerald-400 font-bold text-sm">✅ 3 essais terminés</div>
-                        <div class="mt-1 text-xs text-slate-400">Meilleur : ${meilleurSel?.toFixed(1)}s</div>
-                    ` : `
-                        <button id="sprint-main-btn" 
-                                class="w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
-                            ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
-                        </button>
-                    `}
-                    <button onclick="window.evalSprintReset()" class="mt-2 bg-slate-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
-                        ↺ Réinitialiser
-                    </button>
-                    ${essaisSel.length > 0 ? `
-                        <div class="mt-2 text-xs text-slate-400">
-                            Essais : ${essaisSel.map((t, i) => `
-                                <span class="${t === meilleurSel ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
-                            `).join(' / ')}
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-
-            <!-- 4 colonnes -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                ${htmlColonnes}
-            </div>
-
-            <!-- Légende -->
-            <div class="flex justify-center gap-4 text-xs text-slate-400 flex-wrap">
-                <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
-                <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
-                <span class="flex items-center gap-1">••• = changer statut</span>
-                <span class="flex items-center gap-1">🟡 Meilleur temps en jaune</span>
-            </div>
-        </div>
-    `;
 }
 
 // ============================================================
@@ -303,11 +323,10 @@ function demarrerChrono() {
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
     
-    // Mettre à jour le bouton
     const btn = document.getElementById('sprint-main-btn');
     if (btn) {
         btn.textContent = '⏹ Arrêter';
-        btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-red-600 text-white';
+        btn.className = 'px-12 py-4 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-red-600 text-white';
     }
 }
 
@@ -370,7 +389,7 @@ function resetChrono() {
     const btn = document.getElementById('sprint-main-btn');
     if (btn) {
         btn.textContent = '▶ Démarrer';
-        btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-emerald-600 text-white';
+        btn.className = 'px-12 py-4 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-emerald-600 text-white';
     }
 }
 
@@ -391,10 +410,10 @@ function setStatut(eleveId, statut) {
 }
 
 // ============================================================
-// CHARGEMENT DES PHOTOS
+// CHARGEMENT DES PHOTOS DES COLONNES
 // ============================================================
 
-async function chargerPhotos() {
+async function chargerPhotosColonnes() {
     const containers = document.querySelectorAll('.sprint-photo-container');
     for (const container of containers) {
         const card = container.closest('.sprint-eleve-card');
@@ -412,3 +431,4 @@ async function chargerPhotos() {
 // Exposer les fonctions globales
 window.evalSprintReset = resetChrono;
 window.evalSprintSelectionner = selectionnerEleve;
+window.evalSprintSetStatut = setStatut;
