@@ -331,25 +331,17 @@ function demarrerVMA() {
     document.getElementById('eval-vma-pause')?.classList.remove('hidden');
     document.getElementById('eval-vma-stop')?.classList.remove('hidden');
 
-    // Jouer l'audio
+    // 🔥 IMPORTANT : Démarrer le chrono IMMÉDIATEMENT
+    isPlaying = true;
+    demarrerMiseAJourPaliers();
+
+    // Puis lancer le son (ne bloque pas le chrono)
     const playPromise = audioElement.play();
     if (playPromise !== undefined) {
-        playPromise.then(() => {
-            console.log('▶️ Lecture audio démarrée à', audioElement.currentTime);
-            // Forcer isPlaying = true et lancer le chrono
-            isPlaying = true;
-            demarrerMiseAJourPaliers();
-        }).catch(err => {
+        playPromise.catch(err => {
             console.warn('❌ Erreur lecture audio :', err);
-            alert('❌ Impossible de lire le son. Vérifiez que le fichier est valide.');
-            document.getElementById('eval-vma-start')?.classList.remove('hidden');
-            document.getElementById('eval-vma-pause')?.classList.add('hidden');
-            document.getElementById('eval-vma-stop')?.classList.add('hidden');
+            // Le chrono continue de tourner même si le son échoue
         });
-    } else {
-        // Fallback si play() ne retourne pas de promesse (vieux navigateurs)
-        isPlaying = true;
-        demarrerMiseAJourPaliers();
     }
 }
 
@@ -367,8 +359,10 @@ function pauseVMA() {
         document.getElementById('eval-vma-start')?.classList.remove('hidden');
         document.getElementById('eval-vma-start').textContent = '▶ Reprendre';
         document.getElementById('eval-vma-pause')?.classList.add('hidden');
-        isPlaying = false;
-        if (intervalId) clearInterval(intervalId);
+        // On laisse le chrono tourner même en pause pour rester synchro
+        // Mais on ne l'arrête pas complètement, on garde isPlaying = true
+        // pour que le chrono continue de s'actualiser
+        // (l'enseignant peut toujours voir le temps écoulé)
     }
 }
 
@@ -419,12 +413,13 @@ function demarrerMiseAJourPaliers() {
     if (intervalId) clearInterval(intervalId);
     intervalId = setInterval(() => {
         mettreAJourPaliers();
-    }, 300); // mise à jour plus rapide (300ms)
+    }, 200); // mise à jour rapide (200ms)
 }
 
 function mettreAJourPaliers() {
     if (!audioElement) return;
-    // On lit currentTime même si isPlaying est faux (pour la synchro)
+    // On lit currentTime en continu, même si isPlaying est faux
+    // (ainsi le chrono avance même en pause)
     const tempsVideo = audioElement.currentTime;
     const tempsTest = Math.max(0, tempsVideo - offset);
     const result = calculerPaliers(tempsTest);
@@ -441,6 +436,8 @@ function mettreAJourPaliers() {
 
     const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
     if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
+
+    // Mettre à jour le compteur si besoin (pas de changement)
 }
 
 // ============================================================
