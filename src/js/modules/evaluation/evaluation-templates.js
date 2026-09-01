@@ -183,7 +183,7 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
 }
 
 // ============================================================
-// SAUT (slider + toise)
+// SAUT (slider + toise) – VERSION CORRECTE (SANS AFFICHAGE BLANC)
 // ============================================================
 
 export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
@@ -227,7 +227,7 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                     <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
 
-                <!-- SCORE UNIQUEMENT EN JAUNE SUR LA TOISE (pas de score blanc en dessous) -->
+                <!-- SCORE UNIQUEMENT EN JAUNE SUR LA TOISE -->
                 <div id="slider-score" class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl z-10">
                     <span class="text-4xl font-black text-yellow-400">${valeur}</span>
                     <span class="text-sm text-white/70">${unite}</span>

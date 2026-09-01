@@ -4,6 +4,7 @@
 import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
 import { groupeForce } from './evaluation-utils.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
+import { templateSliderSaut } from './evaluation-templates.js';
 
 let currentData = null;
 let currentTestId = 'force';
@@ -15,50 +16,6 @@ let valeurSlider = 120;
 const maxEssais = 3;
 const minSlider = 0;
 const maxSlider = 250;
-
-// ============================================================
-// FONCTION GLOBALE POUR METTRE À JOUR LE SLIDER
-// (doit être définie AVANT d'être utilisée)
-// ============================================================
-if (!window.evalUpdateSlider) {
-    window.evalUpdateSlider = function(value, min, max) {
-        console.log('🔄 evalUpdateSlider appelée avec value=', value);
-        // Mettre à jour le champ manuel
-        const input = document.getElementById('saut-input-manuel');
-        if (input) input.value = value;
-
-        // Mettre à jour la barre du curseur
-        const bar = document.getElementById('saut-curseur');
-        if (bar) {
-            const pct = ((parseFloat(value) - min) / (max - min)) * 100;
-            bar.style.left = Math.max(0, Math.min(100, pct)) + '%';
-        }
-
-        // Mettre à jour le score affiché sur la toise
-        const score = document.getElementById('saut-score-display');
-        if (score) {
-            score.textContent = value;
-        }
-
-        // Mettre à jour l'affichage des essais (si nécessaire)
-        const essaisContainer = document.getElementById('saut-essais-display');
-        if (essaisContainer && eleveSelectionne) {
-            const eleve = currentData?.eleves?.[eleveSelectionne];
-            if (eleve) {
-                const essais = essaisParEleve[eleveSelectionne] || [];
-                const meilleur = essais.length > 0 ? Math.max(...essais) : null;
-                if (essais.length > 0) {
-                    essaisContainer.innerHTML = essais.map(t => {
-                        const isBest = (t === meilleur);
-                        return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
-                    }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>';
-                } else {
-                    essaisContainer.innerHTML = '<span class="text-slate-600">__ / __ / __</span>';
-                }
-            }
-        }
-    };
-}
 
 // ============================================================
 // INITIALISATION
@@ -119,23 +76,56 @@ function afficherSaut() {
         valeurSlider = Math.max(...essaisSel);
     }
 
-    zoneSaisie.innerHTML = templateSaut(
-        colonnes,
-        eleveSelectionne,
-        eleveSel,
-        essaisParEleve,
-        nbTermines,
-        currentEleves.length,
-        valeurSlider,
-        essaisSel,
-        meilleurSel
-    );
+    // AFFICHAGE DU SLIDER (SANS SCORE BLANC)
+    zoneSaisie.innerHTML = `
+        <div class="space-y-4">
+            <!-- Header -->
+            <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
+                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">
+                    ← Retour
+                </button>
+                <h3 class="font-black text-blue-400 uppercase text-sm">📏 Saut en longueur</h3>
+                <span class="text-xs text-slate-400">${nbTermines}/${currentEleves.length} terminés</span>
+            </div>
 
-    window.evalSautValider = validerEssai;
-    window.evalSautAnnuler = annulerEssai;
-    window.evalSautSelectionner = selectionnerEleve;
+            <!-- Slider central -->
+            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
+                <div class="text-center">
+                    <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</span></p>
+                    <p class="text-xs text-slate-500">Essai ${essaisSel.length + 1} / ${maxEssais}</p>
+                </div>
 
-    // Attacher les événements des cartes
+                <!-- TOISE AVEC SCORE INTÉGRÉ (PAS DE SCORE BLANC) -->
+                ${templateSliderSaut(valeurSlider, 0, 250, 'cm')}
+
+                <!-- AFFICHAGE DES ESSAIS : 114 / 122 / 110 (meilleur en jaune) -->
+                <div id="saut-essais-display" class="text-center mt-2 text-lg font-mono">
+                    ${essaisSel.length > 0 ? essaisSel.map((t, i) => {
+                        const isBest = (t === meilleurSel);
+                        return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
+                    }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>' : '<span class="text-slate-600">__ / __ / __</span>'}
+                </div>
+            </div>
+
+            <!-- 4 colonnes -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                ${templateColonnes(colonnes, eleveSelectionne, essaisParEleve)}
+            </div>
+
+            <!-- Légende -->
+            <div class="flex justify-center gap-4 text-xs text-slate-400 flex-wrap">
+                <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
+                <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
+                <span class="flex items-center gap-1">••• = changer statut</span>
+                <span class="flex items-center gap-1">🟡 Meilleur essai en jaune</span>
+                <span class="flex items-center gap-1">🔴 ≤ 110 cm</span>
+                <span class="flex items-center gap-1">🟠 111-140 cm</span>
+                <span class="flex items-center gap-1">🟢 > 140 cm</span>
+            </div>
+        </div>
+    `;
+
+    // Attacher les événements
     document.querySelectorAll('.saut-eleve-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.saut-menu-btn')) return;
@@ -170,19 +160,13 @@ function afficherSaut() {
     });
 
     // Slider et input
-    const slider = document.getElementById('saut-slider');
-    const input = document.getElementById('saut-input-manuel');
+    const slider = document.getElementById('eval-slider');
+    const input = document.getElementById('eval-input-manuel');
     if (slider) {
         slider.addEventListener('input', () => {
-            const val = parseFloat(slider.value);
-            valeurSlider = val;
-            if (input) input.value = val;
-            // Appeler la fonction de mise à jour
-            if (window.evalUpdateSlider) {
-                window.evalUpdateSlider(val, minSlider, maxSlider);
-            } else {
-                console.warn('⚠️ evalUpdateSlider non définie');
-            }
+            valeurSlider = parseFloat(slider.value);
+            if (input) input.value = valeurSlider;
+            updateSliderDisplay(valeurSlider);
         });
     }
     if (input) {
@@ -195,34 +179,23 @@ function afficherSaut() {
                 else if (val > maxSlider) slider.value = maxSlider;
                 else slider.value = val;
             }
-            if (window.evalUpdateSlider) {
-                window.evalUpdateSlider(val, minSlider, maxSlider);
-            } else {
-                console.warn('⚠️ evalUpdateSlider non définie');
-            }
+            updateSliderDisplay(valeurSlider);
         });
     }
-
-    // Forcer une mise à jour initiale du slider
-    setTimeout(() => {
-        if (window.evalUpdateSlider) {
-            window.evalUpdateSlider(valeurSlider, minSlider, maxSlider);
-        }
-    }, 50);
 
     setTimeout(() => chargerPhotos(), 100);
 }
 
 // ============================================================
-// TEMPLATE (on utilise les IDs fixes : saut-curseur, saut-score-display, saut-essais-display)
+// TEMPLATE DES COLONNES
 // ============================================================
 
-function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nbTermines, totalEleves, valeurSlider, essaisSel, meilleurSel) {
+function templateColonnes(colonnes, eleveSelectionneId, essaisParEleve) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
 
-    const htmlColonnes = colonnesIds.map((colId, idx) => `
+    return colonnesIds.map((colId, idx) => `
         <div class="bg-slate-900 p-2 rounded-2xl border-2 border-dashed ${classes[idx]} min-h-[200px]">
             <div class="text-xs font-bold text-slate-400 uppercase mb-2">${labels[idx]}</div>
             <div id="saut-col-${colId}" class="space-y-2">
@@ -294,117 +267,42 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
             </div>
         </div>
     `).join('');
+}
 
-    const nbEssais = essaisSel.length;
+// ============================================================
+// MISE À JOUR DE L'AFFICHAGE DU SLIDER
+// ============================================================
 
-    return `
-        <div class="space-y-4">
-            <!-- Barre de navigation -->
-            <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
-                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">
-                    ← Retour
-                </button>
-                <h3 class="font-black text-blue-400 uppercase text-sm">📏 Saut en longueur</h3>
-                <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
-            </div>
-
-            <!-- Slider central -->
-            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
-                <div class="text-center">
-                    <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</span></p>
-                    <p class="text-xs text-slate-500">Essai ${nbEssais + 1} / ${maxEssais}</p>
-                </div>
-
-                <!-- TOISE AVEC SCORE INTÉGRÉ -->
-                <div class="relative w-full h-40 mt-2 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-2 border-slate-600 overflow-hidden">
-                    <!-- Graduations -->
-                    <div class="absolute bottom-0 left-0 right-0 h-8 bg-emerald-900/50 flex items-end">
-                        ${Array.from({ length: 26 }, (_, i) => {
-                            const val = i * 10;
-                            const pos = (val / maxSlider) * 100;
-                            return `
-                                <div class="absolute bottom-0 flex flex-col items-center" style="left:${pos}%">
-                                    <div class="w-px h-3 bg-white/30"></div>
-                                    <span class="text-[6px] text-white/50">${val}</span>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                    <!-- Bandes de couleur -->
-                    <div class="absolute inset-0 flex pointer-events-none" style="opacity:0.25;">
-                        <div class="h-full bg-red-500" style="width:${(110 / maxSlider) * 100}%;"></div>
-                        <div class="h-full bg-amber-500" style="width:${(30 / maxSlider) * 100}%;"></div>
-                        <div class="h-full bg-emerald-500" style="width:${((maxSlider - 140) / maxSlider) * 100}%;"></div>
-                    </div>
-                    <!-- Repères -->
-                    <div class="absolute inset-0 pointer-events-none">
-                        <div class="absolute top-0 w-px h-full bg-red-500/50 border-l border-dashed border-red-400/50" style="left:${(110 / maxSlider) * 100}%;"></div>
-                        <div class="absolute top-0 w-px h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${(140 / maxSlider) * 100}%;"></div>
-                    </div>
-                    <!-- Curseur (ID fixe) -->
-                    <div id="saut-curseur" class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
-                         style="left:${(valeurSlider / maxSlider) * 100}%; transform: translateX(-50%);">
-                        <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
-                    </div>
-                    <!-- SCORE (ID fixe) -->
-                    <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10">
-                        <span id="saut-score-display" class="text-3xl font-black text-yellow-400">${valeurSlider}</span>
-                        <span class="text-xs text-white/70">cm</span>
-                    </div>
-                </div>
-
-                <!-- Contrôles du slider -->
-                <div class="flex gap-3 mt-3 items-center">
-                    <input type="range" id="saut-slider" min="${minSlider}" max="${maxSlider}" step="1" value="${Math.min(maxSlider, Math.max(minSlider, valeurSlider))}"
-                           class="flex-1 h-2 bg-slate-700 rounded-full appearance-none cursor-pointer 
-                                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 
-                                  [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-400 
-                                  [&::-webkit-slider-thumb]:border-3 [&::-webkit-slider-thumb]:border-white">
-                    <input type="number" id="saut-input-manuel" value="${valeurSlider}" step="1" min="0"
-                           class="w-24 bg-slate-900 border-2 border-slate-600 rounded-xl p-2 text-center text-xl font-black text-white">
-                    <span class="text-sm text-slate-400">cm</span>
-                </div>
-
-                <!-- AFFICHAGE DES ESSAIS (ID fixe) -->
-                <div id="saut-essais-display" class="text-center mt-2 text-lg font-mono">
-                    ${essaisSel.length > 0 ? essaisSel.map((t, i) => {
-                        const isBest = (t === meilleurSel);
-                        return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
-                    }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>' : '<span class="text-slate-600">__ / __ / __</span>'}
-                </div>
-
-                <!-- Boutons -->
-                <div class="flex gap-3 mt-3">
-                    <button onclick="window.evalSautValider()" id="saut-valider-btn" 
-                            class="flex-1 bg-emerald-600 py-4 rounded-xl font-black text-white text-lg active:scale-95 ${nbEssais >= maxEssais ? 'opacity-50 cursor-not-allowed' : ''}" 
-                            ${nbEssais >= maxEssais ? 'disabled' : ''}>
-                        ✅ Valider l'essai
-                    </button>
-                    <button onclick="window.evalSautAnnuler()" id="saut-annuler-btn" 
-                            class="bg-slate-600 px-6 py-4 rounded-xl font-black text-white text-lg active:scale-95 ${nbEssais === 0 ? 'opacity-50 cursor-not-allowed' : ''}"
-                            ${nbEssais === 0 ? 'disabled' : ''}>
-                        ↩ Annuler
-                    </button>
-                </div>
-            </div>
-
-            <!-- 4 colonnes -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                ${htmlColonnes}
-            </div>
-
-            <!-- Légende -->
-            <div class="flex justify-center gap-4 text-xs text-slate-400 flex-wrap">
-                <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
-                <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
-                <span class="flex items-center gap-1">••• = changer statut</span>
-                <span class="flex items-center gap-1">🟡 Meilleur essai en jaune</span>
-                <span class="flex items-center gap-1">🔴 ≤ 110 cm</span>
-                <span class="flex items-center gap-1">🟠 111-140 cm</span>
-                <span class="flex items-center gap-1">🟢 > 140 cm</span>
-            </div>
-        </div>
-    `;
+function updateSliderDisplay(valeur) {
+    // Mettre à jour le score sur la toise
+    const scoreDisplay = document.getElementById('slider-score');
+    if (scoreDisplay) {
+        const span = scoreDisplay.querySelector('span.text-4xl');
+        if (span) span.textContent = valeur;
+    }
+    // Mettre à jour la position du curseur
+    const curseur = document.getElementById('slider-bar');
+    if (curseur) {
+        const pct = (valeur / maxSlider) * 100;
+        curseur.style.left = Math.min(100, Math.max(0, pct)) + '%';
+    }
+    // Mettre à jour les essais
+    const essaisContainer = document.getElementById('saut-essais-display');
+    if (essaisContainer) {
+        const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
+        if (eleveSel) {
+            const essais = essaisParEleve[eleveSel.id] || [];
+            const meilleur = essais.length > 0 ? Math.max(...essais) : null;
+            if (essais.length > 0) {
+                essaisContainer.innerHTML = essais.map(t => {
+                    const isBest = (t === meilleur);
+                    return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
+                }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>';
+            } else {
+                essaisContainer.innerHTML = '<span class="text-slate-600">__ / __ / __</span>';
+            }
+        }
+    }
 }
 
 // ============================================================
