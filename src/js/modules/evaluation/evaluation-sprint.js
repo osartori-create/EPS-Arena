@@ -1,5 +1,5 @@
 // src/js/modules/evaluation/evaluation-sprint.js
-// Saisie du Sprint 30m (style VMA : colonnes, sélection, gros bouton central)
+// Saisie du Sprint 30m (style VMA : colonnes, sélection, bouton dynamique)
 
 import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
 import { groupeVitesse } from './evaluation-utils.js';
@@ -78,16 +78,24 @@ function afficherSprint() {
     );
 
     // Exposer les fonctions
-    window.evalSprintDemarrer = demarrerChrono;
-    window.evalSprintArreter = arreterChrono;
     window.evalSprintReset = resetChrono;
     window.evalSprintSelectionner = selectionnerEleve;
 
-    // Attacher les événements
+    // BOUTON PRINCIPAL : attacher un écouteur dynamique
+    const mainBtn = document.getElementById('sprint-main-btn');
+    if (mainBtn) {
+        mainBtn.addEventListener('click', () => {
+            if (chronoRunning) {
+                arreterChrono();
+            } else {
+                demarrerChrono();
+            }
+        });
+    }
+
+    // Attacher les événements des cartes
     document.querySelectorAll('.sprint-eleve-card').forEach(card => {
-        // Clic sur la carte = sélectionner
         card.addEventListener('click', (e) => {
-            // Si le clic est sur le bouton menu, ne pas sélectionner
             if (e.target.closest('.sprint-menu-btn')) return;
             const id = card.dataset.id;
             selectionnerEleve(id);
@@ -99,8 +107,6 @@ function afficherSprint() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const id = btn.dataset.id;
-            const eleve = currentData.eleves[id];
-            if (!eleve) return;
             const menu = btn.parentElement.querySelector('.sprint-menu-dropdown');
             if (menu) {
                 menu.classList.toggle('hidden');
@@ -108,24 +114,20 @@ function afficherSprint() {
         });
     });
 
-    // Gérer les clics sur les options du menu
     document.querySelectorAll('.sprint-menu-option').forEach(opt => {
         opt.addEventListener('click', (e) => {
             e.stopPropagation();
             const id = opt.dataset.id;
             const statut = opt.dataset.statut;
             setStatut(id, statut);
-            // Fermer tous les menus
             document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
         });
     });
 
-    // Fermer les menus en cliquant ailleurs
     document.addEventListener('click', () => {
         document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
 
-    // Charger les photos
     setTimeout(() => chargerPhotos(), 100);
 }
 
@@ -160,11 +162,6 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
 
                     const statutBadge = isAbsent ? '🚫' : (isInapte ? '⚠️' : '');
 
-                    let essaisHtml = '';
-                    if (estTermine) {
-                        essaisHtml = `<div class="text-xs font-black text-emerald-600">✅</div>`;
-                    }
-
                     const affichageEssais = Array.from({ length: maxEssais }, (_, i) => {
                         if (i < essais.length) {
                             const val = essais[i];
@@ -174,7 +171,6 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                         return `<span class="text-slate-600">__</span>`;
                     }).join(' / ');
 
-                    // Options du menu contextuel
                     const menuOptions = [
                         { label: '✅ Présent', statut: 'present' },
                         { label: '🚫 Absent', statut: 'absent' },
@@ -197,7 +193,6 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                                 <div class="text-[10px] text-slate-500">${essais.length}/${maxEssais}</div>
                                 ${estTermine ? '<div class="text-xs font-black text-emerald-600">✅</div>' : ''}
                             </div>
-                            <!-- Bouton menu -->
                             <div class="relative flex-shrink-0 ml-1">
                                 <button class="sprint-menu-btn w-6 h-6 rounded-full bg-slate-700 text-white text-xs font-black hover:bg-slate-600 flex items-center justify-center" data-id="${e.id}">
                                     •••
@@ -235,7 +230,7 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                 <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
             </div>
 
-            <!-- Chrono central - GROS BOUTON -->
+            <!-- Chrono central -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
                 <div class="text-center">
                     <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${nomEleveSel}</span></p>
@@ -245,7 +240,7 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                         <div class="mt-2 text-emerald-400 font-bold text-sm">✅ 3 essais terminés</div>
                         <div class="mt-1 text-xs text-slate-400">Meilleur : ${meilleurSel?.toFixed(1)}s</div>
                     ` : `
-                        <button onclick="window.evalSprintDemarrer()" id="sprint-main-btn" 
+                        <button id="sprint-main-btn" 
                                 class="w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
                             ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
                         </button>
@@ -308,13 +303,12 @@ function demarrerChrono() {
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
     
-    // Mettre à jour l'affichage du bouton immédiatement
+    // Mettre à jour le bouton
     const btn = document.getElementById('sprint-main-btn');
     if (btn) {
         btn.textContent = '⏹ Arrêter';
         btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-red-600 text-white';
     }
-    afficherSprint();
 }
 
 function arreterChrono() {
@@ -338,7 +332,6 @@ function arreterChrono() {
     chronoElapsed = 0;
     afficherSprint();
 
-    // Vérifier si l'élève a fini ses 3 essais
     const essais = essaisParEleve[eleveSelectionne] || [];
     if (essais.length >= maxEssais) {
         const suivant = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais && e.id !== eleveSelectionne);
@@ -370,26 +363,23 @@ function resetChrono() {
         if (rafId) cancelAnimationFrame(rafId);
     }
     chronoElapsed = 0;
+    const display = document.getElementById('sprint-chrono-display');
+    if (display) {
+        display.textContent = '0.0';
+    }
     const btn = document.getElementById('sprint-main-btn');
     if (btn) {
         btn.textContent = '▶ Démarrer';
         btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-emerald-600 text-white';
     }
-    const display = document.getElementById('sprint-chrono-display');
-    if (display) {
-        display.textContent = '0.0';
-    }
-    afficherSprint();
 }
 
 function setStatut(eleveId, statut) {
     setStatutEleve(currentData, eleveId, statut);
-    // Recharger les élèves
     import('./evaluation-stockage.js').then(module => {
         const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
         currentData = module.loadOrCreateData(currentData.classe, elevesData);
         currentData.classe = currentData.classe;
-        // Mettre à jour les essais
         currentEleves.forEach(e => {
             const r = getResultat(currentData, e.id, currentTestId);
             if (r && r.essais) {
@@ -419,9 +409,6 @@ async function chargerPhotos() {
     }
 }
 
-// Exposer les fonctions
-window.evalSprintDemarrer = demarrerChrono;
-window.evalSprintArreter = arreterChrono;
+// Exposer les fonctions globales
 window.evalSprintReset = resetChrono;
 window.evalSprintSelectionner = selectionnerEleve;
-window.evalSprintSetStatut = setStatut;
