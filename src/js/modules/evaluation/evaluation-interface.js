@@ -110,7 +110,7 @@ function lancerTest(testId) {
 /**
  * Affiche la vue de passation
  */
-function afficherPassation() {
+async function afficherPassation() {
     const container = document.getElementById('viewEvaluationSettings');
     if (!container || !currentData) return;
 
@@ -128,16 +128,14 @@ function afficherPassation() {
         mode
     );
 
-    const photoContainer = document.getElementById('eval-photo-en-cours');
-if (photoContainer && eleveEnCours) {
-    chargerPhotoDansElement(eleveEnCours.id, photoContainer);
-}
+    // Charger les photos si on est en mode individuel
+    if (mode !== 'collectif' && eleveEnCours) {
+        await chargerPhotoEleve(eleveEnCours.id, 'eval-eleve-photo');
+        if (eleveSuivant) {
+            await chargerPhotoEleve(eleveSuivant.id, 'eval-prochain-photo');
+        }
+    }
 
-// Charger la photo de l'élève suivant
-const photoSuivant = document.getElementById('eval-photo-suivant');
-if (photoSuivant && eleveSuivant) {
-    chargerPhotoDansElement(eleveSuivant.id, photoSuivant);
-}
     const zoneSaisie = document.getElementById('eval-zone-saisie');
     if (zoneSaisie && eleveEnCours) {
         const testId = currentTestId;
@@ -164,6 +162,37 @@ if (photoSuivant && eleveSuivant) {
     window.evalRetourMenu = retourMenu;
     window.evalPasserSuivant = passerSuivant;
     window.evalTerminerTest = terminerTest;
+}
+
+// Fonction utilitaire pour charger une photo
+async function chargerPhotoEleve(eleveId, elementId) {
+    const container = document.getElementById(elementId);
+    if (!container) return;
+    try {
+        const { getPhotoUrl } = await import('../../services/admin-service.js');
+        const url = await getPhotoUrl(eleveId);
+        // Récupérer l'élève pour connaître son sexe
+        const eleve = currentData.eleves[eleveId];
+        if (eleve) {
+            // Déterminer la couleur de fond selon le sexe
+            let bgSexe = 'bg-slate-200 border-slate-400';
+            if (eleve.sexe === 'M' || eleve.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
+            else if (eleve.sexe === 'F' || eleve.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
+            container.className = `w-${elementId === 'eval-eleve-photo' ? '16' : '10'} h-${elementId === 'eval-eleve-photo' ? '16' : '10'} rounded-full border-2 flex items-center justify-center text-3xl overflow-hidden ${bgSexe}`;
+        }
+        if (url) {
+            container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
+        } else {
+            // Conserver l'initiale si pas de photo
+            const initiale = eleve?.prenom?.charAt(0) || '👤';
+            container.innerHTML = `<span class="text-${elementId === 'eval-eleve-photo' ? '3xl' : 'sm'}">${initiale}</span>`;
+        }
+    } catch (e) {
+        // Fallback : garder l'initiale
+        const eleve = currentData.eleves[eleveId];
+        const initiale = eleve?.prenom?.charAt(0) || '👤';
+        container.innerHTML = `<span class="text-${elementId === 'eval-eleve-photo' ? '3xl' : 'sm'}">${initiale}</span>`;
+    }
 }
 
 /**

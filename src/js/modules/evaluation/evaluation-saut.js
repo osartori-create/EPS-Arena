@@ -51,21 +51,17 @@ export function initSaisieSaut(zone, eleve, data, testId) {
 
 function afficherSaisie() {
     const meilleur = essais.length > 0 ? Math.max(...essais) : null;
+    const valeurInitiale = (essaiCourant === 0) ? 120 : (essaiCourant === 1 ? essais[0] : Math.max(...essais));
 
     const html = `
         <div class="space-y-4">
-            <!-- Meilleur performance -->
             <div class="text-center">
                 <span class="text-sm text-slate-400">Meilleur performance</span>
                 <span class="text-2xl font-black text-yellow-400 block">${meilleur !== null ? `${meilleur} cm` : '--'}</span>
             </div>
-
-            <!-- Toise -->
             <div id="eval-slider-container">
                 ${templateSliderSaut(valeurInitiale, 0, 250, 'cm')}
             </div>
-
-            <!-- Infos essais -->
             <div class="text-center text-sm text-slate-400">
                 Essai ${essaiCourant + 1} / ${maxEssais}
                 ${essais.length > 0 ? `| Essais : ${essais.join(' - ')} cm` : ''}
@@ -75,21 +71,18 @@ function afficherSaisie() {
 
     zoneSaisie.innerHTML = html;
 
+    // Exposer les fonctions
     window.evalValiderEssai = validerEssai;
     window.evalEssaiSuivant = essaiSuivant;
 
+    // Synchroniser slider et champ manuel
     const slider = document.getElementById('eval-slider');
     const input = document.getElementById('eval-input-manuel');
-
     if (slider) {
         slider.addEventListener('input', () => {
             if (input) input.value = slider.value;
-            // Mettre à jour l'affichage du score en jaune (dans la toise)
-            const scoreEl = document.querySelector('#eval-slider-container .text-4xl.font-black.text-yellow-400');
-            if (scoreEl) scoreEl.textContent = slider.value;
         });
     }
-
     if (input) {
         input.addEventListener('input', () => {
             let val = parseFloat(input.value);
@@ -99,9 +92,6 @@ function afficherSaisie() {
                 else if (val > 250) slider.value = 250;
                 else slider.value = val;
             }
-            // Mettre à jour l'affichage du score en jaune
-            const scoreEl = document.querySelector('#eval-slider-container .text-4xl.font-black.text-yellow-400');
-            if (scoreEl) scoreEl.textContent = val;
         });
     }
 }

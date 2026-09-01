@@ -133,57 +133,48 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
             </div>
 
             ${!isCollectif ? `
-            <!-- Bloc élève en cours + prochain -->
-            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
-                <div class="flex items-center gap-4">
-                    <!-- Photo + sexe de l'élève en cours -->
-                    <div id="eval-eleve-photo-container" 
-                         class="w-16 h-16 rounded-full border-2 ${bgSexe} flex items-center justify-center text-3xl overflow-hidden flex-shrink-0">
-                        <div id="eval-photo-en-cours" class="w-full h-full flex items-center justify-center">
-                            <!-- Rempli par le script -->
-                        </div>
-                    </div>
-
-                    <div class="flex-1 min-w-0">
-                        <p class="text-xl font-black text-white truncate">${eleveEnCours ? `${eleveEnCours.prenom} ${eleveEnCours.nom}` : '--'}</p>
-                        <p class="text-sm text-slate-400">Code : ${eleveEnCours?.id || '--'}</p>
-                        <p class="text-xs font-bold ${statutClass}">${statutLabel}</p>
-                    </div>
-
-                    <div class="flex flex-col gap-1">
-                        <button onclick="window.evalSetStatut('absent')" 
-                                class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-red-600 hover:text-white transition-colors">
-                            Absent
-                        </button>
-                        <button onclick="window.evalSetStatut('inapte')" 
-                                class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-amber-600 hover:text-white transition-colors">
-                            Inapte
-                        </button>
-                        <button onclick="window.evalSetStatut('present')" 
-                                class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-emerald-600 hover:text-white transition-colors">
-                            Présent
-                        </button>
-                    </div>
-
-                    ${eleveSuivant ? `
-                    <div class="text-right border-l border-slate-700 pl-4 ml-auto min-w-[100px]">
-                        <p class="text-xs text-slate-400">Prochain :</p>
-                        <div class="flex items-center gap-2 justify-end">
-                            <div class="w-10 h-10 rounded-full border-2 ${bgSexeSuivant} flex items-center justify-center text-lg overflow-hidden flex-shrink-0">
-                                <div id="eval-photo-suivant" class="w-full h-full flex items-center justify-center">
-                                    <!-- Rempli par le script -->
-                                </div>
-                            </div>
-                            <div class="text-left">
-                                <p class="font-bold text-white text-sm truncate max-w-[80px]">${eleveSuivant.prenom} ${eleveSuivant.nom}</p>
-                                <p class="text-xs text-amber-400">👀 se prépare</p>
-                            </div>
-                        </div>
-                    </div>
-                    ` : ''}
-                </div>
+<div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
+    <div class="flex items-center gap-4">
+        <!-- Photo de l'élève en cours -->
+        <div id="eval-eleve-photo" class="w-16 h-16 rounded-full border-2 flex items-center justify-center text-3xl overflow-hidden bg-slate-700 border-slate-500">
+            <span class="text-3xl">${eleveEnCours?.prenom?.charAt(0) || '👤'}</span>
+        </div>
+        <div class="flex-1">
+            <p class="text-xl font-black text-white">${eleveEnCours ? `${eleveEnCours.prenom} ${eleveEnCours.nom}` : '--'}</p>
+            <p class="text-sm text-slate-400">Code : ${eleveEnCours?.id || '--'}</p>
+            <div class="flex gap-2 mt-1 flex-wrap">
+                <span id="eval-statut-label" class="text-xs font-bold text-emerald-400">✅ Présent</span>
             </div>
-            ` : ''}
+        </div>
+        <div class="flex flex-col gap-1">
+            <button onclick="window.evalSetStatut('absent')" 
+                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-red-600 hover:text-white transition-colors">
+                Absent
+            </button>
+            <button onclick="window.evalSetStatut('inapte')" 
+                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-amber-600 hover:text-white transition-colors">
+                Inapte
+            </button>
+            <button onclick="window.evalSetStatut('present')" 
+                    class="px-3 py-1 text-xs font-black rounded-lg bg-slate-700 text-slate-300 hover:bg-emerald-600 hover:text-white transition-colors">
+                Présent
+            </button>
+        </div>
+        ${eleveSuivant ? `
+            <div class="text-right border-l border-slate-700 pl-4">
+                <p class="text-xs text-slate-400">Prochain :</p>
+                <div class="flex items-center gap-2 justify-end">
+                    <div id="eval-prochain-photo" class="w-10 h-10 rounded-full border-2 flex items-center justify-center text-sm overflow-hidden bg-slate-700 border-slate-500">
+                        <span class="text-sm">${eleveSuivant.prenom?.charAt(0) || '👤'}</span>
+                    </div>
+                    <p class="font-bold text-white text-sm">${eleveSuivant.prenom} ${eleveSuivant.nom}</p>
+                </div>
+                <p class="text-xs text-amber-400">👀 se prépare</p>
+            </div>
+        ` : ''}
+    </div>
+</div>
+` : ''}
 
             <!-- Zone de saisie spécifique au test -->
             <div id="eval-zone-saisie" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 min-h-[300px]">
@@ -210,13 +201,13 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
 // ============================================================
 
 export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
-    // On s'assure que la valeur est dans les limites pour le curseur
+    // La valeur pour le curseur est bornée entre min et max
     const valCurseur = Math.max(min, Math.min(max, valeur));
     const pct = ((valCurseur - min) / (max - min)) * 100;
 
     return `
-        <div class="space-y-6">
-            <!-- Toise -->
+        <div class="space-y-4">
+            <!-- Toise avec curseur intégré -->
             <div class="relative w-full h-48 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-4 border-slate-600 overflow-hidden">
                 <!-- Graduations -->
                 <div class="absolute bottom-0 left-0 right-0 h-12 bg-emerald-900/50 flex items-end">
@@ -233,7 +224,7 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                 </div>
 
                 <!-- Bande de couleur (groupes de maîtrise) -->
-                <div class="absolute inset-0 flex pointer-events-none" style="opacity:0.25;">
+                <div class="absolute inset-0 flex pointer-events-none" style="opacity:0.3;">
                     <div class="h-full bg-red-500" style="width:${((110 - min) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-amber-500" style="width:${((140 - 110) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-emerald-500" style="width:${((max - 140) / (max - min)) * 100}%;"></div>
@@ -245,35 +236,30 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                     <div class="absolute top-0 w-0.5 h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${((140 - min) / (max - min)) * 100}%;"></div>
                 </div>
 
-                <!-- Curseur (sur toute la hauteur) -->
-                <div class="absolute top-0 bottom-0 w-0.5 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
-                     style="left:${pct}%">
-                    <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
-                    <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
+                <!-- Curseur (centré sur la valeur) -->
+                <div class="absolute bottom-0 w-full h-full pointer-events-none" style="left:0;">
+                    <div class="absolute bottom-0 w-1 h-32 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
+                         style="left:${pct}%; transform: translateX(-50%);">
+                        <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
+                    </div>
                 </div>
 
-                <!-- Score affiché en jaune -->
-                <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl z-10 pointer-events-none">
+                <!-- Score affiché en jaune sur la toise -->
+                <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl z-10">
                     <span class="text-4xl font-black text-yellow-400">${valeur}</span>
                     <span class="text-sm text-white/70">${unite}</span>
                 </div>
             </div>
 
-            <!-- Contrôles -->
-            <div class="flex gap-4 items-center">
-                <div class="flex-1">
-                    <input type="range" id="eval-slider" min="${min}" max="${max}" step="1" value="${Math.min(max, Math.max(min, valeur))}"
-                           class="w-full h-3 bg-slate-700 rounded-full appearance-none cursor-pointer 
-                                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 
-                                  [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-400 
-                                  [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-white">
-                </div>
-                <div class="w-28">
-                    <input type="number" id="eval-input-manuel" value="${valeur}" step="1"
-                           class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-center text-2xl font-black text-white">
-                </div>
+            <!-- Champ de saisie manuelle (sous la toise, pas à côté) -->
+            <div class="flex items-center justify-center gap-4">
+                <label class="text-sm text-slate-400">Saisie manuelle :</label>
+                <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
+                       class="w-32 bg-slate-900 border-2 border-slate-600 rounded-xl p-2 text-center text-xl font-black text-white">
+                <span class="text-sm text-slate-400">cm</span>
             </div>
 
+            <!-- Boutons -->
             <div class="flex gap-3">
                 <button onclick="window.evalValiderEssai()" class="flex-1 bg-emerald-600 py-4 rounded-xl font-black text-white text-xl active:scale-95">
                     ✅ Valider l'essai
