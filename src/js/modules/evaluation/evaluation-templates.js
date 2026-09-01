@@ -23,9 +23,9 @@ export function templateVuePrincipale(data, classe) {
                     <button onclick="window.evalGenererFactices()" class="bg-purple-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400">
                         🧪 Données factices
                     </button>
-                    <button onclick="window.evalReinitialiser()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400">
-                        🗑️ Réinitialiser
-                    </button>
+                    <button onclick="window.evalOuvrirPurge()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400">
+    🗑️ Gérer les données
+</button>
                     <button onclick="window.evalExporterCSV()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">
                         📥 Export CSV
                     </button>
@@ -701,4 +701,59 @@ function calculerStatistiques(data) {
         };
     });
     return stats;
+}
+export function templateModalPurge(classe, stats, libelles, nbEleves) {
+    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
+    const total = Object.values(stats).reduce((a, b) => a + b, 0);
+    
+    return `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-black text-blue-400">🗑️ Gestion des données</h2>
+                <button id="eval-purge-close" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                    ✖ Fermer
+                </button>
+            </div>
+            
+            <p class="text-sm text-slate-400 mb-4">
+                Classe : <span class="font-bold text-white">${classe}</span> · 
+                ${nbEleves} élèves · 
+                ${total} résultat(s) enregistré(s)
+            </p>
+            
+            <div class="space-y-2 mb-6">
+                <p class="text-xs font-bold text-slate-500 uppercase">Purge par test</p>
+                ${tests.map(testId => {
+                    const count = stats[testId] || 0;
+                    const libelle = libelles[testId] || testId;
+                    const status = count > 0 ? `${count} résultats` : 'Aucun résultat';
+                    const statusClass = count > 0 ? 'text-slate-300' : 'text-slate-500';
+                    return `
+                        <div class="flex justify-between items-center bg-slate-800 p-3 rounded-xl border border-slate-700">
+                            <span class="text-sm text-white">${libelle}</span>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs ${statusClass}">${status}</span>
+                                <button data-test="${testId}" class="eval-purge-test bg-red-600 px-3 py-1 rounded-lg font-black text-xs text-white active:scale-95 ${count === 0 ? 'opacity-40 cursor-not-allowed' : ''}" ${count === 0 ? 'disabled' : ''}>
+                                    Purger
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            
+            <div class="border-t border-slate-700 pt-4 space-y-3">
+                <button id="eval-purge-all" class="w-full bg-amber-600 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    🧹 Purger tous les résultats (${total} au total)
+                </button>
+                <button id="eval-purge-all-eleves" class="w-full bg-red-700 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    💀 Supprimer toute la classe (élèves + résultats)
+                </button>
+            </div>
+            
+            <p class="text-[10px] text-slate-500 mt-4 text-center">
+                ⚠️ Les purges sont irréversibles. Les données supprimées ne peuvent pas être récupérées.
+            </p>
+        </div>
+    `;
 }

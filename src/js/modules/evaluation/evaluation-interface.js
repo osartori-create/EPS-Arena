@@ -3,7 +3,8 @@
 
 import {
     loadOrCreateData, getElevesActifs,
-    genererDonneesFactices, reinitialiserDonnees
+    genererDonneesFactices, reinitialiserDonnees,
+    purgerTest, purgerTousLesTests, purgerClasseEntiere
 } from './evaluation-stockage.js';
 import { templateVuePrincipale, templatePassation } from './evaluation-templates.js';
 import { LIBELLES_TESTS, exporterVersIDoceo } from './evaluation-utils.js';
@@ -79,6 +80,7 @@ function afficherMenu() {
     window.evalLancerTest = lancerTest;
     window.evalVoirResultats = voirResultats;
     window.evalGenererFactices = genererFactices;
+    window.evalOuvrirPurge = ouvrirPurge;
     window.evalReinitialiser = reinitialiser;
     window.evalExporterCSV = exporterCSV;
     window.evalRetourMenu = retourMenu;
@@ -298,4 +300,107 @@ async function chargerPhotoDansElement(eleveId, container) {
     } catch (e) {
         container.innerHTML = '👤';
     }
+}
+function ouvrirPurge() {
+    if (!currentData || !currentClasse) {
+        alert('Aucune classe sélectionnée.');
+        return;
+    }
+    
+    // Compter les résultats pour chaque test
+    const stats = {};
+    const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
+    const libelles = {
+        endurance: 'Endurance (Luc Léger)',
+        force: 'Force (saut en longueur)',
+        vitesse: 'Vitesse (30m)',
+        equilibre: 'Équilibre (Flamingo)',
+        coordination: 'Coordination (lancer/rattrapé)',
+        souplesse: 'Souplesse (sit and reach)',
+        endurance_musculaire: 'Endurance musculaire (chaise)'
+    };
+    
+    tests.forEach(testId => {
+        const nb = Object.values(currentData.eleves).filter(e => e.resultats[testId] !== null && e.resultats[testId]?.groupe !== null).length;
+        stats[testId] = nb;
+    });
+    
+    const nbEleves = Object.keys(currentData.eleves).length;
+    
+    // Créer la modale
+    const modalHtml = templateModalPurge(currentClasse, stats, libelles, nbEleves);
+    
+    // Ajouter la modale au DOM
+    const modalContainer = document.createElement('div');
+    modalContainer.id = 'eval-purge-modal';
+    modalContainer.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
+    modalContainer.innerHTML = modalHtml;
+    document.body.appendChild(modalContainer);
+    
+    // Gérer les événements
+    modalContainer.querySelector('#eval-purge-close').addEventListener('click', () => {
+        modalContainer.remove();
+    });
+    
+    modalContainer.querySelectorAll('.eval-purge-test').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const testId = btn.dataset.test;
+            const libelle = libelles[testId] || testId;
+            const count = stats[testId] || 0;
+            if (count === 0) {
+                alert(`ℹ️ Aucun résultat pour ${libelle}.`);
+                return;
+            }
+            if (confirm(`⚠️ Supprimer les ${count} résultat(s) pour "${libelle}" ?`)) {
+                purgerTest(currentClasse, testId);
+                // Recharger les données
+                const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+                currentData = loadOrCreateData(currentClasse, elevesData);
+                currentData.classe = currentClasse;
+                modalContainer.remove();
+                afficherMenu();
+                alert(`✅ Résultats de "${libelle}" supprimés.`);
+            }
+        });
+    });
+    
+    modalContainer.querySelector('#eval-purge-all').addEventListener('click', () => {
+        const total = Object.values(stats).reduce((a, b) => a + b, 0);
+        if (total === 0) {
+            alert('ℹ️ Aucun résultat à supprimer.');
+            return;
+        }
+        if (confirm(`⚠️ Supprimer TOUS les résultats (${total} au total) ? Cette action est irréversible.`)) {
+            purgerTousLesTests(currentClasse);
+            // Recharger les données
+            const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+            currentData = loadOrCreateData(currentClasse, elevesData);
+            currentData.classe = currentClasse;
+            modalContainer.remove();
+            afficherMenu();
+            alert(`✅ Tous les résultats supprimés.`);
+        }
+    });
+    
+    modalContainer.querySelector('#eval-purge-all-eleves').addEventListener('click', () => {
+        if (confirm(`⚠️ Supprimer TOUTES les données de la classe "${currentClasse}" (élèves + résultats) ? Cette action est irréversible.`)) {
+            purgerClasseEntiere(currentClasse);
+            modalContainer.remove();
+            // Recharger la page ou réinitialiser l'affichage
+            const container = document.getElementById('viewEvaluationSettings');
+            if (container) {
+                container.innerHTML = '<p class="text-slate-500 text-center py-10">Classe purgée. Veuillez sélectionner une classe.</p>';
+            }
+            // Réinitialiser currentData
+            currentData = null;
+            alert(`✅ Toutes les données de la classe "${currentClasse}" ont été supprimées.`);
+        }
+    });
+    
+    // Fermer la modale en cliquant à l'extérieur
+    modalContainer.addEventListener('click', (e) => {
+        if (e.target === modalContainer) {
+            modalContainer.remove();
+        }
+    });
 }

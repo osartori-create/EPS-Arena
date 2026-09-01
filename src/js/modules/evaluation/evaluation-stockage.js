@@ -240,3 +240,46 @@ export function genererDonneesFactices(data) {
     sauvegarderDonnees(data.classe || '', data);
     return data;
 }
+export function purgerTest(classe, testId) {
+    const key = getStorageKey(classe);
+    const data = chargerDonnees(classe);
+    if (!data) return false;
+    
+    // Parcourir tous les élèves et supprimer le résultat du test
+    Object.keys(data.eleves).forEach(eleveId => {
+        if (data.eleves[eleveId].resultats[testId]) {
+            data.eleves[eleveId].resultats[testId] = null;
+        }
+    });
+    
+    sauvegarderDonnees(classe, data);
+    return true;
+}
+
+/**
+ * Purge tous les résultats pour une classe (garde les élèves)
+ */
+export function purgerTousLesTests(classe) {
+    const key = getStorageKey(classe);
+    const data = chargerDonnees(classe);
+    if (!data) return false;
+    
+    // Réinitialiser tous les résultats
+    Object.keys(data.eleves).forEach(eleveId => {
+        Object.keys(data.eleves[eleveId].resultats).forEach(testId => {
+            data.eleves[eleveId].resultats[testId] = null;
+        });
+    });
+    
+    sauvegarderDonnees(classe, data);
+    return true;
+}
+
+/**
+ * Purge complètement la classe (élèves + résultats)
+ */
+export function purgerClasseEntiere(classe) {
+    const key = getStorageKey(classe);
+    localStorage.removeItem(key);
+    return true;
+}
