@@ -109,7 +109,7 @@ function afficherPassation() {
     const eleveEnCours = currentEleves[currentIndex] || null;
     const eleveSuivant = currentEleves[currentIndex + 1] || null;
 
-    const mode = (currentTestId === 'endurance') ? 'collectif' : 'individuel';
+    const mode = (currentTestId === 'endurance' || currentTestId === 'vitesse') ? 'collectif' : 'individuel';
 
     container.innerHTML = templatePassation(
         currentTestId,

@@ -1,5 +1,5 @@
 // src/js/modules/evaluation/evaluation-sprint.js
-// Saisie du Sprint 30m (style VMA : colonnes, sélection, chrono central)
+// Saisie du Sprint 30m (style VMA : colonnes, sélection, gros bouton central)
 
 import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
 import { groupeVitesse } from './evaluation-utils.js';
@@ -9,13 +9,12 @@ let currentData = null;
 let currentTestId = 'vitesse';
 let currentEleves = [];
 let zoneSaisie = null;
-let eleveSelectionne = null; // ID de l'élève sélectionné
-let essaisParEleve = {}; // { eleveId: [temps1, temps2, temps3] }
+let eleveSelectionne = null;
+let essaisParEleve = {};
 let chronoRunning = false;
 let chronoStart = 0;
 let chronoElapsed = 0;
 let rafId = null;
-let intervalId = null;
 const maxEssais = 3;
 
 // ============================================================
@@ -28,7 +27,6 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
     currentTestId = testId;
     currentEleves = eleves.filter(e => e.statut === 'present');
 
-    // Charger les essais existants
     essaisParEleve = {};
     currentEleves.forEach(e => {
         const r = getResultat(data, e.id, testId);
@@ -39,7 +37,7 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
         }
     });
 
-    // Sélectionner le premier élève sans 3 essais, ou le premier
+    // Sélectionner le premier élève sans 3 essais
     const premier = currentEleves.find(e => essaisParEleve[e.id].length < maxEssais) || currentEleves[0];
     eleveSelectionne = premier?.id || null;
 
@@ -51,7 +49,6 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
 // ============================================================
 
 function afficherSprint() {
-    // Répartir les élèves par sexe
     const garcons = currentEleves.filter(e => e.sexe === 'M' || e.sexe === 'm');
     const filles = currentEleves.filter(e => e.sexe === 'F' || e.sexe === 'f');
     const autres = currentEleves.filter(e => e.sexe !== 'M' && e.sexe !== 'm' && e.sexe !== 'F' && e.sexe !== 'f');
@@ -67,10 +64,7 @@ function afficherSprint() {
     };
     colonnes.g1 = [...colonnes.g1, ...autres];
 
-    // Compter les terminés (3 essais)
     const nbTermines = currentEleves.filter(e => essaisParEleve[e.id]?.length >= maxEssais).length;
-
-    // Trouver l'élève sélectionné
     const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
 
     zoneSaisie.innerHTML = templateSprint(
@@ -97,25 +91,24 @@ function afficherSprint() {
             const id = card.dataset.id;
             selectionnerEleve(id);
         });
-        // Clic droit pour le statut
         card.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             const id = card.dataset.id;
-            const statutActuel = currentData.eleves[id]?.statut || 'present';
-            const choix = prompt(`Changer le statut de ${card.dataset.nom} :\n1 - Présent\n2 - Absent\n3 - Inapte`, '1');
+            const eleve = currentData.eleves[id];
+            if (!eleve) return;
+            const statutActuel = eleve.statut || 'present';
+            const choix = prompt(
+                `Changer le statut de ${eleve.prenom} ${eleve.nom} :\n1 - Présent\n2 - Absent\n3 - Inapte`,
+                statutActuel === 'present' ? '1' : (statutActuel === 'absent' ? '2' : '3')
+            );
             if (choix === '1') setStatut(id, 'present');
             else if (choix === '2') setStatut(id, 'absent');
             else if (choix === '3') setStatut(id, 'inapte');
         });
     });
 
-    // Mettre à jour l'affichage du chrono
-    if (chronoRunning) {
-        const display = document.getElementById('sprint-chrono-display');
-        if (display) {
-            display.textContent = (chronoElapsed / 1000).toFixed(1);
-        }
-    }
+    // Charger les photos après rendu
+    setTimeout(() => chargerPhotos(), 100);
 }
 
 // ============================================================
@@ -149,6 +142,21 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
 
                     const statutBadge = isAbsent ? '🚫 Absent' : (isInapte ? '⚠️ Inapte' : '');
 
+                    // Construction de l'affichage des essais
+                    let essaisHtml = '';
+                    if (estTermine) {
+                        essaisHtml = `<div class="text-xs font-black text-emerald-600">✅ Terminé</div>`;
+                    }
+                    // Affichage des 3 essais : 5.2 / 4.9 / __
+                    const affichageEssais = Array.from({ length: maxEssais }, (_, i) => {
+                        if (i < essais.length) {
+                            const val = essais[i];
+                            const isBest = (val === meilleur);
+                            return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${val.toFixed(1)}</span>`;
+                        }
+                        return `<span class="text-slate-600">__</span>`;
+                    }).join(' / ');
+
                     return `
                         <div class="sprint-eleve-card p-2 rounded-xl border-2 cursor-pointer hover:border-blue-500 transition-all flex items-center gap-2 ${bgClass} ${estSelectionne ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900' : ''} ${estTermine ? 'border-emerald-500 bg-emerald-950/20' : ''}"
                              data-id="${e.id}" data-nom="${e.prenom} ${e.nom}">
@@ -161,13 +169,8 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                                 ${statutBadge ? `<p class="text-[10px] font-bold ${isAbsent ? 'text-red-600' : 'text-orange-600'}">${statutBadge}</p>` : ''}
                             </div>
                             <div class="text-right flex-shrink-0">
-                                ${estTermine ? `
-                                    <span class="text-xs font-black text-emerald-600">✅ Terminé</span>
-                                    <div class="text-xs font-black text-yellow-600">${meilleur?.toFixed(1)}s</div>
-                                ` : `
-                                    <div class="text-xs text-slate-500">${essais.length}/${maxEssais}</div>
-                                    ${meilleur !== null ? `<div class="text-xs font-black text-yellow-600">${meilleur.toFixed(1)}s</div>` : '<div class="text-xs text-slate-400">--</div>'}
-                                `}
+                                <div class="text-[11px] font-mono">${affichageEssais}</div>
+                                <div class="text-[10px] text-slate-500">${essais.length}/${maxEssais}</div>
                             </div>
                         </div>
                     `;
@@ -178,34 +181,42 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
 
     const affichageChrono = chronoElapsed > 0 ? (chronoElapsed / 1000).toFixed(1) : '0.0';
     const nomEleveSel = eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun';
+    const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
+    const estTermineSel = essaisSel.length >= maxEssais;
 
     return `
         <div class="space-y-4">
             <!-- Barre de navigation -->
-            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+            <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
+                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">
                     ← Retour
                 </button>
                 <h3 class="font-black text-blue-400 uppercase text-sm">🏃 Sprint 30m</h3>
                 <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
             </div>
 
-            <!-- Chrono central -->
+            <!-- Chrono central - GROS BOUTON -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
                 <div class="text-center">
                     <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${nomEleveSel}</span></p>
                     <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">${affichageChrono}</div>
                     <p class="text-sm text-slate-400">secondes</p>
-                    <div class="flex justify-center gap-3 mt-2">
-                        <button onclick="window.evalSprintDemarrer()" id="sprint-start-btn" class="bg-emerald-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95 ${chronoRunning ? 'hidden' : ''}">
-                            ▶ Démarrer
+                    ${estTermineSel ? `
+                        <div class="mt-2 text-emerald-400 font-bold text-sm">✅ 3 essais terminés</div>
+                    ` : `
+                        <button onclick="window.evalSprintDemarrer()" id="sprint-main-btn" 
+                                class="w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
+                            ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
                         </button>
-                        <button onclick="window.evalSprintArreter()" id="sprint-stop-btn" class="bg-red-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95 ${chronoRunning ? '' : 'hidden'}">
-                            ⏹ Arrêter
-                        </button>
-                        <button onclick="window.evalSprintReset()" class="bg-slate-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
-                            ↺ Reset
-                        </button>
+                    `}
+                    <button onclick="window.evalSprintReset()" class="mt-2 bg-slate-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                        ↺ Réinitialiser
+                    </button>
+                    <div class="mt-2 text-xs text-slate-500">
+                        Essais : ${essaisSel.map((t, i) => `
+                            <span class="${t === Math.min(...essaisSel) ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
+                        `).join(' / ')}
+                        ${essaisSel.length === 0 ? '<span class="text-slate-600">Aucun essai</span>' : ''}
                     </div>
                 </div>
             </div>
@@ -220,6 +231,7 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                 <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
                 <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
                 <span class="flex items-center gap-1">🔄 Clic droit = statut</span>
+                <span class="flex items-center gap-1">🟡 Meilleur temps en jaune</span>
             </div>
         </div>
     `;
@@ -240,7 +252,7 @@ function selectionnerEleve(eleveId) {
 
 function demarrerChrono() {
     if (!eleveSelectionne) {
-        alert('Sélectionnez d\'abord un élève.');
+        alert('Sélectionnez d\'abord un élève en cliquant sur sa carte.');
         return;
     }
     const essais = essaisParEleve[eleveSelectionne] || [];
@@ -262,7 +274,6 @@ function arreterChrono() {
     if (rafId) cancelAnimationFrame(rafId);
     const temps = chronoElapsed / 1000;
 
-    // Enregistrer l'essai
     if (eleveSelectionne) {
         if (!essaisParEleve[eleveSelectionne]) essaisParEleve[eleveSelectionne] = [];
         essaisParEleve[eleveSelectionne].push(temps);
@@ -281,15 +292,15 @@ function arreterChrono() {
     // Vérifier si l'élève a fini ses 3 essais
     const essais = essaisParEleve[eleveSelectionne] || [];
     if (essais.length >= maxEssais) {
-        // Passer automatiquement au prochain élève non terminé
         const suivant = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais && e.id !== eleveSelectionne);
         if (suivant) {
             setTimeout(() => {
                 selectionnerEleve(suivant.id);
-                alert(`✅ ${eleveSelectionne} a terminé ses 3 essais. Passage à ${suivant.prenom} ${suivant.nom}.`);
             }, 500);
         } else {
-            alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
+            setTimeout(() => {
+                alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
+            }, 300);
         }
     }
 }
@@ -300,6 +311,11 @@ function updateChrono() {
     const display = document.getElementById('sprint-chrono-display');
     if (display) {
         display.textContent = (chronoElapsed / 1000).toFixed(1);
+    }
+    const btn = document.getElementById('sprint-main-btn');
+    if (btn && chronoRunning) {
+        btn.textContent = '⏹ Arrêter';
+        btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-red-600 text-white';
     }
     rafId = requestAnimationFrame(updateChrono);
 }
@@ -315,15 +331,24 @@ function resetChrono() {
 
 function setStatut(eleveId, statut) {
     setStatutEleve(currentData, eleveId, statut);
-    // Recharger les élèves pour mettre à jour l'affichage
+    // Recharger les élèves
     const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
-    currentData = loadOrCreateData(currentData.classe, elevesData);
-    currentData.classe = currentData.classe;
-    afficherSprint();
+    import('./evaluation-stockage.js').then(module => {
+        currentData = module.loadOrCreateData(currentData.classe, elevesData);
+        currentData.classe = currentData.classe;
+        // Mettre à jour les essais depuis les données rechargées
+        currentEleves.forEach(e => {
+            const r = getResultat(currentData, e.id, currentTestId);
+            if (r && r.essais) {
+                essaisParEleve[e.id] = [...r.essais];
+            }
+        });
+        afficherSprint();
+    });
 }
 
 // ============================================================
-// CHARGEMENT DES PHOTOS (exécuté après le rendu)
+// CHARGEMENT DES PHOTOS
 // ============================================================
 
 async function chargerPhotos() {
@@ -347,6 +372,3 @@ window.evalSprintArreter = arreterChrono;
 window.evalSprintReset = resetChrono;
 window.evalSprintSelectionner = selectionnerEleve;
 window.evalSprintSetStatut = setStatut;
-
-// Charger les photos après chaque rendu
-setTimeout(() => chargerPhotos(), 200);
