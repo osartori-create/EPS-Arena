@@ -87,11 +87,9 @@ function afficherSaut() {
         meilleurSel
     );
 
-    // Exposer les fonctions
     window.evalSautValider = validerEssai;
     window.evalSautAnnuler = annulerEssai;
     window.evalSautSelectionner = selectionnerEleve;
-    window.evalSautUpdateSlider = updateSliderDisplay;
 
     // Attacher les événements des cartes
     document.querySelectorAll('.saut-eleve-card').forEach(card => {
@@ -102,6 +100,7 @@ function afficherSaut() {
         });
     });
 
+    // Attacher les événements des boutons menu
     document.querySelectorAll('.saut-menu-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -127,7 +126,7 @@ function afficherSaut() {
         document.querySelectorAll('.saut-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
 
-    // Slider et input
+    // Attacher les événements du slider et du champ manuel
     const slider = document.getElementById('saut-slider');
     const input = document.getElementById('saut-input-manuel');
     if (slider) {
@@ -152,18 +151,6 @@ function afficherSaut() {
     }
 
     setTimeout(() => chargerPhotos(), 100);
-}
-
-// Met à jour l'affichage du score et du curseur après un changement
-function updateSliderDisplay(value) {
-    const display = document.getElementById('saut-score-display');
-    if (display) display.textContent = value;
-
-    const bar = document.getElementById('saut-slider-bar');
-    if (bar) {
-        const pct = Math.max(0, Math.min(100, (value / maxSlider) * 100));
-        bar.style.left = pct + '%';
-    }
 }
 
 // ============================================================
@@ -295,13 +282,13 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                         <div class="absolute top-0 w-px h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${(140 / maxSlider) * 100}%;"></div>
                     </div>
                     <!-- Curseur -->
-                    <div id="saut-slider-bar" class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
+                    <div class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                          style="left:${(valeurSlider / maxSlider) * 100}%; transform: translateX(-50%);">
                         <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                     </div>
                     <!-- SCORE AFFICHÉ EN JAUNE SUR LA TOISE -->
-                    <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10">
-                        <span id="saut-score-display" class="text-3xl font-black text-yellow-400">${valeurSlider}</span>
+                    <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10" id="saut-score-on-toise">
+                        <span class="text-3xl font-black text-yellow-400" id="saut-score-value">${valeurSlider}</span>
                         <span class="text-xs text-white/70">cm</span>
                     </div>
                 </div>
@@ -438,16 +425,27 @@ function annulerEssai() {
     afficherSaut();
 }
 
-function updateSliderDisplay(value) {
-    const display = document.getElementById('saut-score-display');
-    if (display) display.textContent = value;
+// ============================================================
+// MISE À JOUR DE L'AFFICHAGE DU SLIDER
+// ============================================================
 
-    const bar = document.getElementById('saut-slider-bar');
+function updateSliderDisplay(value) {
+    // Mettre à jour le curseur
+    const bar = document.querySelector('#saut-score-on-toise .text-3xl.font-black.text-yellow-400');
     if (bar) {
-        const pct = Math.max(0, Math.min(100, (value / maxSlider) * 100));
-        bar.style.left = pct + '%';
+        bar.textContent = value;
+    }
+    // Mettre à jour la position du curseur
+    const cursor = document.querySelector('.absolute.bottom-0.w-1.h-28');
+    if (cursor) {
+        const pct = (value / maxSlider) * 100;
+        cursor.style.left = Math.min(100, Math.max(0, pct)) + '%';
     }
 }
+
+// ============================================================
+// STATUT
+// ============================================================
 
 function setStatut(eleveId, statut) {
     setStatutEleve(currentData, eleveId, statut);
@@ -488,5 +486,4 @@ async function chargerPhotos() {
 window.evalSautValider = validerEssai;
 window.evalSautAnnuler = annulerEssai;
 window.evalSautSelectionner = selectionnerEleve;
-window.evalSautUpdateSlider = updateSliderDisplay;
 window.evalSautSetStatut = setStatut;
