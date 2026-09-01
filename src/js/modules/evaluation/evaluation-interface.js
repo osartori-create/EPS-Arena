@@ -128,6 +128,16 @@ function afficherPassation() {
         mode
     );
 
+    const photoContainer = document.getElementById('eval-photo-en-cours');
+if (photoContainer && eleveEnCours) {
+    chargerPhotoDansElement(eleveEnCours.id, photoContainer);
+}
+
+// Charger la photo de l'élève suivant
+const photoSuivant = document.getElementById('eval-photo-suivant');
+if (photoSuivant && eleveSuivant) {
+    chargerPhotoDansElement(eleveSuivant.id, photoSuivant);
+}
     const zoneSaisie = document.getElementById('eval-zone-saisie');
     if (zoneSaisie && eleveEnCours) {
         const testId = currentTestId;
@@ -175,7 +185,13 @@ function terminerTest() {
     currentMode = 'menu';
     afficherMenu();
 }
-
+window.evalSetStatut = function(statut) {
+    if (!currentData || !currentEleves[currentIndex]) return;
+    const eleveId = currentEleves[currentIndex].id;
+    setStatutEleve(currentData, eleveId, statut);
+    // Recharger la passation pour mettre à jour l'affichage
+    afficherPassation();
+};
 /**
  * Retourne au menu
  */
@@ -240,4 +256,17 @@ function exporterCSV() {
         return;
     }
     exporterVersIDoceo(currentData, currentClasse);
+}
+async function chargerPhotoDansElement(eleveId, container) {
+    try {
+        const { getPhotoUrl } = await import('../../services/admin-service.js');
+        const url = await getPhotoUrl(eleveId);
+        if (url) {
+            container.innerHTML = `<img src="${url}" class="w-full h-full object-cover">`;
+        } else {
+            container.innerHTML = '👤';
+        }
+    } catch (e) {
+        container.innerHTML = '👤';
+    }
 }
