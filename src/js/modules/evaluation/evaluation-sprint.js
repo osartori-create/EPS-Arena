@@ -37,7 +37,6 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
         }
     });
 
-    // Sélectionner le premier élève sans 3 essais
     const premier = currentEleves.find(e => essaisParEleve[e.id].length < maxEssais) || currentEleves[0];
     eleveSelectionne = premier?.id || null;
 
@@ -83,31 +82,50 @@ function afficherSprint() {
     window.evalSprintArreter = arreterChrono;
     window.evalSprintReset = resetChrono;
     window.evalSprintSelectionner = selectionnerEleve;
-    window.evalSprintSetStatut = setStatut;
 
-    // Attacher les événements aux cartes
+    // Attacher les événements
     document.querySelectorAll('.sprint-eleve-card').forEach(card => {
-        card.addEventListener('click', () => {
+        // Clic sur la carte = sélectionner
+        card.addEventListener('click', (e) => {
+            // Si le clic est sur le bouton menu, ne pas sélectionner
+            if (e.target.closest('.sprint-menu-btn')) return;
             const id = card.dataset.id;
             selectionnerEleve(id);
         });
-        card.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            const id = card.dataset.id;
+    });
+
+    // Attacher les événements des boutons menu
+    document.querySelectorAll('.sprint-menu-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = btn.dataset.id;
             const eleve = currentData.eleves[id];
             if (!eleve) return;
-            const statutActuel = eleve.statut || 'present';
-            const choix = prompt(
-                `Changer le statut de ${eleve.prenom} ${eleve.nom} :\n1 - Présent\n2 - Absent\n3 - Inapte`,
-                statutActuel === 'present' ? '1' : (statutActuel === 'absent' ? '2' : '3')
-            );
-            if (choix === '1') setStatut(id, 'present');
-            else if (choix === '2') setStatut(id, 'absent');
-            else if (choix === '3') setStatut(id, 'inapte');
+            const menu = btn.parentElement.querySelector('.sprint-menu-dropdown');
+            if (menu) {
+                menu.classList.toggle('hidden');
+            }
         });
     });
 
-    // Charger les photos après rendu
+    // Gérer les clics sur les options du menu
+    document.querySelectorAll('.sprint-menu-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = opt.dataset.id;
+            const statut = opt.dataset.statut;
+            setStatut(id, statut);
+            // Fermer tous les menus
+            document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
+        });
+    });
+
+    // Fermer les menus en cliquant ailleurs
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
+    });
+
+    // Charger les photos
     setTimeout(() => chargerPhotos(), 100);
 }
 
@@ -140,14 +158,13 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                     if (isAbsent) bgClass = 'bg-red-200 border-red-400 opacity-60';
                     else if (isInapte) bgClass = 'bg-orange-200 border-orange-400 opacity-60';
 
-                    const statutBadge = isAbsent ? '🚫 Absent' : (isInapte ? '⚠️ Inapte' : '');
+                    const statutBadge = isAbsent ? '🚫' : (isInapte ? '⚠️' : '');
 
-                    // Construction de l'affichage des essais
                     let essaisHtml = '';
                     if (estTermine) {
-                        essaisHtml = `<div class="text-xs font-black text-emerald-600">✅ Terminé</div>`;
+                        essaisHtml = `<div class="text-xs font-black text-emerald-600">✅</div>`;
                     }
-                    // Affichage des 3 essais : 5.2 / 4.9 / __
+
                     const affichageEssais = Array.from({ length: maxEssais }, (_, i) => {
                         if (i < essais.length) {
                             const val = essais[i];
@@ -156,6 +173,13 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                         }
                         return `<span class="text-slate-600">__</span>`;
                     }).join(' / ');
+
+                    // Options du menu contextuel
+                    const menuOptions = [
+                        { label: '✅ Présent', statut: 'present' },
+                        { label: '🚫 Absent', statut: 'absent' },
+                        { label: '⚠️ Inapte', statut: 'inapte' }
+                    ];
 
                     return `
                         <div class="sprint-eleve-card p-2 rounded-xl border-2 cursor-pointer hover:border-blue-500 transition-all flex items-center gap-2 ${bgClass} ${estSelectionne ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900' : ''} ${estTermine ? 'border-emerald-500 bg-emerald-950/20' : ''}"
@@ -171,6 +195,21 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                             <div class="text-right flex-shrink-0">
                                 <div class="text-[11px] font-mono">${affichageEssais}</div>
                                 <div class="text-[10px] text-slate-500">${essais.length}/${maxEssais}</div>
+                                ${estTermine ? '<div class="text-xs font-black text-emerald-600">✅</div>' : ''}
+                            </div>
+                            <!-- Bouton menu -->
+                            <div class="relative flex-shrink-0 ml-1">
+                                <button class="sprint-menu-btn w-6 h-6 rounded-full bg-slate-700 text-white text-xs font-black hover:bg-slate-600 flex items-center justify-center" data-id="${e.id}">
+                                    •••
+                                </button>
+                                <div class="sprint-menu-dropdown hidden absolute right-0 top-7 z-20 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden shadow-xl min-w-[120px]">
+                                    ${menuOptions.map(opt => `
+                                        <div class="sprint-menu-option px-4 py-2 text-xs font-bold text-white hover:bg-slate-700 cursor-pointer transition-colors ${opt.statut === statut ? 'bg-slate-700' : ''}" 
+                                             data-id="${e.id}" data-statut="${opt.statut}">
+                                            ${opt.label}
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
                         </div>
                     `;
@@ -183,6 +222,7 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
     const nomEleveSel = eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun';
     const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
     const estTermineSel = essaisSel.length >= maxEssais;
+    const meilleurSel = essaisSel.length > 0 ? Math.min(...essaisSel) : null;
 
     return `
         <div class="space-y-4">
@@ -203,6 +243,7 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                     <p class="text-sm text-slate-400">secondes</p>
                     ${estTermineSel ? `
                         <div class="mt-2 text-emerald-400 font-bold text-sm">✅ 3 essais terminés</div>
+                        <div class="mt-1 text-xs text-slate-400">Meilleur : ${meilleurSel?.toFixed(1)}s</div>
                     ` : `
                         <button onclick="window.evalSprintDemarrer()" id="sprint-main-btn" 
                                 class="w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
@@ -212,12 +253,13 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
                     <button onclick="window.evalSprintReset()" class="mt-2 bg-slate-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
                         ↺ Réinitialiser
                     </button>
-                    <div class="mt-2 text-xs text-slate-500">
-                        Essais : ${essaisSel.map((t, i) => `
-                            <span class="${t === Math.min(...essaisSel) ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
-                        `).join(' / ')}
-                        ${essaisSel.length === 0 ? '<span class="text-slate-600">Aucun essai</span>' : ''}
-                    </div>
+                    ${essaisSel.length > 0 ? `
+                        <div class="mt-2 text-xs text-slate-400">
+                            Essais : ${essaisSel.map((t, i) => `
+                                <span class="${t === meilleurSel ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
+                            `).join(' / ')}
+                        </div>
+                    ` : ''}
                 </div>
             </div>
 
@@ -227,10 +269,10 @@ function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, 
             </div>
 
             <!-- Légende -->
-            <div class="flex justify-center gap-4 text-xs text-slate-400">
+            <div class="flex justify-center gap-4 text-xs text-slate-400 flex-wrap">
                 <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
                 <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
-                <span class="flex items-center gap-1">🔄 Clic droit = statut</span>
+                <span class="flex items-center gap-1">••• = changer statut</span>
                 <span class="flex items-center gap-1">🟡 Meilleur temps en jaune</span>
             </div>
         </div>
@@ -265,6 +307,13 @@ function demarrerChrono() {
     chronoRunning = true;
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
+    
+    // Mettre à jour l'affichage du bouton immédiatement
+    const btn = document.getElementById('sprint-main-btn');
+    if (btn) {
+        btn.textContent = '⏹ Arrêter';
+        btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-red-600 text-white';
+    }
     afficherSprint();
 }
 
@@ -312,11 +361,6 @@ function updateChrono() {
     if (display) {
         display.textContent = (chronoElapsed / 1000).toFixed(1);
     }
-    const btn = document.getElementById('sprint-main-btn');
-    if (btn && chronoRunning) {
-        btn.textContent = '⏹ Arrêter';
-        btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-red-600 text-white';
-    }
     rafId = requestAnimationFrame(updateChrono);
 }
 
@@ -326,17 +370,26 @@ function resetChrono() {
         if (rafId) cancelAnimationFrame(rafId);
     }
     chronoElapsed = 0;
+    const btn = document.getElementById('sprint-main-btn');
+    if (btn) {
+        btn.textContent = '▶ Démarrer';
+        btn.className = 'w-full mt-3 py-6 rounded-2xl font-black text-2xl uppercase shadow-xl active:scale-95 transition-transform bg-emerald-600 text-white';
+    }
+    const display = document.getElementById('sprint-chrono-display');
+    if (display) {
+        display.textContent = '0.0';
+    }
     afficherSprint();
 }
 
 function setStatut(eleveId, statut) {
     setStatutEleve(currentData, eleveId, statut);
     // Recharger les élèves
-    const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
     import('./evaluation-stockage.js').then(module => {
+        const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
         currentData = module.loadOrCreateData(currentData.classe, elevesData);
         currentData.classe = currentData.classe;
-        // Mettre à jour les essais depuis les données rechargées
+        // Mettre à jour les essais
         currentEleves.forEach(e => {
             const r = getResultat(currentData, e.id, currentTestId);
             if (r && r.essais) {
