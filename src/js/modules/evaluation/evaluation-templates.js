@@ -201,7 +201,6 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
 // ============================================================
 
 export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
-    // La valeur pour le curseur est bornée entre min et max
     const valCurseur = Math.max(min, Math.min(max, valeur));
     const pct = ((valCurseur - min) / (max - min)) * 100;
 
@@ -236,12 +235,10 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                     <div class="absolute top-0 w-0.5 h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${((140 - min) / (max - min)) * 100}%;"></div>
                 </div>
 
-                <!-- Curseur (centré sur la valeur) -->
-                <div class="absolute bottom-0 w-full h-full pointer-events-none" style="left:0;">
-                    <div class="absolute bottom-0 w-1 h-32 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
-                         style="left:${pct}%; transform: translateX(-50%);">
-                        <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
-                    </div>
+                <!-- Curseur : barre verticale avec rond en bas -->
+                <div class="absolute bottom-0 w-1 h-32 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
+                     style="left:${pct}%; transform: translateX(-50%);">
+                    <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
 
                 <!-- Score affiché en jaune sur la toise -->
@@ -251,7 +248,7 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                 </div>
             </div>
 
-            <!-- Champ de saisie manuelle (sous la toise, pas à côté) -->
+            <!-- Champ de saisie manuelle -->
             <div class="flex items-center justify-center gap-4">
                 <label class="text-sm text-slate-400">Saisie manuelle :</label>
                 <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
