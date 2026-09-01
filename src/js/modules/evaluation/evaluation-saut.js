@@ -168,7 +168,7 @@ function updateSliderDisplay(valeur) {
         const pct = (valeur / maxSlider) * 100;
         curseur.style.left = Math.min(100, Math.max(0, pct)) + '%';
     }
-    // Mettre à jour les essais (le meilleur reste jaune)
+    // Mettre à jour les essais
     const essaisContainer = document.getElementById('saut-essais-display');
     if (essaisContainer) {
         const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
