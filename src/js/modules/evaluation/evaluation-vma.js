@@ -215,7 +215,6 @@ function creerLecteur() {
                 },
                 onError: (err) => {
                     console.warn('⚠️ Erreur YouTube :', err);
-                    // En cas d'erreur, on essaie de relancer
                     setTimeout(() => {
                         if (player) player.playVideo();
                     }, 2000);
@@ -251,10 +250,14 @@ function demarrerMiseAJourPaliers() {
     }, 500);
 }
 
+/**
+ * DÉMARRAGE ROBUSTE : force le player à jouer,
+ * puis après 500ms, si isPlaying est false, on le force manuellement.
+ */
 function demarrerVMA() {
     if (player) {
         console.log('▶️ Tentative de lecture YouTube...');
-        // Forcer la lecture avec mute/unmute pour iPad
+        // Étape 1 : muet pour contourner les restrictions
         player.mute();
         player.playVideo();
         // Démuter après un court délai
@@ -265,9 +268,26 @@ function demarrerVMA() {
             } catch (e) { console.warn('Erreur unmute:', e); }
         }, 300);
 
+        // Mettre à jour l'interface
         document.getElementById('eval-vma-start')?.classList.add('hidden');
         document.getElementById('eval-vma-pause')?.classList.remove('hidden');
         document.getElementById('eval-vma-stop')?.classList.remove('hidden');
+
+        // FORCER LE CHRONO après 500ms si l'événement n'est pas arrivé
+        setTimeout(() => {
+            if (!isPlaying) {
+                console.warn('⚠️ YouTube n\'a pas déclenché PLAYING, forçage manuel.');
+                isPlaying = true;
+                demarrerMiseAJourPaliers();
+                // Rafraîchir l'affichage
+                const elPalier = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
+                if (elPalier) elPalier.textContent = `Palier ${palierEnCours}`;
+                const elValid = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-emerald-400');
+                if (elValid) elValid.textContent = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+                const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
+                if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
+            }
+        }, 500);
     } else {
         console.warn('⚠️ Player YouTube non initialisé');
     }
@@ -281,9 +301,23 @@ function pauseVMA() {
             document.getElementById('eval-vma-start').textContent = '▶ Reprendre';
             document.getElementById('eval-vma-pause')?.classList.add('hidden');
         } else {
+            // Reprise
+            player.mute();
             player.playVideo();
+            setTimeout(() => {
+                try {
+                    player.unMute();
+                } catch (e) {}
+            }, 300);
             document.getElementById('eval-vma-start')?.classList.add('hidden');
             document.getElementById('eval-vma-pause')?.classList.remove('hidden');
+            // Forcer le chrono après reprise
+            setTimeout(() => {
+                if (!isPlaying) {
+                    isPlaying = true;
+                    demarrerMiseAJourPaliers();
+                }
+            }, 500);
         }
     }
 }
