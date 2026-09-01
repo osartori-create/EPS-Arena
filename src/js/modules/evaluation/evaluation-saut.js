@@ -36,7 +36,6 @@ export function initSaisieSaut(zone, eleve, data, testId, eleves) {
         }
     });
 
-    // Sélectionner le premier élève sans 3 essais
     const premier = currentEleves.find(e => essaisParEleve[e.id].length < maxEssais) || currentEleves[0];
     eleveSelectionne = premier?.id || null;
 
@@ -68,7 +67,6 @@ function afficherSaut() {
     const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
     const meilleurSel = essaisSel.length > 0 ? Math.max(...essaisSel) : null;
 
-    // Valeur du slider : si des essais existent, on prend le meilleur, sinon 120
     if (essaisSel.length === 0) {
         valeurSlider = 120;
     } else if (essaisSel.length === 1) {
@@ -93,7 +91,7 @@ function afficherSaut() {
     window.evalSautValider = validerEssai;
     window.evalSautAnnuler = annulerEssai;
     window.evalSautSelectionner = selectionnerEleve;
-    window.evalUpdateSlider = updateSlider;
+    window.evalSautUpdateSlider = updateSliderDisplay;
 
     // Attacher les événements des cartes
     document.querySelectorAll('.saut-eleve-card').forEach(card => {
@@ -104,7 +102,6 @@ function afficherSaut() {
         });
     });
 
-    // Attacher les événements des boutons menu
     document.querySelectorAll('.saut-menu-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -130,14 +127,14 @@ function afficherSaut() {
         document.querySelectorAll('.saut-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
 
-    // Attacher les événements du slider
+    // Slider et input
     const slider = document.getElementById('saut-slider');
     const input = document.getElementById('saut-input-manuel');
     if (slider) {
         slider.addEventListener('input', () => {
             valeurSlider = parseFloat(slider.value);
             if (input) input.value = valeurSlider;
-            mettreAJourScore(valeurSlider);
+            updateSliderDisplay(valeurSlider);
         });
     }
     if (input) {
@@ -150,11 +147,23 @@ function afficherSaut() {
                 else if (val > maxSlider) slider.value = maxSlider;
                 else slider.value = val;
             }
-            mettreAJourScore(valeurSlider);
+            updateSliderDisplay(valeurSlider);
         });
     }
 
     setTimeout(() => chargerPhotos(), 100);
+}
+
+// Met à jour l'affichage du score et du curseur après un changement
+function updateSliderDisplay(value) {
+    const display = document.getElementById('saut-score-display');
+    if (display) display.textContent = value;
+
+    const bar = document.getElementById('saut-slider-bar');
+    if (bar) {
+        const pct = Math.max(0, Math.min(100, (value / maxSlider) * 100));
+        bar.style.left = pct + '%';
+    }
 }
 
 // ============================================================
@@ -239,7 +248,6 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
         </div>
     `).join('');
 
-    const affichageMeilleur = meilleurSel !== null ? `${meilleurSel} cm` : '--';
     const nbEssais = essaisSel.length;
 
     return `
@@ -287,13 +295,13 @@ function templateSaut(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nb
                         <div class="absolute top-0 w-px h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${(140 / maxSlider) * 100}%;"></div>
                     </div>
                     <!-- Curseur -->
-                    <div class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
+                    <div id="saut-slider-bar" class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                          style="left:${(valeurSlider / maxSlider) * 100}%; transform: translateX(-50%);">
                         <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-5 h-5 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                     </div>
                     <!-- SCORE AFFICHÉ EN JAUNE SUR LA TOISE -->
                     <div class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-1.5 rounded-xl z-10">
-                        <span class="text-3xl font-black text-yellow-400">${valeurSlider}</span>
+                        <span id="saut-score-display" class="text-3xl font-black text-yellow-400">${valeurSlider}</span>
                         <span class="text-xs text-white/70">cm</span>
                     </div>
                 </div>
@@ -389,10 +397,8 @@ function validerEssai() {
         groupe: groupe
     });
 
-    // Mettre à jour la variable locale
     essaisParEleve[eleveSelectionne] = essais;
 
-    // Vérifier si l'élève a fini ses 3 essais
     if (essais.length >= maxEssais) {
         const suivant = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais && e.id !== eleveSelectionne);
         if (suivant) {
@@ -432,10 +438,15 @@ function annulerEssai() {
     afficherSaut();
 }
 
-function updateSlider(value) {
-    valeurSlider = parseFloat(value);
+function updateSliderDisplay(value) {
     const display = document.getElementById('saut-score-display');
-    if (display) display.textContent = valeurSlider;
+    if (display) display.textContent = value;
+
+    const bar = document.getElementById('saut-slider-bar');
+    if (bar) {
+        const pct = Math.max(0, Math.min(100, (value / maxSlider) * 100));
+        bar.style.left = pct + '%';
+    }
 }
 
 function setStatut(eleveId, statut) {
@@ -477,5 +488,5 @@ async function chargerPhotos() {
 window.evalSautValider = validerEssai;
 window.evalSautAnnuler = annulerEssai;
 window.evalSautSelectionner = selectionnerEleve;
-window.evalUpdateSlider = updateSlider;
+window.evalSautUpdateSlider = updateSliderDisplay;
 window.evalSautSetStatut = setStatut;
