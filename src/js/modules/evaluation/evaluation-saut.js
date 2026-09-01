@@ -76,7 +76,7 @@ function afficherSaut() {
         valeurSlider = Math.max(...essaisSel);
     }
 
-    // AFFICHAGE DU SLIDER (SANS SCORE BLANC)
+    // AFFICHAGE
     zoneSaisie.innerHTML = `
         <div class="space-y-4">
             <!-- Header -->
@@ -88,14 +88,20 @@ function afficherSaut() {
                 <span class="text-xs text-slate-400">${nbTermines}/${currentEleves.length} terminés</span>
             </div>
 
-            <!-- Slider central -->
+            <!-- Élève sélectionné : PHOTO + NOM EN ÉNORME -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
-                <div class="text-center">
-                    <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</span></p>
-                    <p class="text-xs text-slate-500">Essai ${essaisSel.length + 1} / ${maxEssais}</p>
+                <div class="flex items-center gap-6">
+                    <div id="saut-eleve-photo" class="w-24 h-24 rounded-full border-4 border-blue-500 overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-4xl">
+                        <span class="text-4xl">${eleveSel?.prenom?.charAt(0) || '👤'}</span>
+                    </div>
+                    <div>
+                        <p class="text-5xl font-black text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</p>
+                        <p class="text-sm text-slate-400">Code : ${eleveSel?.id || '--'}</p>
+                        <p class="text-xs text-slate-500">Essai ${essaisSel.length + 1} / ${maxEssais}</p>
+                    </div>
                 </div>
 
-                <!-- TOISE AVEC SCORE INTÉGRÉ (PAS DE SCORE BLANC) -->
+                <!-- Toise -->
                 ${templateSliderSaut(valeurSlider, 0, 250, 'cm')}
 
                 <!-- AFFICHAGE DES ESSAIS : 114 / 122 / 110 (meilleur en jaune) -->
@@ -124,6 +130,11 @@ function afficherSaut() {
             </div>
         </div>
     `;
+
+    // Charger la photo de l'élève sélectionné
+    if (eleveSelectionne) {
+        chargerPhotoEleveSaut(eleveSelectionne);
+    }
 
     // Attacher les événements
     document.querySelectorAll('.saut-eleve-card').forEach(card => {
@@ -183,7 +194,28 @@ function afficherSaut() {
         });
     }
 
-    setTimeout(() => chargerPhotos(), 100);
+    setTimeout(() => chargerPhotosColonnes(), 100);
+}
+
+// ============================================================
+// CHARGEMENT DE LA PHOTO DE L'ÉLÈVE SÉLECTIONNÉ
+// ============================================================
+
+async function chargerPhotoEleveSaut(eleveId) {
+    const container = document.getElementById('saut-eleve-photo');
+    if (!container) return;
+    try {
+        const url = await getPhotoUrl(eleveId);
+        if (url) {
+            container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
+        } else {
+            const eleve = currentData.eleves[eleveId];
+            container.innerHTML = `<span class="text-4xl">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
+        }
+    } catch (e) {
+        const eleve = currentData.eleves[eleveId];
+        container.innerHTML = `<span class="text-4xl">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
+    }
 }
 
 // ============================================================
@@ -277,7 +309,7 @@ function updateSliderDisplay(valeur) {
     // Mettre à jour le score sur la toise
     const scoreDisplay = document.getElementById('slider-score');
     if (scoreDisplay) {
-        const span = scoreDisplay.querySelector('span.text-4xl');
+        const span = scoreDisplay.querySelector('span.text-3xl');
         if (span) span.textContent = valeur;
     }
     // Mettre à jour la position du curseur
@@ -402,12 +434,9 @@ function setStatut(eleveId, statut) {
 // FONCTIONS GLOBALES (pour les appels HTML)
 // ============================================================
 
-// Ces fonctions sont appelées par les boutons du template slider
 window.evalUpdateSlider = function(value, min, max) {
-    // Mettre à jour le slider
     valeurSlider = parseFloat(value);
     updateSliderDisplay(valeurSlider);
-    // Mettre à jour l'input manuel
     const input = document.getElementById('eval-input-manuel');
     if (input) input.value = valeurSlider;
 };
@@ -417,21 +446,19 @@ window.evalValiderEssai = function() {
 };
 
 window.evalEssaiSuivant = function() {
-    // On utilise annulerEssai pour permettre de supprimer le dernier essai
     annulerEssai();
 };
 
-// Exposer les fonctions principales (déjà fait plus haut)
 window.evalSautValider = validerEssai;
 window.evalSautAnnuler = annulerEssai;
 window.evalSautSelectionner = selectionnerEleve;
 window.evalSautSetStatut = setStatut;
 
 // ============================================================
-// CHARGEMENT DES PHOTOS
+// CHARGEMENT DES PHOTOS DES COLONNES
 // ============================================================
 
-async function chargerPhotos() {
+async function chargerPhotosColonnes() {
     const containers = document.querySelectorAll('.saut-photo-container');
     for (const container of containers) {
         const card = container.closest('.saut-eleve-card');
