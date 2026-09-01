@@ -1,5 +1,5 @@
 // src/js/modules/evaluation/evaluation-vma.js
-// Saisie de la VMA (Luc Léger) avec YouTube
+// Saisie de la VMA (Luc Léger) avec fichier audio local importé
 
 import { setResultat, getResultat } from './evaluation-stockage.js';
 import { groupeEndurance } from './evaluation-utils.js';
@@ -8,8 +8,9 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 let currentData = null;
 let currentTestId = 'endurance';
 let currentEleves = [];
-let player = null;
-let offset = 34;
+let audioElement = null;
+let audioContext = null;
+let offset = 34; // pour la synchronisation si la bande son a une intro
 let palierEnCours = 0;
 let palierValide = -1;
 let tempsRestant = 0;
@@ -17,30 +18,73 @@ let isPlaying = false;
 let intervalId = null;
 let elevesResultats = {};
 let zoneSaisie = null;
-let youtubeLoaded = false;
 let historiquePaliers = [];
 
 const DUREE_PALIER_0 = 120;
 const DUREE_PALIER_SUIVANT = 60;
+const AUDIO_STORAGE_KEY = 'eps_arena_luc_leger_audio';
 
-function calculerPaliers(tempsTest) {
-    if (tempsTest < DUREE_PALIER_0) {
-        return {
-            palierEnCours: 0,
-            palierValide: -1,
-            tempsRestant: Math.floor(DUREE_PALIER_0 - tempsTest)
+// ============================================================
+// GESTION DU FICHIER AUDIO EN INDEXEDDB
+// ============================================================
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('EPS_Arena_AudioDB', 1);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('audio')) {
+                db.createObjectStore('audio', { keyPath: 'id' });
+            }
         };
-    }
-    const tempsApresPalier0 = tempsTest - DUREE_PALIER_0;
-    const palierEnCours = 1 + Math.floor(tempsApresPalier0 / DUREE_PALIER_SUIVANT);
-    const palierValide = palierEnCours - 1;
-    const restant = DUREE_PALIER_SUIVANT - (tempsApresPalier0 % DUREE_PALIER_SUIVANT);
-    return {
-        palierEnCours: palierEnCours,
-        palierValide: palierValide,
-        tempsRestant: Math.floor(restant)
-    };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = (e) => reject(e.target.error);
+    });
 }
+
+async function saveAudioToDB(blob) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('audio', 'readwrite');
+        const store = tx.objectStore('audio');
+        const request = store.put({ id: 'luc_leger', blob: blob });
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function loadAudioFromDB() {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('audio', 'readonly');
+        const store = tx.objectStore('audio');
+        const request = store.get('luc_leger');
+        request.onsuccess = () => resolve(request.result ? request.result.blob : null);
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function chargerAudioDepuisDB() {
+    try {
+        const blob = await loadAudioFromDB();
+        if (blob) {
+            const url = URL.createObjectURL(blob);
+            if (audioElement) {
+                audioElement.src = url;
+                audioElement.load();
+            }
+            return true;
+        }
+        return false;
+    } catch (e) {
+        console.warn('Erreur chargement audio :', e);
+        return false;
+    }
+}
+
+// ============================================================
+// INITIALISATION
+// ============================================================
 
 export function initSaisieVMA(zone, eleve, data, testId, eleves) {
     zoneSaisie = zone;
@@ -58,33 +102,44 @@ export function initSaisieVMA(zone, eleve, data, testId, eleves) {
         }
     });
 
-    chargerYouTube();
-    afficherVMA();
+    // Créer l'élément audio
+    if (!audioElement) {
+        audioElement = document.createElement('audio');
+        audioElement.id = 'eval-audio-player';
+        audioElement.style.display = 'none';
+        document.body.appendChild(audioElement);
+        audioElement.addEventListener('play', () => {
+            isPlaying = true;
+            demarrerMiseAJourPaliers();
+        });
+        audioElement.addEventListener('pause', () => {
+            isPlaying = false;
+            if (intervalId) clearInterval(intervalId);
+        });
+        audioElement.addEventListener('ended', () => {
+            isPlaying = false;
+            if (intervalId) clearInterval(intervalId);
+        });
+        audioElement.addEventListener('timeupdate', () => {
+            if (isPlaying) {
+                mettreAJourPaliers();
+            }
+        });
+    }
+
+    // Charger le fichier depuis IndexedDB
+    chargerAudioDepuisDB().then(() => {
+        afficherVMA();
+    }).catch(() => {
+        afficherVMA();
+    });
 }
 
-function chargerYouTube() {
-    if (youtubeLoaded) return;
-    if (typeof YT === 'undefined') {
-        const tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        const firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-    }
-    youtubeLoaded = true;
-}
+// ============================================================
+// AFFICHAGE
+// ============================================================
 
 function afficherVMA() {
-    if (isPlaying && player && typeof player.getCurrentTime === 'function') {
-        try {
-            const tempsVideo = player.getCurrentTime();
-            const tempsTest = Math.max(0, tempsVideo - offset);
-            const result = calculerPaliers(tempsTest);
-            palierEnCours = result.palierEnCours;
-            palierValide = result.palierValide;
-            tempsRestant = result.tempsRestant;
-        } catch (e) { /* ignore */ }
-    }
-
     const garcons = currentEleves.filter(e => e.sexe === 'M' || e.sexe === 'm');
     const filles = currentEleves.filter(e => e.sexe === 'F' || e.sexe === 'f');
     const autres = currentEleves.filter(e => e.sexe !== 'M' && e.sexe !== 'm' && e.sexe !== 'F' && e.sexe !== 'f');
@@ -102,21 +157,24 @@ function afficherVMA() {
 
     const nbTermines = Object.keys(elevesResultats).filter(id => elevesResultats[id] !== undefined && elevesResultats[id] >= 0).length;
 
-    zoneSaisie.innerHTML = templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, currentEleves.length);
+    zoneSaisie.innerHTML = templateVMA(
+        colonnes,
+        palierEnCours,
+        palierValide,
+        tempsRestant,
+        nbTermines,
+        currentEleves.length,
+        chargerAudioDepuisDB
+    );
 
     window.evalVmaDemarrer = demarrerVMA;
     window.evalVmaPause = pauseVMA;
     window.evalVmaTerminer = terminerVMA;
     window.evalVmaClicEleve = clicEleveVMA;
     window.evalVmaUndo = undoVMA;
+    window.evalVmaImporterAudio = importerAudio;
 
     remplirColonnesVMA(colonnes);
-
-    if (typeof YT !== 'undefined' && YT.Player) {
-        creerLecteur();
-    } else {
-        window.onYouTubeIframeAPIReady = creerLecteur;
-    }
 }
 
 async function remplirColonnesVMA(colonnes) {
@@ -187,144 +245,89 @@ async function createCarteVMA(eleve) {
     return div;
 }
 
-function creerLecteur() {
-    if (player) return;
-    try {
-        player = new YT.Player('eval-youtube-player', {
-            height: '0',
-            width: '0',
-            videoId: 'gVp9kx8RKH0',
-            playerVars: {
-                controls: 0,
-                modestbranding: 1,
-                rel: 0,
-                autoplay: 0,
-                origin: window.location.origin
-            },
-            events: {
-                onReady: () => { console.log('📹 YouTube prêt'); },
-                onStateChange: (e) => {
-                    console.log('🎯 YouTube state changed:', e.data);
-                    if (e.data === YT.PlayerState.PLAYING) {
-                        isPlaying = true;
-                        demarrerMiseAJourPaliers();
-                    } else if (e.data === YT.PlayerState.PAUSED || e.data === YT.PlayerState.ENDED) {
-                        isPlaying = false;
-                        if (intervalId) clearInterval(intervalId);
-                    }
-                },
-                onError: (err) => {
-                    console.warn('⚠️ Erreur YouTube :', err);
-                    setTimeout(() => {
-                        if (player) player.playVideo();
-                    }, 2000);
-                }
-            }
-        });
-    } catch (e) {
-        console.error('Erreur création lecteur YouTube :', e);
-    }
-}
+// ============================================================
+// IMPORT DU FICHIER AUDIO
+// ============================================================
 
-function demarrerMiseAJourPaliers() {
-    if (intervalId) clearInterval(intervalId);
-    intervalId = setInterval(() => {
-        if (!player || !isPlaying) return;
+async function importerAudio() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/*';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
         try {
-            const tempsVideo = player.getCurrentTime();
-            const tempsTest = Math.max(0, tempsVideo - offset);
-            const result = calculerPaliers(tempsTest);
-            palierEnCours = result.palierEnCours;
-            palierValide = result.palierValide;
-            tempsRestant = result.tempsRestant;
-
-            const elPalier = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
-            if (elPalier) elPalier.textContent = `Palier ${palierEnCours}`;
-
-            const elValid = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-emerald-400');
-            if (elValid) elValid.textContent = palierValide >= 0 ? `Palier ${palierValide}` : '--';
-
-            const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
-            if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
-        } catch (e) { /* ignore */ }
-    }, 500);
+            await saveAudioToDB(file);
+            const loaded = await chargerAudioDepuisDB();
+            if (loaded) {
+                alert('✅ Fichier audio importé avec succès !');
+                afficherVMA();
+            } else {
+                alert('❌ Erreur lors du chargement du fichier.');
+            }
+        } catch (err) {
+            alert('❌ Erreur d\'import : ' + err.message);
+        }
+    };
+    input.click();
 }
 
-/**
- * DÉMARRAGE ROBUSTE : force le player à jouer,
- * puis après 500ms, si isPlaying est false, on le force manuellement.
- */
-function demarrerVMA() {
-    if (player) {
-        console.log('▶️ Tentative de lecture YouTube...');
-        // Étape 1 : muet pour contourner les restrictions
-        player.mute();
-        player.playVideo();
-        // Démuter après un court délai
-        setTimeout(() => {
-            try {
-                player.unMute();
-                console.log('🔊 Son réactivé');
-            } catch (e) { console.warn('Erreur unmute:', e); }
-        }, 300);
+// ============================================================
+// CONTROLES AUDIO
+// ============================================================
 
+function demarrerVMA() {
+    if (!audioElement || !audioElement.src) {
+        alert('⚠️ Aucun fichier audio importé. Cliquez sur "📁 Importer bande son" d\'abord.');
+        return;
+    }
+
+    // Vérifier si le fichier est chargé
+    if (audioElement.readyState < 2) {
+        alert('⏳ Fichier audio en cours de chargement... Réessayez dans quelques secondes.');
+        return;
+    }
+
+    try {
         // Mettre à jour l'interface
         document.getElementById('eval-vma-start')?.classList.add('hidden');
         document.getElementById('eval-vma-pause')?.classList.remove('hidden');
         document.getElementById('eval-vma-stop')?.classList.remove('hidden');
 
-        // FORCER LE CHRONO après 500ms si l'événement n'est pas arrivé
-        setTimeout(() => {
-            if (!isPlaying) {
-                console.warn('⚠️ YouTube n\'a pas déclenché PLAYING, forçage manuel.');
-                isPlaying = true;
-                demarrerMiseAJourPaliers();
-                // Rafraîchir l'affichage
-                const elPalier = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
-                if (elPalier) elPalier.textContent = `Palier ${palierEnCours}`;
-                const elValid = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-emerald-400');
-                if (elValid) elValid.textContent = palierValide >= 0 ? `Palier ${palierValide}` : '--';
-                const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
-                if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
-            }
-        }, 500);
-    } else {
-        console.warn('⚠️ Player YouTube non initialisé');
+        // Lire le son
+        audioElement.currentTime = offset;
+        audioElement.play().catch(err => {
+            console.warn('Erreur lecture audio :', err);
+            alert('❌ Impossible de lire le son. Vérifiez que le fichier est valide.');
+            // Revenir à l'état initial
+            document.getElementById('eval-vma-start')?.classList.remove('hidden');
+            document.getElementById('eval-vma-pause')?.classList.add('hidden');
+            document.getElementById('eval-vma-stop')?.classList.add('hidden');
+        });
+    } catch (e) {
+        console.error(e);
+        alert('❌ Erreur de lecture.');
     }
 }
 
 function pauseVMA() {
-    if (player) {
-        if (isPlaying) {
-            player.pauseVideo();
-            document.getElementById('eval-vma-start')?.classList.remove('hidden');
-            document.getElementById('eval-vma-start').textContent = '▶ Reprendre';
-            document.getElementById('eval-vma-pause')?.classList.add('hidden');
-        } else {
-            // Reprise
-            player.mute();
-            player.playVideo();
-            setTimeout(() => {
-                try {
-                    player.unMute();
-                } catch (e) {}
-            }, 300);
-            document.getElementById('eval-vma-start')?.classList.add('hidden');
-            document.getElementById('eval-vma-pause')?.classList.remove('hidden');
-            // Forcer le chrono après reprise
-            setTimeout(() => {
-                if (!isPlaying) {
-                    isPlaying = true;
-                    demarrerMiseAJourPaliers();
-                }
-            }, 500);
-        }
+    if (!audioElement) return;
+    if (audioElement.paused) {
+        audioElement.play();
+        document.getElementById('eval-vma-start')?.classList.add('hidden');
+        document.getElementById('eval-vma-pause')?.classList.remove('hidden');
+    } else {
+        audioElement.pause();
+        document.getElementById('eval-vma-start')?.classList.remove('hidden');
+        document.getElementById('eval-vma-start').textContent = '▶ Reprendre';
+        document.getElementById('eval-vma-pause')?.classList.add('hidden');
     }
 }
 
 function terminerVMA() {
-    if (player) {
-        player.pauseVideo();
+    if (audioElement) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
         isPlaying = false;
         if (intervalId) clearInterval(intervalId);
     }
@@ -359,6 +362,42 @@ function terminerVMA() {
     alert('✅ VMA terminée !');
     if (window.evalTerminerTest) window.evalTerminerTest();
 }
+
+// ============================================================
+// MISE À JOUR DES PALIERS (synchronisée avec le temps audio)
+// ============================================================
+
+function demarrerMiseAJourPaliers() {
+    if (intervalId) clearInterval(intervalId);
+    intervalId = setInterval(() => {
+        mettreAJourPaliers();
+    }, 500);
+}
+
+function mettreAJourPaliers() {
+    if (!audioElement || !isPlaying) return;
+    try {
+        const tempsVideo = audioElement.currentTime;
+        const tempsTest = Math.max(0, tempsVideo - offset);
+        const result = calculerPaliers(tempsTest);
+        palierEnCours = result.palierEnCours;
+        palierValide = result.palierValide;
+        tempsRestant = result.tempsRestant;
+
+        const elPalier = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-yellow-400');
+        if (elPalier) elPalier.textContent = `Palier ${palierEnCours}`;
+
+        const elValid = document.querySelector('#eval-zone-saisie .text-4xl.font-black.text-emerald-400');
+        if (elValid) elValid.textContent = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+
+        const elRestant = document.querySelector('#eval-zone-saisie .text-sm.text-slate-500');
+        if (elRestant) elRestant.textContent = `${tempsRestant}s restantes`;
+    } catch (e) { /* ignore */ }
+}
+
+// ============================================================
+// GESTION DES ÉLÈVES
+// ============================================================
 
 function clicEleveVMA(eleveId) {
     if (!isPlaying) {
@@ -465,7 +504,11 @@ function undoVMA() {
     }
 }
 
-function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves) {
+// ============================================================
+// TEMPLATE VMA (avec bouton d'import)
+// ============================================================
+
+function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTermines, totalEleves, hasAudio) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
@@ -478,6 +521,7 @@ function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTerm
     `).join('');
 
     const affichePalierValide = palierValide >= 0 ? `Palier ${palierValide}` : '--';
+    const audioStatus = hasAudio ? '✅' : '❌';
 
     return `
         <div class="space-y-4">
@@ -498,6 +542,9 @@ function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTerm
             </div>
 
             <div class="flex flex-wrap gap-2">
+                <button onclick="window.evalVmaImporterAudio()" class="bg-purple-600 px-4 py-3 rounded-xl font-black text-xs text-white active:scale-95">
+                    📁 Importer bande son ${audioStatus}
+                </button>
                 <button onclick="window.evalVmaDemarrer()" id="eval-vma-start" class="flex-1 min-w-[100px] bg-emerald-600 py-3 rounded-xl font-black text-white active:scale-95">
                     ▶ Démarrer
                 </button>
@@ -511,8 +558,6 @@ function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant, nbTerm
                     ↩ Annuler
                 </button>
             </div>
-
-            <div id="eval-youtube-player" class="w-full h-0"></div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 ${htmlColonnes}
