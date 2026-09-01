@@ -399,6 +399,35 @@ function setStatut(eleveId, statut) {
 }
 
 // ============================================================
+// FONCTIONS GLOBALES (pour les appels HTML)
+// ============================================================
+
+// Ces fonctions sont appelées par les boutons du template slider
+window.evalUpdateSlider = function(value, min, max) {
+    // Mettre à jour le slider
+    valeurSlider = parseFloat(value);
+    updateSliderDisplay(valeurSlider);
+    // Mettre à jour l'input manuel
+    const input = document.getElementById('eval-input-manuel');
+    if (input) input.value = valeurSlider;
+};
+
+window.evalValiderEssai = function() {
+    validerEssai();
+};
+
+window.evalEssaiSuivant = function() {
+    // On utilise annulerEssai pour permettre de supprimer le dernier essai
+    annulerEssai();
+};
+
+// Exposer les fonctions principales (déjà fait plus haut)
+window.evalSautValider = validerEssai;
+window.evalSautAnnuler = annulerEssai;
+window.evalSautSelectionner = selectionnerEleve;
+window.evalSautSetStatut = setStatut;
+
+// ============================================================
 // CHARGEMENT DES PHOTOS
 // ============================================================
 
@@ -416,9 +445,3 @@ async function chargerPhotos() {
         } catch (e) { /* ignorer */ }
     }
 }
-
-// Exposer les fonctions globales
-window.evalSautValider = validerEssai;
-window.evalSautAnnuler = annulerEssai;
-window.evalSautSelectionner = selectionnerEleve;
-window.evalSautSetStatut = setStatut;
