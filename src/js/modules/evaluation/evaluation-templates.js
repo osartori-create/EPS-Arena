@@ -143,7 +143,7 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
             <p class="text-xl font-black text-white">${eleveEnCours ? `${eleveEnCours.prenom} ${eleveEnCours.nom}` : '--'}</p>
             <p class="text-sm text-slate-400">Code : ${eleveEnCours?.id || '--'}</p>
             <div class="flex gap-2 mt-1 flex-wrap">
-                <span id="eval-statut-label" class="text-xs font-bold text-emerald-400">✅ Présent</span>
+                <span id="eval-statut-label" class="text-xs font-bold ${statutClass}">${statutLabel}</span>
             </div>
         </div>
         <div class="flex flex-col gap-1">
@@ -197,7 +197,7 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
 }
 
 // ============================================================
-// SAUT (slider + toise)
+// SAUT (slider + toise) – VERSION CORRECTE AVEC ID FIXES
 // ============================================================
 
 export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
@@ -222,39 +222,47 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                     }).join('')}
                 </div>
 
-                <!-- Bande de couleur (groupes de maîtrise) -->
+                <!-- Bandes de couleur -->
                 <div class="absolute inset-0 flex pointer-events-none" style="opacity:0.3;">
                     <div class="h-full bg-red-500" style="width:${((110 - min) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-amber-500" style="width:${((140 - 110) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-emerald-500" style="width:${((max - 140) / (max - min)) * 100}%;"></div>
                 </div>
 
-                <!-- Repères verticaux des seuils -->
+                <!-- Repères -->
                 <div class="absolute inset-0 pointer-events-none">
                     <div class="absolute top-0 w-0.5 h-full bg-red-500/50 border-l border-dashed border-red-400/50" style="left:${((110 - min) / (max - min)) * 100}%;"></div>
                     <div class="absolute top-0 w-0.5 h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${((140 - min) / (max - min)) * 100}%;"></div>
                 </div>
 
-                <!-- Curseur : barre verticale avec rond en bas -->
-                <div class="absolute bottom-0 w-1 h-32 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
+                <!-- Curseur visuel (ID fixe) -->
+                <div id="slider-bar" class="absolute bottom-0 w-1 h-32 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                      style="left:${pct}%; transform: translateX(-50%);">
                     <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
 
-                <!-- Score affiché en jaune sur la toise -->
-                <div class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl z-10">
+                <!-- Score (ID fixe) -->
+                <div id="slider-score" class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl z-10">
                     <span class="text-4xl font-black text-yellow-400">${valeur}</span>
                     <span class="text-sm text-white/70">${unite}</span>
                 </div>
             </div>
 
-            <!-- Champ de saisie manuelle -->
+            <!-- Champ manuel -->
             <div class="flex items-center justify-center gap-4">
                 <label class="text-sm text-slate-400">Saisie manuelle :</label>
                 <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
                        class="w-32 bg-slate-900 border-2 border-slate-600 rounded-xl p-2 text-center text-xl font-black text-white">
                 <span class="text-sm text-slate-400">cm</span>
             </div>
+
+            <!-- Slider HTML (interactif) -->
+            <input type="range" id="eval-slider" min="${min}" max="${max}" step="1" value="${Math.min(max, Math.max(min, valeur))}"
+                   class="w-full h-3 bg-slate-700 rounded-full appearance-none cursor-pointer 
+                          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 
+                          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-400 
+                          [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-white"
+                   oninput="window.evalUpdateSlider(this.value, 0, 250)">
 
             <!-- Boutons -->
             <div class="flex gap-3">
@@ -693,79 +701,4 @@ function calculerStatistiques(data) {
         };
     });
     return stats;
-}
-export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
-    const valCurseur = Math.max(min, Math.min(max, valeur));
-    const pct = ((valCurseur - min) / (max - min)) * 100;
-
-    return `
-        <div class="space-y-4">
-            <div class="relative w-full h-48 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-4 border-slate-600 overflow-hidden">
-                <!-- Graduations -->
-                <div class="absolute bottom-0 left-0 right-0 h-12 bg-emerald-900/50 flex items-end">
-                    ${Array.from({ length: Math.floor((max - min) / 10) + 1 }, (_, i) => {
-                        const val = min + i * 10;
-                        const pos = ((val - min) / (max - min)) * 100;
-                        return `
-                            <div class="absolute bottom-0 flex flex-col items-center" style="left:${pos}%">
-                                <div class="w-px h-4 bg-white/30"></div>
-                                <span class="text-[8px] text-white/50">${val}</span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-
-                <!-- Bandes de couleur -->
-                <div class="absolute inset-0 flex pointer-events-none" style="opacity:0.3;">
-                    <div class="h-full bg-red-500" style="width:${((110 - min) / (max - min)) * 100}%;"></div>
-                    <div class="h-full bg-amber-500" style="width:${((140 - 110) / (max - min)) * 100}%;"></div>
-                    <div class="h-full bg-emerald-500" style="width:${((max - 140) / (max - min)) * 100}%;"></div>
-                </div>
-
-                <!-- Repères -->
-                <div class="absolute inset-0 pointer-events-none">
-                    <div class="absolute top-0 w-0.5 h-full bg-red-500/50 border-l border-dashed border-red-400/50" style="left:${((110 - min) / (max - min)) * 100}%;"></div>
-                    <div class="absolute top-0 w-0.5 h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${((140 - min) / (max - min)) * 100}%;"></div>
-                </div>
-
-                <!-- Curseur visuel (ID fixe) -->
-                <div id="slider-bar" class="absolute bottom-0 w-1 h-32 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
-                     style="left:${pct}%; transform: translateX(-50%);">
-                    <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
-                </div>
-
-                <!-- Score (ID fixe) -->
-                <div id="slider-score" class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-2 rounded-xl z-10">
-                    <span class="text-4xl font-black text-yellow-400">${valeur}</span>
-                    <span class="text-sm text-white/70">${unite}</span>
-                </div>
-            </div>
-
-            <!-- Champ manuel -->
-            <div class="flex items-center justify-center gap-4">
-                <label class="text-sm text-slate-400">Saisie manuelle :</label>
-                <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
-                       class="w-32 bg-slate-900 border-2 border-slate-600 rounded-xl p-2 text-center text-xl font-black text-white">
-                <span class="text-sm text-slate-400">cm</span>
-            </div>
-
-            <!-- Slider HTML (interactif) -->
-            <input type="range" id="eval-slider" min="${min}" max="${max}" step="1" value="${Math.min(max, Math.max(min, valeur))}"
-                   class="w-full h-3 bg-slate-700 rounded-full appearance-none cursor-pointer 
-                          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 
-                          [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-yellow-400 
-                          [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-white"
-                   oninput="window.evalUpdateSlider(this.value, 0, 250)">
-
-            <!-- Boutons -->
-            <div class="flex gap-3">
-                <button onclick="window.evalValiderEssai()" class="flex-1 bg-emerald-600 py-4 rounded-xl font-black text-white text-xl active:scale-95">
-                    ✅ Valider l'essai
-                </button>
-                <button onclick="window.evalEssaiSuivant()" class="bg-blue-600 px-6 py-4 rounded-xl font-black text-white active:scale-95">
-                    Essai suivant →
-                </button>
-            </div>
-        </div>
-    `;
 }
