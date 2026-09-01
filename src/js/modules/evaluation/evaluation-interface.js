@@ -131,8 +131,8 @@ function afficherPassation() {
                 initSaisieSaut(zoneSaisie, eleve, data, testId);
                 break;
             case 'vitesse':
-                initSaisieSprint(zoneSaisie, eleve, data, testId);
-                break;
+                initSaisieSprint(zoneSaisie, eleve, data, testId, currentEleves);
+    break;
             case 'endurance':
                 initSaisieVMA(zoneSaisie, eleve, data, testId, currentEleves);
                 break;

@@ -1,255 +1,352 @@
 // src/js/modules/evaluation/evaluation-sprint.js
-// Saisie du Sprint 30m (chrono intégré, 3 essais max)
+// Saisie du Sprint 30m (style VMA : colonnes, sélection, chrono central)
 
 import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
-import { groupeVitesse, COULEURS_GROUPES } from './evaluation-utils.js';
+import { groupeVitesse } from './evaluation-utils.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
-let currentEleve = null;
 let currentData = null;
 let currentTestId = 'vitesse';
+let currentEleves = [];
 let zoneSaisie = null;
+let eleveSelectionne = null; // ID de l'élève sélectionné
+let essaisParEleve = {}; // { eleveId: [temps1, temps2, temps3] }
 let chronoRunning = false;
 let chronoStart = 0;
 let chronoElapsed = 0;
 let rafId = null;
-let essais = [];
-let maxEssais = 3;
-let eleveEnCoursId = null;
 let intervalId = null;
+const maxEssais = 3;
 
 // ============================================================
 // INITIALISATION
 // ============================================================
 
-export function initSaisieSprint(zone, eleve, data, testId) {
+export function initSaisieSprint(zone, eleve, data, testId, eleves) {
     zoneSaisie = zone;
-    currentEleve = eleve;
     currentData = data;
     currentTestId = testId;
-    eleveEnCoursId = eleve.id;
+    currentEleves = eleves.filter(e => e.statut === 'present');
 
     // Charger les essais existants
-    const resultat = getResultat(data, eleve.id, testId);
-    if (resultat && resultat.essais) {
-        essais = [...resultat.essais];
-    } else {
-        essais = [];
-    }
+    essaisParEleve = {};
+    currentEleves.forEach(e => {
+        const r = getResultat(data, e.id, testId);
+        if (r && r.essais) {
+            essaisParEleve[e.id] = [...r.essais];
+        } else {
+            essaisParEleve[e.id] = [];
+        }
+    });
 
-    // Si déjà 3 essais, afficher terminé
-    if (essais.length >= maxEssais) {
-        afficherTermine();
-        setTimeout(() => {
-            if (window.evalPasserSuivant) window.evalPasserSuivant();
-        }, 1500);
-        return;
-    }
+    // Sélectionner le premier élève sans 3 essais, ou le premier
+    const premier = currentEleves.find(e => essaisParEleve[e.id].length < maxEssais) || currentEleves[0];
+    eleveSelectionne = premier?.id || null;
 
-    afficherSaisie();
+    afficherSprint();
 }
 
 // ============================================================
 // AFFICHAGE
 // ============================================================
 
-function afficherSaisie() {
-    // Récupérer la meilleure performance
-    const meilleur = essais.length > 0 ? Math.min(...essais) : null;
-    const nbEssais = essais.length;
-    const dernierEssai = nbEssais > 0 ? essais[nbEssais - 1] : null;
+function afficherSprint() {
+    // Répartir les élèves par sexe
+    const garcons = currentEleves.filter(e => e.sexe === 'M' || e.sexe === 'm');
+    const filles = currentEleves.filter(e => e.sexe === 'F' || e.sexe === 'f');
+    const autres = currentEleves.filter(e => e.sexe !== 'M' && e.sexe !== 'm' && e.sexe !== 'F' && e.sexe !== 'f');
 
-    const html = `
+    const moitieGarcons = Math.ceil(garcons.length / 2);
+    const moitieFilles = Math.ceil(filles.length / 2);
+
+    const colonnes = {
+        g1: garcons.slice(0, moitieGarcons),
+        g2: garcons.slice(moitieGarcons),
+        f1: filles.slice(0, moitieFilles),
+        f2: filles.slice(moitieFilles)
+    };
+    colonnes.g1 = [...colonnes.g1, ...autres];
+
+    // Compter les terminés (3 essais)
+    const nbTermines = currentEleves.filter(e => essaisParEleve[e.id]?.length >= maxEssais).length;
+
+    // Trouver l'élève sélectionné
+    const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
+
+    zoneSaisie.innerHTML = templateSprint(
+        colonnes,
+        eleveSelectionne,
+        eleveSel,
+        essaisParEleve,
+        nbTermines,
+        currentEleves.length,
+        chronoRunning,
+        chronoElapsed
+    );
+
+    // Exposer les fonctions
+    window.evalSprintDemarrer = demarrerChrono;
+    window.evalSprintArreter = arreterChrono;
+    window.evalSprintReset = resetChrono;
+    window.evalSprintSelectionner = selectionnerEleve;
+    window.evalSprintSetStatut = setStatut;
+
+    // Attacher les événements aux cartes
+    document.querySelectorAll('.sprint-eleve-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const id = card.dataset.id;
+            selectionnerEleve(id);
+        });
+        // Clic droit pour le statut
+        card.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const id = card.dataset.id;
+            const statutActuel = currentData.eleves[id]?.statut || 'present';
+            const choix = prompt(`Changer le statut de ${card.dataset.nom} :\n1 - Présent\n2 - Absent\n3 - Inapte`, '1');
+            if (choix === '1') setStatut(id, 'present');
+            else if (choix === '2') setStatut(id, 'absent');
+            else if (choix === '3') setStatut(id, 'inapte');
+        });
+    });
+
+    // Mettre à jour l'affichage du chrono
+    if (chronoRunning) {
+        const display = document.getElementById('sprint-chrono-display');
+        if (display) {
+            display.textContent = (chronoElapsed / 1000).toFixed(1);
+        }
+    }
+}
+
+// ============================================================
+// TEMPLATE
+// ============================================================
+
+function templateSprint(colonnes, eleveSelectionneId, eleveSel, essaisParEleve, nbTermines, totalEleves, chronoRunning, chronoElapsed) {
+    const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
+    const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
+    const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
+
+    const htmlColonnes = colonnesIds.map((colId, idx) => `
+        <div class="bg-slate-900 p-2 rounded-2xl border-2 border-dashed ${classes[idx]} min-h-[200px]">
+            <div class="text-xs font-bold text-slate-400 uppercase mb-2">${labels[idx]}</div>
+            <div id="sprint-col-${colId}" class="space-y-2">
+                ${(colonnes[colId] || []).map(e => {
+                    const essais = essaisParEleve[e.id] || [];
+                    const meilleur = essais.length > 0 ? Math.min(...essais) : null;
+                    const estSelectionne = e.id === eleveSelectionneId;
+                    const estTermine = essais.length >= maxEssais;
+                    const statut = currentData.eleves[e.id]?.statut || 'present';
+                    const isAbsent = statut === 'absent';
+                    const isInapte = statut === 'inapte';
+
+                    let bgClass = 'bg-slate-200 border-slate-400';
+                    if (e.sexe === 'M' || e.sexe === 'm') bgClass = 'bg-blue-200 border-blue-400';
+                    else if (e.sexe === 'F' || e.sexe === 'f') bgClass = 'bg-rose-200 border-rose-400';
+
+                    if (isAbsent) bgClass = 'bg-red-200 border-red-400 opacity-60';
+                    else if (isInapte) bgClass = 'bg-orange-200 border-orange-400 opacity-60';
+
+                    const statutBadge = isAbsent ? '🚫 Absent' : (isInapte ? '⚠️ Inapte' : '');
+
+                    return `
+                        <div class="sprint-eleve-card p-2 rounded-xl border-2 cursor-pointer hover:border-blue-500 transition-all flex items-center gap-2 ${bgClass} ${estSelectionne ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-900' : ''} ${estTermine ? 'border-emerald-500 bg-emerald-950/20' : ''}"
+                             data-id="${e.id}" data-nom="${e.prenom} ${e.nom}">
+                            <div class="sprint-photo-container w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-sm">
+                                <span class="text-sm">${e.prenom?.charAt(0) || '👤'}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-bold text-slate-900 truncate">${e.prenom} ${e.nom}</p>
+                                <p class="text-[10px] text-slate-600">${e.id}</p>
+                                ${statutBadge ? `<p class="text-[10px] font-bold ${isAbsent ? 'text-red-600' : 'text-orange-600'}">${statutBadge}</p>` : ''}
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                ${estTermine ? `
+                                    <span class="text-xs font-black text-emerald-600">✅ Terminé</span>
+                                    <div class="text-xs font-black text-yellow-600">${meilleur?.toFixed(1)}s</div>
+                                ` : `
+                                    <div class="text-xs text-slate-500">${essais.length}/${maxEssais}</div>
+                                    ${meilleur !== null ? `<div class="text-xs font-black text-yellow-600">${meilleur.toFixed(1)}s</div>` : '<div class="text-xs text-slate-400">--</div>'}
+                                `}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `).join('');
+
+    const affichageChrono = chronoElapsed > 0 ? (chronoElapsed / 1000).toFixed(1) : '0.0';
+    const nomEleveSel = eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun';
+
+    return `
         <div class="space-y-4">
-            <!-- Meilleur performance -->
-            <div class="text-center">
-                <span class="text-sm text-slate-400">Meilleur performance</span>
-                <span class="text-2xl font-black text-yellow-400 block">
-                    ${meilleur !== null ? `${meilleur.toFixed(1)} s` : '--'}
-                </span>
-            </div>
-
-            <!-- Chrono -->
-            <div class="text-center py-4">
-                <div id="sprint-chrono-display" class="text-8xl font-black tabular-nums text-yellow-400">
-                    ${dernierEssai !== null ? dernierEssai.toFixed(1) : '0.0'}
-                </div>
-                <p class="text-sm text-slate-400 mt-1">secondes</p>
-                <div class="mt-2 text-xs text-slate-500">
-                    Essai ${nbEssais + 1} / ${maxEssais}
-                    ${essais.length > 0 ? `| Essais : ${essais.map(e => e.toFixed(1)).join(' - ')}` : ''}
-                </div>
-            </div>
-
-            <!-- Zone cliquable pour la fiche -->
-            <div id="sprint-click-zone" class="bg-slate-900 p-6 rounded-2xl border-2 border-dashed border-slate-600 cursor-pointer hover:border-blue-500 transition-all text-center">
-                <p class="text-lg font-bold text-slate-400">
-                    ${chronoRunning ? '⏱️ Cliquez pour arrêter' : '👆 Cliquez pour démarrer le chrono'}
-                </p>
-                <p class="text-xs text-slate-500 mt-2">(cliquez sur l'élève pour démarrer/arrêter)</p>
-            </div>
-
-            <!-- Info essais -->
-            <div class="flex justify-center gap-4 text-xs">
-                ${essais.map((t, i) => `
-                    <span class="px-3 py-1 rounded-full ${i === essais.length - 1 ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300'}">
-                        Essai ${i+1}: ${t.toFixed(1)}s
-                    </span>
-                `).join('')}
-                ${Array.from({ length: maxEssais - essais.length }, (_, i) => `
-                    <span class="px-3 py-1 rounded-full bg-slate-800 text-slate-500">
-                        Essai ${essais.length + i + 1}: --
-                    </span>
-                `).join('')}
-            </div>
-
-            <!-- Boutons d'actions -->
-            <div class="flex gap-3">
-                <button onclick="window.evalResetChronoSprint()" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white text-sm active:scale-95">
-                    🔄 Réinitialiser
+            <!-- Barre de navigation -->
+            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                    ← Retour
                 </button>
+                <h3 class="font-black text-blue-400 uppercase text-sm">🏃 Sprint 30m</h3>
+                <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
+            </div>
+
+            <!-- Chrono central -->
+            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
+                <div class="text-center">
+                    <p class="text-xs text-slate-400">Élève sélectionné : <span class="font-bold text-white">${nomEleveSel}</span></p>
+                    <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">${affichageChrono}</div>
+                    <p class="text-sm text-slate-400">secondes</p>
+                    <div class="flex justify-center gap-3 mt-2">
+                        <button onclick="window.evalSprintDemarrer()" id="sprint-start-btn" class="bg-emerald-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95 ${chronoRunning ? 'hidden' : ''}">
+                            ▶ Démarrer
+                        </button>
+                        <button onclick="window.evalSprintArreter()" id="sprint-stop-btn" class="bg-red-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95 ${chronoRunning ? '' : 'hidden'}">
+                            ⏹ Arrêter
+                        </button>
+                        <button onclick="window.evalSprintReset()" class="bg-slate-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                            ↺ Reset
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4 colonnes -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                ${htmlColonnes}
+            </div>
+
+            <!-- Légende -->
+            <div class="flex justify-center gap-4 text-xs text-slate-400">
+                <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
+                <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
+                <span class="flex items-center gap-1">🔄 Clic droit = statut</span>
             </div>
         </div>
     `;
-
-    zoneSaisie.innerHTML = html;
-
-    // Exposer les fonctions globales
-    window.evalDemarrerChronoSprint = demarrerChronoSprint;
-    window.evalArreterChronoSprint = arreterChronoSprint;
-    window.evalResetChronoSprint = resetChronoSprint;
-
-    // Gérer le clic sur la zone
-    const clickZone = document.getElementById('sprint-click-zone');
-    if (clickZone) {
-        clickZone.addEventListener('click', () => {
-            if (chronoRunning) {
-                arreterChronoSprint();
-            } else {
-                demarrerChronoSprint();
-            }
-        });
-    }
-
-    // Mettre à jour le statut des boutons Absent/Inapte via l'en-tête (déjà fait)
 }
 
 // ============================================================
-// CHRONO
+// ACTIONS
 // ============================================================
 
-function demarrerChronoSprint() {
-    if (chronoRunning) return;
-    if (essais.length >= maxEssais) {
-        alert('⚠️ Déjà 3 essais pour cet élève.');
+function selectionnerEleve(eleveId) {
+    if (chronoRunning) {
+        if (!confirm('Un chrono est en cours. Arrêter et sélectionner un autre élève ?')) return;
+        arreterChrono();
+    }
+    eleveSelectionne = eleveId;
+    afficherSprint();
+}
+
+function demarrerChrono() {
+    if (!eleveSelectionne) {
+        alert('Sélectionnez d\'abord un élève.');
         return;
     }
+    const essais = essaisParEleve[eleveSelectionne] || [];
+    if (essais.length >= maxEssais) {
+        alert('Cet élève a déjà 3 essais.');
+        return;
+    }
+    if (chronoRunning) return;
 
     chronoRunning = true;
     chronoStart = performance.now() - chronoElapsed;
-    rafId = requestAnimationFrame(updateChronoSprint);
-
-    // Mettre à jour l'interface
-    const clickZone = document.getElementById('sprint-click-zone');
-    if (clickZone) {
-        clickZone.innerHTML = '<p class="text-lg font-bold text-emerald-400">⏱️ Cliquez pour arrêter</p>';
-        clickZone.className = 'bg-slate-900 p-6 rounded-2xl border-2 border-emerald-500 cursor-pointer hover:border-emerald-400 transition-all text-center';
-    }
+    rafId = requestAnimationFrame(updateChrono);
+    afficherSprint();
 }
 
-function arreterChronoSprint() {
+function arreterChrono() {
     if (!chronoRunning) return;
-    if (essais.length >= maxEssais) return;
-
     chronoRunning = false;
     if (rafId) cancelAnimationFrame(rafId);
     const temps = chronoElapsed / 1000;
 
     // Enregistrer l'essai
-    essais.push(temps);
-    const meilleur = Math.min(...essais);
-    const groupe = groupeVitesse(meilleur);
+    if (eleveSelectionne) {
+        if (!essaisParEleve[eleveSelectionne]) essaisParEleve[eleveSelectionne] = [];
+        essaisParEleve[eleveSelectionne].push(temps);
+        const meilleur = Math.min(...essaisParEleve[eleveSelectionne]);
+        const groupe = groupeVitesse(meilleur);
+        setResultat(currentData, eleveSelectionne, currentTestId, {
+            essais: essaisParEleve[eleveSelectionne],
+            meilleur: meilleur,
+            groupe: groupe
+        });
+    }
 
-    // Sauvegarder
-    setResultat(currentData, currentEleve.id, currentTestId, {
-        essais: essais,
-        meilleur: meilleur,
-        groupe: groupe
-    });
-
-    // Réinitialiser le chrono pour le prochain essai
     chronoElapsed = 0;
+    afficherSprint();
 
-    // Vérifier si on a atteint 3 essais
+    // Vérifier si l'élève a fini ses 3 essais
+    const essais = essaisParEleve[eleveSelectionne] || [];
     if (essais.length >= maxEssais) {
-        afficherTermine();
-        setTimeout(() => {
-            if (window.evalPasserSuivant) window.evalPasserSuivant();
-        }, 1500);
-    } else {
-        // Recharger l'affichage
-        afficherSaisie();
+        // Passer automatiquement au prochain élève non terminé
+        const suivant = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais && e.id !== eleveSelectionne);
+        if (suivant) {
+            setTimeout(() => {
+                selectionnerEleve(suivant.id);
+                alert(`✅ ${eleveSelectionne} a terminé ses 3 essais. Passage à ${suivant.prenom} ${suivant.nom}.`);
+            }, 500);
+        } else {
+            alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
+        }
     }
 }
 
-function updateChronoSprint() {
+function updateChrono() {
     if (!chronoRunning) return;
     chronoElapsed = performance.now() - chronoStart;
     const display = document.getElementById('sprint-chrono-display');
     if (display) {
         display.textContent = (chronoElapsed / 1000).toFixed(1);
     }
-    rafId = requestAnimationFrame(updateChronoSprint);
+    rafId = requestAnimationFrame(updateChrono);
 }
 
-function resetChronoSprint() {
+function resetChrono() {
     if (chronoRunning) {
         chronoRunning = false;
         if (rafId) cancelAnimationFrame(rafId);
     }
     chronoElapsed = 0;
-    const display = document.getElementById('sprint-chrono-display');
-    if (display) {
-        display.textContent = '0.0';
-    }
-    const clickZone = document.getElementById('sprint-click-zone');
-    if (clickZone) {
-        clickZone.innerHTML = '<p class="text-lg font-bold text-slate-400">👆 Cliquez pour démarrer le chrono</p>';
-        clickZone.className = 'bg-slate-900 p-6 rounded-2xl border-2 border-dashed border-slate-600 cursor-pointer hover:border-blue-500 transition-all text-center';
-    }
+    afficherSprint();
+}
+
+function setStatut(eleveId, statut) {
+    setStatutEleve(currentData, eleveId, statut);
+    // Recharger les élèves pour mettre à jour l'affichage
+    const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
+    currentData = loadOrCreateData(currentData.classe, elevesData);
+    currentData.classe = currentData.classe;
+    afficherSprint();
 }
 
 // ============================================================
-// FIN DU TEST (3 essais effectués)
+// CHARGEMENT DES PHOTOS (exécuté après le rendu)
 // ============================================================
 
-function afficherTermine() {
-    const meilleur = essais.length > 0 ? Math.min(...essais) : 0;
-    const groupe = groupeVitesse(meilleur);
-    const couleur = COULEURS_GROUPES[groupe] || '#64748b';
-    const libelleGroupe = groupe === 'satisfaisant' ? '✅ Satisfaisant' :
-                          groupe === 'fragile' ? '⚠️ Fragile' :
-                          '🔴 À besoins';
-
-    const html = `
-        <div class="text-center py-6 bg-slate-900 rounded-2xl border border-slate-700">
-            <div class="text-5xl mb-4">🏆</div>
-            <p class="text-2xl font-black text-white">Test terminé !</p>
-            <p class="text-lg text-slate-400">Meilleur : <span class="text-3xl font-black text-yellow-400">${meilleur.toFixed(1)}</span> s</p>
-            <p class="text-lg" style="color:${couleur}">${libelleGroupe}</p>
-            <div class="mt-4 text-sm text-slate-500">
-                Essais : ${essais.map(e => e.toFixed(1)).join(' - ')} s
-            </div>
-        </div>
-    `;
-
-    zoneSaisie.innerHTML = html;
+async function chargerPhotos() {
+    const containers = document.querySelectorAll('.sprint-photo-container');
+    for (const container of containers) {
+        const card = container.closest('.sprint-eleve-card');
+        if (!card) continue;
+        const eleveId = card.dataset.id;
+        try {
+            const url = await getPhotoUrl(eleveId);
+            if (url) {
+                container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
+            }
+        } catch (e) { /* ignorer */ }
+    }
 }
 
-// ============================================================
-// EXPOSITION DES FONCTIONS GLOBALES
-// ============================================================
+// Exposer les fonctions
+window.evalSprintDemarrer = demarrerChrono;
+window.evalSprintArreter = arreterChrono;
+window.evalSprintReset = resetChrono;
+window.evalSprintSelectionner = selectionnerEleve;
+window.evalSprintSetStatut = setStatut;
 
-window.evalDemarrerChronoSprint = demarrerChronoSprint;
-window.evalArreterChronoSprint = arreterChronoSprint;
-window.evalResetChronoSprint = resetChronoSprint;
+// Charger les photos après chaque rendu
+setTimeout(() => chargerPhotos(), 200);
