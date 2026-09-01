@@ -109,7 +109,7 @@ function afficherPassation() {
     const eleveEnCours = currentEleves[currentIndex] || null;
     const eleveSuivant = currentEleves[currentIndex + 1] || null;
 
-    const mode = (currentTestId === 'endurance' || currentTestId === 'vitesse') ? 'collectif' : 'individuel';
+    const mode = (currentTestId === 'endurance' || currentTestId === 'vitesse' || currentTestId === 'force') ? 'collectif' : 'individuel';
 
     container.innerHTML = templatePassation(
         currentTestId,
@@ -128,8 +128,8 @@ function afficherPassation() {
 
         switch (testId) {
             case 'force':
-                initSaisieSaut(zoneSaisie, eleve, data, testId);
-                break;
+                initSaisieSaut(zoneSaisie, eleve, data, testId, currentEleves);
+    break;
             case 'vitesse':
                 initSaisieSprint(zoneSaisie, eleve, data, testId, currentEleves);
     break;
