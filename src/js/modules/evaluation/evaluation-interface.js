@@ -4,7 +4,7 @@
 import {
     loadOrCreateData, getElevesActifs,
     genererDonneesFactices, reinitialiserDonnees,
-    purgerTest, purgerTousLesTests, purgerClasseEntiere
+    purgerTest, purgerTousLesTests, purgerClasseEntiere, setStatutEleve
 } from './evaluation-stockage.js';
 import { 
     templateVuePrincipale, 
@@ -146,6 +146,16 @@ function afficherPassation() {
     window.evalPasserSuivant = passerSuivant;
     window.evalTerminerTest = terminerTest;
 }
+window.evalSetStatut = function(statut) {
+    if (!currentData || !currentEleves || currentIndex >= currentEleves.length) {
+        alert('Aucun élève sélectionné.');
+        return;
+    }
+    const eleveId = currentEleves[currentIndex].id;
+    setStatutEleve(currentData, eleveId, statut);
+    // Recharger la passation pour mettre à jour l'affichage
+    afficherPassation();
+};
 
 function passerSuivant() {
     if (currentIndex < currentEleves.length - 1) {
