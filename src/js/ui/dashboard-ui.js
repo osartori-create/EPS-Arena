@@ -68,7 +68,7 @@ export function initAdminUI() {
     if (activeClasse) loadLocalEleves();
 }
 
-function renderEleves() {
+async function renderEleves() {
     const container = document.getElementById('eleveList');
     if (!container) return;
     container.innerHTML = '';
