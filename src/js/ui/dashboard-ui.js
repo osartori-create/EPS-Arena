@@ -1,21 +1,17 @@
 // src/js/ui/dashboard-ui.js
-import { importCSV, importZIP, getPhotoUrl, updateStudentForce, updateStudentName, getExistingEleves, saveEleves } from '../services/admin-service.js';
+import { importCSV, importZIP, getPhotoUrl, getPendingStudents, updateStudentForce, updateStudentName, getExistingEleves, saveEleves } from '../services/admin-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
 
+function getStorageKey() {
+    return `eps_arena_eleves_${activeClasse}`;
+}
+
 function loadLocalEleves() {
     currentEleves = getExistingEleves(activeClasse);
-    // Tri par nom (déjà fait dans saveEleves, mais on le refait pour être sûr)
-    currentEleves.sort((a, b) => {
-        const nomA = a.nom ? a.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-        const nomB = b.nom ? b.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-        const cmp = nomA.localeCompare(nomB);
-        if (cmp !== 0) return cmp;
-        const preA = a.prenom ? a.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-        const preB = b.prenom ? b.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
-        return preA.localeCompare(preB);
-    });
+    // Tri alphabétique par nom
+    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom));
     renderEleves();
 }
 
@@ -31,13 +27,15 @@ export function initAdminUI() {
     const csvInput = document.getElementById('csvFile');
     const zipInput = document.getElementById('zipFile');
 
+    // ZIP : création/import des élèves
     if (zipInput) {
         zipInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
                 if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
                 try {
-                    currentEleves = await importZIP(e.target.files[0], activeClasse);
-                    renderEleves();
+                    await importZIP(e.target.files[0], activeClasse);
+                    // Recharger et trier les données après import
+                    loadLocalEleves();
                     alert(`✅ ${currentEleves.length} élève(s) importé(s) depuis les photos.`);
                 } catch (err) {
                     console.error(err);
@@ -48,13 +46,14 @@ export function initAdminUI() {
         });
     }
 
+    // CSV : compléter les données de performance (VMA, etc.)
     if (csvInput) {
         csvInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
                 if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
                 try {
-                    currentEleves = await importCSV(e.target.files[0], activeClasse);
-                    renderEleves();
+                    await importCSV(e.target.files[0], activeClasse);
+                    loadLocalEleves();
                     alert("✅ Données de performance importées.");
                 } catch (err) {
                     console.error(err);
@@ -69,8 +68,7 @@ export function initAdminUI() {
     if (activeClasse) loadLocalEleves();
 }
 
-
-async function renderEleves() {
+function renderEleves() {
     const container = document.getElementById('eleveList');
     if (!container) return;
     container.innerHTML = '';
@@ -79,6 +77,9 @@ async function renderEleves() {
         container.innerHTML = '<p class="text-slate-500 text-sm col-span-full">Aucun élève importé pour cette classe.<br>📸 Utilisez "Import ZIP Photos" pour créer la classe.</p>';
         return;
     }
+
+    // Tri de sécurité avant affichage
+    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom));
 
     for (const e of currentEleves) {
         const url = await getPhotoUrl(e.id);
@@ -113,14 +114,11 @@ async function renderEleves() {
     }
 }
 
+// Fonctions globales
 window.setForce = function(studentId, force) {
     updateStudentForce(studentId, force, activeClasse);
     loadLocalEleves();
 };
-
-// ============================================================
-// MODALE D'ÉDITION D'UN ÉLÈVE
-// ============================================================
 
 window.openEditModal = function(eleveId) {
     const eleve = currentEleves.find(e => e.id === eleveId);
