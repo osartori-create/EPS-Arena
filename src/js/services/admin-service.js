@@ -32,42 +32,15 @@ async function getPhotoUrl(id) {
 
 /**
  * Table de correspondance pour les caractères mal encodés
- * (problème fréquent avec les noms de fichiers windows)
  */
 const ACCENT_MAP = {
-    '╠é': 'é',
-    '╠ü': 'é',
-    '╠Ç': 'è',
-    '╠ê': 'è',
-    '╠á': 'à',
-    '╠ó': 'â',
-    '╠┤': 'ô',
-    '╠╣': 'ù',
-    '╠¿': 'ï',
-    '╠½': 'ë',
-    '╠ª': 'ê',
-    '╠│': 'î',
-    '╠╝': 'û',
-    '╠Â': 'ç',
-    '╠¢': 'œ',
-    '╠╝': 'û',
-    '╠╣': 'ù',
-    '╠®': 'é',
-    '╠▓': 'é',
-    '╠░': 'è',
-    '╠▒': 'è',
-    '╠╡': 'à',
-    '╠╢': 'â',
-    '╠╕': 'ô',
-    '╠╗': 'ù',
-    '╠╬': 'ï',
-    '╠«': 'ë',
-    '╠¬': 'ê',
-    '╠▓': 'î',
-    '╠╝': 'û',
-    '╠╣': 'ù',
-    '╠╢': 'ç',
-    '╠ƒ': 'æ',
+    '╠é': 'é', '╠ü': 'é', '╠Ç': 'è', '╠ê': 'è',
+    '╠á': 'à', '╠ó': 'â', '╠┤': 'ô', '╠╣': 'ù',
+    '╠¿': 'ï', '╠½': 'ë', '╠ª': 'ê', '╠│': 'î',
+    '╠╝': 'û', '╠Â': 'ç', '╠¢': 'œ', '╠®': 'é',
+    '╠▓': 'é', '╠░': 'è', '╠▒': 'è', '╠╡': 'à',
+    '╠╢': 'â', '╠╕': 'ô', '╠╗': 'ù', '╠╬': 'ï',
+    '╠«': 'ë', '╠¬': 'ê', '╠ƒ': 'æ'
 };
 
 function decodeAccents(str) {
@@ -76,14 +49,9 @@ function decodeAccents(str) {
     for (const [key, value] of Object.entries(ACCENT_MAP)) {
         result = result.replace(new RegExp(key, 'g'), value);
     }
-    // Supprimer les caractères de contrôle restants
-    result = result.replace(/[^\x20-\x7E\u00C0-\u00FF\u0152\u0153\u0178]/g, '');
     return result;
 }
 
-/**
- * Normalise une chaîne pour comparaison (supprime accents, majuscules, espaces)
- */
 function normalizeForComparison(str) {
     if (!str) return '';
     return str
@@ -96,21 +64,21 @@ function normalizeForComparison(str) {
 
 /**
  * Parse le nom de fichier pour extraire nom, prénom et sexe
- * Supporte les formats :
+ * Supporte :
  *   - Prénom_Nom_M_302.jpg
- *   - Prénom_Nom1_-_Nom2_F_302.jpg
+ *   - Prénom_Nom_F_302.jpg
  *   - Prénom_Nom1_Nom2_M_302.jpg
+ *   - Prénom_Nom1_-_Nom2_F_302.jpg
  *   - _NOM,_Prénom_M.jpg
- *   - NOM,_Prénom_M.jpg
  */
 function parseZipFileName(fileName) {
-    // Étape 1 : décoder correctement les caractères accentués
+    // Décoder les accents
     let decoded = decodeAccents(fileName);
     
     // Enlever l'extension
     const nameWithoutExt = decoded.replace(/\.[^.]+$/, '');
     
-    // Étape 2 : détecter le format avec virgule (ancien format)
+    // 1. Ancien format avec virgule
     let match = nameWithoutExt.match(/^_?(.+),(.+)_([MF])$/i);
     if (match) {
         let nomBrut = match[1].trim();
@@ -126,51 +94,71 @@ function parseZipFileName(fileName) {
         };
     }
     
-    // Étape 3 : nouveau format (Prénom_Nom_M_302.jpg)
-    // On divise par underscore
+    // 2. Nouveau format : Prénom_Nom_M_302.jpg (ou F)
     const parts = nameWithoutExt.split('_');
     if (parts.length < 3) {
-        console.warn(`Nom de fichier ignoré (trop peu d'éléments) : ${fileName}`);
+        console.warn(`Ignoré (trop peu d'éléments) : ${fileName}`);
         return null;
     }
-
+    
     // Le prénom est le premier élément
     const prenomBrut = parts[0] || '';
-    
-    // Le sexe est le dernier élément avant l'extension (souvent M ou F)
-    const lastPart = parts[parts.length - 1];
-    const sexeMatch = lastPart.match(/^([MF])$/i);
-    if (!sexeMatch) {
-        console.warn(`Nom de fichier ignoré (sexe non trouvé) : ${fileName}`);
+    if (!prenomBrut) {
+        console.warn(`Ignoré (prénom manquant) : ${fileName}`);
         return null;
     }
-    const sexe = sexeMatch[1].toUpperCase();
+    
+    // Trouver le sexe : chercher une partie qui est exactement "M" ou "F"
+    let sexe = null;
+    let sexeIndex = -1;
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i].trim().toUpperCase();
+        if (part === 'M' || part === 'F') {
+            sexe = part;
+            sexeIndex = i;
+            break;
+        }
+    }
+    
+    if (!sexe) {
+        console.warn(`Ignoré (sexe non trouvé) : ${fileName}`);
+        return null;
+    }
     
     // Le nom est tout ce qui est entre le prénom et le sexe
-    // On prend depuis le 2ème élément jusqu'à l'avant-dernier
     let nomParts = [];
-    for (let i = 1; i < parts.length - 1; i++) {
-        // Nettoyer les séparateurs comme " - " ou "_-_"
-        let part = parts[i];
-        part = part.replace(/^-+|-+$/g, ''); // Enlever les tirets en début/fin
+    for (let i = 1; i < sexeIndex; i++) {
+        let part = parts[i].trim();
+        // Nettoyer les tirets
+        part = part.replace(/^-+|-+$/g, '');
         if (part) nomParts.push(part);
     }
     let nomBrut = nomParts.join(' ');
     // Nettoyer les séparateurs multiples
     nomBrut = nomBrut.replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ');
     
-    if (!prenomBrut || !nomBrut) {
-        console.warn(`Nom de fichier ignoré (prénom ou nom manquant) : ${fileName}`);
+    // Si le nom est vide, essayer de prendre les parties restantes après le sexe ?
+    // (cas où le nom serait après le sexe, mais normalement non)
+    if (!nomBrut) {
+        // Fallback : tout entre le prénom et le sexe
+        nomBrut = parts.slice(1, sexeIndex).join(' ');
+    }
+    
+    if (!nomBrut) {
+        console.warn(`Ignoré (nom manquant) : ${fileName}`);
         return null;
     }
     
+    // Nettoyer le prénom des éventuels caractères parasites
+    const prenomClean = prenomBrut.replace(/^_+|_+$/g, '');
+    
     return {
         nom: nomBrut,
-        prenom: prenomBrut,
-        sexe,
+        prenom: prenomClean,
+        sexe: sexe,
         nomNormalise: normalizeForComparison(nomBrut),
-        prenomNormalise: normalizeForComparison(prenomBrut),
-        cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
+        prenomNormalise: normalizeForComparison(prenomClean),
+        cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomClean).charAt(0)}`
     };
 }
 
@@ -184,25 +172,19 @@ export function getExistingEleves(classeName) {
 }
 
 export function saveEleves(classeName, eleves) {
-    // Trier par nom avant sauvegarde
     const sorted = [...eleves].sort((a, b) => a.nom.localeCompare(b.nom));
     localStorage.setItem(getStorageKey(classeName), JSON.stringify(sorted));
 }
 
-/**
- * Import ZIP : crée les élèves à partir des photos
- */
 export async function importZIP(file, classeName) {
     const zip = await JSZip.loadAsync(file);
     const elevesExistants = getExistingEleves(classeName);
-    const mapExistants = {};
-    elevesExistants.forEach(e => mapExistants[e.id] = e);
 
     const nouveauxEleves = [];
     const zipEntries = Object.values(zip.files).filter(f => !f.dir && f.name.match(/\.(jpg|jpeg|png|gif)$/i));
 
     if (zipEntries.length === 0) {
-        throw new Error("Aucune image trouvée dans le ZIP. Vérifie les formats (jpg, jpeg, png, gif).");
+        throw new Error("Aucune image trouvée dans le ZIP.");
     }
 
     let parsedCount = 0;
@@ -250,7 +232,6 @@ export async function importZIP(file, classeName) {
         throw new Error(`Aucun fichier reconnu dans le ZIP. Vérifie le format : Prénom_Nom_M_302.jpg ou _NOM,_Prénom_M.jpg.\nExemples ignorés : ${sample}`);
     }
 
-    // Fusionner les nouveaux avec les existants
     const tousLesEleves = [...elevesExistants];
     nouveauxEleves.forEach(n => {
         if (!tousLesEleves.some(e => e.id === n.id)) {
@@ -262,9 +243,6 @@ export async function importZIP(file, classeName) {
     return tousLesEleves;
 }
 
-/**
- * Import CSV (optionnel) pour compléter les données de performance
- */
 export async function importCSV(file, classeName) {
     return new Promise((resolve) => {
         Papa.parse(file, {
@@ -305,14 +283,9 @@ function fixMojibake(str) {
     try { return decodeURIComponent(escape(str)); } catch (e) { return str; }
 }
 
-export function getPendingStudents(classeName) {
-    // Ne renvoie plus d'élèves "en attente" pour supprimer la modale automatique
-    return [];
-}
-
-export function getOrphanPhotos(classeName) {
-    return [];
-}
+// Suppression des modales automatiques
+export function getPendingStudents(classeName) { return []; }
+export function getOrphanPhotos(classeName) { return []; }
 
 export function updateStudentForce(studentId, force, classeName) {
     const eleves = getExistingEleves(classeName);
