@@ -45,9 +45,11 @@ function normalizeForComparison(str) {
 
 /**
  * Parse le nom de fichier pour extraire nom, prénom et sexe
- * Accepte les deux formats :
+ * Accepte plusieurs formats :
  *   - _NOM,_Prénom_M.jpg  (ancien)
- *   - NOM,_Prénom_M.jpg    (nouveau)
+ *   - NOM,_Prénom_M.jpg    (ancien)
+ *   - Prénom_NOM_M_301.jpg (nouveau)
+ *   - Prénom_NOM_F_301.jpg (nouveau)
  */
 function parseZipFileName(fileName) {
     let decoded = fileName;
@@ -56,22 +58,73 @@ function parseZipFileName(fileName) {
         decoded = new TextDecoder('windows-1252').decode(bytes);
     } catch(e) { decoded = fileName; }
 
-    // Regex avec underscore facultatif au début
-    const match = decoded.match(/^_?(.+),_(.+)_([MF])\./i);
-    if (!match) return null;
+    // 1. Essayer le format ancien avec virgule : _NOM,_Prénom_M.jpg  ou NOM,_Prénom_M.jpg
+    let match = decoded.match(/^_?(.+),_(.+)_([MF])\./i);
+    if (match) {
+        let nomBrut = match[1].trim();
+        let prenomBrut = match[2].trim();
+        const sexe = match[3].toUpperCase();
+        return {
+            nom: nomBrut,
+            prenom: prenomBrut,
+            sexe,
+            nomNormalise: normalizeForComparison(nomBrut),
+            prenomNormalise: normalizeForComparison(prenomBrut),
+            cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
+        };
+    }
 
-    let nomBrut = match[1].trim();
-    let prenomBrut = match[2].trim();
-    const sexe = match[3].toUpperCase();
+    // 2. Essayer le format nouveau : Prénom_NOM_M_301.jpg  ou Prénom_NOM_F_301.jpg
+    // On capture : prénom (avant le 1er underscore), nom (entre les underscores), sexe (M ou F)
+    match = decoded.match(/^([^_]+)_([^_]+)_([MF])_\d+\./i);
+    if (match) {
+        let prenomBrut = match[1].trim();
+        let nomBrut = match[2].trim();
+        const sexe = match[3].toUpperCase();
+        return {
+            nom: nomBrut,
+            prenom: prenomBrut,
+            sexe,
+            nomNormalise: normalizeForComparison(nomBrut),
+            prenomNormalise: normalizeForComparison(prenomBrut),
+            cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
+        };
+    }
 
-    return {
-        nom: nomBrut,
-        prenom: prenomBrut,
-        sexe,
-        nomNormalise: normalizeForComparison(nomBrut),
-        prenomNormalise: normalizeForComparison(prenomBrut),
-        cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
-    };
+    // 3. Essayer le format avec prénom composé (ex: Jean-Michel_DUPONT_M_301.jpg)
+    match = decoded.match(/^([^_]+(?:_[^_]+)*)_([^_]+)_([MF])_\d+\./i);
+    if (match) {
+        let prenomBrut = match[1].trim();
+        let nomBrut = match[2].trim();
+        const sexe = match[3].toUpperCase();
+        return {
+            nom: nomBrut,
+            prenom: prenomBrut,
+            sexe,
+            nomNormalise: normalizeForComparison(nomBrut),
+            prenomNormalise: normalizeForComparison(prenomBrut),
+            cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
+        };
+    }
+
+    // 4. Essayer le format sans numéro : Prénom_NOM_M.jpg
+    match = decoded.match(/^([^_]+)_([^_]+)_([MF])\./i);
+    if (match) {
+        let prenomBrut = match[1].trim();
+        let nomBrut = match[2].trim();
+        const sexe = match[3].toUpperCase();
+        return {
+            nom: nomBrut,
+            prenom: prenomBrut,
+            sexe,
+            nomNormalise: normalizeForComparison(nomBrut),
+            prenomNormalise: normalizeForComparison(prenomBrut),
+            cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
+        };
+    }
+
+    console.warn(`Nom de fichier ignoré (format non reconnu) : ${fileName}`);
+    return null;
 }
 
 // === GESTION DU STOCKAGE PAR CLASSE ===
@@ -103,13 +156,12 @@ export async function importZIP(file, classeName) {
         throw new Error("Aucune image trouvée dans le ZIP. Vérifie les formats (jpg, jpeg, png, gif).");
     }
 
+    let parsedCount = 0;
     for (const entry of zipEntries) {
         const infos = parseZipFileName(entry.name);
-        if (!infos) {
-            console.warn(`Nom de fichier ignoré (format non reconnu) : ${entry.name}`);
-            continue;
-        }
+        if (!infos) continue;
 
+        parsedCount++;
         let eleve = elevesExistants.find(e =>
             normalizeForComparison(e.nom) === infos.nomNormalise &&
             normalizeForComparison(e.prenom) === infos.prenomNormalise
@@ -137,6 +189,10 @@ export async function importZIP(file, classeName) {
             savePhoto(newId, blob);
             nouveauxEleves.push(eleve);
         }
+    }
+
+    if (parsedCount === 0) {
+        throw new Error(`Aucun fichier reconnu dans le ZIP. Vérifie le format : Prénom_NOM_M_301.jpg ou _NOM,_Prénom_M.jpg`);
     }
 
     // Fusionner les nouveaux avec les existants
