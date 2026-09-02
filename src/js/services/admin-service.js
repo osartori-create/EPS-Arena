@@ -30,6 +30,9 @@ async function getPhotoUrl(id) {
     });
 }
 
+/**
+ * Table de correspondance pour les caractères mal encodés
+ */
 const ACCENT_MAP = {
     '╠é': 'é', '╠ü': 'é', '╠Ç': 'è', '╠ê': 'è',
     '╠á': 'à', '╠ó': 'â', '╠┤': 'ô', '╠╣': 'ù',
@@ -59,10 +62,14 @@ function normalizeForComparison(str) {
         .toUpperCase();
 }
 
+/**
+ * Parse le nom de fichier pour extraire nom, prénom et sexe
+ */
 function parseZipFileName(fileName) {
     let decoded = decodeAccents(fileName);
     const nameWithoutExt = decoded.replace(/\.[^.]+$/, '');
     
+    // 1. Ancien format avec virgule
     let match = nameWithoutExt.match(/^_?(.+),(.+)_([MF])$/i);
     if (match) {
         let nomBrut = match[1].trim();
@@ -78,12 +85,20 @@ function parseZipFileName(fileName) {
         };
     }
     
+    // 2. Nouveau format : Prénom_Nom_M_302.jpg (ou F)
     const parts = nameWithoutExt.split('_');
-    if (parts.length < 3) return null;
+    if (parts.length < 3) {
+        console.warn(`Ignoré (trop peu d'éléments) : ${fileName}`);
+        return null;
+    }
     
     const prenomBrut = parts[0] || '';
-    if (!prenomBrut) return null;
+    if (!prenomBrut) {
+        console.warn(`Ignoré (prénom manquant) : ${fileName}`);
+        return null;
+    }
     
+    // Trouver le sexe
     let sexe = null;
     let sexeIndex = -1;
     for (let i = 0; i < parts.length; i++) {
@@ -94,8 +109,13 @@ function parseZipFileName(fileName) {
             break;
         }
     }
-    if (!sexe) return null;
     
+    if (!sexe) {
+        console.warn(`Ignoré (sexe non trouvé) : ${fileName}`);
+        return null;
+    }
+    
+    // Nom = tout entre prénom et sexe
     let nomParts = [];
     for (let i = 1; i < sexeIndex; i++) {
         let part = parts[i].trim();
@@ -104,7 +124,11 @@ function parseZipFileName(fileName) {
     }
     let nomBrut = nomParts.join(' ');
     nomBrut = nomBrut.replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ');
-    if (!nomBrut) return null;
+    
+    if (!nomBrut) {
+        console.warn(`Ignoré (nom manquant) : ${fileName}`);
+        return null;
+    }
     
     const prenomClean = prenomBrut.replace(/^_+|_+$/g, '');
     
@@ -123,14 +147,22 @@ function getStorageKey(classeName) {
 }
 
 export function getExistingEleves(classeName) {
-    const eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
-    // Tri alphabétique par nom (avec gestion des accents)
-    return eleves.sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
+    return JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
 }
 
 export function saveEleves(classeName, eleves) {
-    // Tri avant sauvegarde
-    const sorted = [...eleves].sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
+    // Tri alphabétique par nom (insensible aux accents)
+    const sorted = [...eleves].sort((a, b) => {
+        // On compare les noms normalisés pour ignorer accents et casse
+        const nomA = a.nom ? a.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        const nomB = b.nom ? b.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        const cmp = nomA.localeCompare(nomB);
+        if (cmp !== 0) return cmp;
+        // Si même nom, on compare par prénom
+        const preA = a.prenom ? a.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        const preB = b.prenom ? b.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        return preA.localeCompare(preB);
+    });
     localStorage.setItem(getStorageKey(classeName), JSON.stringify(sorted));
 }
 
@@ -162,6 +194,7 @@ export async function importZIP(file, classeName) {
 
         if (eleve) {
             if (eleve.sexe !== infos.sexe) eleve.sexe = infos.sexe;
+            // Mise à jour des noms avec la version corrigée
             if (eleve.nom !== infos.nom) eleve.nom = infos.nom;
             if (eleve.prenom !== infos.prenom) eleve.prenom = infos.prenom;
             const blob = await entry.async('blob');

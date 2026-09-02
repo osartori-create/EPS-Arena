@@ -1,13 +1,21 @@
 // src/js/ui/dashboard-ui.js
-import { importCSV, importZIP, getPhotoUrl, getPendingStudents, updateStudentForce, updateStudentName, getExistingEleves, saveEleves } from '../services/admin-service.js';
+import { importCSV, importZIP, getPhotoUrl, updateStudentForce, updateStudentName, getExistingEleves, saveEleves } from '../services/admin-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
 
 function loadLocalEleves() {
     currentEleves = getExistingEleves(activeClasse);
-    // Tri redondant pour sécurité
-    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
+    // Tri par nom (déjà fait dans saveEleves, mais on le refait pour être sûr)
+    currentEleves.sort((a, b) => {
+        const nomA = a.nom ? a.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        const nomB = b.nom ? b.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        const cmp = nomA.localeCompare(nomB);
+        if (cmp !== 0) return cmp;
+        const preA = a.prenom ? a.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        const preB = b.prenom ? b.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+        return preA.localeCompare(preB);
+    });
     renderEleves();
 }
 
