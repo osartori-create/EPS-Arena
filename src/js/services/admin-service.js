@@ -1,5 +1,5 @@
 // src/js/services/admin-service.js
-// NOUVELLE VERSION AVEC IMPORT ZIP PRINCIPAL
+// Gestion des photos et des élèves
 
 const Papa = window.Papa;
 const JSZip = window.JSZip;
@@ -43,6 +43,12 @@ function normalizeForComparison(str) {
         .toUpperCase();
 }
 
+/**
+ * Parse le nom de fichier pour extraire nom, prénom et sexe
+ * Accepte les deux formats :
+ *   - _NOM,_Prénom_M.jpg  (ancien)
+ *   - NOM,_Prénom_M.jpg    (nouveau)
+ */
 function parseZipFileName(fileName) {
     let decoded = fileName;
     try {
@@ -50,8 +56,8 @@ function parseZipFileName(fileName) {
         decoded = new TextDecoder('windows-1252').decode(bytes);
     } catch(e) { decoded = fileName; }
 
-    // Format: _NOM,_Prénom_M.jpg  ou  _NOM,_Prénom_F.jpg
-    const match = decoded.match(/^_(.+),_(.+)_([MF])\./i);
+    // Regex avec underscore facultatif au début
+    const match = decoded.match(/^_?(.+),_(.+)_([MF])\./i);
     if (!match) return null;
 
     let nomBrut = match[1].trim();
@@ -82,8 +88,7 @@ export function saveEleves(classeName, eleves) {
 }
 
 /**
- * NOUVELLE VERSION : Import ZIP uniquement
- * Crée les élèves à partir des photos, sans CSV
+ * Import ZIP : crée les élèves à partir des photos
  */
 export async function importZIP(file, classeName) {
     const zip = await JSZip.loadAsync(file);
@@ -94,23 +99,27 @@ export async function importZIP(file, classeName) {
     const nouveauxEleves = [];
     const zipEntries = Object.values(zip.files).filter(f => !f.dir && f.name.match(/\.(jpg|jpeg|png|gif)$/i));
 
+    if (zipEntries.length === 0) {
+        throw new Error("Aucune image trouvée dans le ZIP. Vérifie les formats (jpg, jpeg, png, gif).");
+    }
+
     for (const entry of zipEntries) {
         const infos = parseZipFileName(entry.name);
-        if (!infos) continue;
+        if (!infos) {
+            console.warn(`Nom de fichier ignoré (format non reconnu) : ${entry.name}`);
+            continue;
+        }
 
-        // Chercher un élève existant avec le même nom/prénom
         let eleve = elevesExistants.find(e =>
             normalizeForComparison(e.nom) === infos.nomNormalise &&
             normalizeForComparison(e.prenom) === infos.prenomNormalise
         ) || elevesExistants.find(e => e.id === infos.cleUnique);
 
         if (eleve) {
-            // Mettre à jour le sexe si différent
             if (eleve.sexe !== infos.sexe) eleve.sexe = infos.sexe;
             const blob = await entry.async('blob');
             savePhoto(eleve.id, blob);
         } else {
-            // Créer un nouvel élève
             const newId = infos.cleUnique;
             eleve = {
                 id: newId,
@@ -121,7 +130,7 @@ export async function importZIP(file, classeName) {
                 palier: 0,
                 longueur: null,
                 sprint30: null,
-                needsManualCheck: false, // On a déjà le sexe et le nom
+                needsManualCheck: false,
                 force: 0
             };
             const blob = await entry.async('blob');
@@ -182,7 +191,6 @@ export async function importCSV(file, classeName) {
     });
 }
 
-// Autres fonctions (getPendingStudents, etc.) restent inchangées...
 export function getPendingStudents(classeName) {
     const eleves = getExistingEleves(classeName);
     return eleves.filter(e => e.needsManualCheck || !e.vma || e.vma === 0);
