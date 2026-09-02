@@ -30,9 +30,6 @@ async function getPhotoUrl(id) {
     });
 }
 
-/**
- * Table de correspondance pour les caractères mal encodés
- */
 const ACCENT_MAP = {
     '╠é': 'é', '╠ü': 'é', '╠Ç': 'è', '╠ê': 'è',
     '╠á': 'à', '╠ó': 'â', '╠┤': 'ô', '╠╣': 'ù',
@@ -62,23 +59,10 @@ function normalizeForComparison(str) {
         .toUpperCase();
 }
 
-/**
- * Parse le nom de fichier pour extraire nom, prénom et sexe
- * Supporte :
- *   - Prénom_Nom_M_302.jpg
- *   - Prénom_Nom_F_302.jpg
- *   - Prénom_Nom1_Nom2_M_302.jpg
- *   - Prénom_Nom1_-_Nom2_F_302.jpg
- *   - _NOM,_Prénom_M.jpg
- */
 function parseZipFileName(fileName) {
-    // Décoder les accents
     let decoded = decodeAccents(fileName);
-    
-    // Enlever l'extension
     const nameWithoutExt = decoded.replace(/\.[^.]+$/, '');
     
-    // 1. Ancien format avec virgule
     let match = nameWithoutExt.match(/^_?(.+),(.+)_([MF])$/i);
     if (match) {
         let nomBrut = match[1].trim();
@@ -94,21 +78,12 @@ function parseZipFileName(fileName) {
         };
     }
     
-    // 2. Nouveau format : Prénom_Nom_M_302.jpg (ou F)
     const parts = nameWithoutExt.split('_');
-    if (parts.length < 3) {
-        console.warn(`Ignoré (trop peu d'éléments) : ${fileName}`);
-        return null;
-    }
+    if (parts.length < 3) return null;
     
-    // Le prénom est le premier élément
     const prenomBrut = parts[0] || '';
-    if (!prenomBrut) {
-        console.warn(`Ignoré (prénom manquant) : ${fileName}`);
-        return null;
-    }
+    if (!prenomBrut) return null;
     
-    // Trouver le sexe : chercher une partie qui est exactement "M" ou "F"
     let sexe = null;
     let sexeIndex = -1;
     for (let i = 0; i < parts.length; i++) {
@@ -119,37 +94,18 @@ function parseZipFileName(fileName) {
             break;
         }
     }
+    if (!sexe) return null;
     
-    if (!sexe) {
-        console.warn(`Ignoré (sexe non trouvé) : ${fileName}`);
-        return null;
-    }
-    
-    // Le nom est tout ce qui est entre le prénom et le sexe
     let nomParts = [];
     for (let i = 1; i < sexeIndex; i++) {
         let part = parts[i].trim();
-        // Nettoyer les tirets
         part = part.replace(/^-+|-+$/g, '');
         if (part) nomParts.push(part);
     }
     let nomBrut = nomParts.join(' ');
-    // Nettoyer les séparateurs multiples
     nomBrut = nomBrut.replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ');
+    if (!nomBrut) return null;
     
-    // Si le nom est vide, essayer de prendre les parties restantes après le sexe ?
-    // (cas où le nom serait après le sexe, mais normalement non)
-    if (!nomBrut) {
-        // Fallback : tout entre le prénom et le sexe
-        nomBrut = parts.slice(1, sexeIndex).join(' ');
-    }
-    
-    if (!nomBrut) {
-        console.warn(`Ignoré (nom manquant) : ${fileName}`);
-        return null;
-    }
-    
-    // Nettoyer le prénom des éventuels caractères parasites
     const prenomClean = prenomBrut.replace(/^_+|_+$/g, '');
     
     return {
@@ -162,17 +118,19 @@ function parseZipFileName(fileName) {
     };
 }
 
-// === GESTION DU STOCKAGE PAR CLASSE ===
 function getStorageKey(classeName) {
     return `eps_arena_eleves_${classeName}`;
 }
 
 export function getExistingEleves(classeName) {
-    return JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
+    const eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
+    // Tri alphabétique par nom (avec gestion des accents)
+    return eleves.sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
 }
 
 export function saveEleves(classeName, eleves) {
-    const sorted = [...eleves].sort((a, b) => a.nom.localeCompare(b.nom));
+    // Tri avant sauvegarde
+    const sorted = [...eleves].sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
     localStorage.setItem(getStorageKey(classeName), JSON.stringify(sorted));
 }
 
@@ -283,7 +241,6 @@ function fixMojibake(str) {
     try { return decodeURIComponent(escape(str)); } catch (e) { return str; }
 }
 
-// Suppression des modales automatiques
 export function getPendingStudents(classeName) { return []; }
 export function getOrphanPhotos(classeName) { return []; }
 

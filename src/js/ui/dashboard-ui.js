@@ -4,14 +4,10 @@ import { importCSV, importZIP, getPhotoUrl, getPendingStudents, updateStudentFor
 let currentEleves = [];
 let activeClasse = "";
 
-function getStorageKey() {
-    return `eps_arena_eleves_${activeClasse}`;
-}
-
 function loadLocalEleves() {
     currentEleves = getExistingEleves(activeClasse);
-    // Tri par nom déjà fait dans saveEleves, mais on le refait pour être sûr
-    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom));
+    // Tri redondant pour sécurité
+    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom, 'fr', { sensitivity: 'base' }));
     renderEleves();
 }
 
@@ -27,7 +23,6 @@ export function initAdminUI() {
     const csvInput = document.getElementById('csvFile');
     const zipInput = document.getElementById('zipFile');
 
-    // ZIP : création/import des élèves
     if (zipInput) {
         zipInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
@@ -45,7 +40,6 @@ export function initAdminUI() {
         });
     }
 
-    // CSV : compléter les données de performance (VMA, etc.)
     if (csvInput) {
         csvInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
@@ -66,6 +60,7 @@ export function initAdminUI() {
     activeClasse = select ? select.value : "";
     if (activeClasse) loadLocalEleves();
 }
+
 
 async function renderEleves() {
     const container = document.getElementById('eleveList');
