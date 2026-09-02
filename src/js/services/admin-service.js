@@ -31,37 +31,54 @@ async function getPhotoUrl(id) {
 }
 
 /**
- * Décode correctement une chaîne avec caractères accentués
+ * Table de correspondance pour les caractères mal encodés
+ * (problème fréquent avec les noms de fichiers windows)
  */
+const ACCENT_MAP = {
+    '╠é': 'é',
+    '╠ü': 'é',
+    '╠Ç': 'è',
+    '╠ê': 'è',
+    '╠á': 'à',
+    '╠ó': 'â',
+    '╠┤': 'ô',
+    '╠╣': 'ù',
+    '╠¿': 'ï',
+    '╠½': 'ë',
+    '╠ª': 'ê',
+    '╠│': 'î',
+    '╠╝': 'û',
+    '╠Â': 'ç',
+    '╠¢': 'œ',
+    '╠╝': 'û',
+    '╠╣': 'ù',
+    '╠®': 'é',
+    '╠▓': 'é',
+    '╠░': 'è',
+    '╠▒': 'è',
+    '╠╡': 'à',
+    '╠╢': 'â',
+    '╠╕': 'ô',
+    '╠╗': 'ù',
+    '╠╬': 'ï',
+    '╠«': 'ë',
+    '╠¬': 'ê',
+    '╠▓': 'î',
+    '╠╝': 'û',
+    '╠╣': 'ù',
+    '╠╢': 'ç',
+    '╠ƒ': 'æ',
+};
+
 function decodeAccents(str) {
-    try {
-        // Méthode robuste pour décoder les caractères mal interprétés
-        return decodeURIComponent(escape(str));
-    } catch (e) {
-        // Fallback : essayer de remplacer manuellement
-        const replacements = {
-            '╠é': 'é',
-            '╠ü': 'é',
-            '╠Ç': 'è',
-            '╠ê': 'è',
-            '╠á': 'à',
-            '╠ó': 'â',
-            '╠┤': 'ô',
-            '╠╣': 'ù',
-            '╠¿': 'ï',
-            '╠½': 'ë',
-            '╠ª': 'ê',
-            '╠│': 'î',
-            '╠╝': 'û',
-            '╠╣': 'ù',
-            '╠Â': 'ç'
-        };
-        let result = str;
-        for (const [key, value] of Object.entries(replacements)) {
-            result = result.replace(new RegExp(key, 'g'), value);
-        }
-        return result;
+    if (!str) return '';
+    let result = str;
+    for (const [key, value] of Object.entries(ACCENT_MAP)) {
+        result = result.replace(new RegExp(key, 'g'), value);
     }
+    // Supprimer les caractères de contrôle restants
+    result = result.replace(/[^\x20-\x7E\u00C0-\u00FF\u0152\u0153\u0178]/g, '');
+    return result;
 }
 
 /**
@@ -109,26 +126,37 @@ function parseZipFileName(fileName) {
         };
     }
     
-    // Étape 3 : trouver la position du sexe (M ou F précédé d'un underscore)
-    const sexeMatch = nameWithoutExt.match(/_([MF])$/i);
+    // Étape 3 : nouveau format (Prénom_Nom_M_302.jpg)
+    // On divise par underscore
+    const parts = nameWithoutExt.split('_');
+    if (parts.length < 3) {
+        console.warn(`Nom de fichier ignoré (trop peu d'éléments) : ${fileName}`);
+        return null;
+    }
+
+    // Le prénom est le premier élément
+    const prenomBrut = parts[0] || '';
+    
+    // Le sexe est le dernier élément avant l'extension (souvent M ou F)
+    const lastPart = parts[parts.length - 1];
+    const sexeMatch = lastPart.match(/^([MF])$/i);
     if (!sexeMatch) {
         console.warn(`Nom de fichier ignoré (sexe non trouvé) : ${fileName}`);
         return null;
     }
     const sexe = sexeMatch[1].toUpperCase();
     
-    // Enlever le suffixe _M ou _F (et tout ce qui suit, comme _302)
-    const parts = nameWithoutExt.split('_');
-    // Le prénom est le premier élément
-    const prenomBrut = parts[0] || '';
     // Le nom est tout ce qui est entre le prénom et le sexe
     // On prend depuis le 2ème élément jusqu'à l'avant-dernier
     let nomParts = [];
     for (let i = 1; i < parts.length - 1; i++) {
-        nomParts.push(parts[i]);
+        // Nettoyer les séparateurs comme " - " ou "_-_"
+        let part = parts[i];
+        part = part.replace(/^-+|-+$/g, ''); // Enlever les tirets en début/fin
+        if (part) nomParts.push(part);
     }
     let nomBrut = nomParts.join(' ');
-    // Nettoyer les séparateurs
+    // Nettoyer les séparateurs multiples
     nomBrut = nomBrut.replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ');
     
     if (!prenomBrut || !nomBrut) {
@@ -178,9 +206,13 @@ export async function importZIP(file, classeName) {
     }
 
     let parsedCount = 0;
+    const ignoredFiles = [];
     for (const entry of zipEntries) {
         const infos = parseZipFileName(entry.name);
-        if (!infos) continue;
+        if (!infos) {
+            ignoredFiles.push(entry.name);
+            continue;
+        }
 
         parsedCount++;
         let eleve = elevesExistants.find(e =>
@@ -190,7 +222,6 @@ export async function importZIP(file, classeName) {
 
         if (eleve) {
             if (eleve.sexe !== infos.sexe) eleve.sexe = infos.sexe;
-            // Mettre à jour le nom/prénom avec la version corrigée
             if (eleve.nom !== infos.nom) eleve.nom = infos.nom;
             if (eleve.prenom !== infos.prenom) eleve.prenom = infos.prenom;
             const blob = await entry.async('blob');
@@ -206,7 +237,6 @@ export async function importZIP(file, classeName) {
                 palier: 0,
                 longueur: null,
                 sprint30: null,
-                needsManualCheck: false,
                 force: 0
             };
             const blob = await entry.async('blob');
@@ -216,7 +246,8 @@ export async function importZIP(file, classeName) {
     }
 
     if (parsedCount === 0) {
-        throw new Error(`Aucun fichier reconnu dans le ZIP. Vérifie le format : Prénom_Nom_M_302.jpg ou _NOM,_Prénom_M.jpg`);
+        const sample = ignoredFiles.slice(0, 3).join(', ');
+        throw new Error(`Aucun fichier reconnu dans le ZIP. Vérifie le format : Prénom_Nom_M_302.jpg ou _NOM,_Prénom_M.jpg.\nExemples ignorés : ${sample}`);
     }
 
     // Fusionner les nouveaux avec les existants
@@ -260,7 +291,6 @@ export async function importCSV(file, classeName) {
                         eleve.palier = parseInt(palier) || 0;
                         eleve.longueur = parseFloat(String(longueur).replace(",", ".")) || null;
                         eleve.sprint30 = parseFloat(String(sprint1).replace(",", ".")) || null;
-                        eleve.needsManualCheck = false;
                     }
                 });
 
@@ -293,9 +323,6 @@ export function updateStudentForce(studentId, force, classeName) {
     }
 }
 
-/**
- * Met à jour le nom ou prénom d'un élève
- */
 export function updateStudentName(studentId, field, value, classeName) {
     const eleves = getExistingEleves(classeName);
     const target = eleves.find(e => e.id === studentId);
@@ -318,7 +345,6 @@ export async function assignPhotoToStudent(studentId, sourcePhotoId, classeName)
                 const eleves = getExistingEleves(classeName);
                 const target = eleves.find(e => e.id === studentId);
                 if (target) {
-                    target.needsManualCheck = false;
                     const sourceEleve = eleves.find(e => e.id === sourcePhotoId);
                     if (sourceEleve) target.sexe = sourceEleve.sexe;
                 }
@@ -338,7 +364,7 @@ export async function uploadManualPhoto(studentId, file, classeName) {
     savePhoto(studentId, blob);
     const eleves = getExistingEleves(classeName);
     const target = eleves.find(e => e.id === studentId);
-    if (target) target.needsManualCheck = false;
+    if (target) target.force = target.force || 0;
     saveEleves(classeName, eleves);
     return true;
 }
