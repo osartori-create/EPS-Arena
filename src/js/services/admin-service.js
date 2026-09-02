@@ -30,12 +30,46 @@ async function getPhotoUrl(id) {
     });
 }
 
-function fixMojibake(str) {
-    try { return decodeURIComponent(escape(str)); } catch (e) { return str; }
+/**
+ * Décode correctement une chaîne avec caractères accentués
+ */
+function decodeAccents(str) {
+    try {
+        // Méthode robuste pour décoder les caractères mal interprétés
+        return decodeURIComponent(escape(str));
+    } catch (e) {
+        // Fallback : essayer de remplacer manuellement
+        const replacements = {
+            '╠é': 'é',
+            '╠ü': 'é',
+            '╠Ç': 'è',
+            '╠ê': 'è',
+            '╠á': 'à',
+            '╠ó': 'â',
+            '╠┤': 'ô',
+            '╠╣': 'ù',
+            '╠¿': 'ï',
+            '╠½': 'ë',
+            '╠ª': 'ê',
+            '╠│': 'î',
+            '╠╝': 'û',
+            '╠╣': 'ù',
+            '╠Â': 'ç'
+        };
+        let result = str;
+        for (const [key, value] of Object.entries(replacements)) {
+            result = result.replace(new RegExp(key, 'g'), value);
+        }
+        return result;
+    }
 }
 
+/**
+ * Normalise une chaîne pour comparaison (supprime accents, majuscules, espaces)
+ */
 function normalizeForComparison(str) {
-    return (str || "")
+    if (!str) return '';
+    return str
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/[\s_\-.'']/g, '')
@@ -45,21 +79,22 @@ function normalizeForComparison(str) {
 
 /**
  * Parse le nom de fichier pour extraire nom, prénom et sexe
- * Accepte plusieurs formats :
- *   - _NOM,_Prénom_M.jpg  (ancien)
- *   - NOM,_Prénom_M.jpg    (ancien)
- *   - Prénom_NOM_M_301.jpg (nouveau)
- *   - Prénom_NOM_F_301.jpg (nouveau)
+ * Supporte les formats :
+ *   - Prénom_Nom_M_302.jpg
+ *   - Prénom_Nom1_-_Nom2_F_302.jpg
+ *   - Prénom_Nom1_Nom2_M_302.jpg
+ *   - _NOM,_Prénom_M.jpg
+ *   - NOM,_Prénom_M.jpg
  */
 function parseZipFileName(fileName) {
-    let decoded = fileName;
-    try {
-        const bytes = new TextEncoder().encode(fileName);
-        decoded = new TextDecoder('windows-1252').decode(bytes);
-    } catch(e) { decoded = fileName; }
-
-    // 1. Essayer le format ancien avec virgule : _NOM,_Prénom_M.jpg  ou NOM,_Prénom_M.jpg
-    let match = decoded.match(/^_?(.+),_(.+)_([MF])\./i);
+    // Étape 1 : décoder correctement les caractères accentués
+    let decoded = decodeAccents(fileName);
+    
+    // Enlever l'extension
+    const nameWithoutExt = decoded.replace(/\.[^.]+$/, '');
+    
+    // Étape 2 : détecter le format avec virgule (ancien format)
+    let match = nameWithoutExt.match(/^_?(.+),(.+)_([MF])$/i);
     if (match) {
         let nomBrut = match[1].trim();
         let prenomBrut = match[2].trim();
@@ -73,58 +108,42 @@ function parseZipFileName(fileName) {
             cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
         };
     }
-
-    // 2. Essayer le format nouveau : Prénom_NOM_M_301.jpg  ou Prénom_NOM_F_301.jpg
-    // On capture : prénom (avant le 1er underscore), nom (entre les underscores), sexe (M ou F)
-    match = decoded.match(/^([^_]+)_([^_]+)_([MF])_\d+\./i);
-    if (match) {
-        let prenomBrut = match[1].trim();
-        let nomBrut = match[2].trim();
-        const sexe = match[3].toUpperCase();
-        return {
-            nom: nomBrut,
-            prenom: prenomBrut,
-            sexe,
-            nomNormalise: normalizeForComparison(nomBrut),
-            prenomNormalise: normalizeForComparison(prenomBrut),
-            cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
-        };
+    
+    // Étape 3 : trouver la position du sexe (M ou F précédé d'un underscore)
+    const sexeMatch = nameWithoutExt.match(/_([MF])$/i);
+    if (!sexeMatch) {
+        console.warn(`Nom de fichier ignoré (sexe non trouvé) : ${fileName}`);
+        return null;
     }
-
-    // 3. Essayer le format avec prénom composé (ex: Jean-Michel_DUPONT_M_301.jpg)
-    match = decoded.match(/^([^_]+(?:_[^_]+)*)_([^_]+)_([MF])_\d+\./i);
-    if (match) {
-        let prenomBrut = match[1].trim();
-        let nomBrut = match[2].trim();
-        const sexe = match[3].toUpperCase();
-        return {
-            nom: nomBrut,
-            prenom: prenomBrut,
-            sexe,
-            nomNormalise: normalizeForComparison(nomBrut),
-            prenomNormalise: normalizeForComparison(prenomBrut),
-            cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
-        };
+    const sexe = sexeMatch[1].toUpperCase();
+    
+    // Enlever le suffixe _M ou _F (et tout ce qui suit, comme _302)
+    const parts = nameWithoutExt.split('_');
+    // Le prénom est le premier élément
+    const prenomBrut = parts[0] || '';
+    // Le nom est tout ce qui est entre le prénom et le sexe
+    // On prend depuis le 2ème élément jusqu'à l'avant-dernier
+    let nomParts = [];
+    for (let i = 1; i < parts.length - 1; i++) {
+        nomParts.push(parts[i]);
     }
-
-    // 4. Essayer le format sans numéro : Prénom_NOM_M.jpg
-    match = decoded.match(/^([^_]+)_([^_]+)_([MF])\./i);
-    if (match) {
-        let prenomBrut = match[1].trim();
-        let nomBrut = match[2].trim();
-        const sexe = match[3].toUpperCase();
-        return {
-            nom: nomBrut,
-            prenom: prenomBrut,
-            sexe,
-            nomNormalise: normalizeForComparison(nomBrut),
-            prenomNormalise: normalizeForComparison(prenomBrut),
-            cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
-        };
+    let nomBrut = nomParts.join(' ');
+    // Nettoyer les séparateurs
+    nomBrut = nomBrut.replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ');
+    
+    if (!prenomBrut || !nomBrut) {
+        console.warn(`Nom de fichier ignoré (prénom ou nom manquant) : ${fileName}`);
+        return null;
     }
-
-    console.warn(`Nom de fichier ignoré (format non reconnu) : ${fileName}`);
-    return null;
+    
+    return {
+        nom: nomBrut,
+        prenom: prenomBrut,
+        sexe,
+        nomNormalise: normalizeForComparison(nomBrut),
+        prenomNormalise: normalizeForComparison(prenomBrut),
+        cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
+    };
 }
 
 // === GESTION DU STOCKAGE PAR CLASSE ===
@@ -137,7 +156,9 @@ export function getExistingEleves(classeName) {
 }
 
 export function saveEleves(classeName, eleves) {
-    localStorage.setItem(getStorageKey(classeName), JSON.stringify(eleves));
+    // Trier par nom avant sauvegarde
+    const sorted = [...eleves].sort((a, b) => a.nom.localeCompare(b.nom));
+    localStorage.setItem(getStorageKey(classeName), JSON.stringify(sorted));
 }
 
 /**
@@ -169,13 +190,16 @@ export async function importZIP(file, classeName) {
 
         if (eleve) {
             if (eleve.sexe !== infos.sexe) eleve.sexe = infos.sexe;
+            // Mettre à jour le nom/prénom avec la version corrigée
+            if (eleve.nom !== infos.nom) eleve.nom = infos.nom;
+            if (eleve.prenom !== infos.prenom) eleve.prenom = infos.prenom;
             const blob = await entry.async('blob');
             savePhoto(eleve.id, blob);
         } else {
             const newId = infos.cleUnique;
             eleve = {
                 id: newId,
-                nom: infos.nom.toUpperCase(),
+                nom: infos.nom,
                 prenom: infos.prenom,
                 sexe: infos.sexe,
                 vma: 0,
@@ -192,7 +216,7 @@ export async function importZIP(file, classeName) {
     }
 
     if (parsedCount === 0) {
-        throw new Error(`Aucun fichier reconnu dans le ZIP. Vérifie le format : Prénom_NOM_M_301.jpg ou _NOM,_Prénom_M.jpg`);
+        throw new Error(`Aucun fichier reconnu dans le ZIP. Vérifie le format : Prénom_Nom_M_302.jpg ou _NOM,_Prénom_M.jpg`);
     }
 
     // Fusionner les nouveaux avec les existants
@@ -247,14 +271,17 @@ export async function importCSV(file, classeName) {
     });
 }
 
+function fixMojibake(str) {
+    try { return decodeURIComponent(escape(str)); } catch (e) { return str; }
+}
+
 export function getPendingStudents(classeName) {
-    const eleves = getExistingEleves(classeName);
-    return eleves.filter(e => e.needsManualCheck || !e.vma || e.vma === 0);
+    // Ne renvoie plus d'élèves "en attente" pour supprimer la modale automatique
+    return [];
 }
 
 export function getOrphanPhotos(classeName) {
-    const eleves = getExistingEleves(classeName);
-    return eleves.filter(e => e.needsManualCheck && (e.vma === 0 || !e.vma));
+    return [];
 }
 
 export function updateStudentForce(studentId, force, classeName) {
@@ -264,6 +291,20 @@ export function updateStudentForce(studentId, force, classeName) {
         target.force = force;
         saveEleves(classeName, eleves);
     }
+}
+
+/**
+ * Met à jour le nom ou prénom d'un élève
+ */
+export function updateStudentName(studentId, field, value, classeName) {
+    const eleves = getExistingEleves(classeName);
+    const target = eleves.find(e => e.id === studentId);
+    if (target) {
+        target[field] = value;
+        saveEleves(classeName, eleves);
+        return true;
+    }
+    return false;
 }
 
 export async function assignPhotoToStudent(studentId, sourcePhotoId, classeName) {
