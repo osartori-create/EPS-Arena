@@ -1,3 +1,6 @@
+// src/js/services/admin-service.js
+// NOUVELLE VERSION AVEC IMPORT ZIP PRINCIPAL
+
 const Papa = window.Papa;
 const JSZip = window.JSZip;
 
@@ -47,6 +50,7 @@ function parseZipFileName(fileName) {
         decoded = new TextDecoder('windows-1252').decode(bytes);
     } catch(e) { decoded = fileName; }
 
+    // Format: _NOM,_Prénom_M.jpg  ou  _NOM,_Prénom_F.jpg
     const match = decoded.match(/^_(.+),_(.+)_([MF])\./i);
     if (!match) return null;
 
@@ -55,7 +59,9 @@ function parseZipFileName(fileName) {
     const sexe = match[3].toUpperCase();
 
     return {
-        nom: nomBrut, prenom: prenomBrut, sexe,
+        nom: nomBrut,
+        prenom: prenomBrut,
+        sexe,
         nomNormalise: normalizeForComparison(nomBrut),
         prenomNormalise: normalizeForComparison(prenomBrut),
         cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
@@ -67,16 +73,89 @@ function getStorageKey(classeName) {
     return `eps_arena_eleves_${classeName}`;
 }
 
+export function getExistingEleves(classeName) {
+    return JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
+}
+
+export function saveEleves(classeName, eleves) {
+    localStorage.setItem(getStorageKey(classeName), JSON.stringify(eleves));
+}
+
+/**
+ * NOUVELLE VERSION : Import ZIP uniquement
+ * Crée les élèves à partir des photos, sans CSV
+ */
+export async function importZIP(file, classeName) {
+    const zip = await JSZip.loadAsync(file);
+    const elevesExistants = getExistingEleves(classeName);
+    const mapExistants = {};
+    elevesExistants.forEach(e => mapExistants[e.id] = e);
+
+    const nouveauxEleves = [];
+    const zipEntries = Object.values(zip.files).filter(f => !f.dir && f.name.match(/\.(jpg|jpeg|png|gif)$/i));
+
+    for (const entry of zipEntries) {
+        const infos = parseZipFileName(entry.name);
+        if (!infos) continue;
+
+        // Chercher un élève existant avec le même nom/prénom
+        let eleve = elevesExistants.find(e =>
+            normalizeForComparison(e.nom) === infos.nomNormalise &&
+            normalizeForComparison(e.prenom) === infos.prenomNormalise
+        ) || elevesExistants.find(e => e.id === infos.cleUnique);
+
+        if (eleve) {
+            // Mettre à jour le sexe si différent
+            if (eleve.sexe !== infos.sexe) eleve.sexe = infos.sexe;
+            const blob = await entry.async('blob');
+            savePhoto(eleve.id, blob);
+        } else {
+            // Créer un nouvel élève
+            const newId = infos.cleUnique;
+            eleve = {
+                id: newId,
+                nom: infos.nom.toUpperCase(),
+                prenom: infos.prenom,
+                sexe: infos.sexe,
+                vma: 0,
+                palier: 0,
+                longueur: null,
+                sprint30: null,
+                needsManualCheck: false, // On a déjà le sexe et le nom
+                force: 0
+            };
+            const blob = await entry.async('blob');
+            savePhoto(newId, blob);
+            nouveauxEleves.push(eleve);
+        }
+    }
+
+    // Fusionner les nouveaux avec les existants
+    const tousLesEleves = [...elevesExistants];
+    nouveauxEleves.forEach(n => {
+        if (!tousLesEleves.some(e => e.id === n.id)) {
+            tousLesEleves.push(n);
+        }
+    });
+
+    saveEleves(classeName, tousLesEleves);
+    return tousLesEleves;
+}
+
+/**
+ * Import CSV (optionnel) pour compléter les données de performance
+ */
 export async function importCSV(file, classeName) {
     return new Promise((resolve) => {
         Papa.parse(file, {
-            delimiter: ";", header: false, skipEmptyLines: true,
+            delimiter: ";",
+            header: false,
+            skipEmptyLines: true,
             complete: async (results) => {
-                const existingEleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
-                const existingMap = {};
-                existingEleves.forEach(e => { existingMap[e.id] = e; });
+                const elevesExistants = getExistingEleves(classeName);
+                const map = {};
+                elevesExistants.forEach(e => map[e.id] = e);
 
-                const newEleves = [];
                 results.data.forEach((row, index) => {
                     if (index === 0 || !row[0]) return;
                     const [nomComplet, , , vitesse, palier, , longueur, , , , sprint1] = row;
@@ -86,111 +165,60 @@ export async function importCSV(file, classeName) {
                     const nom = parts.slice(1).join(' ').toUpperCase();
                     const id = `${normalizeForComparison(nom)}_${normalizeForComparison(prenom).charAt(0)}`;
 
-                    const existing = existingMap[id];
-                    
-                    newEleves.push({
-                        id: id,
-                        nom: nom, prenom: prenom,
-                        vma: parseFloat(String(vitesse).replace(",", ".")) || 0,
-                        palier: parseInt(palier) || 0,
-                        longueur: parseFloat(String(longueur).replace(",", ".")) || null,
-                        sprint30: parseFloat(String(sprint1).replace(",", ".")) || null,
-                        sexe: existing ? existing.sexe : '',
-                        needsManualCheck: existing ? existing.needsManualCheck : false,
-                        force: existing ? existing.force : 0, // Note subjective /5
-                    });
+                    const eleve = map[id];
+                    if (eleve) {
+                        eleve.vma = parseFloat(String(vitesse).replace(",", ".")) || 0;
+                        eleve.palier = parseInt(palier) || 0;
+                        eleve.longueur = parseFloat(String(longueur).replace(",", ".")) || null;
+                        eleve.sprint30 = parseFloat(String(sprint1).replace(",", ".")) || null;
+                        eleve.needsManualCheck = false;
+                    }
                 });
 
-                localStorage.setItem(getStorageKey(classeName), JSON.stringify(newEleves));
-                resolve(newEleves);
+                saveEleves(classeName, elevesExistants);
+                resolve(elevesExistants);
             }
         });
     });
 }
 
-export async function importZIP(file, classeName) {
-    const zip = await JSZip.loadAsync(file);
-    let eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
-    const zipEntries = Object.values(zip.files).filter(f => !f.dir && f.name.match(/\.(jpg|jpeg|png|gif)$/i));
-    
-    for (const entry of zipEntries) {
-        const infos = parseZipFileName(entry.name);
-        if (!infos) continue;
-
-        let eleve = eleves.find(e => 
-            normalizeForComparison(e.nom) === infos.nomNormalise && 
-            normalizeForComparison(e.prenom) === infos.prenomNormalise
-        ) || eleves.find(e => e.id === infos.cleUnique);
-
-        if (!eleve) {
-            eleve = eleves.find(e => {
-                const csvNom = normalizeForComparison(e.nom);
-                const csvPrenomInit = normalizeForComparison(e.prenom).charAt(0);
-                return csvNom === infos.nomNormalise && csvPrenomInit === infos.prenomNormalise.charAt(0);
-            });
-        }
-
-        if (eleve) {
-            eleve.sexe = infos.sexe;
-            const blob = await entry.async('blob');
-            savePhoto(eleve.id, blob);
-        } else {
-            const newId = infos.cleUnique;
-            eleves.push({
-                id: newId, nom: infos.nom.toUpperCase(), prenom: infos.prenom,
-                vma: 0, vitessePalier: 0, palier: 0, sexe: infos.sexe,
-                longueur: null, sprint30: null,
-                needsManualCheck: true,
-                force: 0,
-            });
-            const blob = await entry.async('blob');
-            savePhoto(newId, blob);
-        }
-    }
-
-    localStorage.setItem(getStorageKey(classeName), JSON.stringify(eleves));
-    return eleves;
-}
-
-// Fonctions pour la modal
+// Autres fonctions (getPendingStudents, etc.) restent inchangées...
 export function getPendingStudents(classeName) {
-    const eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
+    const eleves = getExistingEleves(classeName);
     return eleves.filter(e => e.needsManualCheck || !e.vma || e.vma === 0);
 }
 
 export function getOrphanPhotos(classeName) {
-    const eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
+    const eleves = getExistingEleves(classeName);
     return eleves.filter(e => e.needsManualCheck && (e.vma === 0 || !e.vma));
 }
 
 export function updateStudentForce(studentId, force, classeName) {
-    const key = `eps_arena_eleves_${classeName}`;
-    let eleves = JSON.parse(localStorage.getItem(key) || '[]');
+    const eleves = getExistingEleves(classeName);
     const target = eleves.find(e => e.id === studentId);
     if (target) {
         target.force = force;
-        localStorage.setItem(key, JSON.stringify(eleves));
+        saveEleves(classeName, eleves);
     }
 }
 
 export async function assignPhotoToStudent(studentId, sourcePhotoId, classeName) {
     const tx = dbPhotos.transaction("eleves", "readwrite");
     const req = tx.objectStore("eleves").get(sourcePhotoId);
-    
     return new Promise((resolve) => {
         req.onsuccess = () => {
             const sourceData = req.result;
             if (sourceData && sourceData.blob) {
                 savePhoto(studentId, sourceData.blob);
-                let eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
+                const eleves = getExistingEleves(classeName);
                 const target = eleves.find(e => e.id === studentId);
                 if (target) {
                     target.needsManualCheck = false;
                     const sourceEleve = eleves.find(e => e.id === sourcePhotoId);
                     if (sourceEleve) target.sexe = sourceEleve.sexe;
                 }
-                eleves = eleves.filter(e => e.id !== sourcePhotoId);
-                localStorage.setItem(getStorageKey(classeName), JSON.stringify(eleves));
+                const filtered = eleves.filter(e => e.id !== sourcePhotoId);
+                saveEleves(classeName, filtered);
                 resolve(true);
             } else {
                 resolve(false);
@@ -203,10 +231,10 @@ export async function assignPhotoToStudent(studentId, sourcePhotoId, classeName)
 export async function uploadManualPhoto(studentId, file, classeName) {
     const blob = await file;
     savePhoto(studentId, blob);
-    const eleves = JSON.parse(localStorage.getItem(getStorageKey(classeName)) || '[]');
+    const eleves = getExistingEleves(classeName);
     const target = eleves.find(e => e.id === studentId);
     if (target) target.needsManualCheck = false;
-    localStorage.setItem(getStorageKey(classeName), JSON.stringify(eleves));
+    saveEleves(classeName, eleves);
     return true;
 }
 

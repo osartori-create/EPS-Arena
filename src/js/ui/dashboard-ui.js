@@ -1,5 +1,5 @@
 // src/js/ui/dashboard-ui.js
-import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto, updateStudentForce } from '../services/admin-service.js';
+import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto, updateStudentForce, getExistingEleves, saveEleves } from '../services/admin-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
@@ -9,8 +9,7 @@ function getStorageKey() {
 }
 
 function loadLocalEleves() {
-    const stored = localStorage.getItem(getStorageKey());
-    currentEleves = stored ? JSON.parse(stored) : [];
+    currentEleves = getExistingEleves(activeClasse);
     renderEleves();
 }
 
@@ -27,33 +26,49 @@ export function initAdminUI() {
     const csvInput = document.getElementById('csvFile');
     const zipInput = document.getElementById('zipFile');
 
-    if (csvInput) csvInput.addEventListener('change', async (e) => {
-        if (e.target.files.length > 0) {
-            if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
-            currentEleves = await importCSV(e.target.files[0], activeClasse);
-            renderEleves();
-        }
-        e.target.value = '';
-    });
-
-    if (zipInput) zipInput.addEventListener('change', async (e) => {
-        if (e.target.files.length > 0) {
-            if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
-            try {
-                currentEleves = await importZIP(e.target.files[0], activeClasse);
-                renderEleves();
-                checkPendingStudents();
-            } catch (err) {
-                console.error(err);
-                alert("Erreur lors de l'import du ZIP");
+    // ZIP : création/import des élèves
+    if (zipInput) {
+        zipInput.addEventListener('change', async (e) => {
+            if (e.target.files.length > 0) {
+                if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
+                try {
+                    currentEleves = await importZIP(e.target.files[0], activeClasse);
+                    renderEleves();
+                    checkPendingStudents();
+                    alert(`✅ ${currentEleves.length} élève(s) importé(s) depuis les photos.`);
+                } catch (err) {
+                    console.error(err);
+                    alert("Erreur lors de l'import du ZIP.\nVérifie que les noms de fichiers sont au format _NOM,_Prénom_M.jpg");
+                }
             }
-        }
-        e.target.value = '';
-    });
+            e.target.value = '';
+        });
+    }
+
+    // CSV : compléter les données de performance (VMA, etc.)
+    if (csvInput) {
+        csvInput.addEventListener('change', async (e) => {
+            if (e.target.files.length > 0) {
+                if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
+                try {
+                    currentEleves = await importCSV(e.target.files[0], activeClasse);
+                    renderEleves();
+                    alert("✅ Données de performance importées.");
+                } catch (err) {
+                    console.error(err);
+                    alert("Erreur lors de l'import du CSV.");
+                }
+            }
+            e.target.value = '';
+        });
+    }
 
     activeClasse = select ? select.value : "";
-    loadLocalEleves();
+    if (activeClasse) loadLocalEleves();
 }
+
+// Le reste du fichier (renderEleves, checkPendingStudents, etc.) reste inchangé.
+// Je le réécris ci-dessous pour être complet.
 
 function checkPendingStudents() {
     const pending = getPendingStudents(activeClasse);
@@ -65,17 +80,16 @@ function checkPendingStudents() {
 async function renderEleves() {
     const container = document.getElementById('eleveList');
     if (!container) return;
-
     container.innerHTML = '';
 
     if (currentEleves.length === 0) {
-        container.innerHTML = '<p class="text-slate-500 text-sm col-span-full">Aucun élève importé pour cette classe.</p>';
+        container.innerHTML = '<p class="text-slate-500 text-sm col-span-full">Aucun élève importé pour cette classe.<br>📸 Utilisez "Import ZIP Photos" pour créer la classe.</p>';
         return;
     }
 
     for (const e of currentEleves) {
         const url = await getPhotoUrl(e.id);
-        const photoHtml = url 
+        const photoHtml = url
             ? `<img src="${url}" class="w-20 h-20 rounded-full object-cover shadow-lg border-2 border-slate-600">`
             : `<div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-3xl">👤</div>`;
 
@@ -88,7 +102,6 @@ async function renderEleves() {
         if (e.longueur) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-orange-400">L: ${e.longueur} cm</span>`;
         if (e.sprint30) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-purple-400">30m: ${e.sprint30}s</span>`;
 
-        // Génération des étoiles
         let starsHtml = '';
         for (let i = 1; i <= 5; i++) {
             const filled = e.force >= i ? 'text-yellow-400' : 'text-slate-600';
@@ -112,13 +125,11 @@ async function renderEleves() {
     }
 }
 
-// Fonction globale pour cliquer sur les étoiles
 window.setForce = function(studentId, force) {
     updateStudentForce(studentId, force, activeClasse);
-    loadLocalEleves(); // Rafraîchit l'affichage
+    loadLocalEleves();
 };
 
-// === MODALE ASSOCIATION PAR CLIC (Fiable iPad) ===
 async function openManualAssignModal() {
     const pending = getPendingStudents(activeClasse);
     if (pending.length === 0) return;
@@ -147,7 +158,6 @@ async function openManualAssignModal() {
                 <strong>1.</strong> Cliquez sur une photo à gauche pour la sélectionner (elle devient jaune).<br>
                 <strong>2.</strong> Cliquez ensuite sur l'élève à droite pour lui attribuer la photo.
             </p>
-            
             <div class="flex gap-6">
                 <div class="w-1/3">
                     <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Photos sans élève</h4>
@@ -165,7 +175,6 @@ async function openManualAssignModal() {
                         `).join('')}
                     </div>
                 </div>
-
                 <div class="w-2/3">
                     <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Élèves en attente d'une photo</h4>
                     <div id="pendingList" class="flex flex-col gap-3 min-h-[200px]">
@@ -184,7 +193,6 @@ async function openManualAssignModal() {
                     </div>
                 </div>
             </div>
-            
             <button onclick="document.getElementById('manualAssignModal').remove()" class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-bold text-white text-sm uppercase">Fermer</button>
         </div>
     </div>`;
@@ -198,7 +206,6 @@ async function openManualAssignModal() {
             el.classList.remove('ring-4', 'ring-yellow-400', 'border-yellow-500');
             el.classList.add('border-slate-600');
         });
-
         window.selectedOrphanId = orphanId;
         const el = document.getElementById(`orphan-${orphanId}`);
         if (el) {
@@ -212,7 +219,6 @@ async function openManualAssignModal() {
             alert("Veuillez d'abord sélectionner une photo à gauche.");
             return;
         }
-
         if (await assignPhotoToStudent(studentId, window.selectedOrphanId, activeClasse)) {
             alert("✅ Photo associée avec succès !");
             loadLocalEleves();
@@ -228,25 +234,24 @@ window.addEleve = function() {
     const prenom = prompt("Prénom ?");
     const nom = prompt("Nom ?");
     const vma = parseFloat(prompt("VMA (Palier) ?"));
-    
     if (!prenom || !nom || isNaN(vma)) return alert("Champs invalides");
-    
+
     const normalized = (str) => str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
     const id = `${normalized(nom)}_${normalized(prenom).charAt(0)}`;
-    
+
     const newEleve = {
-        id: id, prenom: prenom, nom: nom.toUpperCase(),
-        vma: vma, palier: vma, sexe: '', longueur: null, sprint30: null, force: 0
+        id, prenom, nom: nom.toUpperCase(),
+        vma, palier: vma, sexe: '', longueur: null, sprint30: null, force: 0
     };
 
     currentEleves.push(newEleve);
-    localStorage.setItem(getStorageKey(), JSON.stringify(currentEleves));
+    saveEleves(activeClasse, currentEleves);
     renderEleves();
 };
 
 window.purgeEleves = function() {
     if (!confirm("Supprimer tous les élèves de cette classe ?")) return;
     currentEleves = [];
-    localStorage.removeItem(getStorageKey());
+    saveEleves(activeClasse, []);
     renderEleves();
 };
