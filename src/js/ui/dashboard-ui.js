@@ -1,5 +1,5 @@
 // src/js/ui/dashboard-ui.js
-import { importCSV, importZIP, getPhotoUrl, getPendingStudents, getOrphanPhotos, assignPhotoToStudent, uploadManualPhoto, updateStudentForce, getExistingEleves, saveEleves } from '../services/admin-service.js';
+import { importCSV, importZIP, getPhotoUrl, getPendingStudents, updateStudentForce, updateStudentName, getExistingEleves, saveEleves } from '../services/admin-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
@@ -10,8 +10,8 @@ function getStorageKey() {
 
 function loadLocalEleves() {
     currentEleves = getExistingEleves(activeClasse);
-    // Tri par nom, puis prénom
-    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+    // Tri par nom déjà fait dans saveEleves, mais on le refait pour être sûr
+    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom));
     renderEleves();
 }
 
@@ -27,14 +27,13 @@ export function initAdminUI() {
     const csvInput = document.getElementById('csvFile');
     const zipInput = document.getElementById('zipFile');
 
+    // ZIP : création/import des élèves
     if (zipInput) {
         zipInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
                 if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
                 try {
                     currentEleves = await importZIP(e.target.files[0], activeClasse);
-                    // Le tri est fait dans importZIP, mais on le refait ici pour être sûr
-                    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
                     renderEleves();
                     alert(`✅ ${currentEleves.length} élève(s) importé(s) depuis les photos.`);
                 } catch (err) {
@@ -46,13 +45,13 @@ export function initAdminUI() {
         });
     }
 
+    // CSV : compléter les données de performance (VMA, etc.)
     if (csvInput) {
         csvInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
                 if (!activeClasse) return alert("Veuillez d'abord sélectionner une classe.");
                 try {
                     currentEleves = await importCSV(e.target.files[0], activeClasse);
-                    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
                     renderEleves();
                     alert("✅ Données de performance importées.");
                 } catch (err) {
@@ -68,7 +67,7 @@ export function initAdminUI() {
     if (activeClasse) loadLocalEleves();
 }
 
-function renderEleves() {
+async function renderEleves() {
     const container = document.getElementById('eleveList');
     if (!container) return;
     container.innerHTML = '';
@@ -78,14 +77,11 @@ function renderEleves() {
         return;
     }
 
-    currentEleves.forEach(async (e) => {
+    for (const e of currentEleves) {
         const url = await getPhotoUrl(e.id);
         const photoHtml = url
             ? `<img src="${url}" class="w-20 h-20 rounded-full object-cover shadow-lg border-2 border-slate-600">`
             : `<div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-3xl">👤</div>`;
-
-        // Remplacer le badge ! par un crayon
-        const editIcon = `<span onclick="event.stopPropagation(); openEditModal('${e.id}')" class="absolute top-2 right-2 bg-slate-600 hover:bg-blue-600 text-white px-2 py-1 rounded-full text-xs font-black cursor-pointer transition-colors">✏️</span>`;
 
         let extraData = '';
         if (e.longueur) extraData += `<span class="bg-black px-2 py-1 rounded border border-slate-600 text-orange-400">L: ${e.longueur} cm</span>`;
@@ -98,8 +94,7 @@ function renderEleves() {
         }
 
         container.innerHTML += `
-            <div class="bg-slate-800 rounded-2xl p-4 flex flex-col items-center border border-slate-700 text-center relative">
-                ${editIcon}
+            <div class="bg-slate-800 rounded-2xl p-4 flex flex-col items-center border border-slate-700 text-center relative cursor-pointer hover:border-blue-500 transition-all" onclick="openEditModal('${e.id}')">
                 <div class="mb-2">${photoHtml}</div>
                 <p class="font-black text-white leading-tight">${e.prenom}</p>
                 <p class="text-xs text-slate-400 uppercase font-bold mb-2">${e.nom}</p>
@@ -109,91 +104,85 @@ function renderEleves() {
                 </div>
                 <div class="flex gap-1 mt-2">${starsHtml}</div>
                 <span class="text-[10px] text-slate-500 mt-1">${e.sexe ? e.sexe : 'Sexe inconnu'}</span>
+                <span class="text-[10px] text-slate-600 mt-1">✏️ Cliquer pour modifier</span>
             </div>
         `;
-    });
+    }
 }
-
-// === MODALE D'ÉDITION ===
-window.openEditModal = function(eleveId) {
-    const eleve = currentEleves.find(e => e.id === eleveId);
-    if (!eleve) return;
-
-    // Supprimer une modale existante
-    const existing = document.getElementById('editModal');
-    if (existing) existing.remove();
-
-    const modalHtml = `
-        <div id="editModal" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
-            <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
-                <h3 class="text-xl font-black text-blue-400 uppercase mb-4">✏️ Modifier l'élève</h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase">Prénom</label>
-                        <input type="text" id="edit-prenom" value="${eleve.prenom}" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white">
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase">Nom</label>
-                        <input type="text" id="edit-nom" value="${eleve.nom}" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white">
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase">Sexe</label>
-                        <select id="edit-sexe" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white">
-                            <option value="M" ${eleve.sexe === 'M' ? 'selected' : ''}>M</option>
-                            <option value="F" ${eleve.sexe === 'F' ? 'selected' : ''}>F</option>
-                            <option value="" ${!eleve.sexe ? 'selected' : ''}>Non spécifié</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase">VMA (km/h)</label>
-                        <input type="number" id="edit-vma" value="${eleve.vma || ''}" step="0.1" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white">
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="saveEditModal('${eleveId}')" class="flex-1 bg-emerald-600 py-2 rounded-xl font-black text-white active:scale-95">💾 Enregistrer</button>
-                        <button onclick="document.getElementById('editModal').remove()" class="flex-1 bg-slate-700 py-2 rounded-xl font-black text-white active:scale-95">❌ Annuler</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-};
-
-window.saveEditModal = function(eleveId) {
-    const prenom = document.getElementById('edit-prenom').value.trim();
-    const nom = document.getElementById('edit-nom').value.trim();
-    const sexe = document.getElementById('edit-sexe').value;
-    const vma = parseFloat(document.getElementById('edit-vma').value) || 0;
-
-    if (!prenom || !nom) {
-        alert("Le prénom et le nom sont obligatoires.");
-        return;
-    }
-
-    const eleve = currentEleves.find(e => e.id === eleveId);
-    if (eleve) {
-        eleve.prenom = prenom;
-        eleve.nom = nom.toUpperCase();
-        eleve.sexe = sexe;
-        eleve.vma = vma;
-        // Recalculer l'id si nécessaire ? On garde l'id existant pour les références.
-        // Mais on peut mettre à jour la clé unique si le nom/prénom change.
-        // Pour simplifier, on ne change pas l'id.
-        saveEleves(activeClasse, currentEleves);
-        // Re-trier
-        currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-        renderEleves();
-        document.getElementById('editModal').remove();
-        alert("✅ Élève modifié !");
-    }
-};
 
 window.setForce = function(studentId, force) {
     updateStudentForce(studentId, force, activeClasse);
     loadLocalEleves();
 };
 
-// Ajouter un élève manuellement
+// ============================================================
+// MODALE D'ÉDITION D'UN ÉLÈVE
+// ============================================================
+
+window.openEditModal = function(eleveId) {
+    const eleve = currentEleves.find(e => e.id === eleveId);
+    if (!eleve) return;
+
+    const modalHtml = `
+    <div id="editStudentModal" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
+            <h3 class="text-xl font-black text-blue-400 uppercase mb-4">✏️ Modifier l'élève</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Prénom</label>
+                    <input type="text" id="edit-prenom" value="${eleve.prenom}" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-lg font-bold">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Nom</label>
+                    <input type="text" id="edit-nom" value="${eleve.nom}" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-lg font-bold">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Sexe</label>
+                    <select id="edit-sexe" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white">
+                        <option value="M" ${eleve.sexe === 'M' ? 'selected' : ''}>Masculin</option>
+                        <option value="F" ${eleve.sexe === 'F' ? 'selected' : ''}>Féminin</option>
+                        <option value="" ${!eleve.sexe ? 'selected' : ''}>Non renseigné</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">VMA</label>
+                    <input type="number" id="edit-vma" value="${eleve.vma || 0}" step="0.1" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-lg font-bold">
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="saveEditStudent('${eleve.id}')" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white">💾 Enregistrer</button>
+                <button onclick="document.getElementById('editStudentModal').remove()" class="bg-slate-700 px-6 py-3 rounded-xl font-black text-white">Annuler</button>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    document.getElementById('editStudentModal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) e.target.remove();
+    });
+};
+
+window.saveEditStudent = function(eleveId) {
+    const prenom = document.getElementById('edit-prenom').value.trim();
+    const nom = document.getElementById('edit-nom').value.trim();
+    const sexe = document.getElementById('edit-sexe').value;
+    const vma = parseFloat(document.getElementById('edit-vma').value) || 0;
+
+    if (!prenom || !nom) {
+        alert('Le prénom et le nom sont obligatoires.');
+        return;
+    }
+
+    updateStudentName(eleveId, 'prenom', prenom, activeClasse);
+    updateStudentName(eleveId, 'nom', nom, activeClasse);
+    updateStudentName(eleveId, 'sexe', sexe, activeClasse);
+    updateStudentName(eleveId, 'vma', vma, activeClasse);
+
+    document.getElementById('editStudentModal').remove();
+    loadLocalEleves();
+    alert('✅ Élève modifié avec succès !');
+};
+
 window.addEleve = function() {
     const prenom = prompt("Prénom ?");
     const nom = prompt("Nom ?");
@@ -205,18 +194,17 @@ window.addEleve = function() {
 
     const newEleve = {
         id, prenom, nom: nom.toUpperCase(),
-        vma, palier: vma, sexe: '', longueur: null, sprint30: null, force: 0, needsManualCheck: false
+        vma, palier: vma, sexe: '', longueur: null, sprint30: null, force: 0
     };
 
     currentEleves.push(newEleve);
-    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
     saveEleves(activeClasse, currentEleves);
-    renderEleves();
+    loadLocalEleves();
 };
 
 window.purgeEleves = function() {
     if (!confirm("Supprimer tous les élèves de cette classe ?")) return;
     currentEleves = [];
     saveEleves(activeClasse, []);
-    renderEleves();
+    loadLocalEleves();
 };
