@@ -220,6 +220,19 @@ function terminerTest() {
 
 function retourMenu() {
     if (currentMode === 'passation') {
+        // Si c'est la VMA et que des résultats sont en cours, proposer de terminer
+        if (currentTestId === 'endurance') {
+            const hasResults = Object.values(elevesResultats).some(r => r !== undefined && r >= 0);
+            if (hasResults) {
+                if (!confirm('Des résultats sont en cours. Terminer le test avant de quitter ?')) {
+                    return;
+                }
+                // Appeler terminerVMA depuis le module
+                import('../../modules/evaluation/evaluation-vma.js').then(module => {
+                    if (module.terminerVMA) module.terminerVMA();
+                });
+            }
+        }
         if (confirm('Quitter la passation en cours ? Les données seront sauvegardées.')) {
             currentMode = 'menu';
             afficherMenu();

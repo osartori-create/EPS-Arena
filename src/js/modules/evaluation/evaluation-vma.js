@@ -374,6 +374,7 @@ function demarrerVMA() {
     }
 }
 
+// Dans la fonction terminerVMA, ajouter la sauvegarde pour tous les élèves
 function terminerVMA() {
     if (audioElement) {
         audioElement.pause();
@@ -384,17 +385,8 @@ function terminerVMA() {
     tempsTestStart = 0;
     tempsTest = 0;
 
-    const nonEvalues = currentEleves.filter(e => {
-        const palier = elevesResultats[e.id];
-        return palier === undefined || palier < 0;
-    });
-
-    if (nonEvalues.length > 0) {
-        if (!confirm(`${nonEvalues.length} élève(s) n'ont pas validé l'échauffement. Terminer quand même ?`)) {
-            return;
-        }
-    }
-
+    // Sauvegarder les résultats pour chaque élève qui a un palier validé
+    let aDesResultats = false;
     currentEleves.forEach(e => {
         const palier = elevesResultats[e.id];
         if (palier !== undefined && palier >= 0) {
@@ -403,18 +395,27 @@ function terminerVMA() {
                 palier: palier,
                 groupe: groupe
             });
-        } else {
-            setResultat(currentData, e.id, currentTestId, {
-                palier: palier !== undefined ? palier : -1,
-                groupe: null
-            });
+            aDesResultats = true;
         }
     });
 
-    alert('✅ VMA terminée !');
     // Revenir à l'état initial
     document.getElementById('eval-vma-start')?.classList.remove('hidden');
     document.getElementById('eval-vma-stop')?.classList.add('hidden');
+    
+    // Arrêter la mise à jour du chrono
+    if (intervalId) clearInterval(intervalId);
+    
+    // Mettre à jour l'interface pour refléter la fin
+    afficherVMA(chargerAudioDepuisDB);
+    
+    if (aDesResultats) {
+        alert('✅ VMA terminée ! Résultats sauvegardés.');
+    } else {
+        alert('ℹ️ Aucun résultat enregistré. Cliquez sur les élèves pour valider leurs paliers.');
+    }
+    
+    // Retourner au menu
     if (window.evalTerminerTest) window.evalTerminerTest();
 }
 
