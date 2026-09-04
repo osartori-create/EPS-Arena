@@ -27,6 +27,9 @@ export function initSaisieSaut(zone, eleve, data, testId, eleves) {
     currentTestId = testId;
     currentEleves = eleves.filter(e => e.statut === 'present');
 
+    // Trier par nom
+    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+
     essaisParEleve = {};
     currentEleves.forEach(e => {
         const r = getResultat(data, e.id, testId);
@@ -405,23 +408,36 @@ function validerEssai() {
 
     essaisParEleve[eleveSelectionne] = essais;
 
+    // Proposer le choix : continuer avec le même ou passer au suivant
+    const prochain = currentEleves.find(e => 
+        e.id !== eleveSelectionne && 
+        (essaisParEleve[e.id]?.length || 0) < maxEssais
+    );
+
     if (essais.length >= maxEssais) {
-        const prochain = currentEleves.find(e => 
-            e.id !== eleveSelectionne && 
-            (essaisParEleve[e.id]?.length || 0) < maxEssais
-        );
+        // L'élève a terminé
         if (prochain) {
-            setTimeout(() => {
+            if (confirm(`🏁 ${eleveSel.prenom} a terminé ses 3 essais.\nPasser à ${prochain.prenom} ${prochain.nom} ?`)) {
                 selectionnerEleve(prochain.id);
-            }, 400);
-        } else {
-            setTimeout(() => {
-                alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
+            } else {
                 afficherSaut();
-            }, 300);
+            }
+        } else {
+            alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
+            afficherSaut();
         }
     } else {
-        afficherSaut();
+        // Pas encore terminé
+        if (prochain) {
+            const choix = confirm(`✅ Essai enregistré (${essais.length}/${maxEssais}).\n\nPasser à ${prochain.prenom} ${prochain.nom} ?\n(Annuler pour continuer avec ${eleveSel.prenom})`);
+            if (choix) {
+                selectionnerEleve(prochain.id);
+            } else {
+                afficherSaut();
+            }
+        } else {
+            afficherSaut();
+        }
     }
 }
 
