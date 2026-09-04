@@ -27,9 +27,6 @@ export function initSaisieSaut(zone, eleve, data, testId, eleves) {
     currentTestId = testId;
     currentEleves = eleves.filter(e => e.statut === 'present');
 
-    // Trier par nom
-    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-
     essaisParEleve = {};
     currentEleves.forEach(e => {
         const r = getResultat(data, e.id, testId);
@@ -40,7 +37,8 @@ export function initSaisieSaut(zone, eleve, data, testId, eleves) {
         }
     });
 
-    const premier = currentEleves.find(e => essaisParEleve[e.id].length < maxEssais) || currentEleves[0];
+    // Sélectionner le premier élève qui n'a pas 3 essais
+    const premier = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais) || currentEleves[0];
     eleveSelectionne = premier?.id || null;
 
     afficherSaut();
@@ -66,10 +64,12 @@ function afficherSaut() {
     };
     colonnes.g1 = [...colonnes.g1, ...autres];
 
-    const nbTermines = currentEleves.filter(e => essaisParEleve[e.id]?.length >= maxEssais).length;
+    const nbTermines = currentEleves.filter(e => (essaisParEleve[e.id]?.length || 0) >= maxEssais).length;
     const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
     const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
     const meilleurSel = essaisSel.length > 0 ? Math.max(...essaisSel) : null;
+
+    // Prochain élève (par ordre alphabétique, premier qui n'a pas 3 essais et n'est pas sélectionné)
     const prochainEleve = currentEleves.find(e => 
         e.id !== eleveSelectionne && 
         (essaisParEleve[e.id]?.length || 0) < maxEssais
@@ -408,36 +408,25 @@ function validerEssai() {
 
     essaisParEleve[eleveSelectionne] = essais;
 
-    // Proposer le choix : continuer avec le même ou passer au suivant
-    const prochain = currentEleves.find(e => 
-        e.id !== eleveSelectionne && 
-        (essaisParEleve[e.id]?.length || 0) < maxEssais
-    );
-
     if (essais.length >= maxEssais) {
-        // L'élève a terminé
+        const prochain = currentEleves.find(e => 
+            e.id !== eleveSelectionne && 
+            (essaisParEleve[e.id]?.length || 0) < maxEssais
+        );
         if (prochain) {
-            if (confirm(`🏁 ${eleveSel.prenom} a terminé ses 3 essais.\nPasser à ${prochain.prenom} ${prochain.nom} ?`)) {
+            setTimeout(() => {
                 selectionnerEleve(prochain.id);
-            } else {
+                // Recharger l'affichage après sélection
                 afficherSaut();
-            }
+            }, 400);
         } else {
-            alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
-            afficherSaut();
+            setTimeout(() => {
+                alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
+                afficherSaut();
+            }, 300);
         }
     } else {
-        // Pas encore terminé
-        if (prochain) {
-            const choix = confirm(`✅ Essai enregistré (${essais.length}/${maxEssais}).\n\nPasser à ${prochain.prenom} ${prochain.nom} ?\n(Annuler pour continuer avec ${eleveSel.prenom})`);
-            if (choix) {
-                selectionnerEleve(prochain.id);
-            } else {
-                afficherSaut();
-            }
-        } else {
-            afficherSaut();
-        }
+        afficherSaut();
     }
 }
 

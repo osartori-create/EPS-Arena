@@ -27,9 +27,6 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
     currentTestId = testId;
     currentEleves = eleves.filter(e => e.statut === 'present');
 
-    // Trier par nom
-    currentEleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-
     essaisParEleve = {};
     currentEleves.forEach(e => {
         const r = getResultat(data, e.id, testId);
@@ -40,7 +37,8 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
         }
     });
 
-    const premier = currentEleves.find(e => essaisParEleve[e.id].length < maxEssais) || currentEleves[0];
+    // Sélectionner le premier élève qui n'a pas 3 essais
+    const premier = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais) || currentEleves[0];
     eleveSelectionne = premier?.id || null;
 
     afficherSprint();
@@ -66,16 +64,20 @@ function afficherSprint() {
     };
     colonnes.g1 = [...colonnes.g1, ...autres];
 
-    const nbTermines = currentEleves.filter(e => essaisParEleve[e.id]?.length >= maxEssais).length;
+    const nbTermines = currentEleves.filter(e => (essaisParEleve[e.id]?.length || 0) >= maxEssais).length;
     const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
     const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
     const meilleurSel = essaisSel.length > 0 ? Math.min(...essaisSel) : null;
+    const estTermineSel = essaisSel.length >= maxEssais;
+
+    // Prochain élève (par ordre alphabétique, premier qui n'a pas 3 essais et n'est pas sélectionné)
     const prochainEleve = currentEleves.find(e => 
         e.id !== eleveSelectionne && 
         (essaisParEleve[e.id]?.length || 0) < maxEssais
     );
 
-    const affichageChrono = chronoRunning ? (chronoElapsed / 1000).toFixed(1) : (essaisSel.length > 0 ? essaisSel[essaisSel.length - 1].toFixed(1) : '0.0');
+    // Valeur du chrono
+    const affichageChrono = chronoElapsed > 0 ? (chronoElapsed / 1000).toFixed(1) : (essaisSel.length > 0 ? essaisSel[essaisSel.length - 1].toFixed(1) : '0.0');
 
     zoneSaisie.innerHTML = `
         <div class="space-y-4">
@@ -88,22 +90,16 @@ function afficherSprint() {
                 <span class="text-xs text-slate-400">${nbTermines}/${currentEleves.length} terminés</span>
             </div>
 
-            <!-- Élève sélectionné + prochain -->
+            <!-- Élève sélectionné + photo + prochain -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
                 <div class="flex items-center gap-6">
                     <div id="sprint-eleve-photo" class="w-24 h-24 rounded-full border-4 border-blue-500 overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-4xl">
                         <span class="text-4xl">${eleveSel?.prenom?.charAt(0) || '👤'}</span>
                     </div>
-                    <div class="flex-1">
+                    <div>
                         <p class="text-5xl font-black text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</p>
                         <p class="text-sm text-slate-400">Code : ${eleveSel?.id || '--'}</p>
-                        <p class="text-xs text-slate-500">Essai ${essaisSel.length + 1} / ${maxEssais}</p>
-                        ${meilleurSel ? `<p class="text-xs text-yellow-400">Meilleur : ${meilleurSel.toFixed(1)}s</p>` : ''}
-                    </div>
-                    <!-- Chrono central -->
-                    <div class="text-center">
-                        <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">${affichageChrono}</div>
-                        <p class="text-sm text-slate-400">secondes</p>
+                        ${meilleurSel !== null ? `<p class="text-xs text-yellow-400">🏆 Meilleur : ${meilleurSel.toFixed(1)}s</p>` : `<p class="text-xs text-slate-500">Essai ${essaisSel.length + 1} / ${maxEssais}</p>`}
                     </div>
                 </div>
 
@@ -121,42 +117,49 @@ function afficherSprint() {
                 </div>
                 ` : ''}
 
-                <!-- Bouton Démarrer/Arrêter agrandi -->
+                <!-- Chrono central + Bouton Démarrer/Arrêter agrandi -->
                 <div class="mt-4">
-                    ${essaisSel.length >= maxEssais ? `
-                        <div class="text-emerald-400 font-bold text-sm">✅ 3 essais terminés</div>
-                        <div class="mt-1 text-xs text-slate-400">Meilleur : ${meilleurSel?.toFixed(1)}s</div>
-                    ` : `
-                        <button id="sprint-main-btn" 
-                                class="w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
-                            ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
-                        </button>
-                    `}
-                    <div class="flex gap-2 mt-2">
-                        <button onclick="window.evalSprintReset()" class="bg-slate-600 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
-                            ↺ Réinitialiser
-                        </button>
-                        ${essaisSel.length > 0 ? `
-                            <button onclick="window.evalSprintAnnulerEssai()" class="bg-amber-600 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
-                                ↩ Annuler essai
-                            </button>
-                        ` : ''}
+                    <div class="text-center">
+                        <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">${affichageChrono}</div>
+                        <p class="text-sm text-slate-400">secondes</p>
                     </div>
-                </div>
 
-                <!-- Essais -->
-                ${essaisSel.length > 0 ? `
-                    <div class="mt-2 text-xs text-slate-400 text-center">
-                        Essais : ${essaisSel.map((t, i) => `
-                            <span class="${t === meilleurSel ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
-                        `).join(' / ')}
+                    <div class="mt-3">
+                        ${estTermineSel ? `
+                            <div class="text-emerald-400 font-bold text-center text-xl">✅ 3 essais terminés</div>
+                            <div class="text-center mt-1 text-xs text-slate-400">Meilleur : ${meilleurSel?.toFixed(1)}s</div>
+                        ` : `
+                            <button id="sprint-main-btn" 
+                                    class="w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
+                                ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
+                            </button>
+                        `}
+                        <div class="flex gap-3 mt-2">
+                            <button onclick="window.evalSprintReset()" class="flex-1 bg-slate-600 px-4 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                                ↺ Réinitialiser
+                            </button>
+                            ${essaisSel.length > 0 ? `
+                                <button onclick="window.evalSprintAnnulerEssai()" class="flex-1 bg-amber-600 px-4 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                                    ↩ Annuler dernier
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
-                ` : ''}
+
+                    <!-- Essais -->
+                    ${essaisSel.length > 0 ? `
+                        <div class="mt-3 text-xs text-slate-400 text-center">
+                            Essais : ${essaisSel.map((t, i) => `
+                                <span class="${t === meilleurSel ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
+                            `).join(' / ')}
+                        </div>
+                    ` : ''}
+                </div>
             </div>
 
             <!-- Colonnes -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                ${templateColonnes(colonnes, eleveSelectionne, essaisParEleve)}
+                ${templateColonnesSprint(colonnes, eleveSelectionne, essaisParEleve)}
             </div>
 
             <!-- Légende -->
@@ -177,7 +180,7 @@ function afficherSprint() {
         chargerPhotoSprint(prochainEleve.id, 'sprint-prochain-photo');
     }
 
-    // Attacher les événements des cartes
+    // Attacher les événements
     document.querySelectorAll('.sprint-eleve-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.sprint-menu-btn')) return;
@@ -211,7 +214,7 @@ function afficherSprint() {
         document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
 
-    // Gestion du bouton principal
+    // Gestion du bouton principal (Démarrer / Arrêter)
     const mainBtn = document.getElementById('sprint-main-btn');
     if (mainBtn) {
         mainBtn.addEventListener('click', () => {
@@ -223,11 +226,11 @@ function afficherSprint() {
         });
     }
 
-    setTimeout(() => chargerPhotosColonnes(), 100);
+    setTimeout(() => chargerPhotosColonnesSprint(), 100);
 }
 
 // ============================================================
-// CHARGEMENT DES PHOTOS
+// CHARGEMENT DES PHOTOS (élève sélectionné + prochain)
 // ============================================================
 
 async function chargerPhotoSprint(eleveId, elementId) {
@@ -251,7 +254,7 @@ async function chargerPhotoSprint(eleveId, elementId) {
 // TEMPLATE DES COLONNES
 // ============================================================
 
-function templateColonnes(colonnes, eleveSelectionneId, essaisParEleve) {
+function templateColonnesSprint(colonnes, eleveSelectionneId, essaisParEleve) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
@@ -358,7 +361,7 @@ function demarrerChrono() {
     chronoRunning = true;
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
-
+    
     const btn = document.getElementById('sprint-main-btn');
     if (btn) {
         btn.textContent = '⏹ Arrêter';
@@ -385,37 +388,37 @@ function arreterChrono() {
     }
 
     chronoElapsed = 0;
-    const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
+    
     const essais = essaisParEleve[eleveSelectionne] || [];
+    const aFini = essais.length >= maxEssais;
+
+    // Prochain élève (premier qui n'a pas 3 essais)
     const prochain = currentEleves.find(e => 
         e.id !== eleveSelectionne && 
         (essaisParEleve[e.id]?.length || 0) < maxEssais
     );
 
-    if (essais.length >= maxEssais) {
-        // L'élève a terminé
+    // Reconstruire le message
+    let message = `✅ Essai enregistré (${essais.length}/${maxEssais})`;
+    if (aFini) {
+        message += `\n🏁 ${eleveSel.prenom} a terminé ses 3 essais !`;
+    }
+    if (prochain) {
+        message += `\n\nPasser à ${prochain.prenom} ${prochain.nom} ?`;
+    } else if (!aFini) {
+        message += `\n\nContinuer avec ${eleveSel.prenom} ? (Annuler pour rester)`;
+    }
+
+    if (confirm(message)) {
         if (prochain) {
-            if (confirm(`🏁 ${eleveSel.prenom} a terminé ses 3 essais.\nPasser à ${prochain.prenom} ${prochain.nom} ?`)) {
-                selectionnerEleve(prochain.id);
-            } else {
-                afficherSprint();
-            }
+            selectionnerEleve(prochain.id);
         } else {
-            alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
+            // Si plus d'élèves, rester sur le même
             afficherSprint();
         }
     } else {
-        // Pas encore terminé
-        if (prochain) {
-            const choix = confirm(`✅ Essai enregistré (${essais.length}/${maxEssais}).\n\nPasser à ${prochain.prenom} ${prochain.nom} ?\n(Annuler pour continuer avec ${eleveSel.prenom})`);
-            if (choix) {
-                selectionnerEleve(prochain.id);
-            } else {
-                afficherSprint();
-            }
-        } else {
-            afficherSprint();
-        }
+        // Reste sur le même élève
+        afficherSprint();
     }
 }
 
@@ -447,7 +450,7 @@ function resetChrono() {
     afficherSprint();
 }
 
-function annulerEssaiSprint() {
+function annulerDernierEssai() {
     if (!eleveSelectionne) return;
     const essais = essaisParEleve[eleveSelectionne] || [];
     if (essais.length === 0) {
@@ -466,8 +469,6 @@ function annulerEssaiSprint() {
     essaisParEleve[eleveSelectionne] = essais;
     afficherSprint();
 }
-
-window.evalSprintAnnulerEssai = annulerEssaiSprint;
 
 function setStatut(eleveId, statut) {
     setStatutEleve(currentData, eleveId, statut);
@@ -489,7 +490,7 @@ function setStatut(eleveId, statut) {
 // CHARGEMENT DES PHOTOS DES COLONNES
 // ============================================================
 
-async function chargerPhotosColonnes() {
+async function chargerPhotosColonnesSprint() {
     const containers = document.querySelectorAll('.sprint-photo-container');
     for (const container of containers) {
         const card = container.closest('.sprint-eleve-card');
@@ -504,8 +505,11 @@ async function chargerPhotosColonnes() {
     }
 }
 
-// Exposer les fonctions globales
+// ============================================================
+// FONCTIONS GLOBALES
+// ============================================================
+
 window.evalSprintReset = resetChrono;
 window.evalSprintSelectionner = selectionnerEleve;
 window.evalSprintSetStatut = setStatut;
-window.evalSprintAnnulerEssai = annulerEssaiSprint;
+window.evalSprintAnnulerEssai = annulerDernierEssai;
