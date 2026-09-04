@@ -238,32 +238,54 @@ export async function importCSV(file, classeName) {
     return new Promise((resolve) => {
         Papa.parse(file, {
             delimiter: ";",
-            header: false,
+            header: true, // Utiliser la première ligne comme en-têtes
             skipEmptyLines: true,
             complete: async (results) => {
                 const elevesExistants = getExistingEleves(classeName);
                 const map = {};
                 elevesExistants.forEach(e => map[e.id] = e);
 
-                results.data.forEach((row, index) => {
-                    if (index === 0 || !row[0]) return;
-                    const [nomComplet, , , vitesse, palier, , longueur, , , , sprint1] = row;
-                    const nomCompletClean = fixMojibake(nomComplet).trim();
-                    const parts = nomCompletClean.split(' ');
-                    const prenom = parts[0];
-                    const nom = parts.slice(1).join(' ').toUpperCase();
+                let modifie = false;
+                results.data.forEach(row => {
+                    // Colonnes : @name (prénom), @lastname (nom), @birthday (date), @sexe
+                    const prenom = row['@name']?.trim() || '';
+                    const nom = row['@lastname']?.trim() || '';
+                    const dateNaissance = row['@birthday']?.trim() || '';
+                    const sexe = row['@sexe']?.trim() || '';
+
+                    if (!prenom || !nom) return;
+
                     const id = `${normalizeForComparison(nom)}_${normalizeForComparison(prenom).charAt(0)}`;
 
-                    const eleve = map[id];
+                    let eleve = map[id];
                     if (eleve) {
-                        eleve.vma = parseFloat(String(vitesse).replace(",", ".")) || 0;
-                        eleve.palier = parseInt(palier) || 0;
-                        eleve.longueur = parseFloat(String(longueur).replace(",", ".")) || null;
-                        eleve.sprint30 = parseFloat(String(sprint1).replace(",", ".")) || null;
+                        // Mettre à jour les infos
+                        if (eleve.prenom !== prenom) { eleve.prenom = prenom; modifie = true; }
+                        if (eleve.nom !== nom) { eleve.nom = nom; modifie = true; }
+                        if (eleve.sexe !== sexe) { eleve.sexe = sexe; modifie = true; }
+                        if (eleve.dateNaissance !== dateNaissance) { eleve.dateNaissance = dateNaissance; modifie = true; }
+                    } else {
+                        eleve = {
+                            id: id,
+                            prenom: prenom,
+                            nom: nom,
+                            sexe: sexe,
+                            dateNaissance: dateNaissance,
+                            vma: 0,
+                            palier: 0,
+                            longueur: null,
+                            sprint30: null,
+                            force: 0
+                        };
+                        elevesExistants.push(eleve);
+                        map[id] = eleve;
+                        modifie = true;
                     }
                 });
 
-                saveEleves(classeName, elevesExistants);
+                if (modifie) {
+                    saveEleves(classeName, elevesExistants);
+                }
                 resolve(elevesExistants);
             }
         });

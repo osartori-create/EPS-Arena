@@ -428,6 +428,93 @@ async function chargerPhotosColonnes() {
     }
 }
 
+function templateSprint(colonnes, eleveSelectionneId, eleveSel, eleveSuivant, essaisParEleve, nbTermines, totalEleves, chronoRunning, chronoElapsed) {
+    // ... début du template ...
+
+    return `
+        <div class="space-y-4">
+            <!-- Header -->
+            <div class="flex justify-between items-center bg-slate-800 p-3 rounded-2xl border border-slate-700">
+                <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">
+                    ← Retour
+                </button>
+                <h3 class="font-black text-blue-400 uppercase text-sm">🏃 Sprint 30m</h3>
+                <span class="text-xs text-slate-400">${nbTermines}/${totalEleves} terminés</span>
+            </div>
+
+            <!-- Élève sélectionné + prochain -->
+            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
+                <div class="flex items-center gap-6">
+                    <div id="sprint-eleve-photo" class="w-24 h-24 rounded-full border-4 border-blue-500 overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-4xl">
+                        <span class="text-4xl">${eleveSel?.prenom?.charAt(0) || '👤'}</span>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-5xl font-black text-white">${eleveSel ? `${eleveSel.prenom} ${eleveSel.nom}` : 'Aucun'}</p>
+                        <p class="text-sm text-slate-400">Code : ${eleveSel?.id || '--'}</p>
+                        <p class="text-xs text-slate-500">Essai ${essaisSel.length + 1} / ${maxEssais}</p>
+                    </div>
+                    <!-- Chrono central -->
+                    <div class="text-center">
+                        <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">${affichageChrono}</div>
+                        <p class="text-sm text-slate-400">secondes</p>
+                    </div>
+                </div>
+
+                <!-- Prochain élève -->
+                ${eleveSuivant ? `
+                <div class="mt-3 border-t border-slate-700 pt-3 flex items-center gap-3">
+                    <div id="sprint-prochain-photo" class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-sm">
+                        <span class="text-sm">${eleveSuivant.prenom?.charAt(0) || '👤'}</span>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Prochain :</p>
+                        <p class="text-base font-bold text-white">${eleveSuivant.prenom} ${eleveSuivant.nom}</p>
+                    </div>
+                    <span class="text-xs text-amber-400 ml-auto">👀 se prépare</span>
+                </div>
+                ` : ''}
+
+                <!-- Bouton Démarrer/Arrêter agrandi -->
+                <div class="mt-4">
+                    ${estTermineSel ? `
+                        <div class="text-emerald-400 font-bold text-sm">✅ 3 essais terminés</div>
+                        <div class="mt-1 text-xs text-slate-400">Meilleur : ${meilleurSel?.toFixed(1)}s</div>
+                    ` : `
+                        <button id="sprint-main-btn" 
+                                class="w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
+                            ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
+                        </button>
+                    `}
+                    <button onclick="window.evalSprintReset()" class="mt-2 bg-slate-600 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                        ↺ Réinitialiser
+                    </button>
+                </div>
+
+                <!-- Essais -->
+                ${essaisSel.length > 0 ? `
+                    <div class="mt-2 text-xs text-slate-400 text-center">
+                        Essais : ${essaisSel.map((t, i) => `
+                            <span class="${t === meilleurSel ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t.toFixed(1)}s</span>
+                        `).join(' / ')}
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Colonnes -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                ${templateColonnesSprint(colonnes, eleveSelectionneId, essaisParEleve)}
+            </div>
+
+            <!-- Légende -->
+            <div class="flex justify-center gap-4 text-xs text-slate-400 flex-wrap">
+                <span class="flex items-center gap-1">🔵 Clic = sélectionner</span>
+                <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
+                <span class="flex items-center gap-1">••• = changer statut</span>
+                <span class="flex items-center gap-1">🟡 Meilleur temps en jaune</span>
+            </div>
+        </div>
+    `;
+}
 // Exposer les fonctions globales
 window.evalSprintReset = resetChrono;
 window.evalSprintSelectionner = selectionnerEleve;

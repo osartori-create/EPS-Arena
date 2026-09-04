@@ -235,12 +235,13 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
             </div>
 
             <!-- Champ de saisie manuelle -->
-            <div class="flex items-center justify-center gap-3">
-                <label class="text-xs text-slate-400">Saisie manuelle :</label>
-                <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
-                       class="w-28 bg-slate-900 border-2 border-slate-600 rounded-xl p-2 text-center text-xl font-black text-white">
-                <span class="text-xs text-slate-400">cm</span>
-            </div>
+            <div class="flex items-center justify-center gap-2">
+    <button onclick="window.adjustSlider(-1)" class="bg-slate-700 w-14 h-14 rounded-2xl text-3xl font-black text-white active:scale-95 touch-manipulation">−</button>
+    <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
+           class="w-40 bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-center text-3xl font-black text-white">
+    <button onclick="window.adjustSlider(1)" class="bg-slate-700 w-14 h-14 rounded-2xl text-3xl font-black text-white active:scale-95 touch-manipulation">+</button>
+    <span class="text-sm text-slate-400 ml-1">cm</span>
+</div>
 
             <!-- Slider HTML (interactif) -->
             <input type="range" id="eval-slider" min="${min}" max="${max}" step="1" value="${Math.min(max, Math.max(min, valeur))}"

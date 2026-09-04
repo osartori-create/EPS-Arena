@@ -472,3 +472,12 @@ async function chargerPhotosColonnes() {
         } catch (e) { /* ignorer */ }
     }
 }
+window.adjustSlider = function(delta) {
+    const input = document.getElementById('eval-input-manuel');
+    if (!input) return;
+    let val = parseFloat(input.value) || 0;
+    val = Math.max(0, val + delta);
+    input.value = val;
+    // Déclencher l'événement input pour mettre à jour le slider
+    input.dispatchEvent(new Event('input'));
+};

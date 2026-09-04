@@ -46,6 +46,149 @@ export function initAdminUI() {
         });
     }
 
+    // Après l'import ZIP, identifier les photos orphelines et les élèves sans photo
+async function handleZipImport(file, classeName) {
+    try {
+        const result = await importZIP(file, classeName);
+        // Récupérer les élèves sans photo
+        const eleves = getExistingEleves(classeName);
+        const elevesSansPhoto = [];
+        const photosOrphelines = [];
+
+        for (const e of eleves) {
+            const url = await getPhotoUrl(e.id);
+            if (!url) elevesSansPhoto.push(e);
+        }
+
+        // Récupérer les photos orphelines (stockées dans IndexedDB mais sans élève associé)
+        // Pour simplifier, on va parcourir les fichiers du ZIP et comparer avec les élèves
+        // On utilise un flag pour savoir si la photo a été associée
+        // (Cette partie est simplifiée, on pourrait stocker les photos orphelines dans une table séparée)
+
+        if (photosOrphelines.length > 0 || elevesSansPhoto.length > 0) {
+            openDragDropModal(photosOrphelines, elevesSansPhoto, classeName);
+        }
+
+        loadLocalEleves();
+        alert(`✅ ${eleves.length} élèves importés.`);
+    } catch (err) {
+        alert("Erreur : " + err.message);
+    }
+}
+
+// Fonction pour ouvrir la modale de drag & drop
+async function openDragDropModal(photosOrphelines, elevesSansPhoto, classeName) {
+    // Générer les URLs pour les photos orphelines
+    const photosWithUrls = await Promise.all(photosOrphelines.map(async (p) => {
+        const url = await getPhotoUrl(p.id);
+        return { ...p, url };
+    }));
+
+    const modalHtml = `
+    <div id="dragDropModal" class="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-black text-blue-400 uppercase">🖼️ Associer les photos</h3>
+                <button onclick="closeDragDropModal()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white">✖ Fermer</button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">
+                Glissez une photo sur un élève pour l'associer.
+            </p>
+            <div class="flex flex-col md:flex-row gap-6">
+                <div class="w-full md:w-1/3">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">📸 Photos orphelines</h4>
+                    <div id="orphanPhotosList" class="flex flex-col gap-2 min-h-[200px] border border-dashed border-slate-600 p-2 rounded-xl">
+                        ${photosWithUrls.map(p => `
+                            <div draggable="true" class="orphan-photo bg-slate-800 p-2 rounded-xl flex items-center gap-2 cursor-grab active:cursor-grabbing hover:bg-slate-700 transition-colors" 
+                                 data-id="${p.id}" data-url="${p.url}">
+                                <img src="${p.url}" class="w-12 h-12 rounded-full object-cover">
+                                <span class="text-xs text-slate-400 truncate">${p.nom || 'Photo'}</span>
+                            </div>
+                        `).join('')}
+                        ${photosWithUrls.length === 0 ? '<p class="text-slate-500 text-xs">Aucune photo orpheline.</p>' : ''}
+                    </div>
+                </div>
+                <div class="w-full md:w-2/3">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">👤 Élèves sans photo</h4>
+                    <div id="studentsWithoutPhotoList" class="flex flex-col gap-2 min-h-[200px] border border-dashed border-slate-600 p-2 rounded-xl">
+                        ${elevesSansPhoto.map(e => `
+                            <div class="student-drop-zone bg-slate-800 p-2 rounded-xl flex items-center gap-3 border-2 border-transparent hover:border-blue-500 transition-colors" 
+                                 data-id="${e.id}">
+                                <div class="w-12 h-12 rounded-full bg-slate-600 flex items-center justify-center text-xl">👤</div>
+                                <div>
+                                    <p class="text-sm font-bold text-white">${e.prenom} ${e.nom}</p>
+                                    <p class="text-xs text-slate-400">${e.id}</p>
+                                </div>
+                                <span class="ml-auto text-xs text-amber-400">📷 manquante</span>
+                            </div>
+                        `).join('')}
+                        ${elevesSansPhoto.length === 0 ? '<p class="text-slate-500 text-xs">Tous les élèves ont une photo.</p>' : ''}
+                    </div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeDragDropModal()" class="bg-emerald-600 px-6 py-2 rounded-xl font-black text-sm text-white">✅ Terminer</button>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Initialiser les événements de drag & drop
+    document.querySelectorAll('.orphan-photo').forEach(photo => {
+        photo.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', photo.dataset.id);
+            e.dataTransfer.effectAllowed = 'copy';
+        });
+    });
+
+    document.querySelectorAll('.student-drop-zone').forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            zone.classList.add('border-blue-500', 'bg-blue-500/10');
+        });
+        zone.addEventListener('dragleave', () => {
+            zone.classList.remove('border-blue-500', 'bg-blue-500/10');
+        });
+        zone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            zone.classList.remove('border-blue-500', 'bg-blue-500/10');
+            const photoId = e.dataTransfer.getData('text/plain');
+            const eleveId = zone.dataset.id;
+            
+            const success = await assignPhotoToStudent(eleveId, photoId, classeName);
+            if (success) {
+                const photoEl = document.querySelector(`.orphan-photo[data-id="${photoId}"]`);
+                if (photoEl) photoEl.remove();
+                
+                zone.innerHTML = `
+                    <div class="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-2xl">✅</div>
+                    <div>
+                        <p class="text-sm font-bold text-white">${zone.querySelector('.text-sm.font-bold')?.textContent || ''}</p>
+                        <p class="text-xs text-slate-400">${zone.dataset.id}</p>
+                    </div>
+                    <span class="ml-auto text-xs text-emerald-400">📷 associée</span>
+                `;
+                zone.classList.remove('hover:border-blue-500');
+                zone.style.borderColor = '#22c55e';
+                zone.style.backgroundColor = 'rgba(34, 197, 94, 0.1)';
+
+                if (document.querySelectorAll('.orphan-photo').length === 0) {
+                    document.getElementById('orphanPhotosList').innerHTML = '<p class="text-slate-500 text-xs">Toutes les photos ont été associées.</p>';
+                }
+                loadLocalEleves();
+            } else {
+                alert("Erreur lors de l'association.");
+            }
+        });
+    });
+}
+
+window.closeDragDropModal = function() {
+    const modal = document.getElementById('dragDropModal');
+    if (modal) modal.remove();
+};
     // CSV : compléter les données de performance (VMA, etc.)
     if (csvInput) {
         csvInput.addEventListener('change', async (e) => {
@@ -108,6 +251,7 @@ async function renderEleves() {
                 </div>
                 <div class="flex gap-1 mt-2">${starsHtml}</div>
                 <span class="text-[10px] text-slate-500 mt-1">${e.sexe ? e.sexe : 'Sexe inconnu'}</span>
+                <span class="text-[10px] text-slate-500 mt-1">🎂 ${e.dateNaissance || 'Date inconnue'}</span>
                 <span class="text-[10px] text-slate-600 mt-1">✏️ Cliquer pour modifier</span>
             </div>
         `;
