@@ -220,17 +220,27 @@ function terminerTest() {
 
 function retourMenu() {
     if (currentMode === 'passation') {
-        // Si c'est la VMA et que des résultats sont en cours, proposer de terminer
+        // Si c'est la VMA, proposer de terminer proprement
         if (currentTestId === 'endurance') {
-            const hasResults = Object.values(elevesResultats).some(r => r !== undefined && r >= 0);
+            // Vérifier si des résultats sont en cours
+            let hasResults = false;
+            if (typeof elevesResultats !== 'undefined') {
+                hasResults = Object.values(elevesResultats).some(r => r !== undefined && r >= 0);
+            }
             if (hasResults) {
-                if (!confirm('Des résultats sont en cours. Terminer le test avant de quitter ?')) {
+                if (!confirm('Des résultats sont en cours de saisie. Terminer le test avant de quitter ?')) {
                     return;
                 }
-                // Appeler terminerVMA depuis le module
+                // Appeler terminerVMA via l'import dynamique
                 import('../../modules/evaluation/evaluation-vma.js').then(module => {
-                    if (module.terminerVMA) module.terminerVMA();
+                    if (module.terminerVMA) {
+                        module.terminerVMA();
+                    } else {
+                        // Si terminerVMA n'est pas exposée, on l'appelle via window
+                        if (window.evalVmaTerminer) window.evalVmaTerminer();
+                    }
                 });
+                return;
             }
         }
         if (confirm('Quitter la passation en cours ? Les données seront sauvegardées.')) {

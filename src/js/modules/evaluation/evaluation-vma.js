@@ -376,47 +376,68 @@ function demarrerVMA() {
 
 // Dans la fonction terminerVMA, ajouter la sauvegarde pour tous les élèves
 function terminerVMA() {
+    console.log('⏹️ terminerVMA() appelée');
+    
+    // Arrêter le son
     if (audioElement) {
         audioElement.pause();
         audioElement.currentTime = 0;
+        console.log('🔇 Son arrêté');
     }
     isPlaying = false;
-    if (intervalId) clearInterval(intervalId);
+    if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+        console.log('⏱️ Intervalle nettoyé');
+    }
     tempsTestStart = 0;
     tempsTest = 0;
 
     // Sauvegarder les résultats pour chaque élève qui a un palier validé
-    let aDesResultats = false;
+    let nbSauvegardes = 0;
     currentEleves.forEach(e => {
         const palier = elevesResultats[e.id];
         if (palier !== undefined && palier >= 0) {
             const groupe = groupeEndurance(palier);
+            console.log(`💾 Sauvegarde ${e.id} : palier ${palier}, groupe ${groupe}`);
             setResultat(currentData, e.id, currentTestId, {
                 palier: palier,
                 groupe: groupe
             });
-            aDesResultats = true;
+            nbSauvegardes++;
         }
     });
 
-    // Revenir à l'état initial
-    document.getElementById('eval-vma-start')?.classList.remove('hidden');
-    document.getElementById('eval-vma-stop')?.classList.add('hidden');
-    
-    // Arrêter la mise à jour du chrono
-    if (intervalId) clearInterval(intervalId);
-    
-    // Mettre à jour l'interface pour refléter la fin
-    afficherVMA(chargerAudioDepuisDB);
-    
-    if (aDesResultats) {
-        alert('✅ VMA terminée ! Résultats sauvegardés.');
+    // Revenir à l'état initial de l'interface
+    const startBtn = document.getElementById('eval-vma-start');
+    const stopBtn = document.getElementById('eval-vma-stop');
+    if (startBtn) {
+        startBtn.classList.remove('hidden');
+        startBtn.textContent = '▶ Démarrer';
+    }
+    if (stopBtn) stopBtn.classList.add('hidden');
+
+    // Mettre à jour les statistiques dans le menu
+    // On recharge les données depuis localStorage pour que le menu soit à jour
+    const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
+    currentData = loadOrCreateData(currentData.classe, elevesData);
+    currentData.classe = currentData.classe;
+
+    // Afficher un message
+    if (nbSauvegardes > 0) {
+        alert(`✅ VMA terminée ! ${nbSauvegardes} résultat(s) sauvegardé(s).`);
     } else {
         alert('ℹ️ Aucun résultat enregistré. Cliquez sur les élèves pour valider leurs paliers.');
     }
     
     // Retourner au menu
-    if (window.evalTerminerTest) window.evalTerminerTest();
+    if (window.evalTerminerTest) {
+        window.evalTerminerTest();
+    } else {
+        // Fallback : retourner au menu manuellement
+        currentMode = 'menu';
+        afficherMenu();
+    }
 }
 
 // ============================================================

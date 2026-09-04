@@ -1,5 +1,5 @@
 // src/js/modules/evaluation/evaluation-saut.js
-// Saisie du Saut en longueur (style VMA : colonnes, sélection, slider central)
+// Saisie du Saut en longueur (style Sprint : colonnes, sélection, slider central)
 
 import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
 import { groupeForce } from './evaluation-utils.js';
@@ -67,7 +67,12 @@ function afficherSaut() {
     const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
     const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
     const meilleurSel = essaisSel.length > 0 ? Math.max(...essaisSel) : null;
+    const prochainEleve = currentEleves.find(e => 
+        e.id !== eleveSelectionne && 
+        (essaisParEleve[e.id]?.length || 0) < maxEssais
+    );
 
+    // Valeur du slider
     if (essaisSel.length === 0) {
         valeurSlider = 120;
     } else if (essaisSel.length === 1) {
@@ -76,7 +81,6 @@ function afficherSaut() {
         valeurSlider = Math.max(...essaisSel);
     }
 
-    // AFFICHAGE
     zoneSaisie.innerHTML = `
         <div class="space-y-4">
             <!-- Header -->
@@ -88,7 +92,7 @@ function afficherSaut() {
                 <span class="text-xs text-slate-400">${nbTermines}/${currentEleves.length} terminés</span>
             </div>
 
-            <!-- Élève sélectionné : PHOTO + NOM EN ÉNORME -->
+            <!-- Élève sélectionné + photo + prochain -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
                 <div class="flex items-center gap-6">
                     <div id="saut-eleve-photo" class="w-24 h-24 rounded-full border-4 border-blue-500 overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-4xl">
@@ -101,19 +105,45 @@ function afficherSaut() {
                     </div>
                 </div>
 
-                <!-- Toise -->
-                ${templateSliderSaut(valeurSlider, 0, 250, 'cm')}
+                <!-- Prochain élève -->
+                ${prochainEleve ? `
+                <div class="mt-3 border-t border-slate-700 pt-3 flex items-center gap-3">
+                    <div id="saut-prochain-photo" class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-sm">
+                        <span class="text-sm">${prochainEleve.prenom?.charAt(0) || '👤'}</span>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400">Prochain :</p>
+                        <p class="text-base font-bold text-white">${prochainEleve.prenom} ${prochainEleve.nom}</p>
+                    </div>
+                    <span class="text-xs text-amber-400 ml-auto">👀 se prépare</span>
+                </div>
+                ` : ''}
 
-                <!-- AFFICHAGE DES ESSAIS : 114 / 122 / 110 (meilleur en jaune) -->
+                <!-- TOISE AVEC SCORE INTÉGRÉ -->
+                <div class="mt-3">
+                    ${templateSliderSaut(valeurSlider, 0, 250, 'cm')}
+                </div>
+
+                <!-- Affichage des essais -->
                 <div id="saut-essais-display" class="text-center mt-2 text-lg font-mono">
                     ${essaisSel.length > 0 ? essaisSel.map((t, i) => {
                         const isBest = (t === meilleurSel);
                         return `<span class="${isBest ? 'text-yellow-400 font-black' : 'text-slate-400'}">${t}</span>`;
                     }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>' : '<span class="text-slate-600">__ / __ / __</span>'}
                 </div>
+
+                <!-- Boutons -->
+                <div class="flex gap-3 mt-3">
+                    <button onclick="window.evalValiderEssai()" class="flex-1 bg-emerald-600 py-4 rounded-xl font-black text-white text-lg active:scale-95 ${essaisSel.length >= maxEssais ? 'opacity-50 cursor-not-allowed' : ''}" ${essaisSel.length >= maxEssais ? 'disabled' : ''}>
+                        ✅ Valider l'essai
+                    </button>
+                    <button onclick="window.evalEssaiSuivant()" class="bg-slate-600 px-6 py-4 rounded-xl font-black text-white text-lg active:scale-95 ${essaisSel.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${essaisSel.length === 0 ? 'disabled' : ''}>
+                        ↩ Annuler
+                    </button>
+                </div>
             </div>
 
-            <!-- 4 colonnes -->
+            <!-- Colonnes -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 ${templateColonnes(colonnes, eleveSelectionne, essaisParEleve)}
             </div>
@@ -124,19 +154,19 @@ function afficherSaut() {
                 <span class="flex items-center gap-1">🟢 ✅ 3 essais</span>
                 <span class="flex items-center gap-1">••• = changer statut</span>
                 <span class="flex items-center gap-1">🟡 Meilleur essai en jaune</span>
-                <span class="flex items-center gap-1">🔴 ≤ 110 cm</span>
-                <span class="flex items-center gap-1">🟠 111-140 cm</span>
-                <span class="flex items-center gap-1">🟢 > 140 cm</span>
             </div>
         </div>
     `;
 
-    // Charger la photo de l'élève sélectionné
+    // Charger les photos
     if (eleveSelectionne) {
-        chargerPhotoEleveSaut(eleveSelectionne);
+        chargerPhotoSaut(eleveSelectionne, 'saut-eleve-photo');
+    }
+    if (prochainEleve) {
+        chargerPhotoSaut(prochainEleve.id, 'saut-prochain-photo');
     }
 
-    // Attacher les événements
+    // Attacher les événements des cartes
     document.querySelectorAll('.saut-eleve-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.saut-menu-btn')) return;
@@ -198,11 +228,11 @@ function afficherSaut() {
 }
 
 // ============================================================
-// CHARGEMENT DE LA PHOTO DE L'ÉLÈVE SÉLECTIONNÉ
+// CHARGEMENT DES PHOTOS (élève sélectionné + prochain)
 // ============================================================
 
-async function chargerPhotoEleveSaut(eleveId) {
-    const container = document.getElementById('saut-eleve-photo');
+async function chargerPhotoSaut(eleveId, elementId) {
+    const container = document.getElementById(elementId);
     if (!container) return;
     try {
         const url = await getPhotoUrl(eleveId);
@@ -210,11 +240,11 @@ async function chargerPhotoEleveSaut(eleveId) {
             container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
         } else {
             const eleve = currentData.eleves[eleveId];
-            container.innerHTML = `<span class="text-4xl">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
+            container.innerHTML = `<span class="${elementId === 'saut-eleve-photo' ? 'text-4xl' : 'text-sm'}">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
         }
     } catch (e) {
         const eleve = currentData.eleves[eleveId];
-        container.innerHTML = `<span class="text-4xl">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
+        container.innerHTML = `<span class="${elementId === 'saut-eleve-photo' ? 'text-4xl' : 'text-sm'}">${eleve?.prenom?.charAt(0) || '👤'}</span>`;
     }
 }
 
@@ -376,10 +406,13 @@ function validerEssai() {
     essaisParEleve[eleveSelectionne] = essais;
 
     if (essais.length >= maxEssais) {
-        const suivant = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais && e.id !== eleveSelectionne);
-        if (suivant) {
+        const prochain = currentEleves.find(e => 
+            e.id !== eleveSelectionne && 
+            (essaisParEleve[e.id]?.length || 0) < maxEssais
+        );
+        if (prochain) {
             setTimeout(() => {
-                selectionnerEleve(suivant.id);
+                selectionnerEleve(prochain.id);
             }, 400);
         } else {
             setTimeout(() => {
@@ -431,6 +464,25 @@ function setStatut(eleveId, statut) {
 }
 
 // ============================================================
+// CHARGEMENT DES PHOTOS DES COLONNES
+// ============================================================
+
+async function chargerPhotosColonnes() {
+    const containers = document.querySelectorAll('.saut-photo-container');
+    for (const container of containers) {
+        const card = container.closest('.saut-eleve-card');
+        if (!card) continue;
+        const eleveId = card.dataset.id;
+        try {
+            const url = await getPhotoUrl(eleveId);
+            if (url) {
+                container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
+            }
+        } catch (e) { /* ignorer */ }
+    }
+}
+
+// ============================================================
 // FONCTIONS GLOBALES (pour les appels HTML)
 // ============================================================
 
@@ -449,35 +501,16 @@ window.evalEssaiSuivant = function() {
     annulerEssai();
 };
 
-window.evalSautValider = validerEssai;
-window.evalSautAnnuler = annulerEssai;
-window.evalSautSelectionner = selectionnerEleve;
-window.evalSautSetStatut = setStatut;
-
-// ============================================================
-// CHARGEMENT DES PHOTOS DES COLONNES
-// ============================================================
-
-async function chargerPhotosColonnes() {
-    const containers = document.querySelectorAll('.saut-photo-container');
-    for (const container of containers) {
-        const card = container.closest('.saut-eleve-card');
-        if (!card) continue;
-        const eleveId = card.dataset.id;
-        try {
-            const url = await getPhotoUrl(eleveId);
-            if (url) {
-                container.innerHTML = `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
-            }
-        } catch (e) { /* ignorer */ }
-    }
-}
 window.adjustSlider = function(delta) {
     const input = document.getElementById('eval-input-manuel');
     if (!input) return;
     let val = parseFloat(input.value) || 0;
     val = Math.max(0, val + delta);
     input.value = val;
-    // Déclencher l'événement input pour mettre à jour le slider
     input.dispatchEvent(new Event('input'));
 };
+
+window.evalSautValider = validerEssai;
+window.evalSautAnnuler = annulerEssai;
+window.evalSautSelectionner = selectionnerEleve;
+window.evalSautSetStatut = setStatut;

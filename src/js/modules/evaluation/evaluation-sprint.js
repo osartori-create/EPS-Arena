@@ -439,20 +439,36 @@ function arreterChrono() {
     }
 
     chronoElapsed = 0;
-    afficherSprint();
-
+    
     const essais = essaisParEleve[eleveSelectionne] || [];
-    if (essais.length >= maxEssais) {
-        const suivant = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais && e.id !== eleveSelectionne);
-        if (suivant) {
-            setTimeout(() => {
-                selectionnerEleve(suivant.id);
-            }, 500);
+    const aFini = essais.length >= maxEssais;
+
+    // Proposer le choix : continuer avec le même élève ou passer au suivant
+    const prochain = currentEleves.find(e => 
+        e.id !== eleveSelectionne && 
+        (essaisParEleve[e.id]?.length || 0) < maxEssais
+    );
+
+    let message = `✅ Essai enregistré (${essais.length}/${maxEssais})`;
+    if (aFini) {
+        message += `\n🏁 ${eleveSel.prenom} a terminé ses 3 essais !`;
+    }
+    if (prochain) {
+        message += `\n\nPasser à ${prochain.prenom} ${prochain.nom} ?`;
+    } else if (!aFini) {
+        message += `\n\nContinuer avec ${eleveSel.prenom} ? (Annuler pour rester)`;
+    }
+
+    if (confirm(message)) {
+        if (prochain) {
+            selectionnerEleve(prochain.id);
         } else {
-            setTimeout(() => {
-                alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
-            }, 300);
+            // Recharger le même élève pour continuer
+            afficherSprint();
         }
+    } else {
+        // Reste sur le même élève
+        afficherSprint();
     }
 }
 
