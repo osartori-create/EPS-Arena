@@ -38,8 +38,8 @@ const WEBJEJE_CSS = `
         max-width: 800px;
         margin: 0 auto;
         background-color: transparent;
-        padding: 0;
-        overflow: hidden;
+        padding: 25px 20px;
+        overflow: visible;
         border: 2px solid #ffffff;
         border-radius: 4px;
     }
@@ -51,6 +51,7 @@ const WEBJEJE_CSS = `
         position: relative;
         display: flex;
         overflow: hidden;
+        border: 2px solid #ffffff;
     }
 
     .net {
@@ -132,13 +133,13 @@ const WEBJEJE_CSS = `
     .fault-left { left: -19px; }
     .fault-right { right: -19px; }
 
-    /* Pour le mode 9 zones, on ajuste les fautes pour qu'elles soient sur le pourtour */
+    /* Pour le mode 9 zones, on garde les fautes sur le pourtour */
     .mode-9zones .fault-top { top: -19px; }
     .mode-9zones .fault-bottom { bottom: -19px; }
     .mode-9zones .fault-left { left: -19px; }
     .mode-9zones .fault-right { right: -19px; }
 
-    /* Pour le mode 3 zones, on garde les fautes à l'intérieur (mais on ne les utilise pas) */
+    /* Pour le mode 3 zones, on cache les fautes */
     .mode-3zones .fault-area { display: none; }
 
     .impact {
@@ -398,7 +399,8 @@ function renderCourtInterface() {
                 <div id="ratio-p1" class="text-xs text-slate-400">Ratio : 0%</div>
             </div>
             <div class="text-center w-1/3">
-                <h3 id="score-display" class="text-5xl font-black text-yellow-400">${matchPoints.p2} - ${matchPoints.p1}</h3>
+                <!-- ✅ SCORE AFFICHÉ DANS LE BON SENS : p1 - p2 -->
+                <h3 id="score-display" class="text-5xl font-black text-yellow-400">${matchPoints.p1} - ${matchPoints.p2}</h3>
             </div>
             <div class="text-center w-1/3">
                 <h3 class="text-3xl font-black text-white">${currentMatch.p2}</h3>
@@ -456,12 +458,10 @@ function renderCourtInterface() {
     const slider = document.getElementById('middle-zone-slider');
     const display = document.getElementById('zone-size-display');
 
-    // Mise à jour de l'affichage en temps réel
     slider.addEventListener('input', function() {
         display.innerText = this.value + '%';
     });
 
-    // Re-rendu au relâchement
     const reRender = () => {
         const newVal = parseInt(slider.value);
         if (newVal !== badmintonCenterSize) {
@@ -474,11 +474,11 @@ function renderCourtInterface() {
     slider.addEventListener('mouseup', reRender);
     slider.addEventListener('touchend', reRender);
 
-    // Attacher les événements du terrain (avec délai pour que le DOM soit prêt)
+    // Attacher les événements du terrain
     setTimeout(() => {
         const court = document.getElementById('court');
         if (court) {
-            // Supprimer les anciens écouteurs pour éviter les doublons
+            // Nettoyer les anciens écouteurs en clonant
             const newCourt = court.cloneNode(true);
             court.parentNode.replaceChild(newCourt, court);
             
@@ -548,7 +548,6 @@ function generateCourtHTML() {
     if (is9) {
         const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
         const faultLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
-        // Les fautes sont positionnées à l'extérieur grâce au CSS
         faultHtml = `
             <div class="fault-area fault-top" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
             <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
@@ -623,7 +622,8 @@ function handleImpact(e) {
     if (!ratioData[player][type]) ratioData[player][type] = 0;
     ratioData[player][type]++;
 
-    document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
+    // ✅ AFFICHAGE CORRECT : p1 - p2
+    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
     updateRatios();
 
     redoStack = [];
@@ -658,7 +658,8 @@ window.faultPlayer = function(player) {
     if (!ratioData[player]['fault']) ratioData[player]['fault'] = 0;
     ratioData[player]['fault']++;
 
-    document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
+    // ✅ AFFICHAGE CORRECT : p1 - p2
+    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
     updateRatios();
 
     // Impact visuel (au centre du terrain)
@@ -698,7 +699,8 @@ function undoImpact() {
         ratioData[last.zonePlayer][last.type]--;
     }
     
-    document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
+    // ✅ AFFICHAGE CORRECT : p1 - p2
+    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
     updateRatios();
 }
 
@@ -709,6 +711,7 @@ function resetCourt() {
         p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
         p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
     };
+    // ✅ AFFICHAGE CORRECT : p1 - p2
     document.getElementById('score-display').innerText = '0 - 0';
     document.getElementById('ratio-p1').innerText = '0%';
     document.getElementById('ratio-p2').innerText = '0%';
@@ -728,8 +731,8 @@ window.endMatch = function() {
     
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
-    const s1 = matchPoints.p2;
-    const s2 = matchPoints.p1;
+    const s1 = matchPoints.p1; // score de p1
+    const s2 = matchPoints.p2; // score de p2
 
     if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
         const stats = {
