@@ -6,9 +6,13 @@ import { generateTeams as generateClassicTeams } from '../../modules/teams/team-
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove } from '../../core/firebase-service.js';
 import { initOrientShowInterface, loadOrientShowAssignments, exportOrientShowConfig, importOrientShowConfig, startOrientShow, stopOrientShow } from '../../modules/orientshow/orientshow-interface.js';
-import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
+import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig, transmettreBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
 import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
 import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
+
+// ✅ NOUVEAUX IMPORTS POUR LE SÉLECTEUR DE MODE BADMINTON
+import { getModesList } from '../../modules/badminton/badminton-registry.js';
+import { initBadmintonModeSelector, setBadmintonMode } from '../../modules/badminton/badminton-ui-prof.js';
 
 let currentDiscipline = 'multi';
 
@@ -248,6 +252,20 @@ export function initActivities() {
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
     try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
 
+    // ✅ NOUVEAU : Initialisation du sélecteur de mode Badminton
+    try {
+        initBadmintonModeSelector();
+        console.log("✅ Sélecteur de mode Badminton initialisé");
+    } catch (e) {
+        console.error("❌ Erreur initBadmintonModeSelector :", e);
+    }
+
+    // Palette de couleurs pour Multi-activités
+    initPalette();
+
+    // ============================================================
+    // CHANGEMENT DE DISCIPLINE
+    // ============================================================
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         localStorage.setItem('eps_arena_current_discipline', disc);
@@ -305,7 +323,7 @@ export function initActivities() {
     };
 
     // ============================================================
-    // GÉNÉRATION DES ÉQUIPES (VERSION FINALE AVEC STATUTS)
+    // GÉNÉRATION DES ÉQUIPES (MULTI-ACTIVITÉS)
     // ============================================================
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
@@ -313,7 +331,7 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // Cas particuliers
+        // Cas particuliers : CO, Escalade, OrientShow, Badminton, Arcathlon
         if (currentDiscipline === 'co') {
             await populateReserveWithStudents(eleves);
             alert("Tous les élèves sont dans la réserve CO.");
@@ -343,7 +361,6 @@ export function initActivities() {
         }
 
         // ---- Multi-activités ----
-        // Récupérer les statuts
         const statuts = JSON.parse(localStorage.getItem(`eps_arena_multi_statuts_${activeClasse}`) || '{}');
         const elevesActifs = eleves.filter(e => {
             const statut = statuts[e.id] || 'present';
@@ -406,11 +423,9 @@ export function initActivities() {
         const container = document.getElementById('teamsGrid');
         if (!container) return;
 
-        // Construction des cartes AVEC STATUTS
+        // Construction des cartes
         container.innerHTML = teamsWithPhotos.map(team => {
             const bgColor = team.color || '#3b82f6';
-            const textColor = isLightColor(bgColor) ? '#0f172a' : '#ffffff';
-
             return `
                 <div class="bg-slate-900 rounded-2xl p-4 border-4" style="border-color: ${bgColor}">
                     <div class="flex justify-between items-center mb-3">
@@ -444,7 +459,6 @@ export function initActivities() {
                             const longueurDisplay = m.longueur ? `${m.longueur} cm` : '--';
                             const sprintDisplay = m.sprint30 ? `${m.sprint30} s` : '--';
 
-                            // Statut de l'élève
                             const statut = statuts[m.id] || 'present';
                             const isAbsent = statut === 'absent';
                             const isInapte = statut === 'inapte';
@@ -485,45 +499,42 @@ export function initActivities() {
             `;
         }).join('');
 
-        
-        // ============================================================
-// AFFICHER LES ÉLÈVES EXCLUS (ABSENTS / INAPTES) AVEC BOUTON RÉINTÉGRER
-// ============================================================
-const elevesExclus = eleves.filter(e => {
-    const statut = statuts[e.id] || 'present';
-    return statut !== 'present';
-});
+        // Afficher les élèves exclus
+        const elevesExclus = eleves.filter(e => {
+            const statut = statuts[e.id] || 'present';
+            return statut !== 'present';
+        });
 
-if (elevesExclus.length > 0) {
-    let exclHtml = `
-        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mt-4">
-            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">🚫 Élèves non inclus (${elevesExclus.length})</h4>
-            <div class="flex flex-wrap gap-3">
-    `;
-    for (const eleve of elevesExclus) {
-        const url = await getPhotoUrl(eleve.id);
-        const photoHtml = url ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">` : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
-        const statut = statuts[eleve.id] || 'present';
-        const statutLabel = statut === 'absent' ? '🚫 Absent' : '⚠️ Inapte';
-        const statutColor = statut === 'absent' ? 'bg-red-500/20 border-red-500' : 'bg-orange-500/20 border-orange-500';
-        exclHtml += `
-            <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${statutColor}">
-                ${photoHtml}
-                <div>
-                    <span class="font-black text-white text-sm">${eleve.prenom}</span>
-                    <span class="text-xs text-slate-400">${eleve.nom}</span>
-                    <span class="text-[10px] font-bold block ${statut === 'absent' ? 'text-red-400' : 'text-orange-400'}">${statutLabel}</span>
-                </div>
-                <button onclick="window.setEleveStatut('${eleve.id}', 'present')" 
-                        class="ml-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-2 py-1 rounded font-bold transition-colors">
-                    ✅ Réintégrer
-                </button>
-            </div>
-        `;
-    }
-    exclHtml += `</div></div>`;
-    container.insertAdjacentHTML('afterend', exclHtml);
-}
+        if (elevesExclus.length > 0) {
+            let exclHtml = `
+                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mt-4">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">🚫 Élèves non inclus (${elevesExclus.length})</h4>
+                    <div class="flex flex-wrap gap-3">
+            `;
+            for (const eleve of elevesExclus) {
+                const url = await getPhotoUrl(eleve.id);
+                const photoHtml = url ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">` : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+                const statut = statuts[eleve.id] || 'present';
+                const statutLabel = statut === 'absent' ? '🚫 Absent' : '⚠️ Inapte';
+                const statutColor = statut === 'absent' ? 'bg-red-500/20 border-red-500' : 'bg-orange-500/20 border-orange-500';
+                exclHtml += `
+                    <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${statutColor}">
+                        ${photoHtml}
+                        <div>
+                            <span class="font-black text-white text-sm">${eleve.prenom}</span>
+                            <span class="text-xs text-slate-400">${eleve.nom}</span>
+                            <span class="text-[10px] font-bold block ${statut === 'absent' ? 'text-red-400' : 'text-orange-400'}">${statutLabel}</span>
+                        </div>
+                        <button onclick="window.setEleveStatut('${eleve.id}', 'present')" 
+                                class="ml-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-2 py-1 rounded font-bold transition-colors">
+                            ✅ Réintégrer
+                        </button>
+                    </div>
+                `;
+            }
+            exclHtml += `</div></div>`;
+            container.insertAdjacentHTML('afterend', exclHtml);
+        }
 
         // Sortable
         if (window.sortableInstances) {
@@ -625,38 +636,27 @@ if (elevesExclus.length > 0) {
             if (endTime !== null) configData.endTime = endTime;
         } 
         else if (currentDiscipline === 'badminton') {
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
-    
-    // ✅ RÉCUPÉRATION DES PARAMÈTRES AVANCÉS
-    const mode = document.getElementById('badmintonMode')?.value || 'frontback';
-    const centerSize = parseInt(document.getElementById('badmintonCenterSize')?.value) || 33;
-    const centerPoints = parseInt(document.getElementById('badmintonCenterPoints')?.value) || 1;
-    const otherPoints = parseInt(document.getElementById('badmintonOtherPoints')?.value) || 3;
-    const cornerPoints = parseInt(document.getElementById('badmintonCornerPoints')?.value) || 3;
-    const faultPoints = parseInt(document.getElementById('badmintonFaultPoints')?.value) || 1;
-    const faultPenalty = document.getElementById('badmintonFaultPenalty')?.checked || false;
-
-    configData = {
-        activite: 'badminton',
-        mode: mode,
-        centerSize: centerSize,
-        centerPoints: centerPoints,
-        otherPoints: otherPoints,
-        cornerPoints: cornerPoints,
-        faultPoints: faultPoints,
-        faultPenalty: faultPenalty
-    };
-
-    const lettres = ['A','B','C','D','E','F','G','H','I','J'];
-    for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
-        const idsTerrain = assignments[t] || [];
-        idsTerrain.forEach((eleveId, index) => {
-            const lettre = lettres[index] || '?';
-            localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
-        });
-        configData[t] = idsTerrain.length;
-    }
-}
+            const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
+            const lettres = ['A','B','C','D','E','F','G','H','I','J'];
+            
+            // ✅ RÉCUPÉRATION DU MODE BADMINTON
+            const mode = window.badmintonMode || 'terrain';
+            
+            configData = {
+                activite: 'badminton',
+                mode: mode,
+                // On peut ajouter d'autres paramètres si besoin
+            };
+            
+            for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
+                const idsTerrain = assignments[t] || [];
+                idsTerrain.forEach((eleveId, index) => {
+                    const lettre = lettres[index] || '?';
+                    localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
+                });
+                configData[t] = idsTerrain.length;
+            }
+        } 
         else if (currentDiscipline === 'arcathlon') {
             transmettreArcathlonConfig();
             return;
@@ -759,6 +759,9 @@ if (elevesExclus.length > 0) {
         alert("✅ Terrains générés par niveau de force !");
     };
 
+    // ✅ EXPOSER setBadmintonMode SUR window
+    window.setBadmintonMode = setBadmintonMode;
+
     // ============================================================
     // EXPORTS / IMPORTS
     // ============================================================
@@ -781,3 +784,23 @@ if (elevesExclus.length > 0) {
     try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}
 }
+
+// ============================================================
+// PALETTE DE COULEURS (pour Multi-activités)
+// ============================================================
+function initPalette() {
+    const paletteContainer = document.getElementById('paletteCouleurs');
+    if (!paletteContainer) return;
+    const couleursDispo = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
+    paletteContainer.innerHTML = couleursDispo.map(c => 
+        `<div onclick="window.toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
+    ).join('');
+}
+
+window.toggleCouleur = function(couleur) {
+    const el = document.querySelector(`[data-couleur="${couleur}"]`);
+    if (el) {
+        el.classList.toggle('border-emerald-400');
+        el.classList.toggle('border-slate-600');
+    }
+};

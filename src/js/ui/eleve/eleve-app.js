@@ -6,7 +6,8 @@ import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade
 import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
-import { initBadmintonKiosk } from '../../modules/badminton/index.js';
+// ✅ Un seul import pour le dispatcher Badminton
+import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
 import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
@@ -138,7 +139,8 @@ function showLogin() {
         document.getElementById('main-container').classList.remove('max-w-md');
         document.getElementById('main-container').classList.add('max-w-7xl');
         badmintonModule.classList.remove('hidden');
-        console.log('Lancement Badminton pour classe :', selectedClass);
+        console.log('🏸 Lancement Badminton (dispatcher) pour classe :', selectedClass);
+        // ✅ ICI on appelle le dispatcher
         initBadmintonKiosk(selectedClass);
         return;
     }
