@@ -1,6 +1,21 @@
 // src/js/modules/evaluation/evaluation-utils.js
 // Utilitaires : calculs des scores, groupes de maîtrise, export
 
+import { PALIER_VMA } from '../../config/constants.js';
+
+// ============================================================
+// FONCTION : Récupère la VMA à partir du palier
+// ============================================================
+export function getVMAFromPalier(palier) {
+    if (palier === undefined || palier === null || !(palier in PALIER_VMA)) {
+        return null;
+    }
+    return PALIER_VMA[palier];
+}
+
+// ============================================================
+// GROUPES DE MAÎTRISE
+// ============================================================
 export const GROUPES = {
     A_BESOINS: 'a_besoins',
     FRAGILE: 'fragile',
@@ -19,6 +34,9 @@ export const LIBELLES_GROUPES = {
     [GROUPES.SATISFAISANT]: 'Satisfaisant'
 };
 
+// ============================================================
+// FONCTIONS DE CALCUL DES GROUPES PAR TEST
+// ============================================================
 export function groupeEndurance(palier) {
     if (palier === undefined || palier === null) return null;
     if (palier <= 1) return GROUPES.A_BESOINS;
@@ -78,6 +96,9 @@ export const FONCTIONS_GROUPE = {
     endurance_musculaire: groupeEnduranceMusculaire
 };
 
+// ============================================================
+// LIBELLÉS ET UNITÉS
+// ============================================================
 export const LIBELLES_TESTS = {
     endurance: 'Endurance (Luc Léger)',
     force: 'Force (saut en longueur)',
@@ -98,11 +119,16 @@ export const UNITES_TESTS = {
     endurance_musculaire: 's'
 };
 
+// ============================================================
+// EXPORT CSV
+// ============================================================
 export function genererCSV(data, classe) {
     const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom));
+
+    // En-tête avec les colonnes (attention à l'ordre !)
     const entete = [
         '"!groupe"', '"Nom"', '"Prénom"', '"Sexe"', '"Statut"',
-        '"Endurance (palier)"', '"Endurance (groupe)"',
+        '"Endurance (palier)"', '"Endurance (groupe)"', '"VMA (km/h)"',
         '"Force (cm)"', '"Force (groupe)"',
         '"Vitesse (s)"', '"Vitesse (groupe)"',
         '"Équilibre (s)"', '"Équilibre (groupe)"',
@@ -115,6 +141,14 @@ export function genererCSV(data, classe) {
 
     eleves.forEach(e => {
         const r = e.resultats || {};
+
+        // VMA à partir du palier d'endurance
+        let vmaValue = '';
+        if (r.endurance && r.endurance.palier !== undefined && r.endurance.palier !== null) {
+            const vma = getVMAFromPalier(r.endurance.palier);
+            if (vma !== null) vmaValue = vma.toFixed(1);
+        }
+
         const ligne = [
             `"${e.id}"`,
             `"${e.nom}"`,
@@ -123,6 +157,7 @@ export function genererCSV(data, classe) {
             `"${e.statut || 'present'}"`,
             r.endurance ? `"${r.endurance.palier ?? ''}"` : '""',
             r.endurance ? `"${LIBELLES_GROUPES[r.endurance.groupe] || ''}"` : '""',
+            `"${vmaValue}"`,
             r.force ? `"${r.force.meilleur ?? ''}"` : '""',
             r.force ? `"${LIBELLES_GROUPES[r.force.groupe] || ''}"` : '""',
             r.vitesse ? `"${r.vitesse.meilleur ?? ''}"` : '""',
