@@ -25,7 +25,6 @@ let checkboxes = {
 export async function init(classe, config) {
     console.log('📊 [Maniere] Mode "Avec la manière" initialisé');
 
-    // Surcharger selectMatchFromList
     window.selectMatchFromList = function(matchId) {
         const match = matchSchedule.find(m => m.id === matchId);
         if (!match || match.s1 !== null) return;
@@ -48,7 +47,7 @@ export async function init(classe, config) {
 }
 
 // ============================================================
-// RENDU DES CASES À COCHER
+// RENDU DES CASES À COCHER (CASES VISIBLES)
 // ============================================================
 
 function renderCourtInterface() {
@@ -64,59 +63,71 @@ function renderCourtInterface() {
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
 
-    function renderCheckboxes(player) {
+    function renderCheckboxes(player, playerId) {
         let html = '';
         
         // Zone dangereuse (VERT)
         html += `<div class="mb-4">
-            <p class="text-sm font-bold text-emerald-400 uppercase">🟢 Points gagnés en zone dangereuse</p>
-            <div class="grid grid-cols-5 gap-2 mt-2">`;
+            <p class="text-sm font-bold text-emerald-400 uppercase mb-2">🟢 Points gagnés en zone dangereuse</p>
+            <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].danger[i] ? 'checked' : '';
-            html += `<label class="flex items-center justify-center rounded-lg p-2 cursor-pointer transition-all ${checked ? 'bg-emerald-600 ring-2 ring-white' : 'bg-emerald-900/50 hover:bg-emerald-700'}">
-                <input type="checkbox" class="hidden" data-player="${player}" data-zone="danger" data-index="${i}" ${checked} onchange="window.updateCheckbox(this)">
-                <span class="text-sm font-bold ${checked ? 'text-white' : 'text-emerald-300'}">${i+1}</span>
-            </label>`;
+            const id = `danger-${player}-${i}`;
+            html += `
+                <div class="flex items-center justify-center">
+                    <input type="checkbox" id="${id}" 
+                           class="w-10 h-10 rounded-lg cursor-pointer transition-all ${checked ? 'bg-emerald-600 border-2 border-white' : 'bg-emerald-900/50 border-2 border-emerald-700 hover:bg-emerald-700'}"
+                           data-player="${player}" data-zone="danger" data-index="${i}" 
+                           ${checked} 
+                           onchange="window.updateCheckbox(this)">
+                </div>
+            `;
         }
         html += `</div></div>`;
 
         // Zone centrale (ROUGE)
         html += `<div>
-            <p class="text-sm font-bold text-red-400 uppercase">🔴 Points gagnés en zone centrale</p>
-            <div class="grid grid-cols-5 gap-2 mt-2">`;
+            <p class="text-sm font-bold text-red-400 uppercase mb-2">🔴 Points gagnés en zone centrale</p>
+            <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].center[i] ? 'checked' : '';
-            html += `<label class="flex items-center justify-center rounded-lg p-2 cursor-pointer transition-all ${checked ? 'bg-red-600 ring-2 ring-white' : 'bg-red-900/50 hover:bg-red-700'}">
-                <input type="checkbox" class="hidden" data-player="${player}" data-zone="center" data-index="${i}" ${checked} onchange="window.updateCheckbox(this)">
-                <span class="text-sm font-bold ${checked ? 'text-white' : 'text-red-300'}">${i+1}</span>
-            </label>`;
+            const id = `center-${player}-${i}`;
+            html += `
+                <div class="flex items-center justify-center">
+                    <input type="checkbox" id="${id}" 
+                           class="w-10 h-10 rounded-lg cursor-pointer transition-all ${checked ? 'bg-red-600 border-2 border-white' : 'bg-red-900/50 border-2 border-red-700 hover:bg-red-700'}"
+                           data-player="${player}" data-zone="center" data-index="${i}" 
+                           ${checked} 
+                           onchange="window.updateCheckbox(this)">
+                </div>
+            `;
         }
         html += `</div></div>`;
 
-        // Compteurs (avec couleurs)
+        // Compteurs (avec ID pour mise à jour dynamique)
         const totalDanger = checkboxes[player].danger.filter(Boolean).length;
         const totalCenter = checkboxes[player].center.filter(Boolean).length;
         const total = totalDanger + totalCenter;
+        
         html += `
             <div class="mt-4 grid grid-cols-3 gap-2 text-center text-sm font-bold">
                 <div class="bg-emerald-900/30 p-2 rounded-lg border border-emerald-500">
                     <span class="text-emerald-400">Dangereuse</span><br>
-                    <span class="text-2xl text-white">${totalDanger}</span>
+                    <span id="danger-counter-${playerId}" class="text-2xl text-white">${totalDanger}</span>
                 </div>
                 <div class="bg-red-900/30 p-2 rounded-lg border border-red-500">
                     <span class="text-red-400">Centrale</span><br>
-                    <span class="text-2xl text-white">${totalCenter}</span>
+                    <span id="center-counter-${playerId}" class="text-2xl text-white">${totalCenter}</span>
                 </div>
                 <div class="bg-yellow-900/30 p-2 rounded-lg border border-yellow-500">
                     <span class="text-yellow-400">Total</span><br>
-                    <span class="text-2xl text-yellow-400">${total}</span>
+                    <span id="total-counter-${playerId}" class="text-2xl text-yellow-400">${total}</span>
                 </div>
             </div>
         `;
         return html;
     }
 
-    // Construction du HTML complet
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
@@ -140,11 +151,11 @@ function renderCourtInterface() {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
                 <h4 class="text-lg font-black text-white text-center mb-2">${p1}</h4>
-                ${renderCheckboxes('p1')}
+                ${renderCheckboxes('p1', 'p1')}
             </div>
             <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
                 <h4 class="text-lg font-black text-white text-center mb-2">${p2}</h4>
-                ${renderCheckboxes('p2')}
+                ${renderCheckboxes('p2', 'p2')}
             </div>
         </div>
 
@@ -165,11 +176,34 @@ window.updateCheckbox = function(checkbox) {
     const player = checkbox.dataset.player;
     const zone = checkbox.dataset.zone;
     const index = parseInt(checkbox.dataset.index);
+    
+    // Mettre à jour l'état
     checkboxes[player][zone][index] = checkbox.checked;
+    
+    // Mettre à jour le style de la case
+    if (checkbox.checked) {
+        if (zone === 'danger') {
+            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-emerald-600 border-2 border-white';
+        } else {
+            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-red-600 border-2 border-white';
+        }
+    } else {
+        if (zone === 'danger') {
+            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-emerald-900/50 border-2 border-emerald-700 hover:bg-emerald-700';
+        } else {
+            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-red-900/50 border-2 border-red-700 hover:bg-red-700';
+        }
+    }
+    
     updateScores();
 };
 
+// ============================================================
+// MISE À JOUR DES SCORES ET COMPTEURS
+// ============================================================
+
 function updateScores() {
+    // Calculer les totaux
     const dangerP1 = checkboxes.p1.danger.filter(Boolean).length;
     const centerP1 = checkboxes.p1.center.filter(Boolean).length;
     const dangerP2 = checkboxes.p2.danger.filter(Boolean).length;
@@ -183,16 +217,35 @@ function updateScores() {
     stats.p2.danger = dangerP2;
     stats.p2.center = centerP2;
 
+    // Mettre à jour les scores en haut
     document.getElementById('score-p1').innerText = matchPoints.p1;
     document.getElementById('score-p2').innerText = matchPoints.p2;
+
+    // Mettre à jour les compteurs en bas
+    const counters = [
+        { id: 'danger-counter-p1', value: dangerP1 },
+        { id: 'center-counter-p1', value: centerP1 },
+        { id: 'total-counter-p1', value: matchPoints.p1 },
+        { id: 'danger-counter-p2', value: dangerP2 },
+        { id: 'center-counter-p2', value: centerP2 },
+        { id: 'total-counter-p2', value: matchPoints.p2 }
+    ];
+    
+    counters.forEach(c => {
+        const el = document.getElementById(c.id);
+        if (el) el.innerText = c.value;
+    });
 }
+
+// ============================================================
+// RESET
+// ============================================================
 
 window.resetMatch = function() {
     checkboxes = {
         p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
         p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
     };
-    updateScores();
     renderCourtInterface();
 };
 
