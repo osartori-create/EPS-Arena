@@ -1,7 +1,6 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-core.js
 
 import { getJoueurs, getCurrentClasse, updateJoueur, ajouterHistorique } from '../../tournoi-core.js';
-// ✅ Chemin correct depuis variantes/elimination/ vers core/
 import { db, ref, onValue, set } from '../../../../core/firebase-service.js';
 
 let exclus = {};

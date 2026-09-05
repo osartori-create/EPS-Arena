@@ -6,6 +6,7 @@ import { getJoueurs } from '../../tournoi-core.js';
 let currentCode = '';
 let currentClasse = '';
 
+// ✅ Fonction d'initialisation exportée
 export function init(classe) {
     currentClasse = classe;
     initEliminationCore(classe);
@@ -90,6 +91,7 @@ function getStats() {
     return `📊 Éliminations : <span class="font-bold text-yellow-400">${info.eliminations || 0}</span>`;
 }
 
+// Pour l'intégration depuis eleve-app.js
 export function initTournoiKioskFromApp(classe) {
     const activityScreen = document.getElementById('activity-screen');
     let module = document.getElementById('tournoi-module');

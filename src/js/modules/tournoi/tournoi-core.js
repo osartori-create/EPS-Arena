@@ -1,17 +1,12 @@
 // src/js/modules/tournoi/tournoi-core.js
 // Cœur commun à toutes les variantes
 
-// ✅ Chemin correct depuis modules/tournoi/ vers core/
 import { db, ref, onValue, set, update, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
 let joueurs = {};
 let historique = [];
 let config = {};
-
-// ============================================================
-// CHEMINS FIREBASE
-// ============================================================
 
 function getBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -29,10 +24,6 @@ function getHistoriquePath(classe) {
 function getConfigPath(classe) {
     return `${getBasePath(classe)}/config`;
 }
-
-// ============================================================
-// INITIALISATION
-// ============================================================
 
 export function initTournoiCore(classe) {
     currentClasse = classe;
@@ -59,19 +50,11 @@ export function initTournoiCore(classe) {
     });
 }
 
-// ============================================================
-// GETTERS
-// ============================================================
-
 export function getJoueurs() { return joueurs; }
 export function getHistorique() { return historique; }
 export function getConfig() { return config; }
 export function getCurrentClasse() { return currentClasse; }
 export { currentClasse };
-
-// ============================================================
-// SETTERS
-// ============================================================
 
 export function setJoueurs(data) {
     const joueursRef = ref(db, getJoueursPath(currentClasse));
@@ -97,10 +80,6 @@ export function ajouterHistorique(entry) {
     const historiqueRef = ref(db, getHistoriquePath(currentClasse));
     push(historiqueRef, entry);
 }
-
-// ============================================================
-// EXPORT / IMPORT JSON
-// ============================================================
 
 export function exportTournoiData() {
     if (!currentClasse) return alert('Sélectionnez une classe.');

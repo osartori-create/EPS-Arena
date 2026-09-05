@@ -9,7 +9,6 @@ import { showFeedback, showTeamMountain } from './eleve-actions.js';
 import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
 import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
-import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -157,6 +156,7 @@ function showLogin() {
     document.getElementById('code-info')?.classList.add('hidden');
     document.getElementById('btn-quit')?.classList.add('hidden');
     document.getElementById('btn-back-terrain')?.classList.add('hidden');
+    
 
     // Créer le conteneur du module tournoi s'il n'existe pas
     let tournoiModule = document.getElementById('tournoi-module');

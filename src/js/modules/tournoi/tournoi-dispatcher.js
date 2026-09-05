@@ -41,21 +41,20 @@ export async function loadTournoiVariant(classe, mode) {
         console.log(`📦 [Tournoi] Chargement de la variante "${mode}"...`);
         const module = await variantConfig.module();
         
-        // ✅ Récupérer la fonction init (différentes possibilités)
-        const initFn = module.init || module.default?.init || module.initEliminationProf;
-        
+        // Rechercher la fonction init (exportée directement ou via default)
+        const initFn = module.init || module.default?.init;
         if (typeof initFn === 'function') {
             currentUnload = await initFn(classe) || (() => {});
             console.log(`✅ [Tournoi] Variante "${mode}" chargée`);
         } else {
             console.error(`❌ La variante "${mode}" n'exporte pas init()`);
-            // Fallback
+            // Fallback vers la variante par défaut
             const fallback = await getVariantConfig('elimination').module();
-            const fallbackInit = fallback.init || fallback.default?.init || fallback.initEliminationProf;
+            const fallbackInit = fallback.init || fallback.default?.init;
             if (typeof fallbackInit === 'function') {
                 currentUnload = await fallbackInit(classe) || (() => {});
             } else {
-                currentUnload = () => {};
+                console.error('❌ Fallback échoué : aucun init trouvé');
             }
         }
     } catch (error) {
@@ -63,15 +62,12 @@ export async function loadTournoiVariant(classe, mode) {
         // Fallback
         try {
             const fallback = await getVariantConfig('elimination').module();
-            const fallbackInit = fallback.init || fallback.default?.init || fallback.initEliminationProf;
+            const fallbackInit = fallback.init || fallback.default?.init;
             if (typeof fallbackInit === 'function') {
                 currentUnload = await fallbackInit(classe) || (() => {});
-            } else {
-                currentUnload = () => {};
             }
-        } catch (e) {
-            console.error('❌ Fallback échoué :', e);
-            currentUnload = () => {};
+        } catch (e2) {
+            console.error('❌ Fallback échoué :', e2);
         }
     }
 
