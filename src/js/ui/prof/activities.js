@@ -8,7 +8,6 @@ import { db, ref, set, remove } from '../../core/firebase-service.js';
 import { initOrientShowInterface, loadOrientShowAssignments, exportOrientShowConfig, importOrientShowConfig, startOrientShow, stopOrientShow } from '../../modules/orientshow/orientshow-interface.js';
 import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
 import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
-// NOUVEAU : import du module Évaluation
 import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
 
 let currentDiscipline = 'multi';
@@ -26,7 +25,6 @@ export function initActivities() {
     try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
     try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
-    // NOUVEAU : Initialisation Évaluation
     try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
 
     // Exposer les fonctions globales
@@ -37,14 +35,12 @@ export function initActivities() {
         currentDiscipline = disc;
         localStorage.setItem('eps_arena_current_discipline', disc);
 
-        // Cacher toutes les vues de discipline
         const multiView = document.getElementById('viewMultiSettings');
         const coView = document.getElementById('viewCOSettings');
         const osView = document.getElementById('viewOrientShowSettings');
         const escView = document.getElementById('viewEscaladeSettings');
         const bmtView = document.getElementById('viewBadmintonSettings');
         const arcView = document.getElementById('viewArcathlonSettings');
-        // NOUVEAU
         const evalView = document.getElementById('viewEvaluationSettings');
 
         if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
@@ -53,17 +49,15 @@ export function initActivities() {
         if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
         if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
         if (arcView) arcView.classList.toggle('hidden', disc !== 'arcathlon');
-        // NOUVEAU
         if (evalView) evalView.classList.toggle('hidden', disc !== 'evaluation');
 
-        // Mettre à jour les boutons
         const btnMulti = document.getElementById('btnDisc-multi');
         const btnCo = document.getElementById('btnDisc-co');
         const btnOs = document.getElementById('btnDisc-orientshow');
         const btnEsc = document.getElementById('btnDisc-escalade');
         const btnBmt = document.getElementById('btnDisc-badminton');
         const btnArc = document.getElementById('btnDisc-arcathlon');
-        const btnEval = document.getElementById('btnDisc-evaluation'); // NOUVEAU
+        const btnEval = document.getElementById('btnDisc-evaluation');
 
         if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
         if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
@@ -71,9 +65,8 @@ export function initActivities() {
         if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
         if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
         if (btnArc) btnArc.classList.toggle('border-blue-500', disc === 'arcathlon');
-        if (btnEval) btnEval.classList.toggle('border-blue-500', disc === 'evaluation'); // NOUVEAU
+        if (btnEval) btnEval.classList.toggle('border-blue-500', disc === 'evaluation');
 
-        // Initialisation spécifique
         if (disc === 'co') {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
@@ -89,7 +82,6 @@ export function initActivities() {
         if (disc === 'arcathlon') {
             try { initArcathlonInterface(); } catch (e) {}
         }
-        // NOUVEAU
         if (disc === 'evaluation') {
             try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
         }
@@ -98,7 +90,6 @@ export function initActivities() {
     window.switchActivitySubTab = function(subTab) {
         const disc = currentDiscipline;
         
-        // Mettre à jour les boutons
         ['settings', 'live', 'tv'].forEach(tab => {
             const btn = document.getElementById(`subtab-${tab}`);
             if (btn) {
@@ -112,52 +103,44 @@ export function initActivities() {
             }
         });
 
-        // Cacher les paramètres et afficher Live/TV selon le cas
         const multiView = document.getElementById('viewMultiSettings');
         const coView = document.getElementById('viewCOSettings');
         const osView = document.getElementById('viewOrientShowSettings');
         const escView = document.getElementById('viewEscaladeSettings');
         const bmtView = document.getElementById('viewBadmintonSettings');
         const arcView = document.getElementById('viewArcathlonSettings');
-        const evalView = document.getElementById('viewEvaluationSettings'); // NOUVEAU
+        const evalView = document.getElementById('viewEvaluationSettings');
         
-        // On masque TOUTES les vues de réglages
         [multiView, coView, osView, escView, bmtView, arcView, evalView].forEach(el => {
             if (el) el.classList.add('hidden');
         });
 
-        // Cacher les anciennes vues Live et TV globales pour réutiliser leurs conteneurs
         const viewLive = document.getElementById('viewLive');
         const viewTV = document.getElementById('viewTV');
         if (viewLive) viewLive.classList.add('hidden');
         if (viewTV) viewTV.style.display = 'none';
 
         if (subTab === 'settings') {
-            // Afficher la vue de réglages correspondante
             if (disc === 'multi') multiView.classList.remove('hidden');
             else if (disc === 'co') coView.classList.remove('hidden');
             else if (disc === 'orientshow') osView.classList.remove('hidden');
             else if (disc === 'escalade') escView.classList.remove('hidden');
             else if (disc === 'badminton') bmtView.classList.remove('hidden');
             else if (disc === 'arcathlon') arcView.classList.remove('hidden');
-            // NOUVEAU : pour l'évaluation, on affiche sa vue
             else if (disc === 'evaluation') {
                 if (evalView) {
                     evalView.classList.remove('hidden');
-                    // Réinitialiser l'interface au cas où elle a été perdue
                     setTimeout(() => initEvaluationInterface(), 50);
                 }
             }
         } 
         else if (subTab === 'live') {
-            // Afficher le conteneur Live et appeler le bon module
             if (viewLive) viewLive.classList.remove('hidden');
             const container = document.getElementById('live-content');
             container.innerHTML = '<p>Chargement du Live...</p>';
             import('../../ui/prof/live.js').then(module => module.renderLive(disc));
         } 
         else if (subTab === 'tv') {
-            // Afficher le conteneur TV et appeler le bon module
             const tvViewEl = document.getElementById('viewTV');
             if (tvViewEl) {
                 tvViewEl.style.display = 'block';
@@ -175,6 +158,40 @@ export function initActivities() {
                 }, 100);
             }
         }
+    };
+
+    // ✅ FONCTION renderTeams AJOUTÉE
+    window.renderTeams = function() {
+        const container = document.getElementById('teamsGrid');
+        if (!container) return;
+
+        const teams = window.lastTeams || [];
+        if (teams.length === 0) {
+            container.innerHTML = '<p class="text-slate-500 text-center col-span-full">Générez des équipes pour les voir ici.</p>';
+            return;
+        }
+
+        let html = '';
+        teams.forEach(team => {
+            html += `
+                <div class="bg-slate-800 p-4 rounded-2xl border-2 border-slate-600">
+                    <h3 class="text-xl font-black text-blue-400 mb-2">${team.label}</h3>
+                    <div class="space-y-1">
+                        ${team.members.map((m, idx) => `
+                            <div class="flex justify-between items-center bg-slate-900 p-2 rounded-lg border border-slate-700">
+                                <span class="text-white">${m.prenom} ${m.nom}</span>
+                                <span class="text-xs text-slate-400">VMA: ${m.vma || 0}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="mt-2 text-xs text-slate-400">
+                        Total score: ${team.totalScore || 0}
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
     };
 
     window.generateTeams = async function() {
@@ -234,7 +251,7 @@ export function initActivities() {
         });
 
         window.lastTeams = teams;
-        window.renderTeams();
+        window.renderTeams(); // <-- Maintenant cette fonction existe
     };
     
     window.transmettreConfig = async function() {
@@ -332,7 +349,6 @@ export function initActivities() {
             return;
         }
         else {
-            // Multi-activités (par défaut)
             configData.activite = 'multi';
             if (window.lastTeams) {
                 window.lastTeams.forEach((team) => {
