@@ -3,7 +3,7 @@
 
 import { db, ref, onValue, set, update, push } from '../../core/firebase-service.js';
 
-export let currentClasse = '';
+let currentClasse = '';
 let joueurs = {};
 let historique = [];
 let config = {};
@@ -36,7 +36,7 @@ function getConfigPath(classe) {
 export function initTournoiCore(classe) {
     currentClasse = classe;
     joueurs = {};
-    historique = [];
+    historique = {};
     config = {};
 
     const joueursRef = ref(db, getJoueursPath(classe));
@@ -47,7 +47,7 @@ export function initTournoiCore(classe) {
 
     const historiqueRef = ref(db, getHistoriquePath(classe));
     onValue(historiqueRef, (snap) => {
-        historique = snap.val() || [];
+        historique = snap.val() || {};
         window.dispatchEvent(new CustomEvent('tournoi-updated', { detail: { joueurs, historique, config } }));
     });
 

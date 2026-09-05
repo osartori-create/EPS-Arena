@@ -2,6 +2,7 @@
 // Logique spécifique à la variante Élimination
 
 import { getJoueurs, getHistorique, getConfig, getCurrentClasse, updateJoueur, ajouterHistorique } from '../../tournoi-core.js';
+import { db, ref, onValue, set } from '../../../../core/firebase-service.js';
 
 let exclus = {};
 
@@ -41,15 +42,17 @@ export function toggleExclure(code) {
 export function reinitialiserTournoi() {
     if (!confirm('⚠️ Réinitialiser toutes les données du tournoi ?')) return;
     const classe = getCurrentClasse();
-    const joueursRef = ref(db, getJoueursPath(classe));
-    const historiqueRef = ref(db, getHistoriquePath(classe));
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const joueursRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/joueurs`);
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/historique`);
+    const exclusRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/exclus`);
     set(joueursRef, {});
     set(historiqueRef, []);
     setExclus({});
 }
 
-export function init(classe) {
-    // Charger les exclus depuis Firebase (ou localStorage)
+// ✅ Renommée pour éviter le conflit
+export function initEliminationCore(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const exclusRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/exclus`);
     onValue(exclusRef, (snap) => {
@@ -60,4 +63,9 @@ export function init(classe) {
     return () => {
         console.log('🧹 [Élimination] Nettoyage');
     };
+}
+
+// Point d'entrée pour le dispatcher
+export function init(classe) {
+    return initEliminationCore(classe);
 }
