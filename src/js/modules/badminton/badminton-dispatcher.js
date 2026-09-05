@@ -1,7 +1,7 @@
 // src/js/modules/badminton/badminton-dispatcher.js
 // Dispatcher : lit config.mode et charge le bon module
 
-import { getModeConfig, getDefaultMode } from './badminton-registry.js';
+import { getModeConfig, getDefaultMode, getModesList } from './badminton-registry.js';
 import { initBadmintonCommon, currentClasse } from './badminton-common.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 
@@ -93,5 +93,7 @@ export function initBadmintonKiosk(classe) {
     return loadBadmintonMode(classe);
 }
 
-// Pour le professeur : générer la liste des modes
-export { getBadmintonModes } from './badminton-registry.js';
+// ✅ Pour le professeur : générer la liste des modes
+export function getBadmintonModes() {
+    return getModesList();
+}

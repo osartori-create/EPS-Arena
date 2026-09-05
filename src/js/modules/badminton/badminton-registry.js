@@ -16,18 +16,6 @@ export const BADMINTON_MODES = {
         description: 'Saisie des points avec cases à cocher (dangereux/central)'
     }
     // Ajoute ici tes futurs modes
-    // 'training': {
-    //     label: 'Entraînement',
-    //     icon: '🎯',
-    //     module: () => import('./badminton-training.js'),
-    //     description: 'Exercices spécifiques'
-    // },
-    // 'tournoi': {
-    //     label: 'Tournoi',
-    //     icon: '🏆',
-    //     module: () => import('./badminton-tournoi.js'),
-    //     description: 'Gestion d\'un tournoi complet'
-    // },
 };
 
 export function getModeConfig(modeId) {
@@ -58,3 +46,6 @@ export function getModesList() {
         isDefault: config.default || false
     }));
 }
+
+// ✅ Alias pour compatibilité avec le dispatcher
+export const getBadmintonModes = getModesList;
