@@ -268,53 +268,46 @@ function renderCourtInterface() {
     const fPenalty = badmintonFaultPenalty;
 
     // ============================================================
-    // GRILLE 3x3 (comme dans BadZ Impact)
+    // GRILLE 3x3 (identique à BadZ Impact)
     // ============================================================
-    const gridTypes = [
-        ['corner', 'other', 'corner'],
-        ['other', 'center', 'other'],
-        ['corner', 'other', 'corner']
-    ];
-
+    const types = ['corner', 'other', 'corner', 'other', 'center', 'other', 'corner', 'other', 'corner'];
     const pointsMap = {
         center: cPoints,
         other: oPoints,
-        corner: coPoints
+        corner: coPoints,
+        fault: fPoints
     };
     const colorsMap = {
         center: 'bg-blue-500',
         other: 'bg-purple-500',
-        corner: 'bg-orange-500'
+        corner: 'bg-orange-500',
+        fault: 'bg-red-500'
     };
 
     const sideSize = (100 - centerSize) / 2;
 
-    // Génération d'une moitié de terrain avec une grille CSS
+    // Génération d'une moitié de terrain (identique à BadZ Impact)
     function generateHalfCourt(player) {
-        // On définit les tailles pour chaque zone selon sa position
-        const sizes = [
-            [sideSize, centerSize, sideSize],
-            [centerSize, centerSize, centerSize],
-            [sideSize, centerSize, sideSize]
-        ];
+        let zones = '';
+        // On utilise une grille CSS grid pour les 9 zones
+        // 3 colonnes : sideSize, centerSize, sideSize
+        // 3 lignes : sideSize, centerSize, sideSize
+        const gridTemplateColumns = `${sideSize}% ${centerSize}% ${sideSize}%`;
+        const gridTemplateRows = `${sideSize}% ${centerSize}% ${sideSize}%`;
         
-        let html = '';
-        for (let row = 0; row < 3; row++) {
-            html += `<div class="flex w-full" style="height:33.33%;">`;
-            for (let col = 0; col < 3; col++) {
-                const type = gridTypes[row][col];
-                const pts = pointsMap[type] || 0;
-                const color = colorsMap[type] || 'bg-slate-500';
-                const width = sizes[row][col];
-                const height = sizes[col][row]; // symétrique
-                html += `
-                    <div class="zone ${color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80 border border-white/20"
-                         style="width:${width}%; height:${height}%;"
-                         data-points="${pts}" data-type="${type}" data-player="${player}">${pts}</div>
-                `;
-            }
-            html += `</div>`;
+        // On construit le HTML avec grid
+        let html = `<div class="grid w-full h-full" style="grid-template-columns: ${gridTemplateColumns}; grid-template-rows: ${gridTemplateRows};">`;
+        
+        for (let i = 0; i < 9; i++) {
+            const type = types[i];
+            const pts = pointsMap[type] || 0;
+            const color = colorsMap[type] || 'bg-slate-500';
+            html += `
+                <div class="zone ${color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80 border border-white/20"
+                     data-points="${pts}" data-type="${type}" data-player="${player}">${pts}</div>
+            `;
         }
+        html += `</div>`;
         return html;
     }
 
@@ -323,6 +316,7 @@ function renderCourtInterface() {
         const fPt = fPenalty ? fPoints : 0;
         const faultColor = fPenalty ? 'bg-red-500' : 'bg-red-300 opacity-50';
         const faultLabel = fPenalty ? `F ${fPt}` : 'F 0';
+        // Fautes : haut, bas, gauche, droite
         return `
             <div class="fault-area absolute top-0 left-0 w-full h-[10%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
                  data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
@@ -370,7 +364,7 @@ function renderCourtInterface() {
                 <!-- Moitié P1 (gauche) -->
                 <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
                     ${generateFaultAreas('p1')}
-                    <div class="w-full h-full flex flex-col items-center justify-center" style="padding: 10%;">
+                    <div class="w-full h-full flex items-center justify-center" style="padding: 10%;">
                         ${generateHalfCourt('p1')}
                     </div>
                 </div>
@@ -379,7 +373,7 @@ function renderCourtInterface() {
                 <!-- Moitié P2 (droite) -->
                 <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
                     ${generateFaultAreas('p2')}
-                    <div class="w-full h-full flex flex-col items-center justify-center" style="padding: 10%;">
+                    <div class="w-full h-full flex items-center justify-center" style="padding: 10%;">
                         ${generateHalfCourt('p2')}
                     </div>
                 </div>
