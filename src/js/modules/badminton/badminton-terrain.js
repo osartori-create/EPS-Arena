@@ -124,7 +124,7 @@ export async function init(classe, config) {
     console.log('🏸 [Terrain] Mode Classique initialisé');
     
     // Mettre à jour les paramètres
-    badmintonMode = config.mode || 'frontback';
+    badmintonMode = config.terrainType || 'frontback';
     badmintonCenterSize = config.centerSize || 33;
     badmintonCenterPoints = config.centerPoints || 1;
     badmintonOtherPoints = config.otherPoints || 3;

@@ -636,27 +636,30 @@ export function initActivities() {
             if (endTime !== null) configData.endTime = endTime;
         } 
         else if (currentDiscipline === 'badminton') {
-            const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
-            const lettres = ['A','B','C','D','E','F','G','H','I','J'];
-            
-            // ✅ RÉCUPÉRATION DU MODE BADMINTON
-            const mode = window.badmintonMode || 'terrain';
-            
-            configData = {
-                activite: 'badminton',
-                mode: mode,
-                // On peut ajouter d'autres paramètres si besoin
-            };
-            
-            for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
-                const idsTerrain = assignments[t] || [];
-                idsTerrain.forEach((eleveId, index) => {
-                    const lettre = lettres[index] || '?';
-                    localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
-                });
-                configData[t] = idsTerrain.length;
-            }
-        } 
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
+    const lettres = ['A','B','C','D','E','F','G','H','I','J'];
+    
+    // ✅ Récupération du MODE DE JEU (terrain / maniere)
+    const mode = window.badmintonMode || 'terrain';
+    
+    // ✅ Récupération du TYPE DE TERRAIN (frontback / leftright / 4corners)
+    const terrainType = document.getElementById('badmintonMode')?.value || 'frontback';
+    
+    configData = {
+        activite: 'badminton',
+        mode: mode,              // ← pour le dispatcher (terrain ou maniere)
+        terrainType: terrainType, // ← pour le module terrain (frontback/leftright/4corners)
+    };
+    
+    for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
+        const idsTerrain = assignments[t] || [];
+        idsTerrain.forEach((eleveId, index) => {
+            const lettre = lettres[index] || '?';
+            localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
+        });
+        configData[t] = idsTerrain.length;
+    }
+}
         else if (currentDiscipline === 'arcathlon') {
             transmettreArcathlonConfig();
             return;
