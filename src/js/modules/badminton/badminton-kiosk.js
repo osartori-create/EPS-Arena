@@ -251,59 +251,77 @@ function renderClassement() {
 // --- 3. INTERFACE DU TERRAIN 3D ---
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
+    if (!container) return;
 
-    const controlsStyle = `
-        <style>
-            #middle-zone-slider {
-                -webkit-appearance: none; appearance: none;
-                width: 100%; height: 10px;
-                background: #e2e8f0; border-radius: 9999px; outline: none;
-                box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
-            }
-            #middle-zone-slider::-webkit-slider-thumb {
-                -webkit-appearance: none; appearance: none;
-                width: 26px; height: 26px;
-                background: #3b82f6; border-radius: 50%;
-                cursor: pointer; border: 4px solid #ffffff;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            }
-            #middle-zone-slider::-moz-range-thumb {
-                width: 26px; height: 26px;
-                background: #3b82f6; border-radius: 50%;
-                cursor: pointer; border: 4px solid #ffffff;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            }
-            .switch {
-                position: relative; display: inline-block; width: 60px; height: 30px;
-            }
-            .switch input { opacity: 0; width: 0; height: 0; }
-            .slider-toggle {
-                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-                background-color: #94a3b8; transition: .4s; border-radius: 34px;
-            }
-            .slider-toggle:before {
-                position: absolute; content: ""; height: 22px; width: 22px;
-                left: 4px; bottom: 4px; background-color: white;
-                transition: .4s; border-radius: 50%;
-            }
-            input:checked + .slider-toggle { background-color: #3b82f6; }
-            input:checked + .slider-toggle:before { transform: translateX(30px); }
-        </style>
-    `;
+    const mode = window.badmintonMode || 'frontback'; // Récupéré depuis Firebase
+    const centerSize = window.badmintonCenterSize || 33;
+    const faultPenalty = window.badmintonFaultPenalty || false;
+    const cornerPoints = window.badmintonCornerPoints || 3;
+    const faultPoints = window.badmintonFaultPoints || 1;
 
-    const zoneHtml = isFrontBackLayout ? `
-        <div class="flex flex-col h-full">
-            <div class="zone front bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-            <div class="zone middle bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
-            <div class="zone back bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-        </div>` : `
-        <div class="flex flex-row h-full">
-            <div class="zone left bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-            <div class="zone center bg-teal-400" data-player="p1" data-points="${centerPoints}">${centerPoints} pt</div>
-            <div class="zone right bg-green-700" data-player="p1" data-points="${otherPoints}">${otherPoints} pts</div>
-        </div>`;
+    const sideSize = (100 - centerSize) / 2;
 
-    container.innerHTML = controlsStyle + `
+    // Génération des zones selon le mode
+    let zonesHtml = '';
+    if (mode === '4corners') {
+        // 9 zones : 3x3
+        const types = [
+            ['corner', 'other', 'corner'],
+            ['other', 'center', 'other'],
+            ['corner', 'other', 'corner']
+        ];
+        const pointsMap = {
+            center: centerPoints,
+            corner: cornerPoints,
+            other: otherPoints
+        };
+        zonesHtml = types.map(row => 
+            row.map(type => {
+                const pts = pointsMap[type] || 0;
+                const color = type === 'center' ? 'bg-blue-500' : 
+                              type === 'corner' ? 'bg-orange-500' : 'bg-purple-500';
+                return `<div class="zone ${color} flex-1 flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80"
+                          data-points="${pts}" data-type="${type}">${pts}</div>`;
+            }).join('')
+        ).map(row => `<div class="flex flex-1">${row}</div>`).join('');
+        
+        // Ajout des zones Fautes (sur les côtés)
+        const faultColor = faultPenalty ? 'bg-yellow-500 text-black' : 'bg-yellow-300 text-black opacity-50';
+        const faultLabel = faultPenalty ? `⚠️ ${faultPoints} pt` : '⚠️ 0 pt';
+        zonesHtml += `
+            <div class="fault-area absolute top-0 left-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area absolute top-0 right-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area absolute bottom-0 left-0 w-full h-1/6 ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area absolute top-0 left-0 w-full h-1/6 ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+        `;
+    } else {
+        // Mode 3 zones (frontback ou leftright)
+        const isFrontBack = mode === 'frontback';
+        const zones = [
+            { type: 'extreme', size: sideSize, color: 'bg-red-500' },
+            { type: 'center', size: centerSize, color: 'bg-blue-500' },
+            { type: 'extreme', size: sideSize, color: 'bg-red-500' }
+        ];
+        zonesHtml = zones.map(z => {
+            const pts = z.type === 'center' ? centerPoints : otherPoints;
+            const style = isFrontBack ? `height:${z.size}%; width:100%` : `width:${z.size}%; height:100%`;
+            return `<div class="zone ${z.color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80"
+                      style="${style}" data-points="${pts}" data-type="${z.type}">${pts}</div>`;
+        }).join('');
+        
+        if (isFrontBack) {
+            zonesHtml = `<div class="flex flex-col w-full h-full">${zonesHtml}</div>`;
+        } else {
+            zonesHtml = `<div class="flex w-full h-full">${zonesHtml}</div>`;
+        }
+    }
+
+    // Construction du HTML complet
+    container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
                 <h3 class="text-3xl font-black text-white">${currentMatch.p1}</h3>
@@ -316,39 +334,23 @@ function renderCourtInterface() {
             </div>
         </div>
 
-        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-4 flex gap-4 items-center justify-between">
-            <div class="flex items-center gap-2 flex-1">
-                <label class="text-xs font-bold text-slate-400">Zone : <span id="zone-size-display">${middleZoneSize}%</span></label>
-                <input type="range" id="middle-zone-slider" min="20" max="60" value="${middleZoneSize}" class="w-full">
-            </div>
-
-            <div class="flex items-center gap-3">
-                <label class="text-xs font-bold text-slate-400">${isFrontBackLayout ? 'Avant/Arrière' : 'Gauche/Droite'}</label>
-                <label class="switch">
-                    <input type="checkbox" id="layout-switch" ${!isFrontBackLayout ? 'checked' : ''}>
-                    <span class="slider-toggle"></span>
-                </label>
-            </div>
-
-            <div class="flex gap-2">
-                <select id="center-points" class="bg-slate-900 text-white p-1 rounded text-xs">
-                    <option value="1">Centre : 1</option><option value="2">Centre : 2</option><option value="3">Centre : 3</option>
-                </select>
-                <select id="other-points" class="bg-slate-900 text-white p-1 rounded text-xs">
-                    <option value="1">Extérieur : 1</option><option value="2">Extérieur : 2</option><option value="3" selected>Extérieur : 3</option>
-                </select>
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-4">
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold text-slate-400">Zone : <span id="zone-size-display">${centerSize}%</span></label>
+                <input type="range" id="middle-zone-slider" min="20" max="60" value="${centerSize}" class="w-full">
             </div>
         </div>
 
-        <div id="court" class="court-container relative w-full mx-auto mb-4 shadow-2xl" style="background-color: #15803d; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
+        <div id="court" class="court-container relative w-full mx-auto mb-4 shadow-2xl" 
+             style="background-color: #15803d; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
             <div class="absolute inset-0 flex">
                 <div class="half-court w-1/2 h-full relative p-0">
-                    ${zoneHtml}
+                    ${zonesHtml.replace(/p1/g, 'p1')}
                     <div id="ratio-p1" class="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
                 </div>
                 <div class="w-1 h-full bg-black"></div>
                 <div class="half-court w-1/2 h-full relative p-0">
-                    ${zoneHtml.replace(/p1/g, 'p2')}
+                    ${zonesHtml.replace(/p1/g, 'p2')}
                     <div id="ratio-p2" class="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
                 </div>
             </div>
@@ -362,16 +364,10 @@ function renderCourtInterface() {
         </div>
     `;
 
+    // Attacher les événements
     document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
-    document.getElementById('center-points').addEventListener('change', updateZonePoints);
-    document.getElementById('other-points').addEventListener('change', updateZonePoints);
     document.getElementById('court').addEventListener('click', handleImpact);
     document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
-
-    document.getElementById('layout-switch').addEventListener('change', (e) => {
-        isFrontBackLayout = !e.target.checked;
-        renderCourtInterface();
-    });
 
     updateZoneSize();
 }
@@ -503,43 +499,43 @@ window.endMatch = function() {
     
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
-    const s1 = matchPoints.p2; // Inversion B-E
+    const s1 = matchPoints.p2;
     const s2 = matchPoints.p1;
 
     if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
-        // ✅ Création de l'objet statistiques complet
         const stats = {
-            p1: { 
-                extreme: ratioData.p1.extreme, 
-                middle: ratioData.p1.middle,
-                total: matchPoints.p1 
-            },
-            p2: { 
-                extreme: ratioData.p2.extreme, 
-                middle: ratioData.p2.middle, 
-                total: matchPoints.p2 
-            }
+            p1: { extreme: ratioData.p1.extreme, middle: ratioData.p1.middle, total: matchPoints.p1 },
+            p2: { extreme: ratioData.p2.extreme, middle: ratioData.p2.middle, total: matchPoints.p2 },
+            corner: { p1: ratioData.p1.corner || 0, p2: ratioData.p2.corner || 0 },
+            fault: { p1: ratioData.p1.fault || 0, p2: ratioData.p2.fault || 0 }
         };
 
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
         
-        // ✅ Ajout de "stats" dans l'objet envoyé à Firebase
         update(resultRef, { 
             terrain: currentTerrain, 
             p1, p2, s1, s2, 
-            stats: stats, // <--- C'est ici que la donnée d'impact est collectée !
+            stats: stats,
+            mode: window.badmintonMode || 'frontback',
             timestamp: Date.now() 
         })
         .then(() => {
-            // Mise à jour locale des scores pour le classement
             const matchIndex = matchSchedule.findIndex(m => m.id === currentMatch.id);
             if (matchIndex !== -1) {
                 matchSchedule[matchIndex].s1 = s1;
                 matchSchedule[matchIndex].s2 = s2;
             }
             
-            // Retour à la liste des matchs et au classement
+            // ✅ Afficher les graphiques après le match
+            import('./badminton-charts.js').then(module => {
+                const matchData = {
+                    stats: stats,
+                    mode: window.badmintonMode || 'frontback'
+                };
+                module.renderBadmintonStatsModal(matchData, p1, p2);
+            });
+            
             currentMatch = null;
             renderMatchSetup();
         })

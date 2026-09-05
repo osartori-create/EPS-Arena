@@ -6,6 +6,10 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 
 const MAX_PAR_TERRAIN = 5;
 
+// ============================================================
+// INITIALISATION DE L'INTERFACE PROFESSEUR
+// ============================================================
+
 export function initBadmintonInterface(nbTerrains = 6, force = false) {
     const container = document.getElementById('postesGridBadminton');
     if (!container) return;
@@ -13,12 +17,10 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
     const activeClasse = document.getElementById('selectClasse').value;
     const savedData = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     
-    // Si on force, on utilise le nombre passé, sinon on regarde la sauvegarde
     let nbTerrainsCalcule = nbTerrains;
     if (!force && savedData.nbTerrains) {
         nbTerrainsCalcule = savedData.nbTerrains;
     } else if (!force) {
-        // Estimation par défaut
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         const joueurs = eleves.filter(e => e.code !== 'INAPTE' && e.code !== 'ABS');
         if (joueurs.length > 0) {
@@ -26,7 +28,6 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
         }
     }
 
-    // Génération du HTML
     let html = '';
     for (let i = 1; i <= nbTerrainsCalcule; i++) {
         html += `
@@ -40,7 +41,6 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
     }
     container.innerHTML = html;
 
-    // Sauvegarde du nombre de terrains
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     assignments.nbTerrains = nbTerrainsCalcule;
     localStorage.setItem(`eps_arena_badminton_assignments_${activeClasse}`, JSON.stringify(assignments));
@@ -49,10 +49,13 @@ export function initBadmintonInterface(nbTerrains = 6, force = false) {
     setTimeout(() => initSortableBadminton(), 100);
 }
 
+// ============================================================
+// GÉNÉRATION DES TERRAINS PAR NIVEAU DE FORCE
+// ============================================================
+
 export function generateBadmintonTeams(eleves, nbTerrains = 6) {
     const activeClasse = document.getElementById('selectClasse').value;
     
-    // On force l'interface avec le bon nombre de terrains
     initBadmintonInterface(nbTerrains, true);
 
     const absents = eleves.filter(e => e.code === 'ABS');
@@ -61,16 +64,14 @@ export function generateBadmintonTeams(eleves, nbTerrains = 6) {
 
     joueurs.sort((a, b) => (b.force || 0) - (a.force || 0) || Math.random() - 0.5);
 
-    // Répartition équilibrée : chaque terrain reçoit au moins 1 élève, les plus forts en premier.
     const nbJoueurs = joueurs.length;
-    const nbParTerrain = Math.floor(nbJoueurs / nbTerrains); // base
-    const reste = nbJoueurs % nbTerrains; // combien de terrains auront 1 élève de plus
+    const nbParTerrain = Math.floor(nbJoueurs / nbTerrains);
+    const reste = nbJoueurs % nbTerrains;
 
     const terrains = Array.from({ length: nbTerrains }, () => []);
 
     let index = 0;
     for (let t = 0; t < nbTerrains; t++) {
-        // Nombre d'élèves pour ce terrain (base + 1 si t < reste)
         const taille = nbParTerrain + (t < reste ? 1 : 0);
         for (let i = 0; i < taille; i++) {
             if (index < nbJoueurs) {
@@ -80,11 +81,9 @@ export function generateBadmintonTeams(eleves, nbTerrains = 6) {
         }
     }
 
-    // Les inaptes sont répartis équitablement (juste pour le décompte)
     inaptes.forEach((eleve, index) => {
-        const terrainIndex = index % nbTerrains;
         eleve.isPlaying = false;
-        terrains[terrainIndex].push(eleve);
+        terrains[index % nbTerrains].push(eleve);
     });
 
     const assignments = {
@@ -102,19 +101,19 @@ export function generateBadmintonTeams(eleves, nbTerrains = 6) {
     setTimeout(() => loadBadmintonAssignments(), 100);
 }
 
-// ... Le reste du fichier (initSortableBadminton, createEleveCard, loadBadmintonAssignments, etc.) reste identique à la version précédente.
+// ============================================================
+// GLISSER-DÉPOSER (SORTABLE)
+// ============================================================
 
 export function initSortableBadminton() {
     const absContainer = document.getElementById('reserveBadmintonAbsents');
     const inaptContainer = document.getElementById('reserveBadmintonInaptes');
     
-    // Vérification stricte pour ne pas casser si l'élément n'existe pas
     if (!absContainer || !inaptContainer) {
         console.warn('Conteneurs de réserve Badminton introuvables.');
         return;
     }
 
-    // Destruction propre des anciennes instances
     if (absContainer.__sortable) absContainer.__sortable.destroy();
     if (inaptContainer.__sortable) inaptContainer.__sortable.destroy();
     document.querySelectorAll('.terrain-members').forEach(el => {
@@ -129,6 +128,10 @@ export function initSortableBadminton() {
         el.__sortable = new Sortable(el, { group: 'badminton', animation: 150, onEnd });
     });
 }
+
+// ============================================================
+// CRÉATION D'UNE CARTE ÉLÈVE
+// ============================================================
 
 async function createEleveCard(eleve) {
     const url = await getPhotoUrl(eleve.id);
@@ -163,6 +166,10 @@ async function createEleveCard(eleve) {
     `;
     return div;
 }
+
+// ============================================================
+// CHARGEMENT DES AFFECTATIONS
+// ============================================================
 
 export async function loadBadmintonAssignments() {
     const activeClasse = document.getElementById('selectClasse').value;
@@ -217,6 +224,10 @@ export async function loadBadmintonAssignments() {
     setTimeout(() => initSortableBadminton(), 100);
 }
 
+// ============================================================
+// SAUVEGARDE DES AFFECTATIONS
+// ============================================================
+
 export function saveBadmintonAssignments() {
     const activeClasse = document.getElementById('selectClasse').value;
     const assignments = { reserveAbsents: [], reserveInaptes: [], nbTerrains: window.currentBadmintonTerrains || 6 };
@@ -237,6 +248,10 @@ export function saveBadmintonAssignments() {
     localStorage.setItem(`eps_arena_badminton_assignments_${activeClasse}`, JSON.stringify(assignments));
 }
 
+// ============================================================
+// MISE À JOUR DES CODES (A, B, C...)
+// ============================================================
+
 export function updateCodes() {
     document.querySelectorAll('[data-terrain]').forEach(terrainDiv => {
         const membersDiv = terrainDiv.querySelector('.terrain-members');
@@ -255,15 +270,40 @@ export function updateCodes() {
     });
 }
 
-// --- IMPORT / EXPORT JSON ---
+// ============================================================
+// EXPORT / IMPORT JSON
+// ============================================================
+
 export function exportBadmintonConfig() {
     const activeClasse = document.getElementById('selectClasse').value;
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     
+    // Récupérer les paramètres avancés
+    const mode = document.getElementById('badmintonMode')?.value || 'frontback';
+    const centerSize = parseInt(document.getElementById('badmintonCenterSize')?.value) || 33;
+    const centerPoints = parseInt(document.getElementById('badmintonCenterPoints')?.value) || 1;
+    const otherPoints = parseInt(document.getElementById('badmintonOtherPoints')?.value) || 3;
+    const cornerPoints = parseInt(document.getElementById('badmintonCornerPoints')?.value) || 3;
+    const faultPoints = parseInt(document.getElementById('badmintonFaultPoints')?.value) || 1;
+    const faultPenalty = document.getElementById('badmintonFaultPenalty')?.checked || false;
+
     const date = new Date();
     const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
 
-    const data = { version: 1, classe: activeClasse, activite: 'badminton', date: dateStr, ...assignments };
+    const data = {
+        version: 2,
+        classe: activeClasse,
+        activite: 'badminton',
+        date: dateStr,
+        mode: mode,
+        centerSize: centerSize,
+        centerPoints: centerPoints,
+        otherPoints: otherPoints,
+        cornerPoints: cornerPoints,
+        faultPoints: faultPoints,
+        faultPenalty: faultPenalty,
+        ...assignments
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -279,6 +319,18 @@ export function importBadmintonConfig(event) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.classe || !data.nbTerrains) throw new Error("Format de fichier invalide");
+            
+            // Restaurer les paramètres avancés (si présents)
+            if (data.version >= 2) {
+                if (data.mode) document.getElementById('badmintonMode').value = data.mode;
+                if (data.centerSize) document.getElementById('badmintonCenterSize').value = data.centerSize;
+                if (data.centerPoints) document.getElementById('badmintonCenterPoints').value = data.centerPoints;
+                if (data.otherPoints) document.getElementById('badmintonOtherPoints').value = data.otherPoints;
+                if (data.cornerPoints) document.getElementById('badmintonCornerPoints').value = data.cornerPoints;
+                if (data.faultPoints) document.getElementById('badmintonFaultPoints').value = data.faultPoints;
+                if (data.faultPenalty !== undefined) document.getElementById('badmintonFaultPenalty').checked = data.faultPenalty;
+            }
+            
             localStorage.setItem(`eps_arena_badminton_assignments_${data.classe}`, JSON.stringify(data));
             
             const select = document.getElementById('selectClasse');
@@ -296,4 +348,50 @@ export function importBadmintonConfig(event) {
     };
     reader.readAsText(file);
     event.target.value = '';
+}
+
+// ============================================================
+// TRANSMISSION FIREBASE (AVEC PARAMÈTRES AVANCÉS)
+// ============================================================
+
+export async function transmettreBadmintonConfig() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe.");
+
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
+    const localMapping = {};
+    const configData = { activite: 'badminton' };
+
+    // Paramètres avancés
+    configData.mode = document.getElementById('badmintonMode')?.value || 'frontback';
+    configData.centerSize = parseInt(document.getElementById('badmintonCenterSize')?.value) || 33;
+    configData.centerPoints = parseInt(document.getElementById('badmintonCenterPoints')?.value) || 1;
+    configData.otherPoints = parseInt(document.getElementById('badmintonOtherPoints')?.value) || 3;
+    configData.cornerPoints = parseInt(document.getElementById('badmintonCornerPoints')?.value) || 3;
+    configData.faultPoints = parseInt(document.getElementById('badmintonFaultPoints')?.value) || 1;
+    configData.faultPenalty = document.getElementById('badmintonFaultPenalty')?.checked || false;
+
+    // Terrains
+    const lettres = ['A','B','C','D','E','F','G','H','I','J'];
+    for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
+        const idsTerrain = assignments[t] || [];
+        idsTerrain.forEach((eleveId, index) => {
+            const lettre = lettres[index] || '?';
+            localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
+        });
+        configData[t] = idsTerrain.length;
+    }
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const basePath = `etablissements/0680013V/profs/${profCode}`;
+
+    try {
+        await set(ref(db, `${basePath}/${activeClasse}/config`), configData);
+        await set(ref(db, `${basePath}/active_classes/${activeClasse}`), true);
+        localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
+        alert("✅ Configuration Badminton transmise aux iPads !");
+    } catch (e) {
+        console.error("Erreur transmission :", e);
+        alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
+    }
 }
