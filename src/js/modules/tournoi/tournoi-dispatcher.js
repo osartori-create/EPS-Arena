@@ -2,7 +2,7 @@
 // Dispatcher : charge la bonne variante du tournoi
 
 import { getVariantConfig, getDefaultVariant } from './tournoi-registry.js';
-import { initTournoiCore, currentClasse } from './tournoi-core.js';
+import { initTournoiCore, getCurrentClasse } from './tournoi-core.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 
 let currentVariant = null;
@@ -21,7 +21,7 @@ export async function loadTournoiVariant(classe, mode) {
     }
 
     // Initialiser le cœur commun (une seule fois)
-    if (!currentClasseName) {
+    if (!getCurrentClasse()) {
         initTournoiCore(classe);
         currentClasseName = classe;
     }

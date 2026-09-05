@@ -3,7 +3,7 @@
 
 import { db, ref, onValue, set, update, push } from '../../core/firebase-service.js';
 
-let currentClasse = '';
+export let currentClasse = '';
 let joueurs = {};
 let historique = [];
 let config = {};
