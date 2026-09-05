@@ -3,8 +3,11 @@
 
 import { 
     currentTerrain, matchSchedule, playersList, terrainsConfig,
-    renderMatchSetup, renderClassement
+    renderMatchSetup, renderClassement, currentClasse
 } from './badminton-common.js';
+
+// ✅ Imports Firebase manquants
+import { db, ref, update } from '../../core/firebase-service.js';
 
 const SEUIL_MANIERE = 8;
 
@@ -72,10 +75,9 @@ function renderCourtInterface() {
             <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].danger[i] ? 'checked' : '';
-            const id = `danger-${player}-${i}`;
             html += `
                 <div class="flex items-center justify-center">
-                    <input type="checkbox" id="${id}" 
+                    <input type="checkbox" 
                            class="w-10 h-10 rounded-lg cursor-pointer transition-all ${checked ? 'bg-emerald-600 border-2 border-white' : 'bg-emerald-900/50 border-2 border-emerald-700 hover:bg-emerald-700'}"
                            data-player="${player}" data-zone="danger" data-index="${i}" 
                            ${checked} 
@@ -91,10 +93,9 @@ function renderCourtInterface() {
             <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].center[i] ? 'checked' : '';
-            const id = `center-${player}-${i}`;
             html += `
                 <div class="flex items-center justify-center">
-                    <input type="checkbox" id="${id}" 
+                    <input type="checkbox" 
                            class="w-10 h-10 rounded-lg cursor-pointer transition-all ${checked ? 'bg-red-600 border-2 border-white' : 'bg-red-900/50 border-2 border-red-700 hover:bg-red-700'}"
                            data-player="${player}" data-zone="center" data-index="${i}" 
                            ${checked} 
@@ -104,7 +105,7 @@ function renderCourtInterface() {
         }
         html += `</div></div>`;
 
-        // Compteurs (avec ID pour mise à jour dynamique)
+        // Compteurs
         const totalDanger = checkboxes[player].danger.filter(Boolean).length;
         const totalCenter = checkboxes[player].center.filter(Boolean).length;
         const total = totalDanger + totalCenter;
@@ -177,7 +178,6 @@ window.updateCheckbox = function(checkbox) {
     const zone = checkbox.dataset.zone;
     const index = parseInt(checkbox.dataset.index);
     
-    // Mettre à jour l'état
     checkboxes[player][zone][index] = checkbox.checked;
     
     // Mettre à jour le style de la case
@@ -203,7 +203,6 @@ window.updateCheckbox = function(checkbox) {
 // ============================================================
 
 function updateScores() {
-    // Calculer les totaux
     const dangerP1 = checkboxes.p1.danger.filter(Boolean).length;
     const centerP1 = checkboxes.p1.center.filter(Boolean).length;
     const dangerP2 = checkboxes.p2.danger.filter(Boolean).length;
@@ -217,11 +216,9 @@ function updateScores() {
     stats.p2.danger = dangerP2;
     stats.p2.center = centerP2;
 
-    // Mettre à jour les scores en haut
     document.getElementById('score-p1').innerText = matchPoints.p1;
     document.getElementById('score-p2').innerText = matchPoints.p2;
 
-    // Mettre à jour les compteurs en bas
     const counters = [
         { id: 'danger-counter-p1', value: dangerP1 },
         { id: 'center-counter-p1', value: centerP1 },
@@ -319,10 +316,14 @@ window.endMatchManiere = function() {
     renderMatchSetup();
 };
 
+// ============================================================
+// SAUVEGARDE FIREBASE (avec imports corrigés)
+// ============================================================
+
 function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, winner = null, loser = null) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const currentClasse = document.querySelector('#class-select')?.value || '';
-    const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${window.currentMatchId}`);
+    const classe = currentClasse || document.querySelector('#class-select')?.value || '';
+    const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results/${window.currentMatchId}`);
 
     const data = {
         terrain: currentTerrain,
