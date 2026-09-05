@@ -12,7 +12,6 @@ export function renderBadmintonTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
-    // Forcer l'affichage TV
     const tvView = document.getElementById('viewTV');
     if (tvView) {
         tvView.style.display = 'block';
@@ -34,39 +33,33 @@ export function renderBadmintonTV() {
 
     currentClasse = classe;
 
-    // ✅ Récupérer le mapping local et les élèves
     const mapping = getLocalMapping(classe) || {};
     const studentsMap = getStudentsMap(classe) || {};
 
     console.log("📋 [TV] Mapping local :", mapping);
     console.log("📋 [TV] StudentsMap :", studentsMap);
 
-    function getEleveFromCode(code) {
-        const key = `${classe}_${code}`;
+    function getEleveFromCode(terrain, lettre) {
+        const key = `${classe}_${terrain}_${lettre}`;
         if (mapping[key]) {
             const eleveId = mapping[key];
-            const nom = studentsMap[eleveId] || code;
+            const nom = studentsMap[eleveId] || `${lettre}`;
             return { id: eleveId, nom: nom };
         }
-        const match = code.match(/^(\d+)_([A-Z])$/);
-        if (match) {
-            const terrain = match[1];
-            const lettre = match[2];
-            for (const [key, value] of Object.entries(mapping)) {
-                if (key.startsWith(`${classe}_${terrain}_${lettre}`)) {
-                    if (Array.isArray(value)) {
-                        const eleveId = value[0] || value;
-                        const nom = studentsMap[eleveId] || code;
-                        return { id: eleveId, nom: nom };
-                    } else {
-                        const eleveId = value;
-                        const nom = studentsMap[eleveId] || code;
-                        return { id: eleveId, nom: nom };
-                    }
+        for (const [k, v] of Object.entries(mapping)) {
+            if (k.startsWith(`${classe}_${terrain}_${lettre}`)) {
+                if (Array.isArray(v)) {
+                    const eleveId = v[0] || v;
+                    const nom = studentsMap[eleveId] || `${lettre}`;
+                    return { id: eleveId, nom: nom };
+                } else {
+                    const eleveId = v;
+                    const nom = studentsMap[eleveId] || `${lettre}`;
+                    return { id: eleveId, nom: nom };
                 }
             }
         }
-        return { id: null, nom: code };
+        return { id: null, nom: `${lettre}` };
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -81,31 +74,34 @@ export function renderBadmintonTV() {
 
         Object.values(data).forEach(m => {
             if (!m.p1 || !m.p2) return;
+            const terrain = m.terrain || '1';
+            const code1 = `${terrain}_${m.p1}`;
+            const code2 = `${terrain}_${m.p2}`;
             const pts1 = m.pts1 || 0;
             const pts2 = m.pts2 || 0;
 
-            if (!classement[m.p1]) classement[m.p1] = { pts: 0, wins: 0, losses: 0, diff: 0, avec: 0, sans: 0 };
-            if (!classement[m.p2]) classement[m.p2] = { pts: 0, wins: 0, losses: 0, diff: 0, avec: 0, sans: 0 };
+            if (!classement[code1]) classement[code1] = { pts: 0, wins: 0, losses: 0, diff: 0, avec: 0, sans: 0, terrain, lettre: m.p1 };
+            if (!classement[code2]) classement[code2] = { pts: 0, wins: 0, losses: 0, diff: 0, avec: 0, sans: 0, terrain, lettre: m.p2 };
 
-            classement[m.p1].pts += pts1;
-            classement[m.p2].pts += pts2;
+            classement[code1].pts += pts1;
+            classement[code2].pts += pts2;
 
             if (m.winner === m.p1) {
-                classement[m.p1].wins++;
-                classement[m.p2].losses++;
-                if (m.avecManiere1) classement[m.p1].avec++;
-                else classement[m.p1].sans++;
+                classement[code1].wins++;
+                classement[code2].losses++;
+                if (m.avecManiere1) classement[code1].avec++;
+                else classement[code1].sans++;
             } else if (m.winner === m.p2) {
-                classement[m.p2].wins++;
-                classement[m.p1].losses++;
-                if (m.avecManiere2) classement[m.p2].avec++;
-                else classement[m.p2].sans++;
+                classement[code2].wins++;
+                classement[code1].losses++;
+                if (m.avecManiere2) classement[code2].avec++;
+                else classement[code2].sans++;
             }
 
             const diff1 = (m.score1 || 0) - (m.score2 || 0);
             const diff2 = (m.score2 || 0) - (m.score1 || 0);
-            classement[m.p1].diff += diff1;
-            classement[m.p2].diff += diff2;
+            classement[code1].diff += diff1;
+            classement[code2].diff += diff2;
         });
 
         const sorted = Object.entries(classement).sort((a, b) => b[1].pts - a[1].pts || b[1].diff - a[1].diff);
@@ -140,7 +136,7 @@ export function renderBadmintonTV() {
 
         for (let i = 0; i < Math.min(sorted.length, 5); i++) {
             const [code, stats] = sorted[i];
-            const joueur = getEleveFromCode(code);
+            const joueur = getEleveFromCode(stats.terrain || '1', stats.lettre);
             const photoHtml = await getPhotoFromId(joueur.id);
             const rankClass = i === 0 ? 'gold' : (i === 1 ? 'silver' : (i === 2 ? 'bronze' : ''));
             const medaille = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i+1}.`));
@@ -181,7 +177,7 @@ export function renderBadmintonTV() {
         `;
 
         for (const [code, stats] of sorted) {
-            const joueur = getEleveFromCode(code);
+            const joueur = getEleveFromCode(stats.terrain || '1', stats.lettre);
             const idx = sorted.findIndex(([c]) => c === code);
             const bg = idx % 2 === 0 ? 'background: #1e293b;' : 'background: #0f172a;';
             html += `

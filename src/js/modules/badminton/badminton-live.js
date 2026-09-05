@@ -20,47 +20,39 @@ export function renderBadmintonLive() {
 
     currentClasse = classe;
 
-    // ✅ Récupérer le mapping local et les élèves
     const mapping = getLocalMapping(classe) || {};
     const studentsMap = getStudentsMap(classe) || {};
 
     console.log("📋 [Live] Mapping local :", mapping);
     console.log("📋 [Live] StudentsMap :", studentsMap);
 
-    // Fonction pour retrouver un élève à partir d'un code (ex: "1_A")
-    function getEleveFromCode(code) {
-        // Recherche directe dans le mapping
-        const key = `${classe}_${code}`;
+    // ✅ Fonction corrigée : utilise le terrain et la lettre
+    function getEleveFromCode(terrain, lettre) {
+        // Construire la clé complète : "classe_terrain_lettre"
+        const key = `${classe}_${terrain}_${lettre}`;
+        console.log(`🔍 [Live] Recherche de ${key}`);
         if (mapping[key]) {
             const eleveId = mapping[key];
-            const nom = studentsMap[eleveId] || code;
+            const nom = studentsMap[eleveId] || `${lettre}`;
             return { id: eleveId, nom: nom };
         }
 
-        // Recherche avec tableau (cas où plusieurs joueurs par lettre)
-        const match = code.match(/^(\d+)_([A-Z])$/);
-        if (match) {
-            const terrain = match[1];
-            const lettre = match[2];
-            // Chercher une clé qui commence par `${classe}_${terrain}_${lettre}`
-            for (const [key, value] of Object.entries(mapping)) {
-                if (key.startsWith(`${classe}_${terrain}_${lettre}`)) {
-                    // Si c'est un tableau, prendre l'élément approprié
-                    if (Array.isArray(value)) {
-                        // On n'a pas l'index, on prend le premier
-                        const eleveId = value[0] || value;
-                        const nom = studentsMap[eleveId] || code;
-                        return { id: eleveId, nom: nom };
-                    } else {
-                        const eleveId = value;
-                        const nom = studentsMap[eleveId] || code;
-                        return { id: eleveId, nom: nom };
-                    }
+        // Si on a un tableau (plusieurs joueurs par lettre), on prend le premier
+        for (const [k, v] of Object.entries(mapping)) {
+            if (k.startsWith(`${classe}_${terrain}_${lettre}`)) {
+                if (Array.isArray(v)) {
+                    const eleveId = v[0] || v;
+                    const nom = studentsMap[eleveId] || `${lettre}`;
+                    return { id: eleveId, nom: nom };
+                } else {
+                    const eleveId = v;
+                    const nom = studentsMap[eleveId] || `${lettre}`;
+                    return { id: eleveId, nom: nom };
                 }
             }
         }
 
-        return { id: null, nom: code };
+        return { id: null, nom: `${lettre}` };
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -84,22 +76,23 @@ export function renderBadmintonLive() {
         `;
 
         for (const m of matchs.slice(0, 20)) {
-            const p1Code = m.p1 || '?';
-            const p2Code = m.p2 || '?';
+            const terrain = m.terrain || '1';
+            const p1Lettre = m.p1 || '?';
+            const p2Lettre = m.p2 || '?';
             const score1 = m.score1 || 0;
             const score2 = m.score2 || 0;
             const style1 = m.avecManiere1 ? '✅ avec manière' : '❌ sans manière';
             const style2 = m.avecManiere2 ? '✅ avec manière' : '❌ sans manière';
 
-            // ✅ Récupérer les infos des joueurs
-            const joueur1 = getEleveFromCode(p1Code);
-            const joueur2 = getEleveFromCode(p2Code);
+            // ✅ Récupérer les infos avec terrain + lettre
+            const joueur1 = getEleveFromCode(terrain, p1Lettre);
+            const joueur2 = getEleveFromCode(terrain, p2Lettre);
 
             const photo1 = await getPhotoFromId(joueur1.id);
             const photo2 = await getPhotoFromId(joueur2.id);
 
-            const winner = m.winner === p1Code ? p1Code : (m.winner === p2Code ? p2Code : '?');
-            const couleurGagnant = winner === p1Code ? 'text-emerald-400' : (winner === p2Code ? 'text-emerald-400' : 'text-yellow-400');
+            const winner = m.winner === p1Lettre ? p1Lettre : (m.winner === p2Lettre ? p2Lettre : '?');
+            const couleurGagnant = winner === p1Lettre ? 'text-emerald-400' : (winner === p2Lettre ? 'text-emerald-400' : 'text-yellow-400');
 
             html += `
                 <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
@@ -107,13 +100,13 @@ export function renderBadmintonLive() {
                         <div class="flex items-center gap-2">
                             ${photo1}
                             <span class="font-black text-white">${joueur1.nom}</span>
-                            <span class="text-[10px] text-slate-500">${p1Code}</span>
+                            <span class="text-[10px] text-slate-500">T${terrain}-${p1Lettre}</span>
                         </div>
                         <div class="text-center">
                             <span class="text-3xl font-black text-yellow-400">${score1} - ${score2}</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="text-[10px] text-slate-500">${p2Code}</span>
+                            <span class="text-[10px] text-slate-500">T${terrain}-${p2Lettre}</span>
                             <span class="font-black text-white">${joueur2.nom}</span>
                             ${photo2}
                         </div>
