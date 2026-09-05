@@ -485,6 +485,7 @@ export function initActivities() {
             `;
         }).join('');
 
+        
         // ============================================================
         // AFFICHER LES ÉLÈVES EXCLUS (ABSENTS / INAPTES)
         // ============================================================
@@ -755,4 +756,42 @@ export function initActivities() {
     // ============================================================
     try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}
+}
+// ============================================================
+// AFFICHER LES ÉLÈVES EXCLUS (ABSENTS / INAPTES) AVEC BOUTON RÉINTÉGRER
+// ============================================================
+const elevesExclus = eleves.filter(e => {
+    const statut = statuts[e.id] || 'present';
+    return statut !== 'present';
+});
+
+if (elevesExclus.length > 0) {
+    let exclHtml = `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mt-4">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">🚫 Élèves non inclus (${elevesExclus.length})</h4>
+            <div class="flex flex-wrap gap-3">
+    `;
+    for (const eleve of elevesExclus) {
+        const url = await getPhotoUrl(eleve.id);
+        const photoHtml = url ? `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">` : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+        const statut = statuts[eleve.id] || 'present';
+        const statutLabel = statut === 'absent' ? '🚫 Absent' : '⚠️ Inapte';
+        const statutColor = statut === 'absent' ? 'bg-red-500/20 border-red-500' : 'bg-orange-500/20 border-orange-500';
+        exclHtml += `
+            <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${statutColor}">
+                ${photoHtml}
+                <div>
+                    <span class="font-black text-white text-sm">${eleve.prenom}</span>
+                    <span class="text-xs text-slate-400">${eleve.nom}</span>
+                    <span class="text-[10px] font-bold block ${statut === 'absent' ? 'text-red-400' : 'text-orange-400'}">${statutLabel}</span>
+                </div>
+                <button onclick="window.setEleveStatut('${eleve.id}', 'present')" 
+                        class="ml-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] px-2 py-1 rounded font-bold transition-colors">
+                    ✅ Réintégrer
+                </button>
+            </div>
+        `;
+    }
+    exclHtml += `</div></div>`;
+    container.insertAdjacentHTML('afterend', exclHtml);
 }
