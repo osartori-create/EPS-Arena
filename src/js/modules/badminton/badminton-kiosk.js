@@ -261,63 +261,61 @@ function renderCourtInterface() {
 
     const mode = badmintonMode;
     const centerSize = badmintonCenterSize;
-    const cPoints = badmintonCenterPoints;      // 1
-    const oPoints = badmintonOtherPoints;       // 3
-    const coPoints = badmintonCornerPoints;     // 5
-    const fPoints = badmintonFaultPoints;       // 1
+    const cPoints = badmintonCenterPoints;
+    const oPoints = badmintonOtherPoints;
+    const coPoints = badmintonCornerPoints;
+    const fPoints = badmintonFaultPoints;
     const fPenalty = badmintonFaultPenalty;
 
     // ============================================================
-    // GRILLE 3x3 POUR CHAQUE 1/2 TERRAIN (comme dans BadZ Impact)
+    // GRILLE 3x3 (comme dans BadZ Impact)
     // ============================================================
-    // Légende : 0=Centre (1), 1=Autre (3), 2=Coin (5)
-    const grid3x3 = [
-        [2, 1, 2],
-        [1, 0, 1],
-        [2, 1, 2]
+    const gridTypes = [
+        ['corner', 'other', 'corner'],
+        ['other', 'center', 'other'],
+        ['corner', 'other', 'corner']
     ];
 
     const pointsMap = {
-        0: cPoints,   // Centre → 1
-        1: oPoints,   // Autre → 3
-        2: coPoints   // Coin → 5
-    };
-    const typeMap = {
-        0: 'center',
-        1: 'other',
-        2: 'corner'
+        center: cPoints,
+        other: oPoints,
+        corner: coPoints
     };
     const colorsMap = {
-        0: 'bg-blue-500',
-        1: 'bg-purple-500',
-        2: 'bg-orange-500'
+        center: 'bg-blue-500',
+        other: 'bg-purple-500',
+        corner: 'bg-orange-500'
     };
 
-    // Génération de la grille 3x3 pour une moitié
+    const sideSize = (100 - centerSize) / 2;
+
+    // Génération d'une moitié de terrain avec une grille CSS
     function generateHalfCourt(player) {
-        // Calcul des tailles
-        const centerSizePct = centerSize;
-        const sideSizePct = (100 - centerSizePct) / 2;
-
-        // Grille 3x3 avec tailles variables
-        const gridSizes = [
-            [sideSizePct, centerSizePct, sideSizePct],
-            [centerSizePct, centerSizePct, centerSizePct],
-            [sideSizePct, centerSizePct, sideSizePct]
+        // On définit les tailles pour chaque zone selon sa position
+        const sizes = [
+            [sideSize, centerSize, sideSize],
+            [centerSize, centerSize, centerSize],
+            [sideSize, centerSize, sideSize]
         ];
-
-        return grid3x3.map((row, rowIndex) => 
-            row.map((val, colIndex) => {
-                const pts = pointsMap[val] || 0;
-                const type = typeMap[val] || 'other';
-                const color = colorsMap[val] || 'bg-slate-500';
-                const width = gridSizes[rowIndex][colIndex];
-                const height = gridSizes[colIndex][rowIndex]; // symétrique
-                return `<div class="zone ${color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80 border border-white/20"
-                          style="width:${width}%; height:${height}%;"
-                          data-points="${pts}" data-type="${type}" data-player="${player}">${pts}</div>`;
-            }).join('')
-        ).map(row => `<div class="flex w-full h-full">${row}</div>`).join('');
+        
+        let html = '';
+        for (let row = 0; row < 3; row++) {
+            html += `<div class="flex w-full" style="height:33.33%;">`;
+            for (let col = 0; col < 3; col++) {
+                const type = gridTypes[row][col];
+                const pts = pointsMap[type] || 0;
+                const color = colorsMap[type] || 'bg-slate-500';
+                const width = sizes[row][col];
+                const height = sizes[col][row]; // symétrique
+                html += `
+                    <div class="zone ${color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80 border border-white/20"
+                         style="width:${width}%; height:${height}%;"
+                         data-points="${pts}" data-type="${type}" data-player="${player}">${pts}</div>
+                `;
+            }
+            html += `</div>`;
+        }
+        return html;
     }
 
     // Génération des zones Fautes (rouges) sur les bords
@@ -325,15 +323,14 @@ function renderCourtInterface() {
         const fPt = fPenalty ? fPoints : 0;
         const faultColor = fPenalty ? 'bg-red-500' : 'bg-red-300 opacity-50';
         const faultLabel = fPenalty ? `F ${fPt}` : 'F 0';
-        // Fautes en haut, bas, gauche, droite
         return `
-            <div class="fault-area absolute top-0 left-0 w-full h-[8%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
+            <div class="fault-area absolute top-0 left-0 w-full h-[10%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
                  data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
-            <div class="fault-area absolute bottom-0 left-0 w-full h-[8%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
+            <div class="fault-area absolute bottom-0 left-0 w-full h-[10%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
                  data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
-            <div class="fault-area absolute top-0 left-0 w-[8%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
+            <div class="fault-area absolute top-0 left-0 w-[10%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
                  data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
-            <div class="fault-area absolute top-0 right-0 w-[8%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
+            <div class="fault-area absolute top-0 right-0 w-[10%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
                  data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
         `;
     }
@@ -371,18 +368,18 @@ function renderCourtInterface() {
              style="background-color: #15803d; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
             <div class="absolute inset-0 flex">
                 <!-- Moitié P1 (gauche) -->
-                <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.3);">
+                <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
                     ${generateFaultAreas('p1')}
-                    <div class="w-full h-full flex items-center justify-center" style="padding: 6%;">
+                    <div class="w-full h-full flex flex-col items-center justify-center" style="padding: 10%;">
                         ${generateHalfCourt('p1')}
                     </div>
                 </div>
                 <!-- Filet -->
                 <div class="w-1 h-full bg-white/80" style="box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
                 <!-- Moitié P2 (droite) -->
-                <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.3);">
+                <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
                     ${generateFaultAreas('p2')}
-                    <div class="w-full h-full flex items-center justify-center" style="padding: 6%;">
+                    <div class="w-full h-full flex flex-col items-center justify-center" style="padding: 10%;">
                         ${generateHalfCourt('p2')}
                     </div>
                 </div>
@@ -399,11 +396,7 @@ function renderCourtInterface() {
 
     // Attacher les événements
     document.getElementById('middle-zone-slider').addEventListener('input', function() {
-        const val = parseInt(this.value);
-        document.getElementById('zone-size-display').innerText = val + '%';
-        // Re-rendre le terrain pour mettre à jour les tailles
-        // On pourrait stocker les paramètres et re-rendre, mais on garde simple
-        // pour l'instant on laisse l'info visuelle
+        document.getElementById('zone-size-display').innerText = this.value + '%';
     });
 
     document.getElementById('court').addEventListener('click', handleImpact);
