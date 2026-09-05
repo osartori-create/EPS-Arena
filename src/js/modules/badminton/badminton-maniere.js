@@ -1,7 +1,7 @@
 // src/js/modules/badminton/badminton-maniere.js
 // Mode "Avec la manière" : cases à cocher, points dangereux/centraux
-// Version avec arrêt automatique à 11 points, bonus ET seuil "Avec la manière" paramétrables
-// Colorisation garantie avec appearance: none
+// Version simplifiée : bonus uniquement sur les points en zone dangereuse (vert)
+// Seuil "avec la manière" = nombre de cases cochées en vert (paramétrable 3-8)
 
 import { 
     currentTerrain, matchSchedule, playersList, terrainsConfig,
@@ -15,13 +15,14 @@ import { db, ref, update } from '../../core/firebase-service.js';
 // ============================================================
 
 const SEUIL_GAGNANT = 11;
-let BONUS_MANIERE = 5;
+let SEUIL_MANIERE = 5; // Nombre de points en zone dangereuse pour obtenir le bonus
 
 // ============================================================
 // ÉTAT
 // ============================================================
 
 let matchPoints = { p1: 0, p2: 0 };
+let dangerPoints = { p1: 0, p2: 0 }; // Points en zone dangereuse (vert)
 let stats = {
     p1: { danger: 0, center: 0 },
     p2: { danger: 0, center: 0 }
@@ -40,8 +41,8 @@ export async function init(classe, config) {
     console.log('📊 [Maniere] Mode "Avec la manière" initialisé');
 
     if (config && config.bonusManiere) {
-        BONUS_MANIERE = Math.max(3, Math.min(8, parseInt(config.bonusManiere) || 5));
-        console.log(`📊 [Maniere] Bonus ET Seuil "Avec la manière" : ${BONUS_MANIERE} pts`);
+        SEUIL_MANIERE = Math.max(3, Math.min(8, parseInt(config.bonusManiere) || 5));
+        console.log(`📊 [Maniere] Seuil "Avec la manière" (points verts) : ${SEUIL_MANIERE}`);
     }
 
     window.selectMatchFromList = function(matchId) {
@@ -49,6 +50,7 @@ export async function init(classe, config) {
         if (!match || match.s1 !== null) return;
         window.currentMatchId = matchId;
         matchPoints = { p1: 0, p2: 0 };
+        dangerPoints = { p1: 0, p2: 0 };
         stats = { p1: { danger: 0, center: 0 }, p2: { danger: 0, center: 0 } };
         checkboxes = {
             p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
@@ -67,7 +69,7 @@ export async function init(classe, config) {
 }
 
 // ============================================================
-// RENDU DES CASES À COCHER (AVEC APPEARANCE: NONE)
+// RENDU DES CASES À COCHER
 // ============================================================
 
 function renderCourtInterface() {
@@ -83,9 +85,8 @@ function renderCourtInterface() {
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
 
-    // ✅ Styles avec appearance: none pour garantir la couleur
     function getDangerStyle(index, checked) {
-        const isBonus = (index + 1) >= BONUS_MANIERE;
+        const isBonus = (index + 1) >= SEUIL_MANIERE;
         const baseStyle = 'appearance: none; -webkit-appearance: none; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s;';
         if (checked) {
             return baseStyle + (isBonus 
@@ -99,16 +100,12 @@ function renderCourtInterface() {
     }
 
     function getCenterStyle(index, checked) {
-        const isRouge = (index + 1) >= 7;
+        // ✅ Plus de coloriage rouge, on garde un style neutre
         const baseStyle = 'appearance: none; -webkit-appearance: none; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s;';
         if (checked) {
-            return baseStyle + (isRouge 
-                ? 'background-color: #f87171; border: 2px solid #ffffff; opacity: 1;' 
-                : 'background-color: #dc2626; border: 2px solid #ffffff; opacity: 1;');
+            return baseStyle + 'background-color: #475569; border: 2px solid #ffffff; opacity: 1;';
         } else {
-            return baseStyle + (isRouge 
-                ? 'background-color: #7f1d1d; border: 2px solid #f87171; opacity: 0.7;' 
-                : 'background-color: #2a1a1a; border: 2px solid #7f1d1d; opacity: 0.7;');
+            return baseStyle + 'background-color: #1e293b; border: 2px solid #475569; opacity: 0.7;';
         }
     }
 
@@ -117,7 +114,7 @@ function renderCourtInterface() {
         
         // Zone dangereuse (VERT)
         html += `<div class="mb-4">
-            <p class="text-sm font-bold text-emerald-400 uppercase mb-2">🟢 Points gagnés en zone dangereuse (Bonus : ${BONUS_MANIERE} pts)</p>
+            <p class="text-sm font-bold text-emerald-400 uppercase mb-2">🟢 Points en zone dangereuse (Bonus à partir de ${SEUIL_MANIERE})</p>
             <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].danger[i] ? 'checked' : '';
@@ -136,14 +133,14 @@ function renderCourtInterface() {
         html += `</div>
             <div class="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
                 <span>1</span>
-                <span class="text-emerald-400">🔹 Bonus & "Avec la manière" à partir de ${BONUS_MANIERE}</span>
+                <span class="text-emerald-400">🔹 Bonus à partir de ${SEUIL_MANIERE} points verts</span>
                 <span>10</span>
             </div>
         </div>`;
 
-        // Zone centrale (ROUGE)
+        // Zone centrale (neutre)
         html += `<div>
-            <p class="text-sm font-bold text-red-400 uppercase mb-2">🔴 Points gagnés en zone centrale</p>
+            <p class="text-sm font-bold text-slate-400 uppercase mb-2">⚪ Points en zone centrale</p>
             <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].center[i] ? 'checked' : '';
@@ -162,7 +159,6 @@ function renderCourtInterface() {
         html += `</div>
             <div class="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
                 <span>1</span>
-                <span class="text-red-400">🔹 Zone rouge à partir de 7</span>
                 <span>10</span>
             </div>
         </div>`;
@@ -175,11 +171,11 @@ function renderCourtInterface() {
         html += `
             <div class="mt-4 grid grid-cols-3 gap-2 text-center text-sm font-bold">
                 <div class="bg-emerald-900/30 p-2 rounded-lg border border-emerald-500">
-                    <span class="text-emerald-400">Dangereuse</span><br>
+                    <span class="text-emerald-400">🟢 Vert</span><br>
                     <span id="danger-counter-${playerId}" class="text-2xl text-white">${totalDanger}</span>
                 </div>
-                <div class="bg-red-900/30 p-2 rounded-lg border border-red-500">
-                    <span class="text-red-400">Centrale</span><br>
+                <div class="bg-slate-700/50 p-2 rounded-lg border border-slate-500">
+                    <span class="text-slate-400">⚪ Centre</span><br>
                     <span id="center-counter-${playerId}" class="text-2xl text-white">${totalCenter}</span>
                 </div>
                 <div class="bg-yellow-900/30 p-2 rounded-lg border border-yellow-500">
@@ -196,23 +192,24 @@ function renderCourtInterface() {
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">${p1}</h3>
                 <div class="text-xs text-slate-400">Score : <span id="score-p1" class="font-bold text-yellow-400 text-lg">0</span></div>
+                <div class="text-xs text-emerald-400">Vert : <span id="danger-total-p1" class="font-bold text-emerald-400">0</span></div>
             </div>
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">vs</h3>
-                <div class="text-xs text-slate-400">Seuil "Avec la manière" : <span class="text-yellow-400 font-bold">${BONUS_MANIERE} pts</span></div>
-                <div class="text-xs text-emerald-400">Bonus : <span class="font-bold">${BONUS_MANIERE}</span> pts</div>
-                <div class="text-xs text-slate-500">🏆 Victoire à <span class="font-bold text-yellow-400">${SEUIL_GAGNANT}</span> pts</div>
+                <div class="text-xs text-slate-400">🏆 Victoire à <span class="font-bold text-yellow-400">${SEUIL_GAGNANT}</span> pts</div>
+                <div class="text-xs text-emerald-400">🎯 Bonus "Avec la manière" : <span class="font-bold">${SEUIL_MANIERE}</span> pts verts</div>
             </div>
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">${p2}</h3>
                 <div class="text-xs text-slate-400">Score : <span id="score-p2" class="font-bold text-yellow-400 text-lg">0</span></div>
+                <div class="text-xs text-emerald-400">Vert : <span id="danger-total-p2" class="font-bold text-emerald-400">0</span></div>
             </div>
         </div>
 
         <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-4">
             <p class="text-xs text-slate-400 text-center">Cliquez sur les cases pour enregistrer les points (10 essais max par zone)</p>
-            <p class="text-xs text-slate-500 text-center mt-1">🟢 Cases vertes = bonus "Avec la manière" (≥ ${BONUS_MANIERE}) | 🔴 Zone rouge à partir de 7</p>
-            <p class="text-xs text-yellow-400 text-center mt-1">🏆 "Avec la manière" = score ≥ ${BONUS_MANIERE} pts</p>
+            <p class="text-xs text-slate-500 text-center mt-1">🟢 Cases vertes = bonus "Avec la manière" (≥ ${SEUIL_MANIERE} points verts)</p>
+            <p class="text-xs text-yellow-400 text-center mt-1">🏆 "Avec la manière" = ${SEUIL_MANIERE} points verts ou plus</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -236,7 +233,7 @@ function renderCourtInterface() {
 }
 
 // ============================================================
-// GESTION DES CASES À COCHER (AVEC APPEARANCE: NONE)
+// GESTION DES CASES À COCHER
 // ============================================================
 
 window.updateCheckbox = function(checkbox) {
@@ -249,11 +246,10 @@ window.updateCheckbox = function(checkbox) {
     checkboxes[player][zone][index] = checkbox.checked;
     
     const isDanger = zone === 'danger';
-    const isBonus = isDanger && (index + 1) >= BONUS_MANIERE;
-    const isRouge = !isDanger && (index + 1) >= 7;
-    
+    const isBonus = isDanger && (index + 1) >= SEUIL_MANIERE;
     const baseStyle = 'appearance: none; -webkit-appearance: none; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s;';
     let style = baseStyle;
+    
     if (isDanger) {
         if (checkbox.checked) {
             style += isBonus 
@@ -266,18 +262,13 @@ window.updateCheckbox = function(checkbox) {
         }
     } else {
         if (checkbox.checked) {
-            style += isRouge 
-                ? 'background-color: #f87171; border: 2px solid #ffffff; opacity: 1;' 
-                : 'background-color: #dc2626; border: 2px solid #ffffff; opacity: 1;';
+            style += 'background-color: #475569; border: 2px solid #ffffff; opacity: 1;';
         } else {
-            style += isRouge 
-                ? 'background-color: #7f1d1d; border: 2px solid #f87171; opacity: 0.7;' 
-                : 'background-color: #2a1a1a; border: 2px solid #7f1d1d; opacity: 0.7;';
+            style += 'background-color: #1e293b; border: 2px solid #475569; opacity: 0.7;';
         }
     }
     
     checkbox.style.cssText = style;
-    
     updateScores();
 };
 
@@ -293,6 +284,8 @@ function updateScores() {
 
     matchPoints.p1 = dangerP1 + centerP1;
     matchPoints.p2 = dangerP2 + centerP2;
+    dangerPoints.p1 = dangerP1;
+    dangerPoints.p2 = dangerP2;
 
     stats.p1.danger = dangerP1;
     stats.p1.center = centerP1;
@@ -301,6 +294,8 @@ function updateScores() {
 
     document.getElementById('score-p1').innerText = matchPoints.p1;
     document.getElementById('score-p2').innerText = matchPoints.p2;
+    document.getElementById('danger-total-p1').innerText = dangerP1;
+    document.getElementById('danger-total-p2').innerText = dangerP2;
 
     const counters = [
         { id: 'danger-counter-p1', value: dangerP1 },
@@ -329,9 +324,7 @@ function updateScores() {
 // ============================================================
 
 window.resetMatch = function() {
-    if (matchTermine) {
-        matchTermine = false;
-    }
+    if (matchTermine) matchTermine = false;
     checkboxes = {
         p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
         p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
@@ -340,21 +333,21 @@ window.resetMatch = function() {
 };
 
 // ============================================================
-// FIN DE MATCH (avec seuil = BONUS_MANIERE)
+// FIN DE MATCH (bonus = points verts)
 // ============================================================
 
 window.endMatchManiere = function() {
     const currentMatch = matchSchedule.find(m => m.id === window.currentMatchId);
     if (!currentMatch) return;
 
-    if (matchTermine && matchSchedule.find(m => m.id === window.currentMatchId)?.s1 !== null) {
-        return;
-    }
+    if (matchTermine && matchSchedule.find(m => m.id === window.currentMatchId)?.s1 !== null) return;
 
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
     const score1 = matchPoints.p1;
     const score2 = matchPoints.p2;
+    const vert1 = dangerPoints.p1;
+    const vert2 = dangerPoints.p2;
 
     const estArretAuto = (score1 >= SEUIL_GAGNANT || score2 >= SEUIL_GAGNANT);
     let messageAuto = '';
@@ -363,14 +356,18 @@ window.endMatchManiere = function() {
         messageAuto = `🏆 ${gagnant} a atteint ${SEUIL_GAGNANT} points ! Match terminé automatiquement.`;
     }
 
-    let winner, loser, winnerScore, loserScore;
+    let winner, loser, winnerScore, loserScore, winnerVert, loserVert;
     if (score1 > score2) {
-        winner = p1; loser = p2; winnerScore = score1; loserScore = score2;
+        winner = p1; loser = p2;
+        winnerScore = score1; loserScore = score2;
+        winnerVert = vert1; loserVert = vert2;
     } else if (score2 > score1) {
-        winner = p2; loser = p1; winnerScore = score2; loserScore = score1;
+        winner = p2; loser = p1;
+        winnerScore = score2; loserScore = score1;
+        winnerVert = vert2; loserVert = vert1;
     } else {
-        const avecManiere1 = score1 >= BONUS_MANIERE;
-        const avecManiere2 = score2 >= BONUS_MANIERE;
+        const avecManiere1 = vert1 >= SEUIL_MANIERE;
+        const avecManiere2 = vert2 >= SEUIL_MANIERE;
         const pts1 = avecManiere1 ? 2 : 1;
         const pts2 = avecManiere2 ? 2 : 1;
         const matchIndex = matchSchedule.findIndex(m => m.id === window.currentMatchId);
@@ -381,8 +378,10 @@ window.endMatchManiere = function() {
             matchSchedule[matchIndex].score2 = score2;
             matchSchedule[matchIndex].style1 = avecManiere1 ? 'avec' : 'sans';
             matchSchedule[matchIndex].style2 = avecManiere2 ? 'avec' : 'sans';
+            matchSchedule[matchIndex].vert1 = vert1;
+            matchSchedule[matchIndex].vert2 = vert2;
         }
-        saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2);
+        saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, vert1, vert2);
         const msg = `${messageAuto}\n\nMatch nul ! ${p1} ${score1} pts, ${p2} ${score2} pts`;
         alert(msg);
         window.currentMatchId = null;
@@ -391,8 +390,9 @@ window.endMatchManiere = function() {
         return;
     }
 
-    const winnerAvecManiere = winnerScore >= BONUS_MANIERE;
-    const loserAvecManiere = loserScore >= BONUS_MANIERE;
+    // ✅ Seuil "Avec la manière" basé sur les points verts
+    const winnerAvecManiere = winnerVert >= SEUIL_MANIERE;
+    const loserAvecManiere = loserVert >= SEUIL_MANIERE;
 
     let ptsWinner = winnerAvecManiere ? 5 : 3;
     let ptsLoser = loserAvecManiere ? 2 : 1;
@@ -405,15 +405,17 @@ window.endMatchManiere = function() {
         matchSchedule[matchIndex].score2 = score2;
         matchSchedule[matchIndex].style1 = (winner === p1) ? (winnerAvecManiere ? 'avec' : 'sans') : (loserAvecManiere ? 'avec' : 'sans');
         matchSchedule[matchIndex].style2 = (winner === p2) ? (winnerAvecManiere ? 'avec' : 'sans') : (loserAvecManiere ? 'avec' : 'sans');
+        matchSchedule[matchIndex].vert1 = vert1;
+        matchSchedule[matchIndex].vert2 = vert2;
     }
 
-    saveMatchResult(p1, p2, score1, score2, ptsWinner, ptsLoser, winnerAvecManiere, loserAvecManiere, winner, loser);
+    saveMatchResult(p1, p2, score1, score2, ptsWinner, ptsLoser, winnerAvecManiere, loserAvecManiere, vert1, vert2, winner, loser);
 
     const msg = `
         ${messageAuto}
         🏆 Match terminé !
-        ${p1} : ${score1} pts ${score1 >= BONUS_MANIERE ? '✅ avec manière' : '❌ sans manière'}
-        ${p2} : ${score2} pts ${score2 >= BONUS_MANIERE ? '✅ avec manière' : '❌ sans manière'}
+        ${p1} : ${score1} pts (dont ${vert1} verts) ${winnerAvecManiere ? '✅ avec manière' : '❌ sans manière'}
+        ${p2} : ${score2} pts (dont ${vert2} verts) ${loserAvecManiere ? '✅ avec manière' : '❌ sans manière'}
         Points classement : ${winner} = ${ptsWinner} pts, ${loser} = ${ptsLoser} pts
     `;
     alert(msg);
@@ -427,7 +429,7 @@ window.endMatchManiere = function() {
 // SAUVEGARDE FIREBASE
 // ============================================================
 
-function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, winner = null, loser = null) {
+function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, vert1, vert2, winner = null, loser = null) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const classe = currentClasse || document.querySelector('#class-select')?.value || '';
     const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results/${window.currentMatchId}`);
@@ -437,8 +439,9 @@ function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecM
         p1, p2,
         score1, score2,
         pts1, pts2,
+        vert1, vert2,
         avecManiere1, avecManiere2,
-        bonusManiere: BONUS_MANIERE,
+        seuilManiere: SEUIL_MANIERE,
         winner: winner || (score1 > score2 ? p1 : p2),
         loser: loser || (score1 > score2 ? p2 : p1),
         timestamp: Date.now()
