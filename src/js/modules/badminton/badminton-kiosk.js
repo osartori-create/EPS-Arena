@@ -411,25 +411,37 @@ function generateCourtHTML() {
     const sideSize = (100 - cSize) / 2;
 
     let pClass = is9 ? 'layout-grid' : (m === 'leftright' ? 'layout-row' : 'layout-col');
-    const style3Z = (i) => m === 'frontback' ? (i===1 ? `width:100%;height:${cSize}%` : `width:100%;height:${sideSize}%`) : (i===1 ? `width:${cSize}%;height:100%` : `width:${sideSize}%;height:100%`);
-    const style9Z = (i) => `width:${(i%3===1) ? cSize : sideSize}%;height:${(Math.floor(i/3)===1) ? cSize : sideSize}%`;
+
+    const style3Z = (i) => m === 'frontback' ? 
+        (i === 1 ? `width:100%;height:${cSize}%` : `width:100%;height:${sideSize}%`) : 
+        (i === 1 ? `width:${cSize}%;height:100%` : `width:${sideSize}%;height:100%`);
+
+    const style9Z = (i) => `width:${(i % 3 === 1) ? cSize : sideSize}%;height:${(Math.floor(i / 3) === 1) ? cSize : sideSize}%`;
 
     const genZones = (playerCode) => {
         let zones = '';
         if (!is9) {
-            const pts = [badmintonOtherPoints, badmintonCenterPoints, badmintonOtherPoints];
+            const points = [badmintonOtherPoints, badmintonCenterPoints, badmintonOtherPoints];
             const types = ['extreme', 'center', 'extreme'];
             const colors = ['zone-extreme', 'zone-center', 'zone-extreme'];
-            for (let i=0; i<3; i++) {
-                zones += `<div class="zone ${colors[i]}" data-points="${pts[i]}" data-player="${playerCode}" data-type="${types[i]}" style="${style3Z(i)}">${pts[i]}</div>`;
+            for (let i = 0; i < 3; i++) {
+                zones += `<div class="zone ${colors[i]}" data-points="${points[i]}" data-player="${playerCode}" data-type="${types[i]}" style="${style3Z(i)}">${points[i]}</div>`;
             }
         } else {
-            const types = ['corner','other','corner','other','center','other','corner','other','corner'];
-            const ptsMap = { center: badmintonCenterPoints, other: badmintonOtherPoints, corner: badmintonCornerPoints };
-            const colorsMap = { center: 'zone-center', other: 'zone-other', corner: 'zone-corner' };
-            for (let i=0; i<9; i++) {
+            const types = ['corner', 'other', 'corner', 'other', 'center', 'other', 'corner', 'other', 'corner'];
+            const pointsMap = {
+                center: badmintonCenterPoints,
+                other: badmintonOtherPoints,
+                corner: badmintonCornerPoints
+            };
+            const colorsMap = {
+                center: 'zone-center',
+                other: 'zone-other',
+                corner: 'zone-corner'
+            };
+            for (let i = 0; i < 9; i++) {
                 const type = types[i];
-                const pts = ptsMap[type] || 0;
+                const pts = pointsMap[type] || 0;
                 const color = colorsMap[type] || '';
                 zones += `<div class="zone ${color}" data-points="${pts}" data-player="${playerCode}" data-type="${type}" style="${style9Z(i)}">${pts}</div>`;
             }
@@ -437,27 +449,13 @@ function generateCourtHTML() {
         return zones;
     };
 
-    let faultHtml = '';
-    if (is9) {
-        const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
-        const fLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
-        faultHtml = `
-            <div class="fault-area fault-top fault-p1-top" data-points="${fPt}" data-player="p2" data-type="fault">${fLabel}</div>
-            <div class="fault-area fault-top fault-p2-top" data-points="${fPt}" data-player="p1" data-type="fault">${fLabel}</div>
-            <div class="fault-area fault-bottom fault-p1-bot" data-points="${fPt}" data-player="p2" data-type="fault">${fLabel}</div>
-            <div class="fault-area fault-bottom fault-p2-bot" data-points="${fPt}" data-player="p1" data-type="fault">${fLabel}</div>
-            <div class="fault-area fault-left" data-points="${fPt}" data-player="p2" data-type="fault">${fLabel}</div>
-            <div class="fault-area fault-right" data-points="${fPt}" data-player="p1" data-type="fault">${fLabel}</div>
-        `;
-    }
-
-    return `<div class="court-wrapper ${is9?'mode-9zones':'mode-3zones'}">
+    // ✅ PLUS AUCUNE ZONE DE FAUTE - UNIQUEMENT LA GRILLE
+    return `<div class="court-wrapper ${is9 ? 'mode-9zones' : 'mode-3zones'}">
         <div class="court">
             <div class="player-area ${pClass}" id="area-p1">${genZones('p1')}</div>
             <div class="net"></div>
             <div class="player-area ${pClass}" id="area-p2">${genZones('p2')}</div>
         </div>
-        ${faultHtml}
     </div>`;
 }
 
