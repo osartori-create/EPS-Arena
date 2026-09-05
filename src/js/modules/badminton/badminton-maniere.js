@@ -66,50 +66,62 @@ function renderCourtInterface() {
 
     function renderCheckboxes(player) {
         let html = '';
-        // Zone dangereuse
+        
+        // Zone dangereuse (VERT)
         html += `<div class="mb-4">
-            <p class="text-sm font-bold text-slate-400">Points gagnés en zone dangereuse</p>
+            <p class="text-sm font-bold text-emerald-400 uppercase">🟢 Points gagnés en zone dangereuse</p>
             <div class="grid grid-cols-5 gap-2 mt-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].danger[i] ? 'checked' : '';
-            html += `<label class="flex items-center justify-center bg-slate-700 rounded-lg p-2 cursor-pointer hover:bg-slate-600 transition">
-                <input type="checkbox" class="w-6 h-6 accent-blue-500" data-player="${player}" data-zone="danger" data-index="${i}" ${checked} onchange="window.updateCheckbox(this)">
-                <span class="ml-1 text-xs text-slate-300">${i+1}</span>
+            html += `<label class="flex items-center justify-center rounded-lg p-2 cursor-pointer transition-all ${checked ? 'bg-emerald-600 ring-2 ring-white' : 'bg-emerald-900/50 hover:bg-emerald-700'}">
+                <input type="checkbox" class="hidden" data-player="${player}" data-zone="danger" data-index="${i}" ${checked} onchange="window.updateCheckbox(this)">
+                <span class="text-sm font-bold ${checked ? 'text-white' : 'text-emerald-300'}">${i+1}</span>
             </label>`;
         }
         html += `</div></div>`;
 
-        // Zone centrale
+        // Zone centrale (ROUGE)
         html += `<div>
-            <p class="text-sm font-bold text-slate-400">Points gagnés en zone centrale</p>
+            <p class="text-sm font-bold text-red-400 uppercase">🔴 Points gagnés en zone centrale</p>
             <div class="grid grid-cols-5 gap-2 mt-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].center[i] ? 'checked' : '';
-            html += `<label class="flex items-center justify-center bg-slate-700 rounded-lg p-2 cursor-pointer hover:bg-slate-600 transition">
-                <input type="checkbox" class="w-6 h-6 accent-green-500" data-player="${player}" data-zone="center" data-index="${i}" ${checked} onchange="window.updateCheckbox(this)">
-                <span class="ml-1 text-xs text-slate-300">${i+1}</span>
+            html += `<label class="flex items-center justify-center rounded-lg p-2 cursor-pointer transition-all ${checked ? 'bg-red-600 ring-2 ring-white' : 'bg-red-900/50 hover:bg-red-700'}">
+                <input type="checkbox" class="hidden" data-player="${player}" data-zone="center" data-index="${i}" ${checked} onchange="window.updateCheckbox(this)">
+                <span class="text-sm font-bold ${checked ? 'text-white' : 'text-red-300'}">${i+1}</span>
             </label>`;
         }
         html += `</div></div>`;
 
+        // Compteurs (avec couleurs)
         const totalDanger = checkboxes[player].danger.filter(Boolean).length;
         const totalCenter = checkboxes[player].center.filter(Boolean).length;
         const total = totalDanger + totalCenter;
         html += `
-            <div class="mt-4 flex justify-between text-sm text-slate-400">
-                <span>Zone dangereuse : <span class="font-bold text-white">${totalDanger}</span></span>
-                <span>Zone centrale : <span class="font-bold text-white">${totalCenter}</span></span>
-                <span class="text-yellow-400 font-bold">Total : ${total}</span>
+            <div class="mt-4 grid grid-cols-3 gap-2 text-center text-sm font-bold">
+                <div class="bg-emerald-900/30 p-2 rounded-lg border border-emerald-500">
+                    <span class="text-emerald-400">Dangereuse</span><br>
+                    <span class="text-2xl text-white">${totalDanger}</span>
+                </div>
+                <div class="bg-red-900/30 p-2 rounded-lg border border-red-500">
+                    <span class="text-red-400">Centrale</span><br>
+                    <span class="text-2xl text-white">${totalCenter}</span>
+                </div>
+                <div class="bg-yellow-900/30 p-2 rounded-lg border border-yellow-500">
+                    <span class="text-yellow-400">Total</span><br>
+                    <span class="text-2xl text-yellow-400">${total}</span>
+                </div>
             </div>
         `;
         return html;
     }
 
+    // Construction du HTML complet
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">${p1}</h3>
-                <div id="ratio-p1" class="text-xs text-slate-400">Score : <span id="score-p1">0</span></div>
+                <div class="text-xs text-slate-400">Score : <span id="score-p1" class="font-bold text-yellow-400 text-lg">0</span></div>
             </div>
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">vs</h3>
@@ -117,12 +129,12 @@ function renderCourtInterface() {
             </div>
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">${p2}</h3>
-                <div id="ratio-p2" class="text-xs text-slate-400">Score : <span id="score-p2">0</span></div>
+                <div class="text-xs text-slate-400">Score : <span id="score-p2" class="font-bold text-yellow-400 text-lg">0</span></div>
             </div>
         </div>
 
         <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-4">
-            <p class="text-xs text-slate-400 text-center">Cochez les points gagnés dans chaque zone (10 essais maximum par zone)</p>
+            <p class="text-xs text-slate-400 text-center">Cliquez sur les cases pour enregistrer les points (10 essais max par zone)</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -137,8 +149,8 @@ function renderCourtInterface() {
         </div>
 
         <div class="flex flex-wrap justify-center gap-3 mt-4">
-            <button onclick="window.resetMatch()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm">🔄 Reset</button>
-            <button onclick="window.endMatchManiere()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-black text-sm">🏁 Valider le match</button>
+            <button onclick="window.resetMatch()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">🔄 Reset</button>
+            <button onclick="window.endMatchManiere()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-black text-sm transition-colors">🏁 Valider le match</button>
         </div>
     `;
 
