@@ -247,10 +247,10 @@ window.generateTeams = async function() {
             <div class="bg-slate-900 rounded-2xl p-4 border-4" style="border-color: ${bgColor}">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="font-black text-xl cursor-pointer hover:opacity-80 transition-opacity" 
-                        style="color: ${bgColor}"
-                        onclick="openColorPicker('${team.id}')">
-                        ${team.label}
-                    </h3>
+    style="color: ${bgColor}"
+    onclick="window.openColorPicker('${team.id}')">
+    ${team.label}
+</h3>
                     <button onclick="event.stopPropagation(); window.renameTeam('${team.id}')" 
                             class="text-[10px] text-slate-400 underline hover:text-white transition-colors">
                         Renommer
