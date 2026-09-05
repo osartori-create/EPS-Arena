@@ -333,15 +333,12 @@ export function initActivities() {
             if (activeClasse) {
                 // Charger la variante par défaut (élimination)
                 loadTournoiVariant(activeClasse, 'elimination');
-                // ✅ Initialiser l'interface professeur
+                // Initialiser l'interface professeur avec initProf
                 import('../../modules/tournoi/variantes/elimination/elimination-prof.js').then(module => {
-                    // ✅ Appeler la fonction init exportée (sans .initEliminationProf)
-                    if (typeof module.init === 'function') {
-                        module.init(activeClasse);
-                    } else if (typeof module.initEliminationProf === 'function') {
-                        module.initEliminationProf(activeClasse);
+                    if (module.initProf) {
+                        module.initProf(activeClasse);
                     } else {
-                        console.error('❌ Aucune fonction init trouvée dans elimination-prof.js');
+                        console.error('❌ initProf non trouvé');
                     }
                 }).catch(err => console.error("Erreur chargement tournoi prof :", err));
             } else {

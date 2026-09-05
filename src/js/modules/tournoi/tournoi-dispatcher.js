@@ -35,15 +35,15 @@ export async function loadTournoiVariant(classe, mode) {
     try {
         console.log(`📦 [Tournoi] Chargement de la variante "${mode}"...`);
         const module = await variantConfig.module();
-        // Chercher la fonction init dans module.init ou module.default.init
-        const initFn = module.init || (module.default && module.default.init);
+        // ✅ Chercher init dans module.default ou module
+        const initFn = module.default?.init || module.init;
         if (typeof initFn === 'function') {
             currentUnload = await initFn(classe) || (() => {});
             console.log(`✅ [Tournoi] Variante "${mode}" chargée`);
         } else {
             console.error(`❌ La variante "${mode}" n'exporte pas init()`);
             const fallback = await getVariantConfig('elimination').module();
-            const fbInit = fallback.init || (fallback.default && fallback.default.init);
+            const fbInit = fallback.default?.init || fallback.init;
             if (typeof fbInit === 'function') {
                 currentUnload = await fbInit(classe) || (() => {});
             } else {
@@ -53,7 +53,7 @@ export async function loadTournoiVariant(classe, mode) {
     } catch (error) {
         console.error(`❌ Erreur chargement variante "${mode}":`, error);
         const fallback = await getVariantConfig('elimination').module();
-        const fbInit = fallback.init || (fallback.default && fallback.default.init);
+        const fbInit = fallback.default?.init || fallback.init;
         if (typeof fbInit === 'function') {
             currentUnload = await fbInit(classe) || (() => {});
         }

@@ -1,13 +1,14 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-kiosk.js
-import { ajouterElimination, getExclus, init as initEliminationCore } from './elimination-core.js';
+import { ajouterElimination, getExclus, initCore } from './elimination-core.js';
 import { getJoueurs } from '../../tournoi-core.js';
 
 let currentCode = '';
 let currentClasse = '';
 
+// ✅ Fonction d'initialisation appelée par le dispatcher
 export function init(classe) {
     currentClasse = classe;
-    initEliminationCore(classe);
+    initCore(classe);
     renderKiosk();
     return () => console.log('🧹 [Élimination Kiosk] Nettoyage');
 }

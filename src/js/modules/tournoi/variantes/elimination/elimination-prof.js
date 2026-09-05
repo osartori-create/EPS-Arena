@@ -1,15 +1,16 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-prof.js
 import { getPhotoUrl } from '../../../../services/admin-service.js';
 import { getJoueurs, getCurrentClasse, exportTournoiData, importTournoiData } from '../../tournoi-core.js';
-import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, init as initEliminationCore } from './elimination-core.js';
+import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, initCore } from './elimination-core.js';
 
 let currentClasse = '';
 let showExclus = false;
 let unsubscribe = null;
 
-export function init(classe) {
+// ✅ Fonction d'initialisation appelée depuis activities.js
+export function initProf(classe) {
     currentClasse = classe;
-    initEliminationCore(classe);
+    initCore(classe);
 
     const container = document.getElementById('tournoi-prof-container');
     if (!container) return;

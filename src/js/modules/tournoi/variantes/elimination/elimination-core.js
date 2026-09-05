@@ -40,7 +40,8 @@ export function reinitialiserTournoi() {
     setExclus({});
 }
 
-export function init(classe) {
+// ✅ Fonction d'initialisation du core (utilisée par kiosk et prof)
+export function initCore(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const exclusRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/exclus`);
     onValue(exclusRef, (snap) => {
