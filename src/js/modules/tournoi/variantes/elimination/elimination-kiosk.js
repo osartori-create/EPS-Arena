@@ -1,21 +1,15 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-kiosk.js
 // Interface élève : code + bouton élimination
 
-import { ajouterElimination, getExclus, init } from './elimination-core.js';
+import { ajouterElimination, getExclus, init as initEliminationCore } from './elimination-core.js';
 import { getJoueurs } from '../../tournoi-core.js';
 
 let currentCode = '';
 let currentClasse = '';
 
-export function initEliminationKiosk(classe) {
-    currentClasse = classe;
-    init(classe);
-
-    const container = document.getElementById('tournoi-module');
-    if (!container) return;
-
-    renderKiosk();
-}
+// ============================================================
+// RENDU DE L'INTERFACE ÉLÈVE
+// ============================================================
 
 function renderKiosk() {
     const container = document.getElementById('tournoi-module');
@@ -55,6 +49,10 @@ function renderKiosk() {
         document.getElementById('tournoi-btn-elimine').disabled = false;
     }
 }
+
+// ============================================================
+// FONCTIONS GLOBALES (exposées sur window)
+// ============================================================
 
 window.tournoiSetCode = function(value) {
     currentCode = value.trim();
@@ -104,17 +102,25 @@ window.tournoiElimine = function() {
     }
 };
 
+// ============================================================
+// FONCTIONS UTILITAIRES
+// ============================================================
+
 function getStats() {
     const joueurs = getJoueurs();
     const info = joueurs[currentCode] || { eliminations: 0 };
     return `📊 Éliminations : <span class="font-bold text-yellow-400">${info.eliminations || 0}</span>`;
 }
 
-export function init(classe) {
-    initEliminationKiosk(classe);
-}
+// ============================================================
+// EXPORT DE L'INITIALISATION
+// ============================================================
 
-export function initTournoiKioskFromApp(classe) {
+export function initEliminationKiosk(classe) {
+    currentClasse = classe;
+    initEliminationCore(classe);
+
+    // Créer le module dans l'interface élève
     const activityScreen = document.getElementById('activity-screen');
     let module = document.getElementById('tournoi-module');
     if (!module) {
@@ -124,5 +130,11 @@ export function initTournoiKioskFromApp(classe) {
         activityScreen.appendChild(module);
     }
     module.classList.remove('hidden');
+
+    renderKiosk();
+}
+
+// Point d'entrée pour le dispatcher
+export function init(classe) {
     initEliminationKiosk(classe);
 }

@@ -3,25 +3,15 @@
 
 import { getPhotoUrl } from '../../../services/admin-service.js';
 import { getJoueurs, getHistorique, getConfig, getCurrentClasse, exportTournoiData, importTournoiData } from '../../tournoi-core.js';
-import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, init } from './elimination-core.js';
+import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, init as initEliminationCore } from './elimination-core.js';
 
 let currentClasse = '';
 let showExclus = false;
 let unsubscribe = null;
 
-export function initEliminationProf(classe) {
-    currentClasse = classe;
-    init(classe);
-
-    const container = document.getElementById('tournoi-prof-container');
-    if (!container) return;
-
-    const handler = () => renderProf();
-    window.addEventListener('tournoi-updated', handler);
-    unsubscribe = () => window.removeEventListener('tournoi-updated', handler);
-
-    renderProf();
-}
+// ============================================================
+// RENDU DE L'INTERFACE PROFESSEUR
+// ============================================================
 
 async function renderProf() {
     const container = document.getElementById('tournoi-prof-container');
@@ -143,6 +133,10 @@ async function renderProf() {
     container.innerHTML = html;
 }
 
+// ============================================================
+// PHOTOS
+// ============================================================
+
 async function getPhotoHtml(id) {
     if (!id) return `<span class="text-xl">👤</span>`;
     try {
@@ -155,7 +149,7 @@ async function getPhotoHtml(id) {
 }
 
 // ============================================================
-// FONCTIONS GLOBALES
+// FONCTIONS GLOBALES (exposées sur window)
 // ============================================================
 
 window.tournoiAjouterElim = function(code) {
@@ -200,6 +194,25 @@ window.tournoiImporter = function(event) {
     event.target.value = '';
 };
 
+// ============================================================
+// EXPORT DE L'INITIALISATION
+// ============================================================
+
+export function initEliminationProf(classe) {
+    currentClasse = classe;
+    initEliminationCore(classe);
+
+    const container = document.getElementById('tournoi-prof-container');
+    if (!container) return;
+
+    const handler = () => renderProf();
+    window.addEventListener('tournoi-updated', handler);
+    unsubscribe = () => window.removeEventListener('tournoi-updated', handler);
+
+    renderProf();
+}
+
+// Point d'entrée pour le dispatcher
 export function init(classe) {
     initEliminationProf(classe);
 }
