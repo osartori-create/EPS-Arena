@@ -1,7 +1,7 @@
 // src/js/modules/evaluation/evaluation-sprint.js
 // Saisie du Sprint 30m avec ordre alphabétique circulaire
 
-import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
+import { setResultat, getResultat, setStatutEleve, synchroniserAvecAdmin } from './evaluation-stockage.js';
 import { groupeVitesse } from './evaluation-utils.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
@@ -409,9 +409,14 @@ function arreterChrono() {
             meilleur: meilleur,
             groupe: groupe
         });
-    }
 
-    chronoElapsed = 0;
+        // ✅ Synchroniser si c'est le 3ème essai
+        if (essaisParEleve[eleveSelectionne].length >= maxEssais) {
+            import('./evaluation-stockage.js').then(module => {
+                module.synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'vitesse', meilleur);
+            });
+        }
+    }
 
     // Passer au prochain élève dans l'ordre circulaire
     const eleveActuel = currentEleves.find(e => e.id === eleveSelectionne);

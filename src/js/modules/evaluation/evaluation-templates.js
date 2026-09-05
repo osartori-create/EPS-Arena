@@ -97,7 +97,6 @@ function templateCarteTest(testId, data) {
 
 export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, data, mode = 'individuel') {
     const libelle = LIBELLES_TESTS[testId] || testId;
-    const resultat = eleveEnCours ? data.eleves[eleveEnCours.id]?.resultats?.[testId] : null;
     const isCollectif = (mode === 'collectif');
 
     const statut = eleveEnCours?.statut || 'present';
@@ -335,14 +334,14 @@ export function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant,
 }
 
 // ============================================================
-// TABLEAU DE BORD - avec VMA entre Palier et Force
+// TABLEAU DE BORD (MODIFICATION : colonne VMA ajoutée)
 // ============================================================
 
 export function templateTableauBord(data, classe) {
     const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
     const libellesCourts = {
-        endurance: 'Palier',
+        endurance: 'Endur.',
         force: 'Force',
         vitesse: 'Vit.',
         equilibre: 'Éq.',
@@ -395,56 +394,24 @@ export function templateTableauBord(data, classe) {
                     <thead class="bg-slate-900 text-slate-400 text-xs uppercase border-b border-slate-700">
                         <tr>
                             <th class="p-3 font-bold sticky left-0 bg-slate-900">Élève</th>
-                            <th class="p-3 font-bold text-center">Palier</th>
+                            ${tests.map(testId => `
+                                <th class="p-3 font-bold text-center">
+                                    ${testId === 'endurance' ? 'Palier' : libellesCourts[testId]}
+                                </th>
+                            `).join('')}
                             <th class="p-3 font-bold text-center bg-slate-900 text-emerald-400">VMA</th>
-                            <th class="p-3 font-bold text-center">Force</th>
-                            <th class="p-3 font-bold text-center">Vit.</th>
-                            <th class="p-3 font-bold text-center">Éq.</th>
-                            <th class="p-3 font-bold text-center">Coord.</th>
-                            <th class="p-3 font-bold text-center">Soupl.</th>
-                            <th class="p-3 font-bold text-center">EM</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${eleves.map(e => {
                             const bgRow = e.statut === 'absent' ? 'opacity-40' : '';
                             const statutBadge = e.statut === 'absent' ? '🚫' : (e.statut === 'inapte' ? '⚠️' : '');
-                            
-                            // Récupérer les résultats pour chaque test
-                            const rEndurance = e.resultats.endurance;
-                            const rForce = e.resultats.force;
-                            const rVitesse = e.resultats.vitesse;
-                            const rEquilibre = e.resultats.equilibre;
-                            const rCoordination = e.resultats.coordination;
-                            const rSouplesse = e.resultats.souplesse;
-                            const rEM = e.resultats.endurance_musculaire;
-
-                            // VMA
+                            const enduranceResult = e.resultats.endurance;
                             let vmaAffichage = '--';
-                            if (rEndurance && rEndurance.palier !== undefined && rEndurance.palier !== null) {
-                                const vma = getVMAFromPalier(rEndurance.palier);
+                            if (enduranceResult && enduranceResult.palier !== undefined && enduranceResult.palier !== null) {
+                                const vma = getVMAFromPalier(enduranceResult.palier);
                                 if (vma !== null) vmaAffichage = vma.toFixed(1);
                             }
-
-                            // Fonction pour formater une cellule
-                            const formatCell = (result, testId) => {
-                                if (!result || result.groupe === null) {
-                                    return '<td class="p-3 text-center text-slate-500">--</td>';
-                                }
-                                const couleur = COULEURS_GROUPES[result.groupe] || '#64748b';
-                                let valeur = '';
-                                switch (testId) {
-                                    case 'endurance': valeur = result.palier !== undefined ? result.palier : '--'; break;
-                                    case 'force': valeur = result.meilleur !== undefined ? result.meilleur : '--'; break;
-                                    case 'vitesse': valeur = result.meilleur !== undefined ? result.meilleur.toFixed(1) : '--'; break;
-                                    case 'equilibre': valeur = result.temps !== undefined ? result.temps : '--'; break;
-                                    case 'coordination': valeur = result.nb_lancers !== undefined ? result.nb_lancers : '--'; break;
-                                    case 'souplesse': valeur = result.meilleur !== undefined ? result.meilleur : '--'; break;
-                                    case 'endurance_musculaire': valeur = result.temps !== undefined ? result.temps : '--'; break;
-                                    default: valeur = '--';
-                                }
-                                return `<td class="p-3 text-center"><span class="px-2 py-1 rounded-full text-xs font-black text-white" style="background-color:${couleur}">${valeur}</span></td>`;
-                            };
 
                             return `
                                 <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer ${bgRow}" 
@@ -454,14 +421,35 @@ export function templateTableauBord(data, classe) {
                                         <span>${e.prenom} ${e.nom}</span>
                                         ${statutBadge ? `<span class="text-xs">${statutBadge}</span>` : ''}
                                     </td>
-                                    ${formatCell(rEndurance, 'endurance')}
-                                    <td class="p-3 text-center font-black text-emerald-400">${vmaAffichage}</td>
-                                    ${formatCell(rForce, 'force')}
-                                    ${formatCell(rVitesse, 'vitesse')}
-                                    ${formatCell(rEquilibre, 'equilibre')}
-                                    ${formatCell(rCoordination, 'coordination')}
-                                    ${formatCell(rSouplesse, 'souplesse')}
-                                    ${formatCell(rEM, 'endurance_musculaire')}
+                                    ${tests.map(testId => {
+                                        const r = e.resultats[testId];
+                                        if (!r || r.groupe === null) {
+                                            return `<td class="p-3 text-center text-slate-500">--</td>`;
+                                        }
+                                        const couleur = COULEURS_GROUPES[r.groupe] || '#64748b';
+                                        let valeur = '';
+                                        switch (testId) {
+                                            case 'endurance': valeur = r.palier !== undefined ? r.palier : '--'; break;
+                                            case 'force': 
+                                            case 'souplesse': valeur = r.meilleur !== undefined ? r.meilleur : '--'; break;
+                                            case 'vitesse': valeur = r.meilleur !== undefined ? r.meilleur.toFixed(1) : '--'; break;
+                                            case 'equilibre':
+                                            case 'endurance_musculaire': valeur = r.temps !== undefined ? r.temps : '--'; break;
+                                            case 'coordination': valeur = r.nb_lancers !== undefined ? r.nb_lancers : '--'; break;
+                                            default: valeur = '--';
+                                        }
+                                        return `
+                                            <td class="p-3 text-center">
+                                                <span class="px-2 py-1 rounded-full text-xs font-black text-white" 
+                                                      style="background-color:${couleur}">
+                                                    ${valeur}
+                                                </span>
+                                            </td>
+                                        `;
+                                    }).join('')}
+                                    <td class="p-3 text-center font-black text-emerald-400">
+                                        ${vmaAffichage}
+                                    </td>
                                 </tr>
                             `;
                         }).join('')}
@@ -481,7 +469,7 @@ export function templateTableauBord(data, classe) {
 }
 
 // ============================================================
-// FICHE ÉLÈVE
+// FICHE ÉLÈVE (MODIFICATION : affichage VMA)
 // ============================================================
 
 export function templateFicheEleve(eleve, data, modeEdition = false) {

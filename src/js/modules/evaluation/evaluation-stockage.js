@@ -283,3 +283,4 @@ export function purgerClasseEntiere(classe) {
     localStorage.removeItem(key);
     return true;
 }
+import { getVMAFromPalier } from './evaluation-utils.js';

@@ -1,7 +1,7 @@
 // src/js/modules/evaluation/evaluation-saut.js
 // Saisie du Saut en longueur (style Sprint : colonnes, sélection, slider central)
 
-import { setResultat, getResultat, setStatutEleve } from './evaluation-stockage.js';
+import { setResultat, getResultat, setStatutEleve, synchroniserAvecAdmin } from './evaluation-stockage.js';
 import { groupeForce } from './evaluation-utils.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { templateSliderSaut } from './evaluation-templates.js';
@@ -398,6 +398,13 @@ function validerEssai() {
     });
 
     essaisParEleve[eleveSelectionne] = essais;
+
+    // ✅ Synchroniser si c'est le 3ème essai
+    if (essais.length >= maxEssais) {
+        import('./evaluation-stockage.js').then(module => {
+            module.synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'force', meilleur);
+        });
+    }
 
     if (essais.length >= maxEssais) {
         const prochain = currentEleves.find(e => 

@@ -3,7 +3,7 @@
 // Chrono indépendant basé sur performance.now()
 // Palier 0 = 154s (2min échauffement + 34s intro)
 
-import { setResultat, getResultat } from './evaluation-stockage.js';
+import { setResultat, getResultat, loadOrCreateData, synchroniserAvecAdmin } from './evaluation-stockage.js';
 import { groupeEndurance } from './evaluation-utils.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
@@ -404,6 +404,12 @@ function terminerVMA() {
                 palier: palier,
                 groupe: groupe
             });
+            
+            // ✅ NOUVEAU : Synchroniser avec l'admin (VMA extrapolée)
+            import('./evaluation-stockage.js').then(module => {
+                module.synchroniserAvecAdmin(currentData.classe, e.id, 'endurance', palier);
+            });
+            
             nbSauvegardes++;
         }
     });
@@ -417,15 +423,13 @@ function terminerVMA() {
     }
     if (stopBtn) stopBtn.classList.add('hidden');
 
-    // Mettre à jour les statistiques dans le menu
-    // On recharge les données depuis localStorage pour que le menu soit à jour
+    // Recharger les données
     const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentData.classe}`) || '[]');
     currentData = loadOrCreateData(currentData.classe, elevesData);
     currentData.classe = currentData.classe;
 
-    // Afficher un message
     if (nbSauvegardes > 0) {
-        alert(`✅ VMA terminée ! ${nbSauvegardes} résultat(s) sauvegardé(s).`);
+        alert(`✅ VMA terminée ! ${nbSauvegardes} résultat(s) sauvegardé(s) et synchronisé(s).`);
     } else {
         alert('ℹ️ Aucun résultat enregistré. Cliquez sur les élèves pour valider leurs paliers.');
     }
@@ -434,7 +438,6 @@ function terminerVMA() {
     if (window.evalTerminerTest) {
         window.evalTerminerTest();
     } else {
-        // Fallback : retourner au menu manuellement
         currentMode = 'menu';
         afficherMenu();
     }

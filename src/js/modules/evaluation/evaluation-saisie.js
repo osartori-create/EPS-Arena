@@ -2,7 +2,7 @@
 // Saisie standard pour les tests complémentaires
 // (Équilibre, Coordination, Souplesse, Endurance musculaire)
 
-import { setResultat, getResultat } from './evaluation-stockage.js';
+import { setResultat, getResultat, synchroniserAvecAdmin } from './evaluation-stockage.js';
 import { 
     FONCTIONS_GROUPE, LIBELLES_TESTS, UNITES_TESTS,
     GROUPES, LIBELLES_GROUPES
@@ -131,6 +131,11 @@ function validerStandard() {
     }
     
     setResultat(currentData, currentEleve.id, currentTestId, resultat);
+    
+    // ✅ Synchroniser avec l'admin (pour les tests complémentaires)
+    import('./evaluation-stockage.js').then(module => {
+        module.synchroniserAvecAdmin(currentData.classe, currentEleve.id, currentTestId, valeur);
+    });
     
     // Passer à l'élève suivant
     if (window.evalPasserSuivant) {
