@@ -5,7 +5,7 @@
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
 // ============================================================
-// ÉTAT PARTAGÉ
+// ÉTAT PARTAGÉ (toutes les variables exportées)
 // ============================================================
 
 export let currentClasse = '';
@@ -102,7 +102,7 @@ export function generateRoundRobin() {
 }
 
 // ============================================================
-// CLASSEMENT (avec points style "Avec la manière")
+// CLASSEMENT
 // ============================================================
 
 export function renderClassement(containerId = 'classement') {
@@ -235,6 +235,30 @@ export function renderMatchSetup() {
 }
 
 // ============================================================
+// FONCTIONS GLOBALES (exposées sur window)
+// ============================================================
+
+window.selectBadmintonTerrain = function(terrain) {
+    currentTerrain = parseInt(terrain);
+    renderMatchSetup();
+    // Notifier le mode actif du changement de terrain
+    window.dispatchEvent(new CustomEvent('badminton-terrain-selected', { 
+        detail: { terrain: currentTerrain } 
+    }));
+};
+
+window.retourTerrains = function() {
+    currentTerrain = '';
+    renderTerrainSelection();
+};
+
+// La fonction selectMatchFromList est redéfinie dans chaque mode
+// On la définit ici comme placeholder, chaque mode la surchargera
+window.selectMatchFromList = function(matchId) {
+    console.warn('⚠️ selectMatchFromList doit être surchargée par le mode actif');
+};
+
+// ============================================================
 // FIREBASE : ÉCOUTE DES SCORES
 // ============================================================
 
@@ -262,31 +286,3 @@ export function listenForScoreUpdates() {
         }
     });
 }
-
-// ============================================================
-// FONCTIONS GLOBALES (exposées sur window)
-// ============================================================
-
-window.selectBadmintonTerrain = function(terrain) {
-    currentTerrain = parseInt(terrain);
-    renderMatchSetup();
-    // Notifier le mode actif du changement de terrain
-    window.dispatchEvent(new CustomEvent('badminton-terrain-selected', { 
-        detail: { terrain: currentTerrain } 
-    }));
-};
-
-window.retourTerrains = function() {
-    currentTerrain = '';
-    renderTerrainSelection();
-};
-
-window.selectMatchFromList = function(matchId) {
-    const match = matchSchedule.find(m => m.id === matchId);
-    if (!match || match.s1 !== null) return;
-    
-    // Notifier le mode actif du match sélectionné
-    window.dispatchEvent(new CustomEvent('badminton-match-selected', { 
-        detail: { match, matchId } 
-    }));
-};

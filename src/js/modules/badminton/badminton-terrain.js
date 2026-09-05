@@ -2,7 +2,7 @@
 // Mode "Classique" : terrain 3D, impacts, zones
 
 import { 
-    currentTerrain, currentMatch, matchSchedule, playersList, terrainsConfig,
+    currentTerrain, matchSchedule, playersList, terrainsConfig,
     renderMatchSetup, renderClassement
 } from './badminton-common.js';
 
@@ -132,26 +132,28 @@ export async function init(classe, config) {
     badmintonFaultPoints = config.faultPoints || 1;
     badmintonFaultPenalty = config.faultPenalty !== undefined ? config.faultPenalty : true;
 
-    // Écouter les événements de sélection de match
-    const onMatchSelected = (e) => {
-        const match = e.detail.match;
-        if (match) {
-            matchPoints = { p1: 0, p2: 0 };
-            ratioData = { 
-                p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
-                p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
-            };
-            historyStack = [];
-            redoStack = [];
-            renderCourtInterface();
-        }
+    // Surcharger selectMatchFromList
+    window.selectMatchFromList = function(matchId) {
+        const match = matchSchedule.find(m => m.id === matchId);
+        if (!match || match.s1 !== null) return;
+        window.currentMatchId = matchId;
+        matchPoints = { p1: 0, p2: 0 };
+        ratioData = { 
+            p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
+            p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
+        };
+        historyStack = [];
+        redoStack = [];
+        renderCourtInterface();
     };
-    window.addEventListener('badminton-match-selected', onMatchSelected);
 
     // Fonction de déchargement
     return () => {
         console.log('🧹 [Terrain] Nettoyage');
-        window.removeEventListener('badminton-match-selected', onMatchSelected);
+        // Rétablir la fonction par défaut
+        window.selectMatchFromList = function(matchId) {
+            console.warn('⚠️ selectMatchFromList appelée sans mode actif');
+        };
     };
 }
 
@@ -414,9 +416,6 @@ window.endMatch = function() {
     const s2 = matchPoints.p2;
 
     if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
-        // Ici on utilise le système de points "Avec la manière" pour rester cohérent
-        // Même si le mode est "Classique", on utilise le même système de points
-        // pour le classement (5,3,2,1)
         const SEUIL_MANIERE = 8;
         let winner, loser, winnerScore, loserScore;
         if (s1 > s2) {
@@ -490,22 +489,3 @@ function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecM
         .then(() => console.log('✅ [Terrain] Résultat sauvegardé'))
         .catch(err => alert("Erreur envoi : " + err.message));
 }
-
-// ============================================================
-// ÉCOUTE DES ÉVÉNEMENTS DE SÉLECTION DE MATCH
-// ============================================================
-
-// Remplacer la fonction selectMatchFromList dans le common
-window.selectMatchFromList = function(matchId) {
-    const match = matchSchedule.find(m => m.id === matchId);
-    if (!match || match.s1 !== null) return;
-    window.currentMatchId = matchId;
-    matchPoints = { p1: 0, p2: 0 };
-    ratioData = { 
-        p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
-        p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
-    };
-    historyStack = [];
-    redoStack = [];
-    renderCourtInterface();
-};

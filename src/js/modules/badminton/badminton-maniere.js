@@ -2,7 +2,7 @@
 // Mode "Avec la manière" : cases à cocher, points dangereux/centraux
 
 import { 
-    currentTerrain, currentMatch, matchSchedule, playersList, terrainsConfig,
+    currentTerrain, matchSchedule, playersList, terrainsConfig,
     renderMatchSetup, renderClassement
 } from './badminton-common.js';
 
@@ -25,25 +25,25 @@ let checkboxes = {
 export async function init(classe, config) {
     console.log('📊 [Maniere] Mode "Avec la manière" initialisé');
 
-    // Écouter les événements de sélection de match
-    const onMatchSelected = (e) => {
-        const match = e.detail.match;
-        if (match) {
-            matchPoints = { p1: 0, p2: 0 };
-            stats = { p1: { danger: 0, center: 0 }, p2: { danger: 0, center: 0 } };
-            checkboxes = {
-                p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
-                p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
-            };
-            renderCourtInterface();
-        }
+    // Surcharger selectMatchFromList
+    window.selectMatchFromList = function(matchId) {
+        const match = matchSchedule.find(m => m.id === matchId);
+        if (!match || match.s1 !== null) return;
+        window.currentMatchId = matchId;
+        matchPoints = { p1: 0, p2: 0 };
+        stats = { p1: { danger: 0, center: 0 }, p2: { danger: 0, center: 0 } };
+        checkboxes = {
+            p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
+            p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
+        };
+        renderCourtInterface();
     };
-    window.addEventListener('badminton-match-selected', onMatchSelected);
 
-    // Fonction de déchargement
     return () => {
         console.log('🧹 [Maniere] Nettoyage');
-        window.removeEventListener('badminton-match-selected', onMatchSelected);
+        window.selectMatchFromList = function(matchId) {
+            console.warn('⚠️ selectMatchFromList appelée sans mode actif');
+        };
     };
 }
 
@@ -274,21 +274,3 @@ function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecM
         .then(() => console.log('✅ [Maniere] Résultat sauvegardé'))
         .catch(err => alert("Erreur envoi : " + err.message));
 }
-
-// ============================================================
-// REMPLACER LA FONCTION DE SÉLECTION DE MATCH
-// ============================================================
-
-// Remplacer la fonction selectMatchFromList dans le common
-window.selectMatchFromList = function(matchId) {
-    const match = matchSchedule.find(m => m.id === matchId);
-    if (!match || match.s1 !== null) return;
-    window.currentMatchId = matchId;
-    matchPoints = { p1: 0, p2: 0 };
-    stats = { p1: { danger: 0, center: 0 }, p2: { danger: 0, center: 0 } };
-    checkboxes = {
-        p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
-        p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
-    };
-    renderCourtInterface();
-};
