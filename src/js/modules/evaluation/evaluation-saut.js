@@ -121,7 +121,7 @@ function afficherSaut() {
                 </div>
                 ` : ''}
 
-                <!-- TOISE AVEC SCORE INTÉGRÉ (les boutons sont DANS templateSliderSaut) -->
+                <!-- TOISE AVEC SCORE INTÉGRÉ -->
                 <div class="mt-3">
                     ${templateSliderSaut(valeurSlider, 0, 250, 'cm')}
                 </div>
@@ -377,9 +377,8 @@ function validerEssai() {
     }
     const essais = essaisParEleve[eleveSelectionne] || [];
     if (essais.length >= maxEssais) {
-        import('./evaluation-stockage.js').then(module => {
-        module.synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'force', meilleur);
-    });
+        alert('Cet élève a déjà 3 essais.');
+        return;
     }
 
     const valeur = valeurSlider;
@@ -402,9 +401,7 @@ function validerEssai() {
 
     // ✅ Synchroniser si c'est le 3ème essai
     if (essais.length >= maxEssais) {
-        import('./evaluation-stockage.js').then(module => {
-            module.synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'force', meilleur);
-        });
+        synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'force', meilleur);
     }
 
     if (essais.length >= maxEssais) {
