@@ -37,7 +37,6 @@ export function initSaisieSaut(zone, eleve, data, testId, eleves) {
         }
     });
 
-    // Sélectionner le premier élève qui n'a pas 3 essais
     const premier = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais) || currentEleves[0];
     eleveSelectionne = premier?.id || null;
 
@@ -69,13 +68,11 @@ function afficherSaut() {
     const essaisSel = eleveSel ? (essaisParEleve[eleveSel.id] || []) : [];
     const meilleurSel = essaisSel.length > 0 ? Math.max(...essaisSel) : null;
 
-    // Prochain élève (par ordre alphabétique, premier qui n'a pas 3 essais et n'est pas sélectionné)
     const prochainEleve = currentEleves.find(e => 
         e.id !== eleveSelectionne && 
         (essaisParEleve[e.id]?.length || 0) < maxEssais
     );
 
-    // Valeur du slider
     if (essaisSel.length === 0) {
         valeurSlider = 120;
     } else if (essaisSel.length === 1) {
@@ -83,6 +80,8 @@ function afficherSaut() {
     } else {
         valeurSlider = Math.max(...essaisSel);
     }
+
+    const estTermine = essaisSel.length >= maxEssais;
 
     zoneSaisie.innerHTML = `
         <div class="space-y-4">
@@ -122,7 +121,7 @@ function afficherSaut() {
                 </div>
                 ` : ''}
 
-                <!-- TOISE AVEC SCORE INTÉGRÉ -->
+                <!-- TOISE AVEC SCORE INTÉGRÉ (les boutons sont DANS templateSliderSaut) -->
                 <div class="mt-3">
                     ${templateSliderSaut(valeurSlider, 0, 250, 'cm')}
                 </div>
@@ -135,20 +134,15 @@ function afficherSaut() {
                     }).join(' / ') + ' <span class="text-sm text-slate-500">cm</span>' : '<span class="text-slate-600">__ / __ / __</span>'}
                 </div>
 
-                <!-- Boutons -->
-                <div class="flex gap-3 mt-3">
-                    <button onclick="window.evalValiderEssai()" class="flex-1 bg-emerald-600 py-4 rounded-xl font-black text-white text-lg active:scale-95 ${essaisSel.length >= maxEssais ? 'opacity-50 cursor-not-allowed' : ''}" ${essaisSel.length >= maxEssais ? 'disabled' : ''}>
-                        ✅ Valider l'essai
-                    </button>
-                    <button onclick="window.evalEssaiSuivant()" class="bg-slate-600 px-6 py-4 rounded-xl font-black text-white text-lg active:scale-95 ${essaisSel.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${essaisSel.length === 0 ? 'disabled' : ''}>
-                        ↩ Annuler
-                    </button>
-                </div>
+                <!-- Statut : terminé -->
+                ${estTermine ? `
+                    <div class="mt-3 text-emerald-400 font-bold text-center">✅ 3 essais terminés</div>
+                ` : ''}
             </div>
 
             <!-- Colonnes -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                ${templateColonnes(colonnes, eleveSelectionne, essaisParEleve)}
+                ${templateColonnesSaut(colonnes, eleveSelectionne, essaisParEleve)}
             </div>
 
             <!-- Légende -->
@@ -227,7 +221,7 @@ function afficherSaut() {
         });
     }
 
-    setTimeout(() => chargerPhotosColonnes(), 100);
+    setTimeout(() => chargerPhotosColonnesSaut(), 100);
 }
 
 // ============================================================
@@ -255,7 +249,7 @@ async function chargerPhotoSaut(eleveId, elementId) {
 // TEMPLATE DES COLONNES
 // ============================================================
 
-function templateColonnes(colonnes, eleveSelectionneId, essaisParEleve) {
+function templateColonnesSaut(colonnes, eleveSelectionneId, essaisParEleve) {
     const colonnesIds = ['g1', 'g2', 'f1', 'f2'];
     const labels = ['👦 Garçons', '👦 Garçons', '👩 Filles', '👩 Filles'];
     const classes = ['border-blue-800/30', 'border-blue-800/30', 'border-rose-800/30', 'border-rose-800/30'];
@@ -339,19 +333,16 @@ function templateColonnes(colonnes, eleveSelectionneId, essaisParEleve) {
 // ============================================================
 
 function updateSliderDisplay(valeur) {
-    // Mettre à jour le score sur la toise
     const scoreDisplay = document.getElementById('slider-score');
     if (scoreDisplay) {
         const span = scoreDisplay.querySelector('span.text-3xl');
         if (span) span.textContent = valeur;
     }
-    // Mettre à jour la position du curseur
     const curseur = document.getElementById('slider-bar');
     if (curseur) {
         const pct = (valeur / maxSlider) * 100;
         curseur.style.left = Math.min(100, Math.max(0, pct)) + '%';
     }
-    // Mettre à jour les essais
     const essaisContainer = document.getElementById('saut-essais-display');
     if (essaisContainer) {
         const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
@@ -416,7 +407,6 @@ function validerEssai() {
         if (prochain) {
             setTimeout(() => {
                 selectionnerEleve(prochain.id);
-                // Recharger l'affichage après sélection
                 afficherSaut();
             }, 400);
         } else {
@@ -472,7 +462,7 @@ function setStatut(eleveId, statut) {
 // CHARGEMENT DES PHOTOS DES COLONNES
 // ============================================================
 
-async function chargerPhotosColonnes() {
+async function chargerPhotosColonnesSaut() {
     const containers = document.querySelectorAll('.saut-photo-container');
     for (const container of containers) {
         const card = container.closest('.saut-eleve-card');

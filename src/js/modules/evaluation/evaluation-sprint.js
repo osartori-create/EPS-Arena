@@ -37,7 +37,6 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
         }
     });
 
-    // Sélectionner le premier élève qui n'a pas 3 essais
     const premier = currentEleves.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais) || currentEleves[0];
     eleveSelectionne = premier?.id || null;
 
@@ -70,13 +69,11 @@ function afficherSprint() {
     const meilleurSel = essaisSel.length > 0 ? Math.min(...essaisSel) : null;
     const estTermineSel = essaisSel.length >= maxEssais;
 
-    // Prochain élève (par ordre alphabétique, premier qui n'a pas 3 essais et n'est pas sélectionné)
     const prochainEleve = currentEleves.find(e => 
         e.id !== eleveSelectionne && 
         (essaisParEleve[e.id]?.length || 0) < maxEssais
     );
 
-    // Valeur du chrono
     const affichageChrono = chronoElapsed > 0 ? (chronoElapsed / 1000).toFixed(1) : (essaisSel.length > 0 ? essaisSel[essaisSel.length - 1].toFixed(1) : '0.0');
 
     zoneSaisie.innerHTML = `
@@ -117,7 +114,7 @@ function afficherSprint() {
                 </div>
                 ` : ''}
 
-                <!-- Chrono central + Bouton Démarrer/Arrêter agrandi -->
+                <!-- Chrono central + Bouton Démarrer/Arrêter -->
                 <div class="mt-4">
                     <div class="text-center">
                         <div class="text-8xl font-black tabular-nums text-yellow-400" id="sprint-chrono-display">${affichageChrono}</div>
@@ -130,7 +127,8 @@ function afficherSprint() {
                             <div class="text-center mt-1 text-xs text-slate-400">Meilleur : ${meilleurSel?.toFixed(1)}s</div>
                         ` : `
                             <button id="sprint-main-btn" 
-                                    class="w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}">
+                                    class="w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform ${chronoRunning ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'}"
+                                    onclick="window.evalSprintToggleChrono()">
                                 ${chronoRunning ? '⏹ Arrêter' : '▶ Démarrer'}
                             </button>
                         `}
@@ -180,7 +178,7 @@ function afficherSprint() {
         chargerPhotoSprint(prochainEleve.id, 'sprint-prochain-photo');
     }
 
-    // Attacher les événements
+    // Attacher les événements des cartes
     document.querySelectorAll('.sprint-eleve-card').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.sprint-menu-btn')) return;
@@ -213,18 +211,6 @@ function afficherSprint() {
     document.addEventListener('click', () => {
         document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
-
-    // Gestion du bouton principal (Démarrer / Arrêter)
-    const mainBtn = document.getElementById('sprint-main-btn');
-    if (mainBtn) {
-        mainBtn.addEventListener('click', () => {
-            if (chronoRunning) {
-                arreterChrono();
-            } else {
-                demarrerChrono();
-            }
-        });
-    }
 
     setTimeout(() => chargerPhotosColonnesSprint(), 100);
 }
@@ -362,11 +348,8 @@ function demarrerChrono() {
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
     
-    const btn = document.getElementById('sprint-main-btn');
-    if (btn) {
-        btn.textContent = '⏹ Arrêter';
-        btn.className = 'w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform bg-red-600 text-white';
-    }
+    // Le bouton est mis à jour par le rechargement du template via afficherSprint()
+    // Pas besoin de le modifier manuellement ici
 }
 
 function arreterChrono() {
@@ -392,32 +375,33 @@ function arreterChrono() {
     const essais = essaisParEleve[eleveSelectionne] || [];
     const aFini = essais.length >= maxEssais;
 
-    // Prochain élève (premier qui n'a pas 3 essais)
     const prochain = currentEleves.find(e => 
         e.id !== eleveSelectionne && 
         (essaisParEleve[e.id]?.length || 0) < maxEssais
     );
 
-    // Reconstruire le message
     let message = `✅ Essai enregistré (${essais.length}/${maxEssais})`;
     if (aFini) {
-        message += `\n🏁 ${eleveSel.prenom} a terminé ses 3 essais !`;
+        const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
+        message += `\n🏁 ${eleveSel?.prenom} a terminé ses 3 essais !`;
     }
     if (prochain) {
         message += `\n\nPasser à ${prochain.prenom} ${prochain.nom} ?`;
     } else if (!aFini) {
-        message += `\n\nContinuer avec ${eleveSel.prenom} ? (Annuler pour rester)`;
+        const eleveSel = currentEleves.find(e => e.id === eleveSelectionne);
+        message += `\n\nContinuer avec ${eleveSel?.prenom} ? (Annuler pour rester)`;
     }
+
+    // Mettre à jour l'affichage avant la confirmation
+    afficherSprint();
 
     if (confirm(message)) {
         if (prochain) {
             selectionnerEleve(prochain.id);
         } else {
-            // Si plus d'élèves, rester sur le même
             afficherSprint();
         }
     } else {
-        // Reste sur le même élève
         afficherSprint();
     }
 }
@@ -438,15 +422,6 @@ function resetChrono() {
         if (rafId) cancelAnimationFrame(rafId);
     }
     chronoElapsed = 0;
-    const display = document.getElementById('sprint-chrono-display');
-    if (display) {
-        display.textContent = '0.0';
-    }
-    const btn = document.getElementById('sprint-main-btn');
-    if (btn) {
-        btn.textContent = '▶ Démarrer';
-        btn.className = 'w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform bg-emerald-600 text-white';
-    }
     afficherSprint();
 }
 
@@ -508,6 +483,14 @@ async function chargerPhotosColonnesSprint() {
 // ============================================================
 // FONCTIONS GLOBALES
 // ============================================================
+
+window.evalSprintToggleChrono = function() {
+    if (chronoRunning) {
+        arreterChrono();
+    } else {
+        demarrerChrono();
+    }
+};
 
 window.evalSprintReset = resetChrono;
 window.evalSprintSelectionner = selectionnerEleve;
