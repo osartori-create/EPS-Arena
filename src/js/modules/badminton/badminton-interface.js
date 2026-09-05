@@ -362,7 +362,6 @@ export async function transmettreBadmintonConfig() {
     const localMapping = {};
     const configData = { activite: 'badminton' };
 
-    // ✅ Paramètres avancés (BIEN RÉCUPÉRÉS)
     configData.mode = document.getElementById('badmintonMode')?.value || 'frontback';
     configData.centerSize = parseInt(document.getElementById('badmintonCenterSize')?.value) || 33;
     configData.centerPoints = parseInt(document.getElementById('badmintonCenterPoints')?.value) || 1;
@@ -370,6 +369,8 @@ export async function transmettreBadmintonConfig() {
     configData.cornerPoints = parseInt(document.getElementById('badmintonCornerPoints')?.value) || 3;
     configData.faultPoints = parseInt(document.getElementById('badmintonFaultPoints')?.value) || 1;
     configData.faultPenalty = document.getElementById('badmintonFaultPenalty')?.checked || false;
+
+    console.log("📡 [Prof] Transmission Badminton :", configData); // ✅ LOG AJOUTÉ
 
     // Terrains
     const lettres = ['A','B','C','D','E','F','G','H','I','J'];
@@ -386,7 +387,6 @@ export async function transmettreBadmintonConfig() {
     const basePath = `etablissements/0680013V/profs/${profCode}`;
 
     try {
-        console.log("📡 Transmission Badminton :", configData);
         await set(ref(db, `${basePath}/${activeClasse}/config`), configData);
         await set(ref(db, `${basePath}/active_classes/${activeClasse}`), true);
         localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));

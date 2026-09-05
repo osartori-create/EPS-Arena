@@ -50,6 +50,8 @@ export function initBadmintonKiosk(classe) {
         const config = snap.val() || {};
         if (config.activite !== 'badminton') return;
 
+        console.log("📡 [Élève] Config Badminton reçue :", config); // ✅ LOG AJOUTÉ
+
         // Mise à jour des paramètres
         badmintonMode = config.mode || 'frontback';
         badmintonCenterSize = config.centerSize || 33;
@@ -67,6 +69,8 @@ export function initBadmintonKiosk(classe) {
         faultPoints = badmintonFaultPoints;
         isFrontBackLayout = badmintonMode === 'frontback';
 
+        console.log("🏸 [Élève] Mode appliqué :", badmintonMode); // ✅ LOG AJOUTÉ
+
         // Récupérer les terrains
         terrainsConfig = {};
         for (let key in config) {
@@ -75,11 +79,14 @@ export function initBadmintonKiosk(classe) {
             }
         }
 
-        if (currentTerrain) {
-            renderMatchSetup();
-        } else {
-            renderTerrainSelection();
-        }
+        // ✅ FORCER LE RE-RENDU APRÈS MISE À JOUR DES PARAMÈTRES
+        requestAnimationFrame(() => {
+            if (currentTerrain) {
+                renderMatchSetup();
+            } else {
+                renderTerrainSelection();
+            }
+        });
     });
 
     if (!resultsListenerAttached) {
