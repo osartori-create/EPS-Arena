@@ -267,60 +267,87 @@ export function initActivities() {
     // CHANGEMENT DE DISCIPLINE
     // ============================================================
     window.switchDiscipline = function(disc) {
-        currentDiscipline = disc;
-        localStorage.setItem('eps_arena_current_discipline', disc);
+    currentDiscipline = disc;
+    localStorage.setItem('eps_arena_current_discipline', disc);
 
-        const multiView = document.getElementById('viewMultiSettings');
-        const coView = document.getElementById('viewCOSettings');
-        const osView = document.getElementById('viewOrientShowSettings');
-        const escView = document.getElementById('viewEscaladeSettings');
-        const bmtView = document.getElementById('viewBadmintonSettings');
-        const arcView = document.getElementById('viewArcathlonSettings');
-        const evalView = document.getElementById('viewEvaluationSettings');
+    const multiView = document.getElementById('viewMultiSettings');
+    const coView = document.getElementById('viewCOSettings');
+    const osView = document.getElementById('viewOrientShowSettings');
+    const escView = document.getElementById('viewEscaladeSettings');
+    const bmtView = document.getElementById('viewBadmintonSettings');
+    const arcView = document.getElementById('viewArcathlonSettings');
+    const evalView = document.getElementById('viewEvaluationSettings');
+    const tournoiView = document.getElementById('viewTournoiSettings'); // Ajout
 
-        if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
-        if (coView) coView.classList.toggle('hidden', disc !== 'co');
-        if (osView) osView.classList.toggle('hidden', disc !== 'orientshow');
-        if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
-        if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
-        if (arcView) arcView.classList.toggle('hidden', disc !== 'arcathlon');
-        if (evalView) evalView.classList.toggle('hidden', disc !== 'evaluation');
+    if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
+    if (coView) coView.classList.toggle('hidden', disc !== 'co');
+    if (osView) osView.classList.toggle('hidden', disc !== 'orientshow');
+    if (escView) escView.classList.toggle('hidden', disc !== 'escalade');
+    if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
+    if (arcView) arcView.classList.toggle('hidden', disc !== 'arcathlon');
+    if (evalView) evalView.classList.toggle('hidden', disc !== 'evaluation');
+    if (tournoiView) tournoiView.classList.toggle('hidden', disc !== 'tournoi'); // Ajout
 
-        const btnMulti = document.getElementById('btnDisc-multi');
-        const btnCo = document.getElementById('btnDisc-co');
-        const btnOs = document.getElementById('btnDisc-orientshow');
-        const btnEsc = document.getElementById('btnDisc-escalade');
-        const btnBmt = document.getElementById('btnDisc-badminton');
-        const btnArc = document.getElementById('btnDisc-arcathlon');
-        const btnEval = document.getElementById('btnDisc-evaluation');
+    const btnMulti = document.getElementById('btnDisc-multi');
+    const btnCo = document.getElementById('btnDisc-co');
+    const btnOs = document.getElementById('btnDisc-orientshow');
+    const btnEsc = document.getElementById('btnDisc-escalade');
+    const btnBmt = document.getElementById('btnDisc-badminton');
+    const btnArc = document.getElementById('btnDisc-arcathlon');
+    const btnEval = document.getElementById('btnDisc-evaluation');
+    const btnTournoi = document.getElementById('btnDisc-tournoi'); // Ajout
 
-        if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
-        if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
-        if (btnOs) btnOs.classList.toggle('border-blue-500', disc === 'orientshow');
-        if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
-        if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
-        if (btnArc) btnArc.classList.toggle('border-blue-500', disc === 'arcathlon');
-        if (btnEval) btnEval.classList.toggle('border-blue-500', disc === 'evaluation');
+    if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
+    if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
+    if (btnOs) btnOs.classList.toggle('border-blue-500', disc === 'orientshow');
+    if (btnEsc) btnEsc.classList.toggle('border-blue-500', disc === 'escalade');
+    if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
+    if (btnArc) btnArc.classList.toggle('border-blue-500', disc === 'arcathlon');
+    if (btnEval) btnEval.classList.toggle('border-blue-500', disc === 'evaluation');
+    if (btnTournoi) btnTournoi.classList.toggle('border-blue-500', disc === 'tournoi'); // Ajout
 
-        if (disc === 'co') {
-            try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
+    if (disc === 'co') {
+        try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
+    }
+    if (disc === 'escalade') {
+        try { initEscaladeInterface(); initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
+    }
+    if (disc === 'orientshow') {
+        try { setTimeout(() => { initOrientShowInterface(); loadOrientShowAssignments(); }, 100); } catch (e) {}
+    }
+    if (disc === 'badminton') {
+        try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
+    }
+    if (disc === 'arcathlon') {
+        try { initArcathlonInterface(); } catch (e) {}
+    }
+    if (disc === 'evaluation') {
+        try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
+    }
+    if (disc === 'tournoi') { // Ajout
+        try {
+            const container = document.getElementById('viewTournoiSettings');
+            if (container) {
+                container.classList.remove('hidden');
+                import('../../modules/tournoi/tournoi-dispatcher.js').then(module => {
+                    const activeClasse = document.getElementById('selectClasse').value;
+                    if (activeClasse) {
+                        // Charger la variante par défaut (élimination)
+                        module.loadTournoiVariant(activeClasse, 'elimination');
+                        // Initialiser l'interface professeur
+                        import('../../modules/tournoi/variantes/elimination/elimination-prof.js').then(profModule => {
+                            profModule.init(activeClasse);
+                        });
+                    } else {
+                        container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Erreur init Tournoi :", e);
         }
-        if (disc === 'escalade') {
-            try { initEscaladeInterface(); initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
-        }
-        if (disc === 'orientshow') {
-            try { setTimeout(() => { initOrientShowInterface(); loadOrientShowAssignments(); }, 100); } catch (e) {}
-        }
-        if (disc === 'badminton') {
-            try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
-        }
-        if (disc === 'arcathlon') {
-            try { initArcathlonInterface(); } catch (e) {}
-        }
-        if (disc === 'evaluation') {
-            try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
-        }
-    };
+    }
+};
 
     // ============================================================
     // GÉNÉRATION DES ÉQUIPES (MULTI-ACTIVITÉS)

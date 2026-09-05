@@ -6,9 +6,9 @@ import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade
 import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
-// ✅ Un seul import pour le dispatcher Badminton
 import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
 import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
+import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -78,7 +78,7 @@ export function initApp() {
                 if (config.activite === 'arcathlon') {
                     console.log('[eleve] Activité Arcathlon détectée (config principale)');
                     showLoginArcathlon();
-                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi'].includes(config.activite)) {
+                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi'].includes(config.activite)) {
                     currentConfig = config;
                     showLogin();
                 } else {
@@ -139,9 +139,38 @@ function showLogin() {
         document.getElementById('main-container').classList.remove('max-w-md');
         document.getElementById('main-container').classList.add('max-w-7xl');
         badmintonModule.classList.remove('hidden');
-        console.log('🏸 Lancement Badminton (dispatcher) pour classe :', selectedClass);
-        // ✅ ICI on appelle le dispatcher
+        console.log('Lancement Badminton pour classe :', selectedClass);
         initBadmintonKiosk(selectedClass);
+        return;
+    }
+
+    // SPÉCIAL TOURNOI
+    if (config.activite === 'tournoi') {
+        loginScreen.classList.add('hidden');
+        activityScreen.classList.remove('hidden');
+        // Cacher tous les autres modules
+        escaladeModule.classList.add('hidden');
+        coModule.classList.add('hidden');
+        multiModule.classList.add('hidden');
+        if (osModule) osModule.classList.add('hidden');
+        badmintonModule.classList.add('hidden');
+        document.getElementById('code-info').classList.add('hidden');
+        document.getElementById('btn-quit').classList.add('hidden');
+        document.getElementById('btn-back-terrain').classList.add('hidden');
+        document.getElementById('main-container').classList.remove('max-w-md');
+        document.getElementById('main-container').classList.add('max-w-7xl');
+        
+        // Créer le module tournoi s'il n'existe pas
+        let tournoiModule = document.getElementById('tournoi-module');
+        if (!tournoiModule) {
+            tournoiModule = document.createElement('div');
+            tournoiModule.id = 'tournoi-module';
+            tournoiModule.className = 'space-y-4 module';
+            activityScreen.appendChild(tournoiModule);
+        }
+        tournoiModule.classList.remove('hidden');
+        console.log('Lancement Tournoi pour classe :', selectedClass);
+        initTournoi(selectedClass, config.mode || 'elimination');
         return;
     }
 
@@ -168,14 +197,13 @@ function showLogin() {
 }
 
 // ============================================================
-// SPÉCIAL ARCATHLON : sélection équipe → PIN → maillot
+// SPÉCIAL ARCATHLON
 // ============================================================
 function showLoginArcathlon() {
     waitingScreen.classList.add('hidden');
     loginScreen.classList.add('hidden');
     activityScreen.classList.remove('hidden');
 
-    // Cacher les autres modules
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
@@ -195,7 +223,6 @@ function showLoginArcathlon() {
     }
     arcModule.classList.remove('hidden');
 
-    // Étape 1 : afficher les équipes disponibles
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const arcConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
     onValue(arcConfigRef, (snap) => {
@@ -218,7 +245,6 @@ function showLoginArcathlon() {
         arcModule.innerHTML = html;
     }, { onlyOnce: true });
 
-    // Fonctions globales pour les étapes
     window.selectEquipeArcathlon = (equipeId) => {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         const arcConfigRef2 = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
@@ -231,7 +257,6 @@ function showLoginArcathlon() {
                 return;
             }
             const pin = eqData.pin || '000';
-            // Étape 2 : saisie du PIN
             arcModule.innerHTML = `
                 <div class="text-center py-6">
                     <h2 class="text-2xl font-black text-white mb-2">Équipe ${equipeId}</h2>
@@ -262,7 +287,6 @@ function showLoginArcathlon() {
             };
             window.validatePinArcathlon = (eqId) => {
                 if (inputPin === pin) {
-                    // Étape 3 : choisir le maillot
                     const membres = eqData.membres || [];
                     const presents = membres.filter(m => !m.absent && !m.inapte);
                     let html = `<div class="text-center py-6"><h2 class="text-2xl font-black text-white mb-4">Choisis ton maillot</h2><div class="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-md mx-auto">`;
@@ -282,7 +306,6 @@ function showLoginArcathlon() {
                 }
             };
             window.retourChoixEquipeArcathlon = () => {
-                // Revenir à l'étape 1
                 showLoginArcathlon();
             };
         }, { onlyOnce: true });
@@ -340,7 +363,6 @@ function selectCode(code) {
             initOrientShowKiosk(selectedClass, selectedCode);
         }
     } else if (currentConfig.activite === 'arcathlon') {
-        // Cas de secours (si on arrive ici via un appel direct)
         let arcModule = document.getElementById('arcathlon-module');
         if (!arcModule) {
             arcModule = document.createElement('div');
