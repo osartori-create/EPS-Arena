@@ -46,9 +46,8 @@ function getColorName(hex) {
 // EXPOSITION GLOBALE DES FONCTIONS
 // ============================================================
 
-// Fonction pour ouvrir la palette de couleurs
+// Palette de couleurs
 window.openColorPicker = function(teamId) {
-    // Récupérer les couleurs utilisées par les autres équipes
     const allTeams = document.querySelectorAll('.team-members');
     const usedColors = new Set();
     allTeams.forEach(el => {
@@ -62,12 +61,10 @@ window.openColorPicker = function(teamId) {
         }
     });
 
-    // Palette de couleurs (avec blanc)
     const palette = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
     const currentColor = window.teamColorState?.[teamId] || '#3b82f6';
     const availableColors = palette.filter(c => !usedColors.has(c) || c === currentColor);
 
-    // Construire la modale
     const modalHtml = `
         <div id="colorPickerModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
             <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 max-w-md w-full">
@@ -91,28 +88,22 @@ window.openColorPicker = function(teamId) {
         </div>
     `;
 
-    // Supprimer une ancienne modale si elle existe
     const oldModal = document.getElementById('colorPickerModal');
     if (oldModal) oldModal.remove();
-
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 };
 
-// Fonction pour sélectionner une couleur
 window.selectTeamColor = function(teamId, color) {
-    // 1. Mettre à jour l'état global
     if (!window.teamColorState) window.teamColorState = {};
     window.teamColorState[teamId] = color;
     localStorage.setItem('eps_arena_team_colors', JSON.stringify(window.teamColorState));
 
-    // 2. Mettre à jour l'affichage
     const teamCard = document.querySelector(`[data-team-id="${teamId}"]`)?.closest('.bg-slate-900');
     if (teamCard) {
         teamCard.style.borderColor = color;
         const h3 = teamCard.querySelector('h3');
         if (h3) {
             h3.style.color = color;
-            // Si le format est "Couleurs", on change le nom
             const formatLibelle = document.getElementById('formatLibelle')?.value || 'Couleurs';
             if (formatLibelle === 'Couleurs') {
                 const colorName = getColorName(color);
@@ -120,13 +111,10 @@ window.selectTeamColor = function(teamId, color) {
             }
         }
     }
-
-    // 3. Fermer la modale
     const modal = document.getElementById('colorPickerModal');
     if (modal) modal.remove();
 };
 
-// Fonction pour renommer une équipe
 window.renameTeam = function(teamId) {
     const newName = prompt("Nouveau nom pour cette équipe ?");
     if (newName) {
@@ -136,6 +124,107 @@ window.renameTeam = function(teamId) {
             if (h3) h3.textContent = newName;
         }
     }
+};
+
+// ============================================================
+// GESTION DES STATUTS (ABSENT / INAPTE)
+// ============================================================
+window.setEleveStatut = function(eleveId, statut) {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return;
+
+    const key = `eps_arena_multi_statuts_${activeClasse}`;
+    const statuts = JSON.parse(localStorage.getItem(key) || '{}');
+    statuts[eleveId] = statut;
+    localStorage.setItem(key, JSON.stringify(statuts));
+
+    window.generateTeams();
+};
+
+// ============================================================
+// EXPORT / IMPORT JSON MULTI
+// ============================================================
+window.exportMultiConfig = function() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) return alert("Sélectionnez une classe.");
+
+    const teams = window.lastTeams || [];
+    const teamColors = window.teamColorState || {};
+    const statuts = JSON.parse(localStorage.getItem(`eps_arena_multi_statuts_${activeClasse}`) || '{}');
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+
+    const data = {
+        version: 2,
+        classe: activeClasse,
+        activite: 'multi',
+        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
+        equipes: teams.map(team => ({
+            id: team.id,
+            label: team.label,
+            color: teamColors[team.id] || team.color || '#3b82f6',
+            membres: team.members.map(m => m.id)
+        })),
+        statuts: statuts,
+        eleves: eleves.map(e => ({ id: e.id, nom: e.nom, prenom: e.prenom, sexe: e.sexe, vma: e.vma, force: e.force, longueur: e.longueur, sprint30: e.sprint30 }))
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${activeClasse}_multi_${data.date}.json`;
+    a.click();
+};
+
+window.importMultiConfig = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.classe || !data.equipes) throw new Error("Format de fichier invalide.");
+
+            if (data.statuts) {
+                localStorage.setItem(`eps_arena_multi_statuts_${data.classe}`, JSON.stringify(data.statuts));
+            }
+            const colors = {};
+            data.equipes.forEach(eq => {
+                colors[eq.id] = eq.color || '#3b82f6';
+            });
+            window.teamColorState = colors;
+            localStorage.setItem('eps_arena_team_colors', JSON.stringify(colors));
+
+            if (data.eleves) {
+                localStorage.setItem(`eps_arena_eleves_${data.classe}`, JSON.stringify(data.eleves));
+            }
+
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${data.classe}`) || '[]');
+            const teams = data.equipes.map(eq => {
+                const membres = eq.membres.map(id => eleves.find(e => e.id === id)).filter(Boolean);
+                return {
+                    id: eq.id,
+                    label: eq.label || 'Couleur',
+                    color: eq.color || '#3b82f6',
+                    members: membres
+                };
+            });
+
+            window.lastTeams = teams;
+
+            const select = document.getElementById('selectClasse');
+            if (select.value !== data.classe) {
+                select.value = data.classe;
+                select.dispatchEvent(new Event('change'));
+            }
+
+            await window.generateTeams();
+            alert("✅ Configuration Multi importée avec succès !");
+        } catch (err) {
+            alert("❌ Erreur d'import : " + err.message);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
 };
 
 // ============================================================
@@ -159,9 +248,6 @@ export function initActivities() {
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
     try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
 
-    // ============================================================
-    // CHANGEMENT DE DISCIPLINE
-    // ============================================================
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         localStorage.setItem('eps_arena_current_discipline', disc);
@@ -219,7 +305,7 @@ export function initActivities() {
     };
 
     // ============================================================
-    // GÉNÉRATION DES ÉQUIPES (VERSION FINALE)
+    // GÉNÉRATION DES ÉQUIPES (VERSION FINALE AVEC STATUTS)
     // ============================================================
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
@@ -257,6 +343,17 @@ export function initActivities() {
         }
 
         // ---- Multi-activités ----
+        // Récupérer les statuts
+        const statuts = JSON.parse(localStorage.getItem(`eps_arena_multi_statuts_${activeClasse}`) || '{}');
+        const elevesActifs = eleves.filter(e => {
+            const statut = statuts[e.id] || 'present';
+            return statut === 'present';
+        });
+
+        if (elevesActifs.length === 0) {
+            return alert("Aucun élève présent dans cette classe.");
+        }
+
         const options = {
             mode: document.getElementById('modeRepartition')?.value || 'melange',
             mixite: document.getElementById('modeMixite')?.value || 'ignore',
@@ -267,10 +364,10 @@ export function initActivities() {
             couleurs: [],
         };
 
-        if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
-        else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
+        if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(elevesActifs.length / options.nbParEquipe);
+        else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(elevesActifs.length / options.nbEquipes);
 
-        const teams = generateClassicTeams(eleves, options);
+        const teams = generateClassicTeams(elevesActifs, options);
         window.lastTeams = teams;
 
         // Chargement des photos
@@ -300,7 +397,6 @@ export function initActivities() {
             }
         });
 
-        // Mettre à jour l'état global
         window.teamColorState = {};
         teamsWithPhotos.forEach(team => {
             window.teamColorState[team.id] = team.color;
@@ -310,7 +406,7 @@ export function initActivities() {
         const container = document.getElementById('teamsGrid');
         if (!container) return;
 
-        // Construction des cartes
+        // Construction des cartes AVEC STATUTS
         container.innerHTML = teamsWithPhotos.map(team => {
             const bgColor = team.color || '#3b82f6';
             const textColor = isLightColor(bgColor) ? '#0f172a' : '#ffffff';
@@ -348,8 +444,13 @@ export function initActivities() {
                             const longueurDisplay = m.longueur ? `${m.longueur} cm` : '--';
                             const sprintDisplay = m.sprint30 ? `${m.sprint30} s` : '--';
 
+                            // Statut de l'élève
+                            const statut = statuts[m.id] || 'present';
+                            const isAbsent = statut === 'absent';
+                            const isInapte = statut === 'inapte';
+
                             return `
-                                <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${bgSexe}" data-id="${m.id}">
+                                <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${bgSexe} ${isAbsent ? 'opacity-40' : ''} ${isInapte ? 'opacity-60' : ''}" data-id="${m.id}">
                                     ${photoHtml}
                                     <div class="flex flex-col flex-1 leading-tight">
                                         <span class="font-black text-slate-900 text-sm">${m.prenom}</span>
@@ -359,6 +460,20 @@ export function initActivities() {
                                             <span class="text-orange-600">L : ${longueurDisplay}</span>
                                             <span class="text-purple-600">30m : ${sprintDisplay}</span>
                                             <span class="text-yellow-600">${starsHtml}</span>
+                                        </div>
+                                        <div class="flex gap-1 mt-0.5">
+                                            <button onclick="window.setEleveStatut('${m.id}', 'present')" 
+                                                    class="text-[10px] px-1.5 py-0.5 rounded ${statut === 'present' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}">
+                                                ✅
+                                            </button>
+                                            <button onclick="window.setEleveStatut('${m.id}', 'absent')" 
+                                                    class="text-[10px] px-1.5 py-0.5 rounded ${statut === 'absent' ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-400'}">
+                                                🚫
+                                            </button>
+                                            <button onclick="window.setEleveStatut('${m.id}', 'inapte')" 
+                                                    class="text-[10px] px-1.5 py-0.5 rounded ${statut === 'inapte' ? 'bg-orange-600 text-white' : 'bg-slate-700 text-slate-400'}">
+                                                ⚠️
+                                            </button>
                                         </div>
                                     </div>
                                     <span class="text-3xl font-black text-slate-900 pr-2">${m.rank}</span>
