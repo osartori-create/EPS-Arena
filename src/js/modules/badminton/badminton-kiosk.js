@@ -33,92 +33,132 @@ let badmintonFaultPenalty = true;
 // ============================================================
 const WEBJEJE_CSS = `
     .court-wrapper {
-        position: relative;
-        width: 100%;
-        max-width: 800px;
-        margin: 0 auto;
-        background-color: #8B4513;
-        padding: 20px;
-        transition: padding 0.3s ease;
-    }
-    .court-wrapper.mode-3zones { background-color: transparent; padding: 0; }
-    .court-wrapper.mode-9zones { background-color: transparent; padding: 0; }
-    .court {
-        width: 100%;
-        aspect-ratio: 2 / 1;
-        background-color: #107C10;
-        position: relative;
-        border: 2px solid #ffffff;
-        display: flex;
-    }
-    .net {
-        width: 4px;
-        height: 100%;
-        background-color: #ffffff;
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10;
-        pointer-events: none;
-    }
-    .player-area {
-        width: 50%;
-        height: 100%;
-        position: relative;
-        display: flex;
-    }
-    #area-p1 { border-right: 2px solid #fff; }
-    #area-p2 { border-left: 2px solid #fff; }
-    .layout-col { flex-direction: column; }
-    .layout-row { flex-direction: row; }
-    .layout-grid { flex-wrap: wrap; }
-    .zone {
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 12px;
-        font-weight: 600;
-        color: white;
-        cursor: pointer;
-        position: relative;
-        text-align: center;
-        user-select: none;
-    }
-    .zone-extreme { background-color: rgba(232, 17, 35, 0.3); }
-    .zone-center { background-color: rgba(0, 120, 215, 0.4); }
-    .zone-corner { background-color: rgba(216, 59, 1, 0.4); }
-    .zone-other { background-color: rgba(136, 23, 152, 0.3); }
-    .fault-area {
-        position: absolute;
-        background-color: rgba(232, 17, 35, 0.6);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 10px;
-        color: white;
-        cursor: pointer;
-        font-weight: bold;
-    }
-    .fault-top, .fault-bottom { width: 45%; height: 20px; }
-    .fault-left, .fault-right { width: 20px; height: calc(100% - 40px); top: 20px; }
-    .fault-top { top: 0; } .fault-bottom { bottom: 0; }
-    .fault-left { left: 0; } .fault-right { right: 0; }
-    .fault-p1-top { left: 20px; } .fault-p2-top { right: 20px; }
-    .fault-p1-bot { left: 20px; } .fault-p2-bot { right: 20px; }
-    .fault-corner { width: 20px; height: 20px; }
-    .fc-tl { top: 0; left: 0; } .fc-tr { top: 0; right: 0; }
-    .fc-bl { bottom: 0; left: 0; } .fc-br { bottom: 0; right: 0; }
-    .impact {
-        position: absolute;
-        width: 12px;
-        height: 12px;
-        background-color: #FFB900;
-        border: 2px solid #fff;
-        transform: translate(-50%, -50%);
-        z-index: 5;
-        pointer-events: none;
-    }
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #8B4513; /* Couleur bois pour le cadre */
+    padding: 35px 30px; /* Plus de padding pour accueillir les fautes */
+    transition: padding 0.3s ease;
+    border-radius: 4px;
+}
+
+/* Le terrain lui-même */
+.court {
+    width: 100%;
+    aspect-ratio: 2 / 1;
+    background-color: #107C10;
+    position: relative;
+    border: 2px solid #ffffff;
+    display: flex;
+    overflow: hidden;
+}
+
+/* Filet */
+.net {
+    width: 4px;
+    height: 100%;
+    background-color: #ffffff;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* Chaque moitié de terrain */
+.player-area {
+    width: 50%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    overflow: visible; /* Permet aux fautes de déborder */
+}
+#area-p1 { border-right: 2px solid #fff; }
+#area-p2 { border-left: 2px solid #fff; }
+
+/* Dispositions des zones */
+.layout-col { flex-direction: column; }
+.layout-row { flex-direction: row; }
+.layout-grid { flex-wrap: wrap; }
+
+/* Zones de jeu */
+.zone {
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    position: relative;
+    text-align: center;
+    user-select: none;
+    transition: opacity 0.15s;
+}
+.zone:hover { opacity: 0.8; }
+.zone-extreme { background-color: rgba(232, 17, 35, 0.4); }
+.zone-center { background-color: rgba(0, 120, 215, 0.4); }
+.zone-corner { background-color: rgba(216, 59, 1, 0.4); }
+.zone-other { background-color: rgba(136, 23, 152, 0.35); }
+
+/* ============================================================
+   ZONES DE FAUTE - PLUS LARGES ET À L'EXTÉRIEUR
+   ============================================================ */
+
+.fault-area {
+    position: absolute;
+    background-color: rgba(232, 17, 35, 0.75);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    z-index: 5;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: opacity 0.15s;
+    border-radius: 2px;
+}
+.fault-area:hover { opacity: 0.8; }
+
+/* Fautes en haut et en bas - sur toute la largeur de la moitié */
+.fault-top, .fault-bottom {
+    width: 100%;
+    height: 28px; /* Plus épais */
+    left: 0;
+}
+.fault-top { top: -30px; } /* Décalé vers l'extérieur */
+.fault-bottom { bottom: -30px; }
+
+/* Fautes à gauche et à droite - sur toute la hauteur de la moitié */
+.fault-left, .fault-right {
+    width: 28px; /* Plus large */
+    height: 100%;
+    top: 0;
+}
+.fault-left { left: -30px; }
+.fault-right { right: -30px; }
+
+/* Pour le mode 9 zones uniquement */
+.mode-9zones .fault-area { display: flex; }
+.mode-3zones .fault-area { display: none; }
+
+/* Points d'impact */
+.impact {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background-color: #FFB900;
+    border: 2px solid #fff;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    pointer-events: none;
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(255, 185, 0, 0.6);
+}
 `;
 
 // ============================================================
