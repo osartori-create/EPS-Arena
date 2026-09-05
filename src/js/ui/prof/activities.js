@@ -9,6 +9,7 @@ import { initOrientShowInterface, loadOrientShowAssignments, exportOrientShowCon
 import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig, transmettreBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
 import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
 import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
+import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
 
 // ✅ NOUVEAUX IMPORTS POUR LE SÉLECTEUR DE MODE BADMINTON
 import { getModesList } from '../../modules/badminton/badminton-registry.js';
@@ -277,7 +278,7 @@ export function initActivities() {
     const bmtView = document.getElementById('viewBadmintonSettings');
     const arcView = document.getElementById('viewArcathlonSettings');
     const evalView = document.getElementById('viewEvaluationSettings');
-    const tournoiView = document.getElementById('viewTournoiSettings'); // Ajout
+    const tournoiView = document.getElementById('viewTournoiSettings');
 
     if (multiView) multiView.classList.toggle('hidden', disc !== 'multi');
     if (coView) coView.classList.toggle('hidden', disc !== 'co');
@@ -286,7 +287,7 @@ export function initActivities() {
     if (bmtView) bmtView.classList.toggle('hidden', disc !== 'badminton');
     if (arcView) arcView.classList.toggle('hidden', disc !== 'arcathlon');
     if (evalView) evalView.classList.toggle('hidden', disc !== 'evaluation');
-    if (tournoiView) tournoiView.classList.toggle('hidden', disc !== 'tournoi'); // Ajout
+    if (tournoiView) tournoiView.classList.toggle('hidden', disc !== 'tournoi');
 
     const btnMulti = document.getElementById('btnDisc-multi');
     const btnCo = document.getElementById('btnDisc-co');
@@ -295,7 +296,7 @@ export function initActivities() {
     const btnBmt = document.getElementById('btnDisc-badminton');
     const btnArc = document.getElementById('btnDisc-arcathlon');
     const btnEval = document.getElementById('btnDisc-evaluation');
-    const btnTournoi = document.getElementById('btnDisc-tournoi'); // Ajout
+    const btnTournoi = document.getElementById('btnDisc-tournoi');
 
     if (btnMulti) btnMulti.classList.toggle('border-blue-500', disc === 'multi');
     if (btnCo) btnCo.classList.toggle('border-blue-500', disc === 'co');
@@ -304,7 +305,7 @@ export function initActivities() {
     if (btnBmt) btnBmt.classList.toggle('border-blue-500', disc === 'badminton');
     if (btnArc) btnArc.classList.toggle('border-blue-500', disc === 'arcathlon');
     if (btnEval) btnEval.classList.toggle('border-blue-500', disc === 'evaluation');
-    if (btnTournoi) btnTournoi.classList.toggle('border-blue-500', disc === 'tournoi'); // Ajout
+    if (btnTournoi) btnTournoi.classList.toggle('border-blue-500', disc === 'tournoi');
 
     if (disc === 'co') {
         try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
@@ -324,24 +325,21 @@ export function initActivities() {
     if (disc === 'evaluation') {
         try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
     }
-    if (disc === 'tournoi') { // Ajout
+    if (disc === 'tournoi') {
         try {
-            const container = document.getElementById('viewTournoiSettings');
+            const container = document.getElementById('tournoi-prof-container');
             if (container) {
-                container.classList.remove('hidden');
-                import('../../modules/tournoi/tournoi-dispatcher.js').then(module => {
-                    const activeClasse = document.getElementById('selectClasse').value;
-                    if (activeClasse) {
-                        // Charger la variante par défaut (élimination)
-                        module.loadTournoiVariant(activeClasse, 'elimination');
-                        // Initialiser l'interface professeur
-                        import('../../modules/tournoi/variantes/elimination/elimination-prof.js').then(profModule => {
-                            profModule.init(activeClasse);
-                        });
-                    } else {
-                        container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
-                    }
-                });
+                const activeClasse = document.getElementById('selectClasse').value;
+                if (activeClasse) {
+                    // Charger la variante par défaut (élimination)
+                    loadTournoiVariant(activeClasse, 'elimination');
+                    // Initialiser l'interface professeur
+                    import('../../modules/tournoi/variantes/elimination/elimination-prof.js').then(module => {
+                        module.initEliminationProf(activeClasse);
+                    }).catch(err => console.error("Erreur chargement tournoi prof :", err));
+                } else {
+                    container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+                }
             }
         } catch (e) {
             console.error("Erreur init Tournoi :", e);

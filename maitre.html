@@ -85,6 +85,7 @@
                     <button onclick="switchDiscipline('badminton')" id="btnDisc-badminton" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏸 Badminton</button>
                     <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏹 Arcathlon</button>
                     <button onclick="switchDiscipline('evaluation')" id="btnDisc-evaluation" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">📊 Évaluation</button>
+                    <button onclick="switchDiscipline('tournoi')" id="btnDisc-tournoi" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏆 Tournoi</button>
                 </div>
             </div>
 
@@ -429,6 +430,27 @@
 
         </div> <!-- Fin viewActivities -->
 
+        <!-- VUE TOURNOI ÉLIMINATION -->
+<div id="viewTournoiSettings" class="hidden space-y-4">
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h3 class="font-black text-blue-400 uppercase text-sm">🏆 Tournoi Élimination</h3>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="window.tournoiReinitialiser()" class="bg-red-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">🔄 Réinitialiser</button>
+                <button onclick="window.tournoiExporter()" class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">⬇️ Export</button>
+                <button onclick="document.getElementById('tournoiImportFile').click()" class="bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">⬆️ Import</button>
+                <input type="file" id="tournoiImportFile" class="hidden" accept=".json" onchange="window.tournoiImporter(event)">
+                <label class="flex items-center gap-2 text-xs text-slate-400">
+                    <input type="checkbox" id="tournoi-show-exclus" onchange="window.tournoiToggleExclus()">
+                    Afficher exclus
+                </label>
+            </div>
+        </div>
+        <div id="tournoi-prof-container" class="space-y-4">
+            <!-- Rempli dynamiquement par le module -->
+        </div>
+    </div>
+</div>
         <!-- ONGLET 3 : LIVE -->
         <div id="viewLive" class="hidden space-y-4">
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">

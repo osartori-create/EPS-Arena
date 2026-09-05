@@ -9,6 +9,7 @@ import { showFeedback, showTeamMountain } from './eleve-actions.js';
 import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
 import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
+import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -144,6 +145,33 @@ function showLogin() {
         return;
     }
 
+    else if (config.activite === 'tournoi') {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    // Cacher les autres modules
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    document.getElementById('code-info')?.classList.add('hidden');
+    document.getElementById('btn-quit')?.classList.add('hidden');
+    document.getElementById('btn-back-terrain')?.classList.add('hidden');
+
+    // Créer le conteneur du module tournoi s'il n'existe pas
+    let tournoiModule = document.getElementById('tournoi-module');
+    if (!tournoiModule) {
+        tournoiModule = document.createElement('div');
+        tournoiModule.id = 'tournoi-module';
+        tournoiModule.className = 'space-y-4 module';
+        activityScreen.appendChild(tournoiModule);
+    }
+    tournoiModule.classList.remove('hidden');
+
+    console.log('🏆 Lancement Tournoi pour classe :', selectedClass);
+    initTournoi(selectedClass, 'elimination');
+    return;
+}
     // SPÉCIAL TOURNOI
     if (config.activite === 'tournoi') {
         loginScreen.classList.add('hidden');
