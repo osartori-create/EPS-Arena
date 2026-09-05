@@ -12,11 +12,62 @@ import { initEvaluationInterface } from '../../modules/evaluation/evaluation-int
 
 let currentDiscipline = 'multi';
 
+// ============================================================
+// PALETTE DE COULEURS (RESTAURÉE)
+// ============================================================
+window.toggleCouleur = function(couleur) {
+    const el = document.querySelector(`[data-couleur="${couleur}"]`);
+    if (el) {
+        el.classList.toggle('border-emerald-400');
+        el.classList.toggle('border-slate-600');
+    }
+};
+
+function initPalette() {
+    const paletteContainer = document.getElementById('paletteCouleurs');
+    if (!paletteContainer) return;
+    const couleursDispo = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
+    paletteContainer.innerHTML = couleursDispo.map(c => 
+        `<div onclick="toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
+    ).join('');
+}
+
+// ============================================================
+// UTILITAIRE : COULEUR CLAIRE ?
+// ============================================================
+function isLightColor(hex) {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5;
+}
+
+// ============================================================
+// RENOMMER UNE ÉQUIPE
+// ============================================================
+window.renameTeam = function(teamId) {
+    const newName = prompt("Nouveau nom pour cette équipe ?");
+    if (newName) {
+        const teamDiv = document.querySelector(`[data-team-id="${teamId}"]`)?.parentElement;
+        if (teamDiv) {
+            const h3 = teamDiv.querySelector('h3');
+            if (h3) h3.textContent = newName;
+        }
+    }
+};
+
+// ============================================================
+// CHEMINS FIREBASE
+// ============================================================
 function getBaseProf() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     return `etablissements/0680013V/profs/${profCode}`;
 }
 
+// ============================================================
+// INITIALISATION PRINCIPALE
+// ============================================================
 export function initActivities() {
     console.log("🚀 initActivities appelée !");
     
@@ -27,10 +78,12 @@ export function initActivities() {
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
     try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
 
-    // Exposer les fonctions globales
-    window.generateArcathlonTeams = generateArcathlonTeams;
-    window.transmettreArcathlonConfig = transmettreArcathlonConfig;
+    // Palette de couleurs (restaurée)
+    initPalette();
 
+    // ============================================================
+    // CHANGEMENT DE DISCIPLINE
+    // ============================================================
     window.switchDiscipline = function(disc) {
         currentDiscipline = disc;
         localStorage.setItem('eps_arena_current_discipline', disc);
@@ -87,119 +140,16 @@ export function initActivities() {
         }
     };
 
-    window.switchActivitySubTab = function(subTab) {
-        const disc = currentDiscipline;
-        
-        ['settings', 'live', 'tv'].forEach(tab => {
-            const btn = document.getElementById(`subtab-${tab}`);
-            if (btn) {
-                if (tab === subTab) {
-                    btn.classList.remove('bg-slate-700', 'text-slate-300');
-                    btn.classList.add('bg-blue-600', 'text-white');
-                } else {
-                    btn.classList.remove('bg-blue-600', 'text-white');
-                    btn.classList.add('bg-slate-700', 'text-slate-300');
-                }
-            }
-        });
-
-        const multiView = document.getElementById('viewMultiSettings');
-        const coView = document.getElementById('viewCOSettings');
-        const osView = document.getElementById('viewOrientShowSettings');
-        const escView = document.getElementById('viewEscaladeSettings');
-        const bmtView = document.getElementById('viewBadmintonSettings');
-        const arcView = document.getElementById('viewArcathlonSettings');
-        const evalView = document.getElementById('viewEvaluationSettings');
-        
-        [multiView, coView, osView, escView, bmtView, arcView, evalView].forEach(el => {
-            if (el) el.classList.add('hidden');
-        });
-
-        const viewLive = document.getElementById('viewLive');
-        const viewTV = document.getElementById('viewTV');
-        if (viewLive) viewLive.classList.add('hidden');
-        if (viewTV) viewTV.style.display = 'none';
-
-        if (subTab === 'settings') {
-            if (disc === 'multi') multiView.classList.remove('hidden');
-            else if (disc === 'co') coView.classList.remove('hidden');
-            else if (disc === 'orientshow') osView.classList.remove('hidden');
-            else if (disc === 'escalade') escView.classList.remove('hidden');
-            else if (disc === 'badminton') bmtView.classList.remove('hidden');
-            else if (disc === 'arcathlon') arcView.classList.remove('hidden');
-            else if (disc === 'evaluation') {
-                if (evalView) {
-                    evalView.classList.remove('hidden');
-                    setTimeout(() => initEvaluationInterface(), 50);
-                }
-            }
-        } 
-        else if (subTab === 'live') {
-            if (viewLive) viewLive.classList.remove('hidden');
-            const container = document.getElementById('live-content');
-            container.innerHTML = '<p>Chargement du Live...</p>';
-            import('../../ui/prof/live.js').then(module => module.renderLive(disc));
-        } 
-        else if (subTab === 'tv') {
-            const tvViewEl = document.getElementById('viewTV');
-            if (tvViewEl) {
-                tvViewEl.style.display = 'block';
-                tvViewEl.style.height = '100vh';
-                setTimeout(() => {
-                    if (disc === 'badminton') {
-                        import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV());
-                    } else if (disc === 'orientshow') {
-                        import('../../modules/orientshow/orientshow-tv.js').then(m => m.renderOrientShowTV());
-                    } else if (disc === 'arcathlon') {
-                        import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV());
-                    } else {
-                        import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV());
-                    }
-                }, 100);
-            }
-        }
-    };
-
-    // ✅ FONCTION renderTeams AJOUTÉE
-    window.renderTeams = function() {
-        const container = document.getElementById('teamsGrid');
-        if (!container) return;
-
-        const teams = window.lastTeams || [];
-        if (teams.length === 0) {
-            container.innerHTML = '<p class="text-slate-500 text-center col-span-full">Générez des équipes pour les voir ici.</p>';
-            return;
-        }
-
-        let html = '';
-        teams.forEach(team => {
-            html += `
-                <div class="bg-slate-800 p-4 rounded-2xl border-2 border-slate-600">
-                    <h3 class="text-xl font-black text-blue-400 mb-2">${team.label}</h3>
-                    <div class="space-y-1">
-                        ${team.members.map((m, idx) => `
-                            <div class="flex justify-between items-center bg-slate-900 p-2 rounded-lg border border-slate-700">
-                                <span class="text-white">${m.prenom} ${m.nom}</span>
-                                <span class="text-xs text-slate-400">VMA: ${m.vma || 0}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="mt-2 text-xs text-slate-400">
-                        Total score: ${team.totalScore || 0}
-                    </div>
-                </div>
-            `;
-        });
-
-        container.innerHTML = html;
-    };
-
+    // ============================================================
+    // GÉNÉRATION DES ÉQUIPES (RESTAURÉE AVEC PHOTOS, SEXE, ÉTOILES, RANG, SORTABLE)
+    // ============================================================
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
+        // Cas particuliers : CO, Escalade, OrientShow, Badminton, Arcathlon
         if (currentDiscipline === 'co') {
             await populateReserveWithStudents(eleves);
             alert("Tous les élèves sont dans la réserve CO.");
@@ -228,7 +178,7 @@ export function initActivities() {
             return;
         }
 
-        // ---- Multi-activités ----
+        // ---- Multi-activités (le cœur restauré) ----
         const options = {
             mode: document.getElementById('modeRepartition')?.value || 'melange',
             mixite: document.getElementById('modeMixite')?.value || 'ignore',
@@ -238,22 +188,101 @@ export function initActivities() {
             nbParEquipe: parseInt(document.getElementById('nbParEquipe')?.value) || 0,
             couleurs: Array.from(document.querySelectorAll('#paletteCouleurs .border-emerald-400')).map(el => el.dataset.couleur),
         };
-        window.lastOptions = options;
+
         if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
         else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
         const teams = generateClassicTeams(eleves, options);
-        
-        teams.forEach(team => {
-            team.label = "Couleur";
-            team.color = "#e2e8f0";
-            team.textColor = "#334155";
+        window.lastTeams = teams; // pour transmission
+
+        // Chargement des photos (comme dans l'ancien code)
+        const teamsWithPhotos = [];
+        for (const team of teams) {
+            const membersWithPhotos = [];
+            for (const m of team.members) {
+                const url = await getPhotoUrl(m.id);
+                membersWithPhotos.push({ ...m, photoUrl: url });
+            }
+            teamsWithPhotos.push({ ...team, members: membersWithPhotos });
+        }
+
+        const container = document.getElementById('teamsGrid');
+        if (!container) return;
+
+        // Construction des cartes (avec photo, sexe, étoiles, rang)
+        container.innerHTML = teamsWithPhotos.map(team => {
+            const bgColor = team.color || '#3b82f6';
+            const textColor = isLightColor(bgColor) ? '#0f172a' : '#ffffff';
+
+            return `
+                <div class="bg-slate-900 rounded-2xl p-4 border-2" style="border-color: ${bgColor}">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-xl" style="color: ${bgColor}">${team.label}</h3>
+                        <button onclick="event.stopPropagation(); window.renameTeam('${team.id}')" 
+                                class="text-[10px] text-slate-400 underline hover:text-white transition-colors">
+                            Renommer
+                        </button>
+                    </div>
+                    <div class="team-members flex flex-col gap-2 min-h-[60px]" data-team-id="${team.id}">
+                        ${team.members.map(m => {
+                            const photoHtml = m.photoUrl 
+                                ? `<img src="${m.photoUrl}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">`
+                                : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+
+                            let bgSexe = 'bg-slate-200 border-slate-400';
+                            if (m.sexe === 'M' || m.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
+                            else if (m.sexe === 'F' || m.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
+
+                            let starsHtml = '';
+                            const force = m.force || 0;
+                            for (let i = 1; i <= 5; i++) {
+                                starsHtml += `<span class="${i <= force ? 'text-yellow-400' : 'text-slate-600'}">★</span>`;
+                            }
+
+                            return `
+                                <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${bgSexe}" data-id="${m.id}">
+                                    ${photoHtml}
+                                    <div class="flex flex-col flex-1 leading-tight">
+                                        <span class="font-black text-slate-900 text-sm">${m.prenom}</span>
+                                        <span class="text-xs font-bold text-slate-600 uppercase">${m.nom}</span>
+                                        <span class="text-[10px] text-yellow-600">${starsHtml}</span>
+                                    </div>
+                                    <span class="text-3xl font-black text-slate-900 pr-2">${m.rank}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Destruction des anciennes instances Sortable
+        if (window.sortableInstances) {
+            window.sortableInstances.forEach(s => s.destroy());
+        }
+        window.sortableInstances = [];
+
+        // Initialisation de Sortable sur chaque équipe
+        document.querySelectorAll('.team-members').forEach(el => {
+            const sortable = new Sortable(el, {
+                group: 'teams',
+                animation: 150,
+                onEnd: function(evt) {
+                    console.log("Nouvelle répartition détectée");
+                    // On pourrait sauvegarder l'ordre ici
+                }
+            });
+            window.sortableInstances.push(sortable);
         });
 
-        window.lastTeams = teams;
-        window.renderTeams(); // <-- Maintenant cette fonction existe
+        // Mise à jour des champs nbEquipes / nbParEquipe
+        document.getElementById('nbEquipes').value = options.nbEquipes;
+        document.getElementById('nbParEquipe').value = options.nbParEquipe;
     };
-    
+
+    // ============================================================
+    // TRANSMISSION FIREBASE (CONSERVÉE ET AMÉLIORÉE)
+    // ============================================================
     window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe.");
@@ -314,7 +343,6 @@ export function initActivities() {
             Object.keys(codeCounts).forEach(couleur => {
                 configData[couleur] = codeCounts[couleur];
             });
-            
             configData.matrix = DEFAULT_OS_MATRIX;
             
             const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
@@ -333,7 +361,6 @@ export function initActivities() {
         else if (currentDiscipline === 'badminton') {
             const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
             configData = { activite: 'badminton' };
-            
             const lettres = ['A','B','C','D','E','F','G','H','I','J'];
             for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
                 const idsTerrain = assignments[t] || [];
@@ -349,6 +376,7 @@ export function initActivities() {
             return;
         }
         else {
+            // Multi-activités (par défaut)
             configData.activite = 'multi';
             if (window.lastTeams) {
                 window.lastTeams.forEach((team) => {
@@ -374,6 +402,9 @@ export function initActivities() {
         }
     };
 
+    // ============================================================
+    // PURGE
+    // ============================================================
     window.openPurgeModal = function() {
         const choix = prompt("Purge Firebase\n1- Purger la classe active (sauf OrientShow)\n2- Purger TOUTE la base (code RNE)");
         const baseProf = getBaseProf();
@@ -408,7 +439,9 @@ export function initActivities() {
         }
     };
 
-    // CO specific
+    // ============================================================
+    // FONCTIONS CO (circuits)
+    // ============================================================
     window.addCircuit = function() {
         const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
         if(!cat) return;
@@ -429,6 +462,9 @@ export function initActivities() {
         if(confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
     };
 
+    // ============================================================
+    // BADMINTON
+    // ============================================================
     window.generateBadmintonTeamsFromCurrentClass = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
@@ -438,7 +474,9 @@ export function initActivities() {
         alert("✅ Terrains générés par niveau de force !");
     };
 
-    // Exports globaux
+    // ============================================================
+    // EXPORTS / IMPORTS
+    // ============================================================
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
     window.exportEscaladeConfig = exportEscaladeConfig;
@@ -449,7 +487,12 @@ export function initActivities() {
     window.stopOrientShow = stopOrientShow;
     window.exportBadmintonConfig = exportBadmintonConfig;
     window.importBadmintonConfig = importBadmintonConfig;
+    window.generateArcathlonTeams = generateArcathlonTeams;
+    window.transmettreArcathlonConfig = transmettreArcathlonConfig;
 
+    // ============================================================
+    // INITIALISATION SORTABLE (au cas où)
+    // ============================================================
     try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}
 }
