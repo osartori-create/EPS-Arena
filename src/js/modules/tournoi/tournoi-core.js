@@ -1,6 +1,4 @@
 // src/js/modules/tournoi/tournoi-core.js
-// Cœur commun à toutes les variantes
-
 import { db, ref, onValue, set, update, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -13,17 +11,9 @@ function getBasePath(classe) {
     return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi`;
 }
 
-function getJoueursPath(classe) {
-    return `${getBasePath(classe)}/joueurs`;
-}
-
-function getHistoriquePath(classe) {
-    return `${getBasePath(classe)}/historique`;
-}
-
-function getConfigPath(classe) {
-    return `${getBasePath(classe)}/config`;
-}
+function getJoueursPath(classe) { return `${getBasePath(classe)}/joueurs`; }
+function getHistoriquePath(classe) { return `${getBasePath(classe)}/historique`; }
+function getConfigPath(classe) { return `${getBasePath(classe)}/config`; }
 
 export function initTournoiCore(classe) {
     currentClasse = classe;
@@ -31,22 +21,17 @@ export function initTournoiCore(classe) {
     historique = [];
     config = {};
 
-    const joueursRef = ref(db, getJoueursPath(classe));
-    onValue(joueursRef, (snap) => {
+    onValue(ref(db, getJoueursPath(classe)), snap => {
         joueurs = snap.val() || {};
-        window.dispatchEvent(new CustomEvent('tournoi-updated', { detail: { joueurs, historique, config } }));
+        window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
-
-    const historiqueRef = ref(db, getHistoriquePath(classe));
-    onValue(historiqueRef, (snap) => {
+    onValue(ref(db, getHistoriquePath(classe)), snap => {
         historique = snap.val() || [];
-        window.dispatchEvent(new CustomEvent('tournoi-updated', { detail: { joueurs, historique, config } }));
+        window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
-
-    const configRef = ref(db, getConfigPath(classe));
-    onValue(configRef, (snap) => {
+    onValue(ref(db, getConfigPath(classe)), snap => {
         config = snap.val() || {};
-        window.dispatchEvent(new CustomEvent('tournoi-updated', { detail: { joueurs, historique, config } }));
+        window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
 }
 
@@ -56,41 +41,15 @@ export function getConfig() { return config; }
 export function getCurrentClasse() { return currentClasse; }
 export { currentClasse };
 
-export function setJoueurs(data) {
-    const joueursRef = ref(db, getJoueursPath(currentClasse));
-    set(joueursRef, data);
-}
-
-export function setHistorique(data) {
-    const historiqueRef = ref(db, getHistoriquePath(currentClasse));
-    set(historiqueRef, data);
-}
-
-export function setConfig(data) {
-    const configRef = ref(db, getConfigPath(currentClasse));
-    set(configRef, data);
-}
-
-export function updateJoueur(code, data) {
-    const joueursRef = ref(db, getJoueursPath(currentClasse));
-    update(joueursRef, { [code]: data });
-}
-
-export function ajouterHistorique(entry) {
-    const historiqueRef = ref(db, getHistoriquePath(currentClasse));
-    push(historiqueRef, entry);
-}
+export function setJoueurs(data) { set(ref(db, getJoueursPath(currentClasse)), data); }
+export function setHistorique(data) { set(ref(db, getHistoriquePath(currentClasse)), data); }
+export function setConfig(data) { set(ref(db, getConfigPath(currentClasse)), data); }
+export function updateJoueur(code, data) { update(ref(db, getJoueursPath(currentClasse)), { [code]: data }); }
+export function ajouterHistorique(entry) { push(ref(db, getHistoriquePath(currentClasse)), entry); }
 
 export function exportTournoiData() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
-    const data = {
-        version: 1,
-        classe: currentClasse,
-        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
-        joueurs: joueurs,
-        historique: historique,
-        config: config
-    };
+    const data = { version: 1, classe: currentClasse, date: new Date().toISOString().slice(0,10).replace(/-/g,''), joueurs, historique, config };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -104,14 +63,11 @@ export function importTournoiData(file) {
         try {
             const data = JSON.parse(e.target.result);
             if (!data.classe) throw new Error('Format invalide.');
-            const classe = data.classe;
             setJoueurs(data.joueurs || {});
             setHistorique(data.historique || []);
             setConfig(data.config || {});
             alert('✅ Tournoi importé avec succès !');
-        } catch (err) {
-            alert('❌ Erreur d\'import : ' + err.message);
-        }
+        } catch (err) { alert('❌ Erreur d\'import : ' + err.message); }
     };
     reader.readAsText(file);
 }

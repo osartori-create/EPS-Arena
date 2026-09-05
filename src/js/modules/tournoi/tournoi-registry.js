@@ -1,5 +1,4 @@
 // src/js/modules/tournoi/tournoi-registry.js
-
 export const TOURNOI_VARIANTS = {
     'elimination': {
         id: 'elimination',
@@ -15,13 +14,4 @@ export function getVariantConfig(id) {
     return TOURNOI_VARIANTS[id] || TOURNOI_VARIANTS['elimination'];
 }
 
-export function getAvailableVariants() {
-    return Object.values(TOURNOI_VARIANTS);
-}
-
-export function getDefaultVariant() {
-    for (const [id, config] of Object.entries(TOURNOI_VARIANTS)) {
-        if (config.default) return id;
-    }
-    return 'elimination';
-}
+export function getDefaultVariant() { return 'elimination'; }

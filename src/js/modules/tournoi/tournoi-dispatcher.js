@@ -1,5 +1,4 @@
 // src/js/modules/tournoi/tournoi-dispatcher.js
-
 import { getVariantConfig, getDefaultVariant } from './tournoi-registry.js';
 import { initTournoiCore, currentClasse } from './tournoi-core.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
@@ -13,9 +12,7 @@ export async function loadTournoiVariant(classe, mode) {
         currentUnload = null;
     }
 
-    if (!currentClasse) {
-        initTournoiCore(classe);
-    }
+    if (!currentClasse) initTournoiCore(classe);
 
     if (!mode) {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -26,12 +23,10 @@ export async function loadTournoiVariant(classe, mode) {
     }
 
     console.log(`🎯 [Tournoi] Variante demandée : ${mode}`);
-
     if (mode === currentVariant) return currentUnload;
 
     currentVariant = mode;
     const variantConfig = getVariantConfig(mode);
-
     if (!variantConfig) {
         console.warn(`⚠️ Variante "${mode}" inconnue, fallback elimination`);
         return loadTournoiVariant(classe, 'elimination');
@@ -40,37 +35,29 @@ export async function loadTournoiVariant(classe, mode) {
     try {
         console.log(`📦 [Tournoi] Chargement de la variante "${mode}"...`);
         const module = await variantConfig.module();
-        
-        // Rechercher la fonction init (exportée directement ou via default)
-        const initFn = module.init || module.default?.init;
+        // Chercher la fonction init dans module.init ou module.default.init
+        const initFn = module.init || (module.default && module.default.init);
         if (typeof initFn === 'function') {
             currentUnload = await initFn(classe) || (() => {});
             console.log(`✅ [Tournoi] Variante "${mode}" chargée`);
         } else {
             console.error(`❌ La variante "${mode}" n'exporte pas init()`);
-            // Fallback vers la variante par défaut
             const fallback = await getVariantConfig('elimination').module();
-            const fallbackInit = fallback.init || fallback.default?.init;
-            if (typeof fallbackInit === 'function') {
-                currentUnload = await fallbackInit(classe) || (() => {});
+            const fbInit = fallback.init || (fallback.default && fallback.default.init);
+            if (typeof fbInit === 'function') {
+                currentUnload = await fbInit(classe) || (() => {});
             } else {
                 console.error('❌ Fallback échoué : aucun init trouvé');
             }
         }
     } catch (error) {
         console.error(`❌ Erreur chargement variante "${mode}":`, error);
-        // Fallback
-        try {
-            const fallback = await getVariantConfig('elimination').module();
-            const fallbackInit = fallback.init || fallback.default?.init;
-            if (typeof fallbackInit === 'function') {
-                currentUnload = await fallbackInit(classe) || (() => {});
-            }
-        } catch (e2) {
-            console.error('❌ Fallback échoué :', e2);
+        const fallback = await getVariantConfig('elimination').module();
+        const fbInit = fallback.init || (fallback.default && fallback.default.init);
+        if (typeof fbInit === 'function') {
+            currentUnload = await fbInit(classe) || (() => {});
         }
     }
-
     return currentUnload;
 }
 

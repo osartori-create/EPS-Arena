@@ -1,5 +1,4 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-core.js
-
 import { getJoueurs, getCurrentClasse, updateJoueur, ajouterHistorique } from '../../tournoi-core.js';
 import { db, ref, onValue, set } from '../../../../core/firebase-service.js';
 
@@ -36,10 +35,8 @@ export function toggleExclure(code) {
 export function reinitialiserTournoi() {
     if (!confirm('⚠️ Réinitialiser toutes les données du tournoi ?')) return;
     const classe = getCurrentClasse();
-    const joueursRef = ref(db, getJoueursPath(classe));
-    const historiqueRef = ref(db, getHistoriquePath(classe));
-    set(joueursRef, {});
-    set(historiqueRef, []);
+    set(ref(db, getJoueursPath(classe)), {});
+    set(ref(db, getHistoriquePath(classe)), []);
     setExclus({});
 }
 
@@ -50,5 +47,5 @@ export function init(classe) {
         exclus = snap.val() || {};
         window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
-    return () => console.log('🧹 [Élimination] Nettoyage');
+    return () => console.log('🧹 [Élimination Core] Nettoyage');
 }

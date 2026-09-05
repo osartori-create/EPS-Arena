@@ -1,5 +1,4 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-prof.js
-
 import { getPhotoUrl } from '../../../../services/admin-service.js';
 import { getJoueurs, getCurrentClasse, exportTournoiData, importTournoiData } from '../../tournoi-core.js';
 import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, init as initEliminationCore } from './elimination-core.js';
@@ -8,7 +7,6 @@ let currentClasse = '';
 let showExclus = false;
 let unsubscribe = null;
 
-// ✅ UNIQUE fonction d'initialisation exportée
 export function init(classe) {
     currentClasse = classe;
     initEliminationCore(classe);
@@ -39,42 +37,27 @@ async function renderProf() {
 
     const codes = Object.keys(joueurs).sort((a, b) => parseInt(a) - parseInt(b));
     if (codes.length === 0) {
-        container.innerHTML = `
-            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
-                <p class="text-slate-400">Aucun élève n'a encore participé.</p>
-                <p class="text-xs text-slate-500 mt-2">Demandez aux élèves de saisir leur code sur les tablettes.</p>
-            </div>
-        `;
+        container.innerHTML = `<div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center"><p class="text-slate-400">Aucun élève n'a encore participé.</p><p class="text-xs text-slate-500 mt-2">Demandez aux élèves de saisir leur code sur les tablettes.</p></div>`;
         return;
     }
 
     let html = `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
             <div class="flex justify-between items-center flex-wrap gap-2">
-                <div>
-                    <h3 class="font-black text-blue-400 uppercase text-sm">🏆 Tournoi Élimination</h3>
-                    <p class="text-xs text-slate-400">Classe : ${currentClasse}</p>
-                </div>
+                <div><h3 class="font-black text-blue-400 uppercase text-sm">🏆 Tournoi Élimination</h3><p class="text-xs text-slate-400">Classe : ${currentClasse}</p></div>
                 <div class="flex gap-2 flex-wrap">
                     <button onclick="window.tournoiReinitialiser()" class="bg-red-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">🔄 Réinitialiser</button>
                     <button onclick="window.tournoiExporter()" class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">⬇️ Export</button>
                     <button onclick="document.getElementById('tournoiImportFile').click()" class="bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">⬆️ Import</button>
                     <input type="file" id="tournoiImportFile" class="hidden" accept=".json" onchange="window.tournoiImporter(event)">
-                    <label class="flex items-center gap-2 text-xs text-slate-400">
-                        <input type="checkbox" id="tournoi-show-exclus" ${showExclus ? 'checked' : ''} onchange="window.tournoiToggleExclus()">
-                        Afficher exclus
-                    </label>
+                    <label class="flex items-center gap-2 text-xs text-slate-400"><input type="checkbox" id="tournoi-show-exclus" ${showExclus ? 'checked' : ''} onchange="window.tournoiToggleExclus()"> Afficher exclus</label>
                 </div>
             </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     `;
 
-    const sortedCodes = [...codes].sort((a, b) => {
-        const elimA = joueurs[a]?.eliminations || 0;
-        const elimB = joueurs[b]?.eliminations || 0;
-        return elimB - elimA;
-    });
+    const sortedCodes = [...codes].sort((a, b) => (joueurs[b]?.eliminations || 0) - (joueurs[a]?.eliminations || 0));
 
     for (const code of sortedCodes) {
         const info = joueurs[code] || { eliminations: 0 };
@@ -89,15 +72,12 @@ async function renderProf() {
         if (info.eliminations >= 10) { statusColor = 'border-red-500'; statusBg = 'bg-red-500/10'; statusText = 'text-red-400'; }
         else if (info.eliminations >= 5) { statusColor = 'border-yellow-500'; statusBg = 'bg-yellow-500/10'; statusText = 'text-yellow-400'; }
 
-        const sexeBg = eleve?.sexe === 'M' ? 'bg-blue-200 border-blue-400' : 
-                       eleve?.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400';
+        const sexeBg = eleve?.sexe === 'M' ? 'bg-blue-200 border-blue-400' : eleve?.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400';
 
         html += `
             <div class="bg-slate-900 p-4 rounded-2xl border-2 ${statusColor} ${statusBg}">
                 <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 ${sexeBg} flex items-center justify-center">
-                        ${photoHtml}
-                    </div>
+                    <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 ${sexeBg} flex items-center justify-center">${photoHtml}</div>
                     <div class="flex-1 min-w-0">
                         <div class="font-black text-white text-sm truncate">${nom}</div>
                         <div class="text-xs text-slate-400">Code ${code}</div>
@@ -123,10 +103,7 @@ async function renderProf() {
 
 async function getPhotoHtml(id) {
     if (!id) return `<span class="text-xl">👤</span>`;
-    try {
-        const url = await getPhotoUrl(id);
-        if (url) return `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
-    } catch(e) {}
+    try { const url = await getPhotoUrl(id); if (url) return `<img src="${url}" class="w-full h-full object-cover rounded-full">`; } catch(e) {}
     return `<span class="text-xl">👤</span>`;
 }
 
@@ -137,31 +114,25 @@ window.tournoiAjouterElim = function(code) {
         renderProf();
     }
 };
-
 window.tournoiReinitialiserJoueur = function(code) {
     if (confirm(`Réinitialiser les éliminations du joueur ${code} ?`)) {
         reinitialiserJoueur(code);
         renderProf();
     }
 };
-
 window.tournoiToggleExclure = function(code) {
     toggleExclure(code);
     renderProf();
 };
-
 window.tournoiToggleExclus = function() {
     showExclus = !showExclus;
     renderProf();
 };
-
 window.tournoiReinitialiser = function() {
     reinitialiserTournoi();
     renderProf();
 };
-
 window.tournoiExporter = function() { exportTournoiData(); };
-
 window.tournoiImporter = function(event) {
     const file = event.target.files[0];
     if (file) {
