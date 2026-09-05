@@ -13,26 +13,6 @@ import { initEvaluationInterface } from '../../modules/evaluation/evaluation-int
 let currentDiscipline = 'multi';
 
 // ============================================================
-// PALETTE DE COULEURS (RESTAURÉE)
-// ============================================================
-window.toggleCouleur = function(couleur) {
-    const el = document.querySelector(`[data-couleur="${couleur}"]`);
-    if (el) {
-        el.classList.toggle('border-emerald-400');
-        el.classList.toggle('border-slate-600');
-    }
-};
-
-function initPalette() {
-    const paletteContainer = document.getElementById('paletteCouleurs');
-    if (!paletteContainer) return;
-    const couleursDispo = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
-    paletteContainer.innerHTML = couleursDispo.map(c => 
-        `<div onclick="toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
-    ).join('');
-}
-
-// ============================================================
 // UTILITAIRE : COULEUR CLAIRE ?
 // ============================================================
 function isLightColor(hex) {
@@ -44,8 +24,109 @@ function isLightColor(hex) {
 }
 
 // ============================================================
-// RENOMMER UNE ÉQUIPE
+// NOM DES COULEURS
 // ============================================================
+function getColorName(hex) {
+    const map = {
+        '#ef4444': 'Rouge',
+        '#3b82f6': 'Bleu',
+        '#22c55e': 'Vert',
+        '#eab308': 'Jaune',
+        '#f97316': 'Orange',
+        '#a855f7': 'Violet',
+        '#ec4899': 'Rose',
+        '#06b6d4': 'Cyan',
+        '#ffffff': 'Blanc',
+        '#000000': 'Noir'
+    };
+    return map[hex] || 'Couleur';
+}
+
+// ============================================================
+// EXPOSITION GLOBALE DES FONCTIONS
+// ============================================================
+
+// Fonction pour ouvrir la palette de couleurs
+window.openColorPicker = function(teamId) {
+    // Récupérer les couleurs utilisées par les autres équipes
+    const allTeams = document.querySelectorAll('.team-members');
+    const usedColors = new Set();
+    allTeams.forEach(el => {
+        const id = el.dataset.teamId;
+        if (id !== teamId) {
+            const parent = el.closest('.bg-slate-900');
+            if (parent) {
+                const borderColor = parent.style.borderColor;
+                if (borderColor) usedColors.add(borderColor);
+            }
+        }
+    });
+
+    // Palette de couleurs (avec blanc)
+    const palette = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
+    const currentColor = window.teamColorState?.[teamId] || '#3b82f6';
+    const availableColors = palette.filter(c => !usedColors.has(c) || c === currentColor);
+
+    // Construire la modale
+    const modalHtml = `
+        <div id="colorPickerModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+            <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 max-w-md w-full">
+                <h3 class="text-xl font-black text-white text-center mb-4">Choisis une couleur</h3>
+                <div class="grid grid-cols-5 gap-3">
+                    ${availableColors.map(c => {
+                        const isSelected = c === currentColor;
+                        return `
+                            <div onclick="window.selectTeamColor('${teamId}', '${c}')" 
+                                 class="w-16 h-16 rounded-full border-4 cursor-pointer hover:scale-105 transition-transform ${isSelected ? 'border-white ring-4 ring-blue-500' : 'border-slate-600'}"
+                                 style="background-color: ${c}">
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <button onclick="document.getElementById('colorPickerModal').remove()" 
+                        class="w-full mt-6 bg-slate-700 py-3 rounded-xl font-black text-white text-sm uppercase active:scale-95 transition-transform">
+                    Annuler
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Supprimer une ancienne modale si elle existe
+    const oldModal = document.getElementById('colorPickerModal');
+    if (oldModal) oldModal.remove();
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+// Fonction pour sélectionner une couleur
+window.selectTeamColor = function(teamId, color) {
+    // 1. Mettre à jour l'état global
+    if (!window.teamColorState) window.teamColorState = {};
+    window.teamColorState[teamId] = color;
+    localStorage.setItem('eps_arena_team_colors', JSON.stringify(window.teamColorState));
+
+    // 2. Mettre à jour l'affichage
+    const teamCard = document.querySelector(`[data-team-id="${teamId}"]`)?.closest('.bg-slate-900');
+    if (teamCard) {
+        teamCard.style.borderColor = color;
+        const h3 = teamCard.querySelector('h3');
+        if (h3) {
+            h3.style.color = color;
+            // Si le format est "Couleurs", on change le nom
+            const formatLibelle = document.getElementById('formatLibelle')?.value || 'Couleurs';
+            if (formatLibelle === 'Couleurs') {
+                const colorName = getColorName(color);
+                h3.textContent = colorName;
+            }
+        }
+    }
+
+    // 3. Fermer la modale
+    const modal = document.getElementById('colorPickerModal');
+    if (modal) modal.remove();
+};
+
+// Fonction pour renommer une équipe
 window.renameTeam = function(teamId) {
     const newName = prompt("Nouveau nom pour cette équipe ?");
     if (newName) {
@@ -77,9 +158,6 @@ export function initActivities() {
     try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
     try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
-
-    // Palette de couleurs (restaurée)
-    initPalette();
 
     // ============================================================
     // CHANGEMENT DE DISCIPLINE
@@ -141,235 +219,180 @@ export function initActivities() {
     };
 
     // ============================================================
-    // GÉNÉRATION DES ÉQUIPES (RESTAURÉE AVEC PHOTOS, SEXE, ÉTOILES, RANG, SORTABLE)
+    // GÉNÉRATION DES ÉQUIPES (VERSION FINALE)
     // ============================================================
-    // ============================================================
-// GÉNÉRATION DES ÉQUIPES (VERSION FINALE)
-// ============================================================
+    window.generateTeams = async function() {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+        if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-window.generateTeams = async function() {
-    const activeClasse = document.getElementById('selectClasse').value;
-    if (!activeClasse) return alert("Sélectionnez une classe d'abord.");
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-    if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
-
-    // Cas particuliers : CO, Escalade, OrientShow, Badminton, Arcathlon
-    if (currentDiscipline === 'co') {
-        await populateReserveWithStudents(eleves);
-        alert("Tous les élèves sont dans la réserve CO.");
-        return;
-    }
-    if (currentDiscipline === 'escalade') {
-        const nbGroupes = Math.ceil(eleves.length / 3);
-        initEscaladeInterface(nbGroupes, true);
-        await populateReserveEscalade(eleves);
-        alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
-        return;
-    }
-    if (currentDiscipline === 'orientshow') {
-        alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
-        return;
-    }
-    if (currentDiscipline === 'badminton') {
-        const joueurs = eleves.filter(e => e.code !== 'INAPTE');
-        const inaptes = eleves.filter(e => e.code === 'INAPTE');
-        generateBadmintonTeams([...joueurs, ...inaptes]);
-        alert("✅ Terrains générés par niveau de force !");
-        return;
-    }
-    if (currentDiscipline === 'arcathlon') {
-        generateArcathlonTeams();
-        return;
-    }
-
-    // ---- Multi-activités ----
-    const options = {
-        mode: document.getElementById('modeRepartition')?.value || 'melange',
-        mixite: document.getElementById('modeMixite')?.value || 'ignore',
-        critere: document.getElementById('critereForce')?.value || 'vma',
-        formatLibelle: document.getElementById('formatLibelle')?.value || 'Couleurs',
-        nbEquipes: parseInt(document.getElementById('nbEquipes')?.value) || 0,
-        nbParEquipe: parseInt(document.getElementById('nbParEquipe')?.value) || 0,
-        couleurs: [], // On ne les utilise plus ici, la palette est interactive
-    };
-
-    if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
-    else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
-
-    const teams = generateClassicTeams(eleves, options);
-    window.lastTeams = teams;
-
-    // Chargement des photos
-    const teamsWithPhotos = [];
-    for (const team of teams) {
-        const membersWithPhotos = [];
-        for (const m of team.members) {
-            const url = await getPhotoUrl(m.id);
-            membersWithPhotos.push({ ...m, photoUrl: url });
+        // Cas particuliers
+        if (currentDiscipline === 'co') {
+            await populateReserveWithStudents(eleves);
+            alert("Tous les élèves sont dans la réserve CO.");
+            return;
         }
-        teamsWithPhotos.push({ ...team, members: membersWithPhotos });
-    }
-
-    // Restaurer les couleurs sauvegardées (ou en générer de nouvelles)
-    const savedColors = JSON.parse(localStorage.getItem('eps_arena_team_colors') || '{}');
-    const usedColors = new Set(Object.values(savedColors));
-    const palette = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
-    let availableColors = palette.filter(c => !usedColors.has(c));
-
-    teamsWithPhotos.forEach((team, index) => {
-        // Si une couleur est sauvegardée pour cette équipe, on la réutilise
-        if (savedColors[team.id]) {
-            team.color = savedColors[team.id];
-        } else {
-            // Sinon, on prend la première disponible
-            const color = availableColors.length > 0 ? availableColors.shift() : palette[index % palette.length];
-            team.color = color;
-            usedColors.add(color);
+        if (currentDiscipline === 'escalade') {
+            const nbGroupes = Math.ceil(eleves.length / 3);
+            initEscaladeInterface(nbGroupes, true);
+            await populateReserveEscalade(eleves);
+            alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
+            return;
         }
-    });
+        if (currentDiscipline === 'orientshow') {
+            alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
+            return;
+        }
+        if (currentDiscipline === 'badminton') {
+            const joueurs = eleves.filter(e => e.code !== 'INAPTE');
+            const inaptes = eleves.filter(e => e.code === 'INAPTE');
+            generateBadmintonTeams([...joueurs, ...inaptes]);
+            alert("✅ Terrains générés par niveau de force !");
+            return;
+        }
+        if (currentDiscipline === 'arcathlon') {
+            generateArcathlonTeams();
+            return;
+        }
 
-    // Mettre à jour l'état global des couleurs
-    window.teamColorState = {};
-    teamsWithPhotos.forEach(team => {
-        window.teamColorState[team.id] = team.color;
-    });
-    localStorage.setItem('eps_arena_team_colors', JSON.stringify(window.teamColorState));
+        // ---- Multi-activités ----
+        const options = {
+            mode: document.getElementById('modeRepartition')?.value || 'melange',
+            mixite: document.getElementById('modeMixite')?.value || 'ignore',
+            critere: document.getElementById('critereForce')?.value || 'vma',
+            formatLibelle: document.getElementById('formatLibelle')?.value || 'Couleurs',
+            nbEquipes: parseInt(document.getElementById('nbEquipes')?.value) || 0,
+            nbParEquipe: parseInt(document.getElementById('nbParEquipe')?.value) || 0,
+            couleurs: [],
+        };
 
-    const container = document.getElementById('teamsGrid');
-    if (!container) return;
+        if (!options.nbEquipes && options.nbParEquipe) options.nbEquipes = Math.ceil(eleves.length / options.nbParEquipe);
+        else if (options.nbEquipes && !options.nbParEquipe) options.nbParEquipe = Math.ceil(eleves.length / options.nbEquipes);
 
-    // Construction des cartes (avec photo, sexe, étoiles, rang + TOUS les critères)
-    container.innerHTML = teamsWithPhotos.map(team => {
-        const bgColor = team.color || '#3b82f6';
-        const textColor = isLightColor(bgColor) ? '#0f172a' : '#ffffff';
+        const teams = generateClassicTeams(eleves, options);
+        window.lastTeams = teams;
 
-        return `
-            <div class="bg-slate-900 rounded-2xl p-4 border-4" style="border-color: ${bgColor}">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-black text-xl cursor-pointer hover:opacity-80 transition-opacity" 
-    style="color: ${bgColor}"
-    onclick="window.openColorPicker('${team.id}')">
-    ${team.label}
-</h3>
-                    <button onclick="event.stopPropagation(); window.renameTeam('${team.id}')" 
-                            class="text-[10px] text-slate-400 underline hover:text-white transition-colors">
-                        Renommer
-                    </button>
-                </div>
-                <div class="team-members flex flex-col gap-2 min-h-[60px]" data-team-id="${team.id}">
-                    ${team.members.map(m => {
-                        const photoHtml = m.photoUrl 
-                            ? `<img src="${m.photoUrl}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">`
-                            : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+        // Chargement des photos
+        const teamsWithPhotos = [];
+        for (const team of teams) {
+            const membersWithPhotos = [];
+            for (const m of team.members) {
+                const url = await getPhotoUrl(m.id);
+                membersWithPhotos.push({ ...m, photoUrl: url });
+            }
+            teamsWithPhotos.push({ ...team, members: membersWithPhotos });
+        }
 
-                        let bgSexe = 'bg-slate-200 border-slate-400';
-                        if (m.sexe === 'M' || m.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
-                        else if (m.sexe === 'F' || m.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
+        // Restaurer les couleurs sauvegardées
+        const savedColors = JSON.parse(localStorage.getItem('eps_arena_team_colors') || '{}');
+        const usedColors = new Set(Object.values(savedColors));
+        const palette = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#f97316', '#a855f7', '#ec4899', '#06b6d4', '#ffffff', '#000000'];
+        let availableColors = palette.filter(c => !usedColors.has(c));
 
-                        let starsHtml = '';
-                        const force = m.force || 0;
-                        for (let i = 1; i <= 5; i++) {
-                            starsHtml += `<span class="${i <= force ? 'text-yellow-400' : 'text-slate-600'}">★</span>`;
-                        }
-
-                        // Affichage de TOUS les critères
-                        const vmaDisplay = m.vma ? `${m.vma} km/h` : '--';
-                        const longueurDisplay = m.longueur ? `${m.longueur} cm` : '--';
-                        const sprintDisplay = m.sprint30 ? `${m.sprint30} s` : '--';
-
-                        return `
-                            <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${bgSexe}" data-id="${m.id}">
-                                ${photoHtml}
-                                <div class="flex flex-col flex-1 leading-tight">
-                                    <span class="font-black text-slate-900 text-sm">${m.prenom}</span>
-                                    <span class="text-xs font-bold text-slate-600 uppercase">${m.nom}</span>
-                                    <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-bold">
-                                        <span class="text-blue-600">VMA : ${vmaDisplay}</span>
-                                        <span class="text-orange-600">L : ${longueurDisplay}</span>
-                                        <span class="text-purple-600">30m : ${sprintDisplay}</span>
-                                        <span class="text-yellow-600">${starsHtml}</span>
-                                    </div>
-                                </div>
-                                <span class="text-3xl font-black text-slate-900 pr-2">${m.rank}</span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // Sortable (comme avant)
-    if (window.sortableInstances) {
-        window.sortableInstances.forEach(s => s.destroy());
-    }
-    window.sortableInstances = [];
-
-    document.querySelectorAll('.team-members').forEach(el => {
-        const sortable = new Sortable(el, {
-            group: 'teams',
-            animation: 150,
-            onEnd: function(evt) {
-                console.log("Nouvelle répartition détectée");
+        teamsWithPhotos.forEach((team, index) => {
+            if (savedColors[team.id]) {
+                team.color = savedColors[team.id];
+            } else {
+                const color = availableColors.length > 0 ? availableColors.shift() : palette[index % palette.length];
+                team.color = color;
+                usedColors.add(color);
             }
         });
-        window.sortableInstances.push(sortable);
-    });
 
-    document.getElementById('nbEquipes').value = options.nbEquipes;
-    document.getElementById('nbParEquipe').value = options.nbParEquipe;
-};
-// ============================================================
-// SÉLECTION D'UNE COULEUR POUR UNE ÉQUIPE
-// ============================================================
+        // Mettre à jour l'état global
+        window.teamColorState = {};
+        teamsWithPhotos.forEach(team => {
+            window.teamColorState[team.id] = team.color;
+        });
+        localStorage.setItem('eps_arena_team_colors', JSON.stringify(window.teamColorState));
 
-window.selectTeamColor = function(teamId, color) {
-    // 1. Mettre à jour l'état global
-    window.teamColorState[teamId] = color;
-    localStorage.setItem('eps_arena_team_colors', JSON.stringify(window.teamColorState));
+        const container = document.getElementById('teamsGrid');
+        if (!container) return;
 
-    // 2. Mettre à jour l'affichage
-    const teamCard = document.querySelector(`[data-team-id="${teamId}"]`)?.closest('.bg-slate-900');
-    if (teamCard) {
-        teamCard.style.borderColor = color;
-        const h3 = teamCard.querySelector('h3');
-        if (h3) {
-            h3.style.color = color;
-            // Si le format est "Couleurs", on change le nom
-            const formatLibelle = document.getElementById('formatLibelle')?.value || 'Couleurs';
-            if (formatLibelle === 'Couleurs') {
-                const colorName = getColorName(color);
-                h3.textContent = colorName;
-            }
+        // Construction des cartes
+        container.innerHTML = teamsWithPhotos.map(team => {
+            const bgColor = team.color || '#3b82f6';
+            const textColor = isLightColor(bgColor) ? '#0f172a' : '#ffffff';
+
+            return `
+                <div class="bg-slate-900 rounded-2xl p-4 border-4" style="border-color: ${bgColor}">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-black text-xl cursor-pointer hover:opacity-80 transition-opacity" 
+                            style="color: ${bgColor}"
+                            onclick="window.openColorPicker('${team.id}')">
+                            ${team.label}
+                        </h3>
+                        <button onclick="event.stopPropagation(); window.renameTeam('${team.id}')" 
+                                class="text-[10px] text-slate-400 underline hover:text-white transition-colors">
+                            Renommer
+                        </button>
+                    </div>
+                    <div class="team-members flex flex-col gap-2 min-h-[60px]" data-team-id="${team.id}">
+                        ${team.members.map(m => {
+                            const photoHtml = m.photoUrl 
+                                ? `<img src="${m.photoUrl}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">`
+                                : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+
+                            let bgSexe = 'bg-slate-200 border-slate-400';
+                            if (m.sexe === 'M' || m.sexe === 'm') bgSexe = 'bg-blue-200 border-blue-400';
+                            else if (m.sexe === 'F' || m.sexe === 'f') bgSexe = 'bg-rose-200 border-rose-400';
+
+                            let starsHtml = '';
+                            const force = m.force || 0;
+                            for (let i = 1; i <= 5; i++) {
+                                starsHtml += `<span class="${i <= force ? 'text-yellow-400' : 'text-slate-600'}">★</span>`;
+                            }
+
+                            const vmaDisplay = m.vma ? `${m.vma} km/h` : '--';
+                            const longueurDisplay = m.longueur ? `${m.longueur} cm` : '--';
+                            const sprintDisplay = m.sprint30 ? `${m.sprint30} s` : '--';
+
+                            return `
+                                <div class="p-2 rounded-lg border-2 flex items-center gap-3 ${bgSexe}" data-id="${m.id}">
+                                    ${photoHtml}
+                                    <div class="flex flex-col flex-1 leading-tight">
+                                        <span class="font-black text-slate-900 text-sm">${m.prenom}</span>
+                                        <span class="text-xs font-bold text-slate-600 uppercase">${m.nom}</span>
+                                        <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-bold">
+                                            <span class="text-blue-600">VMA : ${vmaDisplay}</span>
+                                            <span class="text-orange-600">L : ${longueurDisplay}</span>
+                                            <span class="text-purple-600">30m : ${sprintDisplay}</span>
+                                            <span class="text-yellow-600">${starsHtml}</span>
+                                        </div>
+                                    </div>
+                                    <span class="text-3xl font-black text-slate-900 pr-2">${m.rank}</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Sortable
+        if (window.sortableInstances) {
+            window.sortableInstances.forEach(s => s.destroy());
         }
-    }
+        window.sortableInstances = [];
 
-    // 3. Fermer la modale
-    const modal = document.getElementById('colorPickerModal');
-    if (modal) modal.remove();
-};
+        document.querySelectorAll('.team-members').forEach(el => {
+            const sortable = new Sortable(el, {
+                group: 'teams',
+                animation: 150,
+                onEnd: function(evt) {
+                    console.log("Nouvelle répartition détectée");
+                }
+            });
+            window.sortableInstances.push(sortable);
+        });
 
-// ============================================================
-// NOM DES COULEURS (pour l'affichage)
-// ============================================================
-
-function getColorName(hex) {
-    const map = {
-        '#ef4444': 'Rouge',
-        '#3b82f6': 'Bleu',
-        '#22c55e': 'Vert',
-        '#eab308': 'Jaune',
-        '#f97316': 'Orange',
-        '#a855f7': 'Violet',
-        '#ec4899': 'Rose',
-        '#06b6d4': 'Cyan',
-        '#ffffff': 'Blanc',
-        '#000000': 'Noir'
+        document.getElementById('nbEquipes').value = options.nbEquipes;
+        document.getElementById('nbParEquipe').value = options.nbParEquipe;
     };
-    return map[hex] || 'Couleur';
-}
+
     // ============================================================
-    // TRANSMISSION FIREBASE (CONSERVÉE ET AMÉLIORÉE)
+    // TRANSMISSION FIREBASE
     // ============================================================
     window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
@@ -464,7 +487,6 @@ function getColorName(hex) {
             return;
         }
         else {
-            // Multi-activités (par défaut)
             configData.activite = 'multi';
             if (window.lastTeams) {
                 window.lastTeams.forEach((team) => {
@@ -577,9 +599,6 @@ function getColorName(hex) {
     window.importBadmintonConfig = importBadmintonConfig;
     window.generateArcathlonTeams = generateArcathlonTeams;
     window.transmettreArcathlonConfig = transmettreArcathlonConfig;
-    window.openColorPicker = openColorPicker;
-window.selectTeamColor = selectTeamColor;
-window.renameTeam = renameTeam;
 
     // ============================================================
     // INITIALISATION SORTABLE (au cas où)
