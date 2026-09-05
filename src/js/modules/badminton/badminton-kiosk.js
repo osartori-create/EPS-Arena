@@ -1,5 +1,6 @@
 // src/js/modules/badminton/badminton-kiosk.js
 // Interface élève : Sélection Terrain -> Liste Round Robin -> Terrain 3D
+// Adapté de BadZ Impact (Webjéjé) et du module EPS-Arena.
 
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
@@ -23,7 +24,7 @@ let badmintonMode = 'frontback';
 let badmintonCenterSize = 33;
 let badmintonCenterPoints = 1;
 let badmintonOtherPoints = 3;
-let badmintonCornerPoints = 3;
+let badmintonCornerPoints = 5;
 let badmintonFaultPoints = 1;
 let badmintonFaultPenalty = true;
 
@@ -45,12 +46,11 @@ export function initBadmintonKiosk(classe) {
 
         console.log("📡 [Élève] Config reçue :", config);
 
-        // Mise à jour des paramètres
         badmintonMode = config.mode || 'frontback';
         badmintonCenterSize = config.centerSize || 33;
         badmintonCenterPoints = config.centerPoints || 1;
         badmintonOtherPoints = config.otherPoints || 3;
-        badmintonCornerPoints = config.cornerPoints || 3;
+        badmintonCornerPoints = config.cornerPoints || 5;
         badmintonFaultPoints = config.faultPoints || 1;
         badmintonFaultPenalty = config.faultPenalty !== undefined ? config.faultPenalty : true;
 
@@ -63,7 +63,6 @@ export function initBadmintonKiosk(classe) {
             }
         }
 
-        // Re-rendu
         if (currentTerrain) {
             renderMatchSetup();
         } else {
@@ -250,24 +249,28 @@ function renderClassement() {
 }
 
 // ============================================================
-// 3. TERRAIN 3D (VERSION CORRIGÉE)
+// 3. TERRAIN 3D (VERSION FINALE)
 // ============================================================
 
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
     if (!container) return;
 
+    console.log("🎨 Rendu du terrain, mode :", badmintonMode);
+
     const mode = badmintonMode;
-    const cSize = badmintonCenterSize;
+    const centerSize = badmintonCenterSize;
     const cPoints = badmintonCenterPoints;
     const oPoints = badmintonOtherPoints;
     const coPoints = badmintonCornerPoints;
     const fPoints = badmintonFaultPoints;
     const fPenalty = badmintonFaultPenalty;
 
-    const sideSize = (100 - cSize) / 2;
+    const sideSize = (100 - centerSize) / 2;
 
-    // === Génération d'une moitié de terrain (3x3) ===
+    // ============================================================
+    // GRILLE 3x3 (comme dans Webjéjé BadZ Impact)
+    // ============================================================
     const gridTypes = [
         ['corner', 'other', 'corner'],
         ['other', 'center', 'other'],
@@ -285,29 +288,30 @@ function renderCourtInterface() {
         corner: 'bg-orange-500'
     };
 
-    // Tailles pour chaque zone (en %)
-    function getSize(row, col) {
-        const sizeMap = {
-            'center': cSize,
-            'other': sideSize,
-            'corner': sideSize
-        };
-        const type = gridTypes[row][col];
-        return sizeMap[type] || sideSize;
-    }
-
+    // Génération d'une moitié de terrain avec grille 3x3
     function generateHalfCourt(player) {
+        // Tailles de chaque zone selon la position
+        // row 0: [sideSize, centerSize, sideSize]
+        // row 1: [centerSize, centerSize, centerSize]
+        // row 2: [sideSize, centerSize, sideSize]
+        const gridSizes = [
+            [sideSize, centerSize, sideSize],
+            [centerSize, centerSize, centerSize],
+            [sideSize, centerSize, sideSize]
+        ];
+
         let html = '';
         for (let row = 0; row < 3; row++) {
-            html += `<div class="flex w-full" style="height:${33.33}%;">`;
+            html += `<div class="flex w-full" style="height:33.33%;">`;
             for (let col = 0; col < 3; col++) {
                 const type = gridTypes[row][col];
-                const pts = pointsMap[type];
-                const color = colorsMap[type];
-                const size = getSize(row, col);
+                const pts = pointsMap[type] || 0;
+                const color = colorsMap[type] || 'bg-slate-500';
+                const width = gridSizes[row][col];
+                const height = gridSizes[row][col]; // symétrique
                 html += `
                     <div class="zone ${color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80 border border-white/20"
-                         style="width:${size}%; height:100%;"
+                         style="width:${width}%; height:${height}%;"
                          data-points="${pts}" data-type="${type}" data-player="${player}">${pts}</div>
                 `;
             }
@@ -316,25 +320,25 @@ function renderCourtInterface() {
         return html;
     }
 
-    // === Zones de faute (sur les bords) ===
+    // Génération des zones Fautes (rouges) UNIQUEMENT sur le pourtour
     function generateFaultAreas(player) {
         const fPt = fPenalty ? fPoints : 0;
         const faultColor = fPenalty ? 'bg-red-500' : 'bg-red-300 opacity-50';
         const faultLabel = fPenalty ? `F ${fPt}` : 'F 0';
-        const sidePlayer = player === 'p1' ? 'p2' : 'p1'; // inversé !
+        // 4 zones de faute : haut, bas, gauche, droite
         return `
-            <div class="fault-area absolute top-0 left-0 w-full h-[8%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
-                 data-points="${fPt}" data-type="fault" data-player="${sidePlayer}">${faultLabel}</div>
-            <div class="fault-area absolute bottom-0 left-0 w-full h-[8%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
-                 data-points="${fPt}" data-type="fault" data-player="${sidePlayer}">${faultLabel}</div>
-            <div class="fault-area absolute top-0 left-0 w-[8%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
-                 data-points="${fPt}" data-type="fault" data-player="${sidePlayer}">${faultLabel}</div>
-            <div class="fault-area absolute top-0 right-0 w-[8%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80"
-                 data-points="${fPt}" data-type="fault" data-player="${sidePlayer}">${faultLabel}</div>
+            <div class="fault-area absolute top-0 left-0 w-full h-[10%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                 data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
+            <div class="fault-area absolute bottom-0 left-0 w-full h-[10%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                 data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
+            <div class="fault-area absolute top-0 left-0 w-[10%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                 data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
+            <div class="fault-area absolute top-0 right-0 w-[10%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                 data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>
         `;
     }
 
-    // === Construction du HTML ===
+    // Construction du HTML complet
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
@@ -352,8 +356,8 @@ function renderCourtInterface() {
 
         <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-4">
             <div class="flex items-center gap-2">
-                <label class="text-xs font-bold text-slate-400">Zone centrale : <span id="zone-size-display">${cSize}%</span></label>
-                <input type="range" id="middle-zone-slider" min="20" max="60" value="${cSize}" class="w-full">
+                <label class="text-xs font-bold text-slate-400">Zone centrale : <span id="zone-size-display">${centerSize}%</span></label>
+                <input type="range" id="middle-zone-slider" min="20" max="60" value="${centerSize}" step="1" class="w-full">
             </div>
             <div class="flex justify-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
                 <span><span class="inline-block w-3 h-3 bg-blue-500 rounded-sm"></span> Centre ${cPoints}pt</span>
@@ -369,38 +373,61 @@ function renderCourtInterface() {
                 <!-- Moitié P1 (gauche) -->
                 <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
                     ${generateFaultAreas('p1')}
-                    <div class="w-full h-full flex flex-col" style="padding: 8%;">
+                    <div class="w-full h-full flex flex-col items-center justify-center" style="padding: 10%;">
                         ${generateHalfCourt('p1')}
                     </div>
                 </div>
+                <!-- Filet -->
                 <div class="w-1 h-full bg-white/80" style="box-shadow: 0 0 10px rgba(255,255,255,0.5);"></div>
                 <!-- Moitié P2 (droite) -->
                 <div class="half-court w-1/2 h-full relative p-1 flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
                     ${generateFaultAreas('p2')}
-                    <div class="w-full h-full flex flex-col" style="padding: 8%;">
+                    <div class="w-full h-full flex flex-col items-center justify-center" style="padding: 10%;">
                         ${generateHalfCourt('p2')}
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="flex justify-center gap-4 flex-wrap">
-            <button onclick="undoImpact()" class="bg-slate-600 text-white px-4 py-2 rounded-xl font-bold">↩ Annuler</button>
-            <button onclick="resetCourt()" class="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">Reset</button>
-            <button onclick="endMatch()" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-black">🏁 Terminer Match</button>
-            <button onclick="window.retourTerrains()" class="bg-slate-700 text-white px-6 py-2 rounded-xl font-bold">← Terrain</button>
+        <div class="flex flex-wrap justify-center gap-3 mt-2">
+            <button onclick="window.faultPlayer('p1')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+                🟥 Faute ${currentMatch.p1}
+            </button>
+            <button onclick="window.faultPlayer('p2')" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+                🟥 Faute ${currentMatch.p2}
+            </button>
+            <button onclick="undoImpact()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+                ↩ Annuler
+            </button>
+            <button onclick="resetCourt()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+                Reset
+            </button>
+            <button onclick="endMatch()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-black text-sm transition-colors">
+                🏁 Terminer Match
+            </button>
         </div>
     `;
 
-    // Écouteur du slider pour re-rendre
-    document.getElementById('middle-zone-slider').addEventListener('input', function() {
-        const val = parseInt(this.value);
-        document.getElementById('zone-size-display').innerText = val + '%';
-        badmintonCenterSize = val;
-        // Re-rendre le terrain avec la nouvelle taille
-        renderCourtInterface();
+    // Attacher les événements du slider (re-rendu au relâchement)
+    const slider = document.getElementById('middle-zone-slider');
+    const display = document.getElementById('zone-size-display');
+
+    slider.addEventListener('input', function() {
+        display.innerText = this.value + '%';
     });
 
+    // Re-rendu au relâchement du slider
+    const reRender = () => {
+        const newVal = parseInt(slider.value);
+        if (newVal !== badmintonCenterSize) {
+            badmintonCenterSize = newVal;
+            renderCourtInterface();
+        }
+    };
+    slider.addEventListener('mouseup', reRender);
+    slider.addEventListener('touchend', reRender);
+
+    // Attacher les événements du terrain
     document.getElementById('court').addEventListener('click', handleImpact);
     document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
 }
@@ -423,7 +450,11 @@ function handleImpact(e) {
     const points = parseInt(target.dataset.points) || 0;
     const type = target.dataset.type || 'extreme';
 
-    console.log(`🎯 Impact : joueur ${player}, points ${points}, type ${type}`);
+    // ⚠️ LOGIQUE WEBJÉJÉ : le marqueur est l'adversaire du côté de la zone
+    // Si la zone est du côté de p1, c'est p2 qui marque (et inversement)
+    const scoringPlayer = player === 'p1' ? 'p2' : 'p1';
+
+    console.log(`🎯 Impact : zone ${player}, type ${type}, points ${points} → ${scoringPlayer} marque`);
 
     // Si c'est une faute et que les fautes ne sont pas pénalisées
     const isFault = type === 'fault';
@@ -438,7 +469,8 @@ function handleImpact(e) {
     court.appendChild(impact);
 
     // Mettre à jour les scores
-    matchPoints[player] += finalPoints;
+    matchPoints[scoringPlayer] += finalPoints;
+    // Stats : on enregistre du côté du joueur qui a frappé (player)
     if (!ratioData[player][type]) ratioData[player][type] = 0;
     ratioData[player][type]++;
 
@@ -447,9 +479,42 @@ function handleImpact(e) {
     updateRatios();
 
     // Historique
-    historyStack.push({ element: impact, player, points: finalPoints, type });
+    historyStack.push({ element: impact, player: scoringPlayer, points: finalPoints, type, zonePlayer: player });
     redoStack = [];
 }
+
+// Boutons "Faute joueur"
+window.faultPlayer = function(player) {
+    // player = 'p1' ou 'p2' = le joueur qui commet la faute
+    const scoringPlayer = player === 'p1' ? 'p2' : 'p1';
+    const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
+    
+    if (fPt === 0) {
+        alert('Les fautes ne sont pas pénalisées (case décochée)');
+        return;
+    }
+
+    matchPoints[scoringPlayer] += fPt;
+    // On enregistre la faute dans les stats du joueur qui a commis la faute
+    if (!ratioData[player]['fault']) ratioData[player]['fault'] = 0;
+    ratioData[player]['fault']++;
+
+    document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
+    updateRatios();
+
+    // Marquer l'impact (au centre du terrain)
+    const court = document.getElementById('court');
+    if (court) {
+        const rect = court.getBoundingClientRect();
+        const impact = document.createElement('div');
+        impact.className = 'impact absolute w-4 h-4 bg-red-500 rounded-full';
+        impact.style.left = (rect.width / 2 - 10) + 'px';
+        impact.style.top = (rect.height / 2 - 10) + 'px';
+        court.appendChild(impact);
+        historyStack.push({ element: impact, player: scoringPlayer, points: fPt, type: 'fault_btn', zonePlayer: player });
+        redoStack = [];
+    }
+};
 
 function handleTouch(e) {
     e.preventDefault();
@@ -478,7 +543,9 @@ function undoImpact() {
     last.element.remove();
     
     matchPoints[last.player] -= last.points;
-    if (ratioData[last.player][last.type] > 0) ratioData[last.player][last.type]--;
+    if (ratioData[last.zonePlayer] && ratioData[last.zonePlayer][last.type] > 0) {
+        ratioData[last.zonePlayer][last.type]--;
+    }
     
     document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
     updateRatios();
