@@ -29,16 +29,16 @@ let badmintonFaultPoints = 1;
 let badmintonFaultPenalty = true;
 
 // ============================================================
-// CSS Webjéjé INJECTÉ (CORRIGÉ)
+// CSS Webjéjé INJECTÉ
 // ============================================================
 const WEBJEJE_CSS = `
     .court-wrapper {
         position: relative;
         width: 100%;
-        max-width: 800px;
+        max-width: 900px;
         margin: 0 auto;
         background-color: transparent;
-        padding: 25px 20px;
+        padding: 32px 25px;
         overflow: visible;
         border: 2px solid #ffffff;
         border-radius: 4px;
@@ -98,48 +98,44 @@ const WEBJEJE_CSS = `
     .zone-corner { background-color: rgba(216, 59, 1, 0.5); }
     .zone-other { background-color: rgba(136, 23, 152, 0.4); }
 
-    /* Zones de faute - POSITIONNÉES À L'EXTÉRIEUR */
     .fault-area {
         position: absolute;
-        background-color: rgba(232, 17, 35, 0.75);
+        background-color: rgba(232, 17, 35, 0.8);
         display: flex;
         justify-content: center;
         align-items: center;
-        font-size: 12px;
+        font-size: 13px;
         color: white;
         cursor: pointer;
         font-weight: bold;
         z-index: 5;
         transition: opacity 0.15s;
-        border: 1px solid rgba(255,255,255,0.2);
+        border: 1px solid rgba(255,255,255,0.3);
     }
     .fault-area:hover { opacity: 0.8; }
 
     /* Fautes en haut et en bas - sur toute la largeur */
     .fault-top, .fault-bottom { 
         width: 100%; 
-        height: 18px; 
+        height: 22px; 
         left: 0;
     }
-    .fault-top { top: -19px; }
-    .fault-bottom { bottom: -19px; }
+    .fault-top { top: -23px; }
+    .fault-bottom { bottom: -23px; }
 
     /* Fautes à gauche et à droite - sur toute la hauteur */
     .fault-left, .fault-right { 
-        width: 18px; 
+        width: 22px; 
         height: 100%; 
         top: 0;
     }
-    .fault-left { left: -19px; }
-    .fault-right { right: -19px; }
+    .fault-left { left: -23px; }
+    .fault-right { right: -23px; }
 
-    /* Pour le mode 9 zones, on garde les fautes sur le pourtour */
-    .mode-9zones .fault-top { top: -19px; }
-    .mode-9zones .fault-bottom { bottom: -19px; }
-    .mode-9zones .fault-left { left: -19px; }
-    .mode-9zones .fault-right { right: -19px; }
-
-    /* Pour le mode 3 zones, on cache les fautes */
+    .mode-9zones .fault-top { top: -23px; }
+    .mode-9zones .fault-bottom { bottom: -23px; }
+    .mode-9zones .fault-left { left: -23px; }
+    .mode-9zones .fault-right { right: -23px; }
     .mode-3zones .fault-area { display: none; }
 
     .impact {
@@ -283,35 +279,36 @@ function renderMatchSetup() {
         generateRoundRobin();
     }
 
+    // ✅ Colonne de gauche réduite à w-1/4
     let html = `
-        <div class="flex flex-col lg:flex-row gap-6 w-full max-w-7xl mx-auto">
-            <div class="w-full lg:w-1/3 bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-black text-white">Terrain ${currentTerrain}</h2>
-                    <button onclick="window.retourTerrains()" class="bg-red-600 px-3 py-1 rounded-lg text-xs font-black text-white">← Terrain</button>
+        <div class="flex flex-col lg:flex-row gap-4 w-full max-w-7xl mx-auto">
+            <div class="w-full lg:w-1/4 bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-black text-white">Terrain ${currentTerrain}</h2>
+                    <button onclick="window.retourTerrains()" class="bg-red-600 px-2 py-1 rounded-lg text-xs font-black text-white">←</button>
                 </div>
-                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Programmation</h3>
-                <div class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                <h3 class="text-[10px] font-bold text-slate-400 uppercase mb-2">Programmation</h3>
+                <div class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                     ${matchSchedule.map(match => {
                         const isPlayed = match.s1 !== null;
                         const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
-                        const playedStyle = isPlayed ? 'line-through opacity-60' : '';
+                        const playedStyle = isPlayed ? 'line-through opacity-50' : '';
                         const clickAction = isPlayed ? '' : `onclick="selectMatchFromList('${match.id}')"`;
                         return `
                             <button ${clickAction} 
-                                class="w-full text-left p-3 rounded-lg border-2 transition-colors ${playedStyle} ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
-                                <div class="flex justify-between items-center font-black">
+                                class="w-full text-left p-2 rounded-lg border transition-colors ${playedStyle} ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
+                                <div class="flex justify-between items-center font-black text-xs">
                                     <span>${match.p1} vs ${match.p2}</span>
-                                    <span class="text-sm">${scoreDisplay}</span>
+                                    <span class="text-[10px]">${scoreDisplay}</span>
                                 </div>
                             </button>`;
                     }).join('')}
                 </div>
-                <div id="classement" class="mt-6"></div>
+                <div id="classement" class="mt-4"></div>
             </div>
-            <div class="w-full lg:w-2/3 bg-slate-900 p-6 rounded-2xl border border-slate-700" id="court-zone">
+            <div class="w-full lg:w-3/4 bg-slate-900 p-4 rounded-2xl border border-slate-700" id="court-zone">
                 <div class="text-center py-10">
-                    <p class="text-2xl font-black text-slate-500">Cliquez sur un match pour jouer</p>
+                    <p class="text-xl font-black text-slate-500">Cliquez sur un match pour jouer</p>
                 </div>
             </div>
         </div>
@@ -364,12 +361,12 @@ function renderClassement() {
 
     const sorted = Object.entries(standings).sort((a, b) => b[1].pts - a[1].pts || b[1].diff - a[1].diff);
     
-    let html = `<h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Classement</h3>
-                <div class="space-y-2">`;
+    let html = `<h3 class="text-[10px] font-bold text-slate-400 uppercase mb-2">Classement</h3>
+                <div class="space-y-1">`;
     sorted.forEach(([player, data], idx) => {
-        html += `<div class="bg-slate-900 p-2 rounded-lg border border-slate-700 flex justify-between items-center">
+        html += `<div class="bg-slate-900 p-1.5 rounded border border-slate-700 flex justify-between items-center text-xs">
                     <span class="font-black text-white">${idx + 1}. ${player}</span>
-                    <span class="text-xs text-slate-400">${data.pts} pts | ${data.wins} V - ${data.losses} D</span>
+                    <span class="text-[10px] text-slate-400">${data.pts} pts | ${data.wins}V-${data.losses}D</span>
                 </div>`;
     });
     html += `</div>`;
@@ -386,35 +383,32 @@ function renderCourtInterface() {
 
     console.log("🎨 Rendu du terrain, mode :", badmintonMode);
 
-    // Générer le HTML du terrain
     const courtHTML = generateCourtHTML();
 
-    // Construction du HTML complet avec CSS injecté
     container.innerHTML = `
         <style>${WEBJEJE_CSS}</style>
 
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex justify-between items-center mb-3">
             <div class="text-center w-1/3">
-                <h3 class="text-3xl font-black text-white">${currentMatch.p1}</h3>
-                <div id="ratio-p1" class="text-xs text-slate-400">Ratio : 0%</div>
+                <h3 class="text-2xl font-black text-white">${currentMatch.p1}</h3>
+                <div id="ratio-p1" class="text-[10px] text-slate-400">Ratio : 0%</div>
             </div>
             <div class="text-center w-1/3">
-                <!-- ✅ SCORE AFFICHÉ DANS LE BON SENS : p1 - p2 -->
-                <h3 id="score-display" class="text-5xl font-black text-yellow-400">${matchPoints.p1} - ${matchPoints.p2}</h3>
+                <h3 id="score-display" class="text-4xl font-black text-yellow-400">${matchPoints.p1} - ${matchPoints.p2}</h3>
             </div>
             <div class="text-center w-1/3">
-                <h3 class="text-3xl font-black text-white">${currentMatch.p2}</h3>
-                <div id="ratio-p2" class="text-xs text-slate-400">Ratio : 0%</div>
+                <h3 class="text-2xl font-black text-white">${currentMatch.p2}</h3>
+                <div id="ratio-p2" class="text-[10px] text-slate-400">Ratio : 0%</div>
             </div>
         </div>
 
         <!-- Slider -->
-        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-3">
+        <div class="bg-slate-800 p-2 rounded-xl border border-slate-700 mb-2">
             <div class="flex items-center gap-2">
                 <label class="text-xs font-bold text-slate-400">Zone centrale : <span id="zone-size-display">${badmintonCenterSize}%</span></label>
                 <input type="range" id="middle-zone-slider" min="20" max="60" value="${badmintonCenterSize}" step="1" class="w-full">
             </div>
-            <div class="flex justify-center gap-4 mt-2 text-xs text-slate-400 flex-wrap">
+            <div class="flex justify-center gap-3 mt-1 text-[10px] text-slate-400 flex-wrap">
                 <span><span class="inline-block w-3 h-3 bg-blue-500 rounded-sm"></span> Centre ${badmintonCenterPoints}pt</span>
                 <span><span class="inline-block w-3 h-3 bg-purple-500 rounded-sm"></span> Zone ${badmintonOtherPoints}pt</span>
                 <span><span class="inline-block w-3 h-3 bg-orange-500 rounded-sm"></span> Coin ${badmintonCornerPoints}pt</span>
@@ -422,12 +416,12 @@ function renderCourtInterface() {
             </div>
         </div>
 
-        <!-- Boutons Faute -->
-        <div class="flex justify-between items-center gap-4 mb-3">
-            <button onclick="window.faultPlayer('p1')" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+        <!-- Boutons Faute avec marge -->
+        <div class="flex justify-between items-center gap-4 mb-3 mt-1">
+            <button onclick="window.faultPlayer('p1')" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg">
                 🟥 Faute ${currentMatch.p1}
             </button>
-            <button onclick="window.faultPlayer('p2')" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
+            <button onclick="window.faultPlayer('p2')" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-3 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg">
                 🟥 Faute ${currentMatch.p2}
             </button>
         </div>
@@ -438,23 +432,23 @@ function renderCourtInterface() {
         </div>
 
         <!-- Boutons d'action -->
-        <div class="flex flex-wrap justify-center gap-3 mt-3">
-            <button onclick="undoImpact()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+        <div class="flex flex-wrap justify-center gap-2 mt-3">
+            <button onclick="undoImpact()" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs transition-colors">
                 ↩ Annuler
             </button>
-            <button onclick="resetCourt()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+            <button onclick="resetCourt()" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs transition-colors">
                 Reset
             </button>
-            <button onclick="endMatch()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-black text-sm transition-colors">
-                🏁 Terminer Match
+            <button onclick="endMatch()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-1.5 rounded-xl font-black text-xs transition-colors">
+                🏁 Terminer
             </button>
-            <button onclick="window.retourTerrains()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+            <button onclick="window.retourTerrains()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-xl font-bold text-xs transition-colors">
                 ← Terrain
             </button>
         </div>
     `;
 
-    // Attacher les événements du slider
+    // Slider
     const slider = document.getElementById('middle-zone-slider');
     const display = document.getElementById('zone-size-display');
 
@@ -466,7 +460,6 @@ function renderCourtInterface() {
         const newVal = parseInt(slider.value);
         if (newVal !== badmintonCenterSize) {
             badmintonCenterSize = newVal;
-            console.log("🔄 Re-rendu avec zone centrale :", newVal);
             renderCourtInterface();
         }
     };
@@ -474,17 +467,14 @@ function renderCourtInterface() {
     slider.addEventListener('mouseup', reRender);
     slider.addEventListener('touchend', reRender);
 
-    // Attacher les événements du terrain
+    // Écouteurs terrain
     setTimeout(() => {
         const court = document.getElementById('court');
         if (court) {
-            // Nettoyer les anciens écouteurs en clonant
             const newCourt = court.cloneNode(true);
             court.parentNode.replaceChild(newCourt, court);
-            
             newCourt.addEventListener('click', handleImpact);
             newCourt.addEventListener('touchstart', handleTouch, { passive: false });
-            console.log("✅ Écouteurs attachés au terrain");
         }
     }, 50);
 }
@@ -499,21 +489,17 @@ function generateCourtHTML() {
     const cSize = badmintonCenterSize;
     const sideSize = (100 - cSize) / 2;
 
-    // Déterminer la classe de disposition
     let pClass = is9 ? 'layout-grid' : (m === 'leftright' ? 'layout-row' : 'layout-col');
 
-    // Styles pour les zones
     const style3Z = (i) => m === 'frontback' ? 
         (i === 1 ? `width:100%;height:${cSize}%` : `width:100%;height:${sideSize}%`) : 
         (i === 1 ? `width:${cSize}%;height:100%` : `width:${sideSize}%;height:100%`);
 
     const style9Z = (i) => `width:${(i % 3 === 1) ? cSize : sideSize}%;height:${(Math.floor(i / 3) === 1) ? cSize : sideSize}%`;
 
-    // Génération des zones pour un joueur
     const genZones = (playerCode) => {
         let zones = '';
         if (!is9) {
-            // Mode 3 zones
             const points = [badmintonOtherPoints, badmintonCenterPoints, badmintonOtherPoints];
             const types = ['extreme', 'center', 'extreme'];
             const colors = ['zone-extreme', 'zone-center', 'zone-extreme'];
@@ -521,7 +507,6 @@ function generateCourtHTML() {
                 zones += `<div class="zone ${colors[i]}" data-points="${points[i]}" data-player="${playerCode}" data-type="${types[i]}" style="${style3Z(i)}">${points[i]}</div>`;
             }
         } else {
-            // Mode 9 zones
             const types = ['corner', 'other', 'corner', 'other', 'center', 'other', 'corner', 'other', 'corner'];
             const pointsMap = {
                 center: badmintonCenterPoints,
@@ -543,20 +528,25 @@ function generateCourtHTML() {
         return zones;
     };
 
-    // Génération des zones Fautes (UNIQUEMENT pour le mode 9 zones)
+    // ✅ Génération des fautes pour les DEUX côtés
     let faultHtml = '';
     if (is9) {
         const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
         const faultLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
-        faultHtml = `
-            <div class="fault-area fault-top" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-left" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-right" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
+
+        // Fautes pour p1 (moitié gauche)
+        faultHtml += `
             <div class="fault-area fault-top" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
             <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
             <div class="fault-area fault-left" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
             <div class="fault-area fault-right" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
+        `;
+        // Fautes pour p2 (moitié droite)
+        faultHtml += `
+            <div class="fault-area fault-top" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-left" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-right" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
         `;
     }
 
@@ -576,35 +566,20 @@ function generateCourtHTML() {
 
 function handleImpact(e) {
     const court = document.getElementById('court');
-    if (!court) {
-        console.warn('❌ Court non trouvé');
-        return;
-    }
+    if (!court) return;
     
     const target = e.target.closest('.zone, .fault-area');
-    if (!target) {
-        console.warn('❌ Clic hors zone');
-        return;
-    }
+    if (!target) return;
 
     const player = target.dataset.player || 'p1';
     const points = parseInt(target.dataset.points) || 0;
     const type = target.dataset.type || 'extreme';
 
-    // Logique Webjéjé : le marqueur est l'adversaire du côté de la zone
     const scoringPlayer = player === 'p1' ? 'p2' : 'p1';
 
-    console.log(`🎯 Impact : zone ${player}, type ${type}, points ${points} → ${scoringPlayer} marque`);
-
-    // Si c'est une faute et que les fautes ne sont pas pénalisées
     const isFault = type === 'fault';
     const finalPoints = (isFault && !badmintonFaultPenalty) ? 0 : points;
 
-    if (finalPoints === 0 && isFault) {
-        console.log('⚠️ Faute non pénalisée, pas de point');
-    }
-
-    // ✅ IMPACT JAUNE
     const wrapper = court.querySelector('.court-wrapper');
     if (wrapper) {
         const rect = wrapper.getBoundingClientRect();
@@ -614,15 +589,12 @@ function handleImpact(e) {
         impact.style.top = (e.clientY - rect.top) + 'px';
         wrapper.appendChild(impact);
         historyStack.push({ element: impact, player: scoringPlayer, points: finalPoints, type, zonePlayer: player });
-        console.log('✅ Impact visuel ajouté');
     }
 
-    // Mettre à jour les scores
     matchPoints[scoringPlayer] += finalPoints;
     if (!ratioData[player][type]) ratioData[player][type] = 0;
     ratioData[player][type]++;
 
-    // ✅ AFFICHAGE CORRECT : p1 - p2
     document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
     updateRatios();
 
@@ -640,10 +612,7 @@ function handleTouch(e) {
     });
 }
 
-// Bouton "Faute joueur" - CORRIGÉ
 window.faultPlayer = function(player) {
-    // player = le joueur qui commet la faute
-    // Le point va à l'adversaire
     const scoringPlayer = player === 'p1' ? 'p2' : 'p1';
     const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
     
@@ -652,17 +621,13 @@ window.faultPlayer = function(player) {
         return;
     }
 
-    console.log(`🟥 Faute de ${player} → ${scoringPlayer} marque ${fPt}pt`);
-
     matchPoints[scoringPlayer] += fPt;
     if (!ratioData[player]['fault']) ratioData[player]['fault'] = 0;
     ratioData[player]['fault']++;
 
-    // ✅ AFFICHAGE CORRECT : p1 - p2
     document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
     updateRatios();
 
-    // Impact visuel (au centre du terrain)
     const court = document.getElementById('court');
     const wrapper = court?.querySelector('.court-wrapper');
     if (wrapper) {
@@ -699,7 +664,6 @@ function undoImpact() {
         ratioData[last.zonePlayer][last.type]--;
     }
     
-    // ✅ AFFICHAGE CORRECT : p1 - p2
     document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
     updateRatios();
 }
@@ -711,7 +675,6 @@ function resetCourt() {
         p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
         p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
     };
-    // ✅ AFFICHAGE CORRECT : p1 - p2
     document.getElementById('score-display').innerText = '0 - 0';
     document.getElementById('ratio-p1').innerText = '0%';
     document.getElementById('ratio-p2').innerText = '0%';
@@ -731,8 +694,8 @@ window.endMatch = function() {
     
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
-    const s1 = matchPoints.p1; // score de p1
-    const s2 = matchPoints.p2; // score de p2
+    const s1 = matchPoints.p1;
+    const s2 = matchPoints.p2;
 
     if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
         const stats = {
