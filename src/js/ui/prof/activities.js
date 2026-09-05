@@ -577,6 +577,9 @@ function getColorName(hex) {
     window.importBadmintonConfig = importBadmintonConfig;
     window.generateArcathlonTeams = generateArcathlonTeams;
     window.transmettreArcathlonConfig = transmettreArcathlonConfig;
+    window.openColorPicker = openColorPicker;
+window.selectTeamColor = selectTeamColor;
+window.renameTeam = renameTeam;
 
     // ============================================================
     // INITIALISATION SORTABLE (au cas où)
