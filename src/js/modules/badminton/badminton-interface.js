@@ -362,7 +362,7 @@ export async function transmettreBadmintonConfig() {
     const localMapping = {};
     const configData = { activite: 'badminton' };
 
-    // Paramètres avancés
+    // ✅ Paramètres avancés (BIEN RÉCUPÉRÉS)
     configData.mode = document.getElementById('badmintonMode')?.value || 'frontback';
     configData.centerSize = parseInt(document.getElementById('badmintonCenterSize')?.value) || 33;
     configData.centerPoints = parseInt(document.getElementById('badmintonCenterPoints')?.value) || 1;
@@ -386,6 +386,7 @@ export async function transmettreBadmintonConfig() {
     const basePath = `etablissements/0680013V/profs/${profCode}`;
 
     try {
+        console.log("📡 Transmission Badminton :", configData);
         await set(ref(db, `${basePath}/${activeClasse}/config`), configData);
         await set(ref(db, `${basePath}/active_classes/${activeClasse}`), true);
         localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));

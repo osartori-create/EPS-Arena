@@ -11,16 +11,20 @@ let playersList = [];
 let matchSchedule = [];
 let currentMatch = null;
 let matchPoints = { p1: 0, p2: 0 };
-let ratioData = { p1: { middle: 0, extreme: 0 }, p2: { middle: 0, extreme: 0 } };
+let ratioData = { p1: { middle: 0, extreme: 0, corner: 0, fault: 0 }, p2: { middle: 0, extreme: 0, corner: 0, fault: 0 } };
 let terrainsConfig = {};
 let historyStack = [];
 let redoStack = [];
 let resultsListenerAttached = false;
 
-let middleZoneSize = 33;
-let isFrontBackLayout = true;
-let centerPoints = 1;
-let otherPoints = 3;
+// Variables globales pour les paramètres (synchronisées avec Firebase)
+let badmintonMode = 'frontback';
+let badmintonCenterSize = 33;
+let badmintonCenterPoints = 1;
+let badmintonOtherPoints = 3;
+let badmintonCornerPoints = 3;
+let badmintonFaultPoints = 1;
+let badmintonFaultPenalty = true;
 
 export function initBadmintonKiosk(classe) {
     currentClasse = classe;
@@ -30,10 +34,21 @@ export function initBadmintonKiosk(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
 
+    // ✅ Écoute des paramètres (mode, points, etc.)
     onValue(configRef, (snap) => {
         const config = snap.val() || {};
         if (config.activite !== 'badminton') return;
 
+        // Récupération des paramètres avancés
+        badmintonMode = config.mode || 'frontback';
+        badmintonCenterSize = config.centerSize || 33;
+        badmintonCenterPoints = config.centerPoints || 1;
+        badmintonOtherPoints = config.otherPoints || 3;
+        badmintonCornerPoints = config.cornerPoints || 3;
+        badmintonFaultPoints = config.faultPoints || 1;
+        badmintonFaultPenalty = config.faultPenalty !== undefined ? config.faultPenalty : true;
+
+        // Récupérer les terrains
         terrainsConfig = {};
         for (let key in config) {
             if (!isNaN(parseInt(key))) {
@@ -41,10 +56,11 @@ export function initBadmintonKiosk(classe) {
             }
         }
 
-        if (!currentTerrain) {
-            renderTerrainSelection();
-        } else {
+        // Si un terrain est déjà sélectionné, on re-rend le match
+        if (currentTerrain) {
             renderMatchSetup();
+        } else {
+            renderTerrainSelection();
         }
     });
 
@@ -253,11 +269,13 @@ function renderCourtInterface() {
     const container = document.getElementById('court-zone');
     if (!container) return;
 
-    const mode = window.badmintonMode || 'frontback'; // Récupéré depuis Firebase
-    const centerSize = window.badmintonCenterSize || 33;
-    const faultPenalty = window.badmintonFaultPenalty || false;
-    const cornerPoints = window.badmintonCornerPoints || 3;
-    const faultPoints = window.badmintonFaultPoints || 1;
+    const mode = badmintonMode;
+    const centerSize = badmintonCenterSize;
+    const centerPoints = badmintonCenterPoints;
+    const otherPoints = badmintonOtherPoints;
+    const cornerPoints = badmintonCornerPoints || 3;
+    const faultPoints = badmintonFaultPoints || 1;
+    const faultPenalty = badmintonFaultPenalty;
 
     const sideSize = (100 - centerSize) / 2;
 
@@ -275,20 +293,24 @@ function renderCourtInterface() {
             corner: cornerPoints,
             other: otherPoints
         };
+        const colorsMap = {
+            center: 'bg-blue-500',
+            corner: 'bg-orange-500',
+            other: 'bg-purple-500'
+        };
         zonesHtml = types.map(row => 
             row.map(type => {
                 const pts = pointsMap[type] || 0;
-                const color = type === 'center' ? 'bg-blue-500' : 
-                              type === 'corner' ? 'bg-orange-500' : 'bg-purple-500';
+                const color = colorsMap[type] || 'bg-slate-500';
                 return `<div class="zone ${color} flex-1 flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80"
                           data-points="${pts}" data-type="${type}">${pts}</div>`;
             }).join('')
         ).map(row => `<div class="flex flex-1">${row}</div>`).join('');
-        
+
         // Ajout des zones Fautes (sur les côtés)
         const faultColor = faultPenalty ? 'bg-yellow-500 text-black' : 'bg-yellow-300 text-black opacity-50';
-        const faultLabel = faultPenalty ? `⚠️ ${faultPoints} pt` : '⚠️ 0 pt';
-        zonesHtml += `
+        const faultLabel = faultPenalty ? `⚠️ ${faultPoints}` : '⚠️ 0';
+        const faultZones = `
             <div class="fault-area absolute top-0 left-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
                  data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
             <div class="fault-area absolute top-0 right-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
@@ -298,6 +320,7 @@ function renderCourtInterface() {
             <div class="fault-area absolute top-0 left-0 w-full h-1/6 ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
                  data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
         `;
+        zonesHtml += faultZones;
     } else {
         // Mode 3 zones (frontback ou leftright)
         const isFrontBack = mode === 'frontback';
@@ -327,7 +350,7 @@ function renderCourtInterface() {
                 <h3 class="text-3xl font-black text-white">${currentMatch.p1}</h3>
             </div>
             <div class="text-center w-1/3">
-                <h3 id="score-display" class="text-5xl font-black text-yellow-400">0 - 0</h3>
+                <h3 id="score-display" class="text-5xl font-black text-yellow-400">${matchPoints.p2} - ${matchPoints.p1}</h3>
             </div>
             <div class="text-center w-1/3">
                 <h3 class="text-3xl font-black text-white">${currentMatch.p2}</h3>
@@ -356,7 +379,136 @@ function renderCourtInterface() {
             </div>
         </div>
 
-        <div class="flex justify-center gap-4">
+        <div class="flex justify-center gap-4 flex-wrap">
+            <button onclick="undoImpact()" class="bg-slate-600 text-white px-4 py-2 rounded-xl font-bold">↩ Annuler</button>
+            <button onclick="resetCourt()" class="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">Reset</button>
+            <button onclick="endMatch()" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-black">🏁 Terminer Match</button>
+            <button onclick="window.retourTerrains()" class="bg-slate-700 text-white px-6 py-2 rounded-xl font-bold">← Terrain</button>
+        </div>
+    `;
+
+    // Attacher les événements
+    document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
+    document.getElementById('court').addEventListener('click', handleImpact);
+    document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
+
+    updateZoneSize();
+}
+function renderCourtInterface() {
+    const container = document.getElementById('court-zone');
+    if (!container) return;
+
+    const mode = badmintonMode;
+    const centerSize = badmintonCenterSize;
+    const centerPoints = badmintonCenterPoints;
+    const otherPoints = badmintonOtherPoints;
+    const cornerPoints = badmintonCornerPoints || 3;
+    const faultPoints = badmintonFaultPoints || 1;
+    const faultPenalty = badmintonFaultPenalty;
+
+    const sideSize = (100 - centerSize) / 2;
+
+    // Génération des zones selon le mode
+    let zonesHtml = '';
+    if (mode === '4corners') {
+        // 9 zones : 3x3
+        const types = [
+            ['corner', 'other', 'corner'],
+            ['other', 'center', 'other'],
+            ['corner', 'other', 'corner']
+        ];
+        const pointsMap = {
+            center: centerPoints,
+            corner: cornerPoints,
+            other: otherPoints
+        };
+        const colorsMap = {
+            center: 'bg-blue-500',
+            corner: 'bg-orange-500',
+            other: 'bg-purple-500'
+        };
+        zonesHtml = types.map(row => 
+            row.map(type => {
+                const pts = pointsMap[type] || 0;
+                const color = colorsMap[type] || 'bg-slate-500';
+                return `<div class="zone ${color} flex-1 flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80"
+                          data-points="${pts}" data-type="${type}">${pts}</div>`;
+            }).join('')
+        ).map(row => `<div class="flex flex-1">${row}</div>`).join('');
+
+        // Ajout des zones Fautes (sur les côtés)
+        const faultColor = faultPenalty ? 'bg-yellow-500 text-black' : 'bg-yellow-300 text-black opacity-50';
+        const faultLabel = faultPenalty ? `⚠️ ${faultPoints}` : '⚠️ 0';
+        const faultZones = `
+            <div class="fault-area absolute top-0 left-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area absolute top-0 right-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area absolute bottom-0 left-0 w-full h-1/6 ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area absolute top-0 left-0 w-full h-1/6 ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+                 data-points="${faultPenalty ? faultPoints : 0}" data-type="fault">${faultLabel}</div>
+        `;
+        zonesHtml += faultZones;
+    } else {
+        // Mode 3 zones (frontback ou leftright)
+        const isFrontBack = mode === 'frontback';
+        const zones = [
+            { type: 'extreme', size: sideSize, color: 'bg-red-500' },
+            { type: 'center', size: centerSize, color: 'bg-blue-500' },
+            { type: 'extreme', size: sideSize, color: 'bg-red-500' }
+        ];
+        zonesHtml = zones.map(z => {
+            const pts = z.type === 'center' ? centerPoints : otherPoints;
+            const style = isFrontBack ? `height:${z.size}%; width:100%` : `width:${z.size}%; height:100%`;
+            return `<div class="zone ${z.color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80"
+                      style="${style}" data-points="${pts}" data-type="${z.type}">${pts}</div>`;
+        }).join('');
+        
+        if (isFrontBack) {
+            zonesHtml = `<div class="flex flex-col w-full h-full">${zonesHtml}</div>`;
+        } else {
+            zonesHtml = `<div class="flex w-full h-full">${zonesHtml}</div>`;
+        }
+    }
+
+    // Construction du HTML complet
+    container.innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+            <div class="text-center w-1/3">
+                <h3 class="text-3xl font-black text-white">${currentMatch.p1}</h3>
+            </div>
+            <div class="text-center w-1/3">
+                <h3 id="score-display" class="text-5xl font-black text-yellow-400">${matchPoints.p2} - ${matchPoints.p1}</h3>
+            </div>
+            <div class="text-center w-1/3">
+                <h3 class="text-3xl font-black text-white">${currentMatch.p2}</h3>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-4">
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-bold text-slate-400">Zone : <span id="zone-size-display">${centerSize}%</span></label>
+                <input type="range" id="middle-zone-slider" min="20" max="60" value="${centerSize}" class="w-full">
+            </div>
+        </div>
+
+        <div id="court" class="court-container relative w-full mx-auto mb-4 shadow-2xl" 
+             style="background-color: #15803d; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
+            <div class="absolute inset-0 flex">
+                <div class="half-court w-1/2 h-full relative p-0">
+                    ${zonesHtml.replace(/p1/g, 'p1')}
+                    <div id="ratio-p1" class="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
+                </div>
+                <div class="w-1 h-full bg-black"></div>
+                <div class="half-court w-1/2 h-full relative p-0">
+                    ${zonesHtml.replace(/p1/g, 'p2')}
+                    <div id="ratio-p2" class="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-4 flex-wrap">
             <button onclick="undoImpact()" class="bg-slate-600 text-white px-4 py-2 rounded-xl font-bold">↩ Annuler</button>
             <button onclick="resetCourt()" class="bg-red-600 text-white px-4 py-2 rounded-xl font-bold">Reset</button>
             <button onclick="endMatch()" class="bg-emerald-600 text-white px-6 py-2 rounded-xl font-black">🏁 Terminer Match</button>
