@@ -3,7 +3,7 @@
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
-import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
+import { getLocalMapping, getCurrentClasse, getStudentsMap } from '../../core/live-engine.js';
 
 let currentUnsub = null;
 let currentClasse = '';
@@ -34,33 +34,39 @@ export function renderBadmintonTV() {
 
     currentClasse = classe;
 
+    // ✅ Récupérer le mapping local et les élèves
     const mapping = getLocalMapping(classe) || {};
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    const studentsMap = getStudentsMap(classe) || {};
 
-    const eleveMap = {};
-    eleves.forEach(e => {
-        eleveMap[e.id] = { nom: `${e.prenom} ${e.nom}`, sexe: e.sexe };
-    });
+    console.log("📋 [TV] Mapping local :", mapping);
+    console.log("📋 [TV] StudentsMap :", studentsMap);
 
     function getEleveFromCode(code) {
-        for (const [key, value] of Object.entries(mapping)) {
-            const parts = key.split('_');
-            if (parts.length >= 3) {
-                const terrain = parts[1];
-                const lettre = parts[2];
-                if (`${terrain}_${lettre}` === code) {
-                    return eleveMap[value] || { nom: code, sexe: '' };
-                }
-                if (Array.isArray(value)) {
-                    const index = parseInt(lettre) - 1;
-                    if (index >= 0 && index < value.length) {
-                        const id = value[index];
-                        return eleveMap[id] || { nom: code, sexe: '' };
+        const key = `${classe}_${code}`;
+        if (mapping[key]) {
+            const eleveId = mapping[key];
+            const nom = studentsMap[eleveId] || code;
+            return { id: eleveId, nom: nom };
+        }
+        const match = code.match(/^(\d+)_([A-Z])$/);
+        if (match) {
+            const terrain = match[1];
+            const lettre = match[2];
+            for (const [key, value] of Object.entries(mapping)) {
+                if (key.startsWith(`${classe}_${terrain}_${lettre}`)) {
+                    if (Array.isArray(value)) {
+                        const eleveId = value[0] || value;
+                        const nom = studentsMap[eleveId] || code;
+                        return { id: eleveId, nom: nom };
+                    } else {
+                        const eleveId = value;
+                        const nom = studentsMap[eleveId] || code;
+                        return { id: eleveId, nom: nom };
                     }
                 }
             }
         }
-        return { nom: code, sexe: '' };
+        return { id: null, nom: code };
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -71,12 +77,10 @@ export function renderBadmintonTV() {
     currentUnsub = onValue(resultsRef, async (snap) => {
         const data = snap.val() || {};
 
-        // Calculer le classement
         const classement = {};
 
         Object.values(data).forEach(m => {
             if (!m.p1 || !m.p2) return;
-            // Points classement (déjà calculés)
             const pts1 = m.pts1 || 0;
             const pts2 = m.pts2 || 0;
 
@@ -98,7 +102,6 @@ export function renderBadmintonTV() {
                 else classement[m.p2].sans++;
             }
 
-            // Diff
             const diff1 = (m.score1 || 0) - (m.score2 || 0);
             const diff2 = (m.score2 || 0) - (m.score1 || 0);
             classement[m.p1].diff += diff1;
@@ -112,16 +115,16 @@ export function renderBadmintonTV() {
             return;
         }
 
-        // Afficher le podium
         let html = `
             <style>
                 .tv-podium { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-bottom: 30px; }
                 .tv-card { background: #1e293b; border-radius: 16px; padding: 20px; min-width: 150px; text-align: center; border: 2px solid #334155; }
-                .tv-card.gold { border-color: #facc15; background: #1e293b; }
-                .tv-card.silver { border-color: #94a3b8; background: #1e293b; }
-                .tv-card.bronze { border-color: #d97706; background: #1e293b; }
+                .tv-card.gold { border-color: #facc15; }
+                .tv-card.silver { border-color: #94a3b8; }
+                .tv-card.bronze { border-color: #d97706; }
                 .tv-rank { font-size: 2rem; font-weight: 900; color: #facc15; }
-                .tv-photo { width: 60px; height: 60px; border-radius: 50%; margin: 10px auto; }
+                .tv-photo { width: 60px; height: 60px; border-radius: 50%; margin: 10px auto; overflow: hidden; }
+                .tv-photo img { width: 100%; height: 100%; object-fit: cover; }
                 .tv-name { font-size: 1.2rem; font-weight: 700; color: white; }
                 .tv-stats { font-size: 0.9rem; color: #94a3b8; }
                 .tv-score { font-size: 2rem; font-weight: 900; color: #facc15; }
@@ -138,8 +141,8 @@ export function renderBadmintonTV() {
         for (let i = 0; i < Math.min(sorted.length, 5); i++) {
             const [code, stats] = sorted[i];
             const joueur = getEleveFromCode(code);
-            let photoHtml = await getPhotoFromId(joueur.id || code);
-            let rankClass = i === 0 ? 'gold' : (i === 1 ? 'silver' : (i === 2 ? 'bronze' : ''));
+            const photoHtml = await getPhotoFromId(joueur.id);
+            const rankClass = i === 0 ? 'gold' : (i === 1 ? 'silver' : (i === 2 ? 'bronze' : ''));
             const medaille = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i+1}.`));
 
             html += `
@@ -160,7 +163,6 @@ export function renderBadmintonTV() {
             `;
         }
 
-        // Tableau complet
         html += `
             </div>
             <div style="background: #1e293b; border-radius: 12px; overflow: hidden; border: 1px solid #334155;">
@@ -178,8 +180,9 @@ export function renderBadmintonTV() {
                     <tbody>
         `;
 
-        sorted.forEach(([code, stats], idx) => {
+        for (const [code, stats] of sorted) {
             const joueur = getEleveFromCode(code);
+            const idx = sorted.findIndex(([c]) => c === code);
             const bg = idx % 2 === 0 ? 'background: #1e293b;' : 'background: #0f172a;';
             html += `
                 <tr style="${bg} border-bottom: 1px solid #1e293b;">
@@ -193,7 +196,7 @@ export function renderBadmintonTV() {
                     </td>
                 </tr>
             `;
-        });
+        }
 
         html += `
                     </tbody>
@@ -210,7 +213,7 @@ async function getPhotoFromId(id) {
     try {
         const url = await getPhotoUrl(id);
         if (url) {
-            return `<img src="${url}" style="width: 60px; height: 60px; border-radius: 50%; object-cover; border: 2px solid #3b82f6; margin: 10px auto;">`;
+            return `<img src="${url}" style="width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #3b82f6; margin: 10px auto;">`;
         }
     } catch (e) { /* ignore */ }
     return `<div style="width: 60px; height: 60px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 24px; margin: 10px auto;">👤</div>`;
