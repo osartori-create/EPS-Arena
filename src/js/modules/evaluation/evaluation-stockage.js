@@ -1,6 +1,8 @@
 // src/js/modules/evaluation/evaluation-stockage.js
 // Gestion du stockage local (localStorage)
 
+import { getVMAFromPalier } from './evaluation-utils.js';
+
 const PREFIX = 'eps_arena_evaluation_';
 
 export function getStorageKey(classe) {
@@ -240,12 +242,12 @@ export function genererDonneesFactices(data) {
     sauvegarderDonnees(data.classe || '', data);
     return data;
 }
+
 export function purgerTest(classe, testId) {
     const key = getStorageKey(classe);
     const data = chargerDonnees(classe);
     if (!data) return false;
     
-    // Parcourir tous les élèves et supprimer le résultat du test
     Object.keys(data.eleves).forEach(eleveId => {
         if (data.eleves[eleveId].resultats[testId]) {
             data.eleves[eleveId].resultats[testId] = null;
@@ -256,15 +258,11 @@ export function purgerTest(classe, testId) {
     return true;
 }
 
-/**
- * Purge tous les résultats pour une classe (garde les élèves)
- */
 export function purgerTousLesTests(classe) {
     const key = getStorageKey(classe);
     const data = chargerDonnees(classe);
     if (!data) return false;
     
-    // Réinitialiser tous les résultats
     Object.keys(data.eleves).forEach(eleveId => {
         Object.keys(data.eleves[eleveId].resultats).forEach(testId => {
             data.eleves[eleveId].resultats[testId] = null;
@@ -275,12 +273,55 @@ export function purgerTousLesTests(classe) {
     return true;
 }
 
-/**
- * Purge complètement la classe (élèves + résultats)
- */
 export function purgerClasseEntiere(classe) {
     const key = getStorageKey(classe);
     localStorage.removeItem(key);
     return true;
 }
-import { getVMAFromPalier } from './evaluation-utils.js';
+
+// ============================================================
+// SYNCHRONISATION AVEC L'ADMIN (NOUVEAU – BIEN EXPORTÉ)
+// ============================================================
+
+export function synchroniserAvecAdmin(classe, eleveId, testId, valeur) {
+    // Récupérer les élèves de la classe
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    const eleve = eleves.find(e => e.id === eleveId);
+    if (!eleve) return false;
+
+    // Correspondance test → champ admin
+    const mapping = {
+        endurance: { champ: 'vma', transform: (v) => getVMAFromPalier(v)?.toFixed(1) || null },
+        force: { champ: 'longueur', transform: (v) => v },
+        vitesse: { champ: 'sprint30', transform: (v) => v },
+        souplesse: { champ: 'souplesse', transform: (v) => v },
+        equilibre: { champ: 'equilibre', transform: (v) => v },
+        coordination: { champ: 'coordination', transform: (v) => v },
+        endurance_musculaire: { champ: 'endurance_musculaire', transform: (v) => v }
+    };
+
+    const mappingTest = mapping[testId];
+    if (!mappingTest) return false;
+
+    const champ = mappingTest.champ;
+    const nouvelleValeur = mappingTest.transform(valeur);
+
+    if (nouvelleValeur === null || nouvelleValeur === undefined) return false;
+
+    // Vérifier si la valeur actuelle est différente
+    const ancienneValeur = eleve[champ];
+    if (ancienneValeur === nouvelleValeur) return false;
+
+    // Demander confirmation
+    const message = `Voulez-vous mettre à jour "${champ}" de ${eleve.prenom} ${eleve.nom} ?\nAncienne valeur : ${ancienneValeur ?? 'vide'}\nNouvelle valeur : ${nouvelleValeur}`;
+    if (!confirm(message)) return false;
+
+    // Mettre à jour
+    eleve[champ] = nouvelleValeur;
+    localStorage.setItem(`eps_arena_eleves_${classe}`, JSON.stringify(eleves));
+    
+    // Émettre un événement pour rafraîchir l'UI
+    window.dispatchEvent(new CustomEvent('eleve-updated', { detail: { classe, eleveId, champ, valeur: nouvelleValeur } }));
+
+    return true;
+}
