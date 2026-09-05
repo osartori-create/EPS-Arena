@@ -1,17 +1,17 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-prof.js
 // Interface professeur : vue globale de la classe
 
-// ✅ Chemin corrigé
-import { getPhotoUrl } from '../../../../services/admin-service.js';
+// ✅ Correction du chemin d'import
+import { getPhotoUrl } from '../../../services/admin-service.js';
 import { getJoueurs, getHistorique, getConfig, getCurrentClasse, exportTournoiData, importTournoiData } from '../../tournoi-core.js';
-import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, initEliminationCore } from './elimination-core.js';
+import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, init as initEliminationCore } from './elimination-core.js';
 
 let currentClasse = '';
 let showExclus = false;
 let unsubscribe = null;
 
-// ✅ Renommée pour éviter le conflit avec le dispatcher
-export function initEliminationProf(classe) {
+// ✅ Fonction d'initialisation (appelée par le dispatcher)
+export function init(classe) {
     currentClasse = classe;
     initEliminationCore(classe);
 
@@ -23,6 +23,12 @@ export function initEliminationProf(classe) {
     unsubscribe = () => window.removeEventListener('tournoi-updated', handler);
 
     renderProf();
+    
+    // Retourner une fonction de nettoyage
+    return () => {
+        if (unsubscribe) unsubscribe();
+        console.log('🧹 [Élimination Prof] Nettoyage');
+    };
 }
 
 async function renderProf() {
@@ -202,7 +208,5 @@ window.tournoiImporter = function(event) {
     event.target.value = '';
 };
 
-// ✅ Point d'entrée pour le dispatcher
-export function init(classe) {
-    initEliminationProf(classe);
-}
+// Exporter l'init pour le dispatcher
+export { init as initEliminationProf };

@@ -1,20 +1,20 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-kiosk.js
 // Interface élève : code + bouton élimination
 
-import { ajouterElimination, getExclus, initEliminationCore } from './elimination-core.js';
+import { ajouterElimination, getExclus, init as initEliminationCore } from './elimination-core.js';
 import { getJoueurs } from '../../tournoi-core.js';
 
 let currentCode = '';
 let currentClasse = '';
 
-export function initEliminationKiosk(classe) {
+// ✅ Fonction d'initialisation (appelée par le dispatcher)
+export function init(classe) {
     currentClasse = classe;
     initEliminationCore(classe);
-
-    const container = document.getElementById('tournoi-module');
-    if (!container) return;
-
     renderKiosk();
+    return () => {
+        console.log('🧹 [Élimination Kiosk] Nettoyage');
+    };
 }
 
 function renderKiosk() {
@@ -56,6 +56,7 @@ function renderKiosk() {
     }
 }
 
+// Fonctions globales exposées pour les onclick
 window.tournoiSetCode = function(value) {
     currentCode = value.trim();
     const btn = document.getElementById('tournoi-btn-elimine');
@@ -110,6 +111,7 @@ function getStats() {
     return `📊 Éliminations : <span class="font-bold text-yellow-400">${info.eliminations || 0}</span>`;
 }
 
+// Pour l'intégration depuis eleve-app
 export function initTournoiKioskFromApp(classe) {
     const activityScreen = document.getElementById('activity-screen');
     let module = document.getElementById('tournoi-module');
@@ -120,10 +122,8 @@ export function initTournoiKioskFromApp(classe) {
         activityScreen.appendChild(module);
     }
     module.classList.remove('hidden');
-    initEliminationKiosk(classe);
+    init(classe);
 }
 
-// ✅ Point d'entrée pour le dispatcher
-export function init(classe) {
-    initEliminationKiosk(classe);
-}
+// ✅ Exporter une fonction d'init générique pour le dispatcher
+export { init as initKiosk };elimination-prof

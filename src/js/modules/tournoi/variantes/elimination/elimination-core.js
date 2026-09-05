@@ -2,7 +2,7 @@
 // Logique spécifique à la variante Élimination
 
 import { getJoueurs, getHistorique, getConfig, getCurrentClasse, updateJoueur, ajouterHistorique } from '../../tournoi-core.js';
-import { db, ref, onValue, set } from '../../../../core/firebase-service.js';
+import { db, ref, onValue, set } from '../../../core/firebase-service.js';
 
 let exclus = {};
 
@@ -42,17 +42,15 @@ export function toggleExclure(code) {
 export function reinitialiserTournoi() {
     if (!confirm('⚠️ Réinitialiser toutes les données du tournoi ?')) return;
     const classe = getCurrentClasse();
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const joueursRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/joueurs`);
-    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/historique`);
-    const exclusRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/exclus`);
+    const joueursRef = ref(db, getJoueursPath(classe));
+    const historiqueRef = ref(db, getHistoriquePath(classe));
     set(joueursRef, {});
     set(historiqueRef, []);
     setExclus({});
 }
 
-// ✅ Renommée pour éviter le conflit
-export function initEliminationCore(classe) {
+// ✅ Fonction d'initialisation (appelée par le dispatcher)
+export function init(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const exclusRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/exclus`);
     onValue(exclusRef, (snap) => {
@@ -60,12 +58,11 @@ export function initEliminationCore(classe) {
         window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
     
+    // Retourner une fonction de nettoyage
     return () => {
         console.log('🧹 [Élimination] Nettoyage');
     };
 }
 
-// Point d'entrée pour le dispatcher
-export function init(classe) {
-    return initEliminationCore(classe);
-}
+// Exporter en plus pour compatibilité
+export { init as initEliminationCore };

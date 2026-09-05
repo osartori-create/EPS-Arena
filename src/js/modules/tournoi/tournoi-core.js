@@ -36,7 +36,7 @@ function getConfigPath(classe) {
 export function initTournoiCore(classe) {
     currentClasse = classe;
     joueurs = {};
-    historique = {};
+    historique = [];
     config = {};
 
     const joueursRef = ref(db, getJoueursPath(classe));
@@ -47,7 +47,7 @@ export function initTournoiCore(classe) {
 
     const historiqueRef = ref(db, getHistoriquePath(classe));
     onValue(historiqueRef, (snap) => {
-        historique = snap.val() || {};
+        historique = snap.val() || [];
         window.dispatchEvent(new CustomEvent('tournoi-updated', { detail: { joueurs, historique, config } }));
     });
 
@@ -67,8 +67,11 @@ export function getHistorique() { return historique; }
 export function getConfig() { return config; }
 export function getCurrentClasse() { return currentClasse; }
 
+// ✅ EXPORT DE currentClasse (pour tournoi-dispatcher)
+export { currentClasse };
+
 // ============================================================
-// SETTERS POUR LES VARIANTES
+// SETTERS
 // ============================================================
 
 export function setJoueurs(data) {
@@ -97,7 +100,7 @@ export function ajouterHistorique(entry) {
 }
 
 // ============================================================
-// EXPORT / IMPORT JSON (commun)
+// EXPORT / IMPORT JSON
 // ============================================================
 
 export function exportTournoiData() {
