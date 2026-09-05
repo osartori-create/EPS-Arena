@@ -301,6 +301,31 @@
         <option value="8">8 pts</option>
     </select>
 </div>
+
+<!-- PARAMÈTRES "AVEC LA MANIÈRE" -->
+<div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 mt-4">
+    <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📊 Paramètres "Avec la manière"</h3>
+    
+    <div class="grid grid-cols-2 gap-4 text-xs">
+        <div>
+            <label class="block font-bold text-slate-400 uppercase mb-1">Bonus "Avec la manière" (pts)</label>
+            <select id="badmintonBonusManiere" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                <option value="3">3 pts</option>
+                <option value="4">4 pts</option>
+                <option value="5" selected>5 pts</option>
+                <option value="6">6 pts</option>
+                <option value="7">7 pts</option>
+                <option value="8">8 pts</option>
+            </select>
+            <p class="text-[10px] text-slate-500 mt-1">Seuil pour déclencher le bonus "Avec la manière" dans la zone dangereuse</p>
+        </div>
+        <div>
+            <label class="block font-bold text-slate-400 uppercase mb-1">Seuil de victoire</label>
+            <input type="number" id="badmintonSeuilVictoire" value="11" min="5" max="21" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+            <p class="text-[10px] text-slate-500 mt-1">Points à atteindre pour gagner (arrêt automatique)</p>
+        </div>
+    </div>
+</div>
     <!-- ════════════════════════════════════════════════════════════ -->
     <!-- GESTION DES TERRAINS (existant) -->
     <!-- ════════════════════════════════════════════════════════════ -->
