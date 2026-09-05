@@ -377,8 +377,9 @@ function validerEssai() {
     }
     const essais = essaisParEleve[eleveSelectionne] || [];
     if (essais.length >= maxEssais) {
-        alert('Cet élève a déjà 3 essais.');
-        return;
+        import('./evaluation-stockage.js').then(module => {
+        module.synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'force', meilleur);
+    });
     }
 
     const valeur = valeurSlider;
