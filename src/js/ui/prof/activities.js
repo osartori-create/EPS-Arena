@@ -625,18 +625,38 @@ if (elevesExclus.length > 0) {
             if (endTime !== null) configData.endTime = endTime;
         } 
         else if (currentDiscipline === 'badminton') {
-            const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
-            configData = { activite: 'badminton' };
-            const lettres = ['A','B','C','D','E','F','G','H','I','J'];
-            for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
-                const idsTerrain = assignments[t] || [];
-                idsTerrain.forEach((eleveId, index) => {
-                    const lettre = lettres[index] || '?';
-                    localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
-                });
-                configData[t] = idsTerrain.length;
-            }
-        } 
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
+    
+    // ✅ RÉCUPÉRATION DES PARAMÈTRES AVANCÉS
+    const mode = document.getElementById('badmintonMode')?.value || 'frontback';
+    const centerSize = parseInt(document.getElementById('badmintonCenterSize')?.value) || 33;
+    const centerPoints = parseInt(document.getElementById('badmintonCenterPoints')?.value) || 1;
+    const otherPoints = parseInt(document.getElementById('badmintonOtherPoints')?.value) || 3;
+    const cornerPoints = parseInt(document.getElementById('badmintonCornerPoints')?.value) || 3;
+    const faultPoints = parseInt(document.getElementById('badmintonFaultPoints')?.value) || 1;
+    const faultPenalty = document.getElementById('badmintonFaultPenalty')?.checked || false;
+
+    configData = {
+        activite: 'badminton',
+        mode: mode,
+        centerSize: centerSize,
+        centerPoints: centerPoints,
+        otherPoints: otherPoints,
+        cornerPoints: cornerPoints,
+        faultPoints: faultPoints,
+        faultPenalty: faultPenalty
+    };
+
+    const lettres = ['A','B','C','D','E','F','G','H','I','J'];
+    for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
+        const idsTerrain = assignments[t] || [];
+        idsTerrain.forEach((eleveId, index) => {
+            const lettre = lettres[index] || '?';
+            localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
+        });
+        configData[t] = idsTerrain.length;
+    }
+}
         else if (currentDiscipline === 'arcathlon') {
             transmettreArcathlonConfig();
             return;
