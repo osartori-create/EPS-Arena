@@ -639,6 +639,7 @@ export function initActivities() {
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     const lettres = ['A','B','C','D','E','F','G','H','I','J'];
     
+    configData.seuilManiere = parseInt(document.getElementById('badmintonManiereSeuil').value) || 6;
     // ✅ Récupération du MODE DE JEU (terrain / maniere)
     const mode = window.badmintonMode || 'terrain';
     

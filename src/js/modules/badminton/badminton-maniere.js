@@ -1,15 +1,25 @@
 // src/js/modules/badminton/badminton-maniere.js
 // Mode "Avec la manière" : cases à cocher, points dangereux/centraux
+// Version avec arrêt automatique à 11 points et bonus paramétrable
 
 import { 
     currentTerrain, matchSchedule, playersList, terrainsConfig,
     renderMatchSetup, renderClassement, currentClasse
 } from './badminton-common.js';
 
-// ✅ Imports Firebase manquants
 import { db, ref, update } from '../../core/firebase-service.js';
 
-const SEUIL_MANIERE = 8;
+// ============================================================
+// CONSTANTES
+// ============================================================
+
+const SEUIL_GAGNANT = 11;           // Score à atteindre pour gagner (arrêt automatique)
+const SEUIL_MANIERE = 8;            // Seuil "Avec la manière" (pour l'affichage)
+let BONUS_MANIERE = 5;              // Bonus "Avec la manière" (paramétrable 3-8)
+
+// ============================================================
+// ÉTAT
+// ============================================================
 
 let matchPoints = { p1: 0, p2: 0 };
 let stats = {
@@ -20,6 +30,7 @@ let checkboxes = {
     p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
     p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
 };
+let matchTermine = false;
 
 // ============================================================
 // INITIALISATION DU MODE
@@ -27,6 +38,12 @@ let checkboxes = {
 
 export async function init(classe, config) {
     console.log('📊 [Maniere] Mode "Avec la manière" initialisé');
+
+    // Récupérer le bonus depuis la config (si disponible)
+    if (config && config.bonusManiere) {
+        BONUS_MANIERE = Math.max(3, Math.min(8, parseInt(config.bonusManiere) || 5));
+        console.log(`📊 [Maniere] Bonus "Avec la manière" : ${BONUS_MANIERE} pts`);
+    }
 
     window.selectMatchFromList = function(matchId) {
         const match = matchSchedule.find(m => m.id === matchId);
@@ -38,6 +55,7 @@ export async function init(classe, config) {
             p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
             p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
         };
+        matchTermine = false;
         renderCourtInterface();
     };
 
@@ -50,7 +68,7 @@ export async function init(classe, config) {
 }
 
 // ============================================================
-// RENDU DES CASES À COCHER (CASES VISIBLES)
+// RENDU DES CASES À COCHER
 // ============================================================
 
 function renderCourtInterface() {
@@ -69,41 +87,77 @@ function renderCourtInterface() {
     function renderCheckboxes(player, playerId) {
         let html = '';
         
-        // Zone dangereuse (VERT)
+        // Zone dangereuse (VERT) - avec coloriage selon le seuil de bonus
         html += `<div class="mb-4">
-            <p class="text-sm font-bold text-emerald-400 uppercase mb-2">🟢 Points gagnés en zone dangereuse</p>
+            <p class="text-sm font-bold text-emerald-400 uppercase mb-2">🟢 Points gagnés en zone dangereuse (Bonus : ${BONUS_MANIERE} pts)</p>
             <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].danger[i] ? 'checked' : '';
+            // Colorier en vert les cases >= BONUS_MANIERE (si cochées)
+            const isBonus = (i + 1) >= BONUS_MANIERE;
+            const baseClass = 'w-10 h-10 rounded-lg cursor-pointer transition-all';
+            let colorClass;
+            
+            if (checked) {
+                colorClass = isBonus ? 'bg-emerald-400 border-2 border-white' : 'bg-emerald-600 border-2 border-white';
+            } else {
+                colorClass = isBonus ? 'bg-emerald-800/50 border-2 border-emerald-500 hover:bg-emerald-600' : 'bg-emerald-900/50 border-2 border-emerald-700 hover:bg-emerald-700';
+            }
+            
             html += `
                 <div class="flex items-center justify-center">
                     <input type="checkbox" 
-                           class="w-10 h-10 rounded-lg cursor-pointer transition-all ${checked ? 'bg-emerald-600 border-2 border-white' : 'bg-emerald-900/50 border-2 border-emerald-700 hover:bg-emerald-700'}"
+                           class="${baseClass} ${colorClass}"
                            data-player="${player}" data-zone="danger" data-index="${i}" 
                            ${checked} 
                            onchange="window.updateCheckbox(this)">
+                    <span class="absolute text-[10px] font-bold text-white/50 pointer-events-none">${i+1}</span>
                 </div>
             `;
         }
-        html += `</div></div>`;
+        html += `</div>
+            <div class="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
+                <span>1</span>
+                <span class="text-emerald-400">🔹 Bonus à partir de ${BONUS_MANIERE}</span>
+                <span>10</span>
+            </div>
+        </div>`;
 
-        // Zone centrale (ROUGE)
+        // Zone centrale (ROUGE) - coloriage à partir de 7
         html += `<div>
             <p class="text-sm font-bold text-red-400 uppercase mb-2">🔴 Points gagnés en zone centrale</p>
             <div class="grid grid-cols-5 gap-2">`;
         for (let i = 0; i < 10; i++) {
             const checked = checkboxes[player].center[i] ? 'checked' : '';
+            // Colorier en rouge plus foncé les cases à partir de 7
+            const isRouge = (i + 1) >= 7;
+            const baseClass = 'w-10 h-10 rounded-lg cursor-pointer transition-all';
+            let colorClass;
+            
+            if (checked) {
+                colorClass = isRouge ? 'bg-red-400 border-2 border-white' : 'bg-red-600 border-2 border-white';
+            } else {
+                colorClass = isRouge ? 'bg-red-800/50 border-2 border-red-500 hover:bg-red-600' : 'bg-red-900/50 border-2 border-red-700 hover:bg-red-700';
+            }
+            
             html += `
                 <div class="flex items-center justify-center">
                     <input type="checkbox" 
-                           class="w-10 h-10 rounded-lg cursor-pointer transition-all ${checked ? 'bg-red-600 border-2 border-white' : 'bg-red-900/50 border-2 border-red-700 hover:bg-red-700'}"
+                           class="${baseClass} ${colorClass}"
                            data-player="${player}" data-zone="center" data-index="${i}" 
                            ${checked} 
                            onchange="window.updateCheckbox(this)">
+                    <span class="absolute text-[10px] font-bold text-white/50 pointer-events-none">${i+1}</span>
                 </div>
             `;
         }
-        html += `</div></div>`;
+        html += `</div>
+            <div class="flex justify-between text-[10px] text-slate-500 mt-1 px-1">
+                <span>1</span>
+                <span class="text-red-400">🔹 Zone rouge à partir de 7</span>
+                <span>10</span>
+            </div>
+        </div>`;
 
         // Compteurs
         const totalDanger = checkboxes[player].danger.filter(Boolean).length;
@@ -138,6 +192,8 @@ function renderCourtInterface() {
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">vs</h3>
                 <div class="text-xs text-slate-400">Seuil "Avec la manière" : <span class="text-yellow-400 font-bold">${SEUIL_MANIERE} pts</span></div>
+                <div class="text-xs text-emerald-400">Bonus : <span class="font-bold">${BONUS_MANIERE}</span> pts</div>
+                <div class="text-xs text-slate-500">🏆 Victoire à <span class="font-bold text-yellow-400">${SEUIL_GAGNANT}</span> pts</div>
             </div>
             <div class="text-center w-1/3">
                 <h3 class="text-2xl font-black text-white">${p2}</h3>
@@ -147,6 +203,7 @@ function renderCourtInterface() {
 
         <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 mb-4">
             <p class="text-xs text-slate-400 text-center">Cliquez sur les cases pour enregistrer les points (10 essais max par zone)</p>
+            <p class="text-xs text-slate-500 text-center mt-1">🟢 Cases vertes = bonus "Avec la manière" | 🔴 Zone rouge à partir de 7</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -174,6 +231,8 @@ function renderCourtInterface() {
 // ============================================================
 
 window.updateCheckbox = function(checkbox) {
+    if (matchTermine) return; // Bloquer les modifications après la fin du match
+
     const player = checkbox.dataset.player;
     const zone = checkbox.dataset.zone;
     const index = parseInt(checkbox.dataset.index);
@@ -181,17 +240,21 @@ window.updateCheckbox = function(checkbox) {
     checkboxes[player][zone][index] = checkbox.checked;
     
     // Mettre à jour le style de la case
+    const isBonus = (zone === 'danger' && (index + 1) >= BONUS_MANIERE);
+    const isRouge = (zone === 'center' && (index + 1) >= 7);
+    const baseClass = 'w-10 h-10 rounded-lg cursor-pointer transition-all';
+    
     if (checkbox.checked) {
         if (zone === 'danger') {
-            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-emerald-600 border-2 border-white';
+            checkbox.className = `${baseClass} ${isBonus ? 'bg-emerald-400 border-2 border-white' : 'bg-emerald-600 border-2 border-white'}`;
         } else {
-            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-red-600 border-2 border-white';
+            checkbox.className = `${baseClass} ${isRouge ? 'bg-red-400 border-2 border-white' : 'bg-red-600 border-2 border-white'}`;
         }
     } else {
         if (zone === 'danger') {
-            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-emerald-900/50 border-2 border-emerald-700 hover:bg-emerald-700';
+            checkbox.className = `${baseClass} ${isBonus ? 'bg-emerald-800/50 border-2 border-emerald-500 hover:bg-emerald-600' : 'bg-emerald-900/50 border-2 border-emerald-700 hover:bg-emerald-700'}`;
         } else {
-            checkbox.className = 'w-10 h-10 rounded-lg cursor-pointer transition-all bg-red-900/50 border-2 border-red-700 hover:bg-red-700';
+            checkbox.className = `${baseClass} ${isRouge ? 'bg-red-800/50 border-2 border-red-500 hover:bg-red-600' : 'bg-red-900/50 border-2 border-red-700 hover:bg-red-700'}`;
         }
     }
     
@@ -199,7 +262,7 @@ window.updateCheckbox = function(checkbox) {
 };
 
 // ============================================================
-// MISE À JOUR DES SCORES ET COMPTEURS
+// MISE À JOUR DES SCORES ET COMPTEURS (AVEC ARRÊT AUTOMATIQUE)
 // ============================================================
 
 function updateScores() {
@@ -232,6 +295,15 @@ function updateScores() {
         const el = document.getElementById(c.id);
         if (el) el.innerText = c.value;
     });
+
+    // ✅ ARRÊT AUTOMATIQUE : si un joueur atteint SEUIL_GAGNANT (11)
+    if (!matchTermine && (matchPoints.p1 >= SEUIL_GAGNANT || matchPoints.p2 >= SEUIL_GAGNANT)) {
+        matchTermine = true;
+        // Petite temporisation pour laisser voir le score final
+        setTimeout(() => {
+            window.endMatchManiere();
+        }, 500);
+    }
 }
 
 // ============================================================
@@ -239,6 +311,9 @@ function updateScores() {
 // ============================================================
 
 window.resetMatch = function() {
+    if (matchTermine) {
+        matchTermine = false;
+    }
     checkboxes = {
         p1: { danger: Array(10).fill(false), center: Array(10).fill(false) },
         p2: { danger: Array(10).fill(false), center: Array(10).fill(false) }
@@ -247,18 +322,32 @@ window.resetMatch = function() {
 };
 
 // ============================================================
-// FIN DE MATCH
+// FIN DE MATCH (MANUELLE OU AUTOMATIQUE)
 // ============================================================
 
 window.endMatchManiere = function() {
     const currentMatch = matchSchedule.find(m => m.id === window.currentMatchId);
     if (!currentMatch) return;
 
+    // Si le match est déjà terminé, ne pas le re-valider
+    if (matchTermine && matchSchedule.find(m => m.id === window.currentMatchId)?.s1 !== null) {
+        return;
+    }
+
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
     const score1 = matchPoints.p1;
     const score2 = matchPoints.p2;
 
+    // Vérifier si c'est un arrêt automatique (score >= SEUIL_GAGNANT)
+    const estArretAuto = (score1 >= SEUIL_GAGNANT || score2 >= SEUIL_GAGNANT);
+    let messageAuto = '';
+    if (estArretAuto) {
+        const gagnant = score1 >= SEUIL_GAGNANT ? p1 : p2;
+        messageAuto = `🏆 ${gagnant} a atteint ${SEUIL_GAGNANT} points ! Match terminé automatiquement.`;
+    }
+
+    // Déterminer le gagnant et le perdant
     let winner, loser, winnerScore, loserScore;
     if (score1 > score2) {
         winner = p1; loser = p2; winnerScore = score1; loserScore = score2;
@@ -280,8 +369,10 @@ window.endMatchManiere = function() {
             matchSchedule[matchIndex].style2 = avecManiere2 ? 'avec' : 'sans';
         }
         saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2);
-        alert(`Match nul ! ${p1} ${score1} pts, ${p2} ${score2} pts`);
+        const msg = `${messageAuto}\n\nMatch nul ! ${p1} ${score1} pts, ${p2} ${score2} pts`;
+        alert(msg);
         window.currentMatchId = null;
+        matchTermine = false;
         renderMatchSetup();
         return;
     }
@@ -304,20 +395,22 @@ window.endMatchManiere = function() {
 
     saveMatchResult(p1, p2, score1, score2, ptsWinner, ptsLoser, winnerAvecManiere, loserAvecManiere, winner, loser);
 
-    const message = `
+    const msg = `
+        ${messageAuto}
         🏆 Match terminé !
         ${p1} : ${score1} pts ${score1 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
         ${p2} : ${score2} pts ${score2 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
         Points classement : ${winner} = ${ptsWinner} pts, ${loser} = ${ptsLoser} pts
     `;
-    alert(message);
+    alert(msg);
 
     window.currentMatchId = null;
+    matchTermine = false;
     renderMatchSetup();
 };
 
 // ============================================================
-// SAUVEGARDE FIREBASE (avec imports corrigés)
+// SAUVEGARDE FIREBASE
 // ============================================================
 
 function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, winner = null, loser = null) {
@@ -331,6 +424,7 @@ function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecM
         score1, score2,
         pts1, pts2,
         avecManiere1, avecManiere2,
+        bonusManiere: BONUS_MANIERE,
         winner: winner || (score1 > score2 ? p1 : p2),
         loser: loser || (score1 > score2 ? p2 : p1),
         timestamp: Date.now()
