@@ -497,6 +497,7 @@ function generateCourtHTML() {
 
     const style9Z = (i) => `width:${(i % 3 === 1) ? cSize : sideSize}%;height:${(Math.floor(i / 3) === 1) ? cSize : sideSize}%`;
 
+    // Génération des zones pour un joueur (sans fautes)
     const genZones = (playerCode) => {
         let zones = '';
         if (!is9) {
@@ -528,77 +529,36 @@ function generateCourtHTML() {
         return zones;
     };
 
-    // ✅ Génération des fautes pour les DEUX côtés
-    let faultHtml = '';
-    if (is9) {
+    // ✅ Génération des fautes pour UNE moitié de terrain
+    const genFaults = (playerCode) => {
         const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
         const faultLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
-
-        // Fautes pour p1 (moitié gauche)
-        faultHtml += `
-            <div class="fault-area fault-top" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-left" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-right" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
+        // Chaque moitié a ses propres fautes : haut, bas, gauche, droite
+        return `
+            <div class="fault-area fault-top" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-left" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-right" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
         `;
-        // Fautes pour p2 (moitié droite)
-        faultHtml += `
-            <div class="fault-area fault-top" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-left" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-right" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-        `;
-    }
+    };
 
+    // Construction du terrain
     return `<div class="court-wrapper ${is9 ? 'mode-9zones' : 'mode-3zones'}">
         <div class="court">
-            <div class="player-area ${pClass}" id="area-p1">${genZones('p1')}</div>
+            <!-- Moitié p1 (gauche) -->
+            <div class="player-area ${pClass}" id="area-p1" style="position:relative; overflow:visible;">
+                ${genZones('p1')}
+                ${is9 ? genFaults('p1') : ''}
+            </div>
+            <!-- Filet -->
             <div class="net"></div>
-            <div class="player-area ${pClass}" id="area-p2">${genZones('p2')}</div>
+            <!-- Moitié p2 (droite) -->
+            <div class="player-area ${pClass}" id="area-p2" style="position:relative; overflow:visible;">
+                ${genZones('p2')}
+                ${is9 ? genFaults('p2') : ''}
+            </div>
         </div>
-        ${faultHtml}
     </div>`;
-}
-
-// ============================================================
-// 4. INTERACTIONS
-// ============================================================
-
-function handleImpact(e) {
-    const court = document.getElementById('court');
-    if (!court) return;
-    
-    const target = e.target.closest('.zone, .fault-area');
-    if (!target) return;
-
-    const player = target.dataset.player || 'p1';
-    const points = parseInt(target.dataset.points) || 0;
-    const type = target.dataset.type || 'extreme';
-
-    const scoringPlayer = player === 'p1' ? 'p2' : 'p1';
-
-    const isFault = type === 'fault';
-    const finalPoints = (isFault && !badmintonFaultPenalty) ? 0 : points;
-
-    const wrapper = court.querySelector('.court-wrapper');
-    if (wrapper) {
-        const rect = wrapper.getBoundingClientRect();
-        const impact = document.createElement('div');
-        impact.className = 'impact';
-        impact.style.left = (e.clientX - rect.left) + 'px';
-        impact.style.top = (e.clientY - rect.top) + 'px';
-        wrapper.appendChild(impact);
-        historyStack.push({ element: impact, player: scoringPlayer, points: finalPoints, type, zonePlayer: player });
-    }
-
-    matchPoints[scoringPlayer] += finalPoints;
-    if (!ratioData[player][type]) ratioData[player][type] = 0;
-    ratioData[player][type]++;
-
-    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
-    updateRatios();
-
-    redoStack = [];
 }
 
 function handleTouch(e) {
