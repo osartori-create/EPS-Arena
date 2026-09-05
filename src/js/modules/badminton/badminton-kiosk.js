@@ -1,6 +1,6 @@
 // src/js/modules/badminton/badminton-kiosk.js
 // Interface élève : Sélection Terrain -> Liste Round Robin -> Terrain 3D
-// Adapté de BadZ Impact (Webjéjé) avec la logique de rendu 9 zones.
+// Adapté de BadZ Impact (Webjéjé)
 
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
@@ -46,6 +46,7 @@ export function initBadmintonKiosk(classe) {
 
         console.log("📡 [Élève] Config reçue :", config);
 
+        // ✅ Récupération du mode (avec vérification explicite)
         badmintonMode = config.mode || 'frontback';
         badmintonCenterSize = config.centerSize || 33;
         badmintonCenterPoints = config.centerPoints || 1;
@@ -53,6 +54,8 @@ export function initBadmintonKiosk(classe) {
         badmintonCornerPoints = config.cornerPoints || 5;
         badmintonFaultPoints = config.faultPoints || 1;
         badmintonFaultPenalty = config.faultPenalty !== undefined ? config.faultPenalty : true;
+
+        console.log("🏸 Mode appliqué :", badmintonMode);
 
         terrainsConfig = {};
         for (let key in config) {
@@ -247,7 +250,7 @@ function renderClassement() {
 }
 
 // ============================================================
-// 3. RENDU DU TERRAIN (BASÉ SUR WEBJÉJÉ)
+// 3. RENDU DU TERRAIN (VERSION CORRIGÉE AVEC IMPACTS)
 // ============================================================
 
 function renderCourtInterface() {
@@ -289,7 +292,7 @@ function renderCourtInterface() {
             </div>
         </div>
 
-        <!-- Boutons Faute (entre slider et terrain) -->
+        <!-- Boutons Faute -->
         <div class="flex justify-between items-center gap-4 mb-3">
             <button onclick="window.faultPlayer('p1')" class="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-xl font-bold text-sm transition-colors shadow-lg">
                 🟥 Faute ${currentMatch.p1}
@@ -299,7 +302,7 @@ function renderCourtInterface() {
             </button>
         </div>
 
-        <!-- Terrain -->
+        <!-- Terrain (avec conteneur pour les impacts) -->
         <div id="court" class="relative w-full mx-auto mb-4" style="background: #1a3a2a; border-radius: 15px; padding: 8px;">
             ${courtHTML}
         </div>
@@ -351,7 +354,7 @@ function renderCourtInterface() {
 }
 
 // ============================================================
-// 3b. GÉNÉRATION DU TERRAIN (CODE WEBJÉJÉ ADAPTÉ)
+// 3b. GÉNÉRATION DU TERRAIN (AVEC GRILLE CSS 3x3)
 // ============================================================
 
 function generateCourtHTML() {
@@ -361,7 +364,7 @@ function generateCourtHTML() {
     const sideSize = (100 - cSize) / 2;
 
     // ============================================================
-    // FONCTION : Génère une moitié de terrain (grille 3x3 + fautes)
+    // FONCTION : Génère une moitié de terrain
     // ============================================================
     function generateHalf(player) {
         let html = '';
@@ -385,14 +388,14 @@ function generateCourtHTML() {
                 corner: 'bg-orange-500'
             };
 
-            // Grille CSS 3x3
+            // Grille CSS 3x3 avec tailles variables
             html += `<div class="grid grid-cols-3 gap-0 w-full h-full" style="padding: 8%;">`;
             for (let row = 0; row < 3; row++) {
                 for (let col = 0; col < 3; col++) {
                     const type = grid[row][col];
                     const pts = pointsMap[type] || 0;
                     const color = colorsMap[type] || 'bg-slate-500';
-                    // Tailles variables selon la position
+                    // Tailles variables : centre = cSize, côtés = sideSize
                     const isCenterRow = row === 1;
                     const isCenterCol = col === 1;
                     const width = isCenterCol ? cSize : sideSize;
@@ -424,7 +427,7 @@ function generateCourtHTML() {
                       data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>`;
 
         } else {
-            // === MODE 3 ZONES (frontback ou leftright) ===
+            // === MODE 3 ZONES ===
             const isFrontBack = m === 'frontback';
             const zones = [
                 { type: 'extreme', pts: badmintonOtherPoints, color: 'bg-red-500' },
@@ -470,7 +473,7 @@ function generateCourtHTML() {
 }
 
 // ============================================================
-// 4. INTERACTIONS (IMPACTS, SCORES, UNDO)
+// 4. INTERACTIONS (AVEC IMPACTS JAUNES)
 // ============================================================
 
 function handleImpact(e) {
@@ -496,25 +499,27 @@ function handleImpact(e) {
     const isFault = type === 'fault';
     const finalPoints = (isFault && !badmintonFaultPenalty) ? 0 : points;
 
-    // Marquer l'impact visuellement
+    // ✅ IMPACT JAUNE (comme avant)
     const wrapper = court.querySelector('.court-wrapper');
-    const rect = wrapper.getBoundingClientRect();
-    const impact = document.createElement('div');
-    impact.className = 'impact';
-    impact.style.left = (e.clientX - rect.left) + 'px';
-    impact.style.top = (e.clientY - rect.top) + 'px';
-    wrapper.appendChild(impact);
+    if (wrapper) {
+        const rect = wrapper.getBoundingClientRect();
+        const impact = document.createElement('div');
+        impact.className = 'impact absolute w-4 h-4 bg-yellow-400 rounded-full border-2 border-white shadow-lg';
+        impact.style.left = (e.clientX - rect.left - 8) + 'px';
+        impact.style.top = (e.clientY - rect.top - 8) + 'px';
+        impact.style.zIndex = '20';
+        wrapper.appendChild(impact);
+        historyStack.push({ element: impact, player: scoringPlayer, points: finalPoints, type, zonePlayer: player });
+    }
 
     // Mettre à jour les scores
     matchPoints[scoringPlayer] += finalPoints;
-    // Stats : du côté du joueur qui a frappé
     if (!ratioData[player][type]) ratioData[player][type] = 0;
     ratioData[player][type]++;
 
     document.getElementById('score-display').innerText = `${matchPoints.p2} - ${matchPoints.p1}`;
     updateRatios();
 
-    historyStack.push({ element: impact, player: scoringPlayer, points: finalPoints, type, zonePlayer: player });
     redoStack = [];
 }
 
@@ -551,9 +556,10 @@ window.faultPlayer = function(player) {
     if (wrapper) {
         const rect = wrapper.getBoundingClientRect();
         const impact = document.createElement('div');
-        impact.className = 'impact';
+        impact.className = 'impact absolute w-4 h-4 bg-red-500 rounded-full border-2 border-white shadow-lg';
         impact.style.left = (rect.width / 2 - 10) + 'px';
         impact.style.top = (rect.height / 2 - 10) + 'px';
+        impact.style.zIndex = '20';
         wrapper.appendChild(impact);
         historyStack.push({ element: impact, player: scoringPlayer, points: fPt, type: 'fault_btn', zonePlayer: player });
         redoStack = [];
@@ -561,10 +567,10 @@ window.faultPlayer = function(player) {
 };
 
 function updateRatios() {
-    const p1Total = ratioData.p1.extreme + ratioData.p1.center + (ratioData.p1.corner || 0) + (ratioData.p1.other || 0) + (ratioData.p1.fault || 0);
-    const p2Total = ratioData.p2.extreme + ratioData.p2.center + (ratioData.p2.corner || 0) + (ratioData.p2.other || 0) + (ratioData.p2.fault || 0);
-    const p1Ext = p1Total > 0 ? Math.round(((ratioData.p1.extreme + (ratioData.p1.corner || 0)) / p1Total) * 100) : 0;
-    const p2Ext = p2Total > 0 ? Math.round(((ratioData.p2.extreme + (ratioData.p2.corner || 0)) / p2Total) * 100) : 0;
+    const p1Total = (ratioData.p1.extreme || 0) + (ratioData.p1.center || 0) + (ratioData.p1.corner || 0) + (ratioData.p1.other || 0) + (ratioData.p1.fault || 0);
+    const p2Total = (ratioData.p2.extreme || 0) + (ratioData.p2.center || 0) + (ratioData.p2.corner || 0) + (ratioData.p2.other || 0) + (ratioData.p2.fault || 0);
+    const p1Ext = p1Total > 0 ? Math.round(((ratioData.p1.extreme || 0) + (ratioData.p1.corner || 0)) / p1Total * 100) : 0;
+    const p2Ext = p2Total > 0 ? Math.round(((ratioData.p2.extreme || 0) + (ratioData.p2.corner || 0)) / p2Total * 100) : 0;
     document.getElementById('ratio-p1').innerText = p1Ext + '%';
     document.getElementById('ratio-p2').innerText = p2Ext + '%';
 }
@@ -573,7 +579,9 @@ function undoImpact() {
     if (historyStack.length === 0) return;
     const last = historyStack.pop();
     redoStack.push(last);
-    last.element.remove();
+    if (last.element && last.element.parentNode) {
+        last.element.remove();
+    }
     
     matchPoints[last.player] -= last.points;
     if (ratioData[last.zonePlayer] && ratioData[last.zonePlayer][last.type] > 0) {
@@ -585,7 +593,7 @@ function undoImpact() {
 }
 
 function resetCourt() {
-    document.querySelectorAll('.impact').forEach(el => el.remove());
+    document.querySelectorAll('.court-wrapper .impact').forEach(el => el.remove());
     matchPoints = { p1: 0, p2: 0 };
     ratioData = { 
         p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
@@ -616,16 +624,16 @@ window.endMatch = function() {
     if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
         const stats = {
             p1: { 
-                extreme: ratioData.p1.extreme, 
-                center: ratioData.p1.center,
+                extreme: ratioData.p1.extreme || 0,
+                center: ratioData.p1.center || 0,
                 corner: ratioData.p1.corner || 0,
                 other: ratioData.p1.other || 0,
                 fault: ratioData.p1.fault || 0,
                 total: matchPoints.p1 
             },
             p2: { 
-                extreme: ratioData.p2.extreme, 
-                center: ratioData.p2.center,
+                extreme: ratioData.p2.extreme || 0,
+                center: ratioData.p2.center || 0,
                 corner: ratioData.p2.corner || 0,
                 other: ratioData.p2.other || 0,
                 fault: ratioData.p2.fault || 0,
