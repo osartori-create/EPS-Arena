@@ -1,4 +1,36 @@
-// CSS Webjéjé pour le terrain
+// src/js/modules/badminton/badminton-kiosk.js
+// Interface élève : Sélection Terrain -> Liste Round Robin -> Terrain 3D
+// Adapté de BadZ Impact (Webjéjé)
+
+import { db, ref, onValue, update } from '../../core/firebase-service.js';
+
+let currentClasse = '';
+let currentTerrain = '';
+let playersList = [];
+let matchSchedule = [];
+let currentMatch = null;
+let matchPoints = { p1: 0, p2: 0 };
+let ratioData = { 
+    p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
+    p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
+};
+let terrainsConfig = {};
+let historyStack = [];
+let redoStack = [];
+let resultsListenerAttached = false;
+
+// Paramètres synchronisés avec Firebase
+let badmintonMode = 'frontback';
+let badmintonCenterSize = 33;
+let badmintonCenterPoints = 1;
+let badmintonOtherPoints = 3;
+let badmintonCornerPoints = 5;
+let badmintonFaultPoints = 1;
+let badmintonFaultPenalty = true;
+
+// ============================================================
+// CSS Webjéjé INJECTÉ (CORRIGÉ)
+// ============================================================
 const WEBJEJE_CSS = `
     .court-wrapper {
         position: relative;
@@ -7,17 +39,16 @@ const WEBJEJE_CSS = `
         margin: 0 auto;
         background-color: transparent;
         padding: 0;
-        transition: padding 0.3s ease;
+        overflow: hidden;
+        border: 2px solid #ffffff;
+        border-radius: 4px;
     }
-    .court-wrapper.mode-3zones { background-color: transparent; padding: 0; }
-    .court-wrapper.mode-9zones { background-color: transparent; padding: 0; }
 
     .court {
         width: 100%;
         aspect-ratio: 2 / 1;
         background-color: #107C10;
         position: relative;
-        border: 2px solid #ffffff;
         display: flex;
         overflow: hidden;
     }
@@ -51,22 +82,25 @@ const WEBJEJE_CSS = `
         display: flex;
         justify-content: center;
         align-items: center;
-        font-size: 14px;
-        font-weight: 600;
+        font-size: 16px;
+        font-weight: 700;
         color: white;
         cursor: pointer;
         position: relative;
         text-align: center;
         user-select: none;
+        transition: opacity 0.15s;
     }
+    .zone:hover { opacity: 0.8; }
     .zone-extreme { background-color: rgba(232, 17, 35, 0.5); }
     .zone-center { background-color: rgba(0, 120, 215, 0.5); }
     .zone-corner { background-color: rgba(216, 59, 1, 0.5); }
     .zone-other { background-color: rgba(136, 23, 152, 0.4); }
 
+    /* Zones de faute - POSITIONNÉES À L'EXTÉRIEUR */
     .fault-area {
         position: absolute;
-        background-color: rgba(232, 17, 35, 0.7);
+        background-color: rgba(232, 17, 35, 0.75);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -75,60 +109,51 @@ const WEBJEJE_CSS = `
         cursor: pointer;
         font-weight: bold;
         z-index: 5;
+        transition: opacity 0.15s;
+        border: 1px solid rgba(255,255,255,0.2);
     }
-    .fault-top, .fault-bottom { width: 45%; height: 20px; }
-    .fault-left, .fault-right { width: 20px; height: calc(100% - 40px); top: 20px; }
-    .fault-top { top: 0; }
-    .fault-bottom { bottom: 0; }
-    .fault-left { left: 0; }
-    .fault-right { right: 0; }
-    .fault-p1-top { left: 20px; }
-    .fault-p2-top { right: 20px; }
-    .fault-p1-bot { left: 20px; }
-    .fault-p2-bot { right: 20px; }
+    .fault-area:hover { opacity: 0.8; }
+
+    /* Fautes en haut et en bas - sur toute la largeur */
+    .fault-top, .fault-bottom { 
+        width: 100%; 
+        height: 18px; 
+        left: 0;
+    }
+    .fault-top { top: -19px; }
+    .fault-bottom { bottom: -19px; }
+
+    /* Fautes à gauche et à droite - sur toute la hauteur */
+    .fault-left, .fault-right { 
+        width: 18px; 
+        height: 100%; 
+        top: 0;
+    }
+    .fault-left { left: -19px; }
+    .fault-right { right: -19px; }
+
+    /* Pour le mode 9 zones, on ajuste les fautes pour qu'elles soient sur le pourtour */
+    .mode-9zones .fault-top { top: -19px; }
+    .mode-9zones .fault-bottom { bottom: -19px; }
+    .mode-9zones .fault-left { left: -19px; }
+    .mode-9zones .fault-right { right: -19px; }
+
+    /* Pour le mode 3 zones, on garde les fautes à l'intérieur (mais on ne les utilise pas) */
+    .mode-3zones .fault-area { display: none; }
 
     .impact {
         position: absolute;
-        width: 12px;
-        height: 12px;
+        width: 14px;
+        height: 14px;
         background-color: #FFB900;
         border: 2px solid #fff;
         transform: translate(-50%, -50%);
         z-index: 20;
         pointer-events: none;
         border-radius: 50%;
+        box-shadow: 0 0 10px rgba(255, 185, 0, 0.5);
     }
 `;
-
-// src/js/modules/badminton/badminton-kiosk.js
-// Interface élève : Sélection Terrain -> Liste Round Robin -> Terrain 3D
-// Adapté de BadZ Impact (Webjéjé) - Structure HTML strictement identique
-
-import { db, ref, onValue, update } from '../../core/firebase-service.js';
-
-let currentClasse = '';
-let currentTerrain = '';
-let playersList = [];
-let matchSchedule = [];
-let currentMatch = null;
-let matchPoints = { p1: 0, p2: 0 };
-let ratioData = { 
-    p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
-    p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
-};
-let terrainsConfig = {};
-let historyStack = [];
-let redoStack = [];
-let resultsListenerAttached = false;
-
-// Paramètres synchronisés avec Firebase
-let badmintonMode = 'frontback';
-let badmintonCenterSize = 33;
-let badmintonCenterPoints = 1;
-let badmintonOtherPoints = 3;
-let badmintonCornerPoints = 5;
-let badmintonFaultPoints = 1;
-let badmintonFaultPenalty = true;
 
 // ============================================================
 // INIT
@@ -351,7 +376,7 @@ function renderClassement() {
 }
 
 // ============================================================
-// 3. RENDU DU TERRAIN (STRUCTURE WEBJÉJÉ STRICTE)
+// 3. RENDU DU TERRAIN
 // ============================================================
 
 function renderCourtInterface() {
@@ -365,7 +390,6 @@ function renderCourtInterface() {
 
     // Construction du HTML complet avec CSS injecté
     container.innerHTML = `
-        <!-- Injection du CSS Webjéjé -->
         <style>${WEBJEJE_CSS}</style>
 
         <div class="flex justify-between items-center mb-4">
@@ -428,12 +452,45 @@ function renderCourtInterface() {
         </div>
     `;
 
-    // Attacher les événements du slider...
-    // (le reste est identique)
+    // Attacher les événements du slider
+    const slider = document.getElementById('middle-zone-slider');
+    const display = document.getElementById('zone-size-display');
+
+    // Mise à jour de l'affichage en temps réel
+    slider.addEventListener('input', function() {
+        display.innerText = this.value + '%';
+    });
+
+    // Re-rendu au relâchement
+    const reRender = () => {
+        const newVal = parseInt(slider.value);
+        if (newVal !== badmintonCenterSize) {
+            badmintonCenterSize = newVal;
+            console.log("🔄 Re-rendu avec zone centrale :", newVal);
+            renderCourtInterface();
+        }
+    };
+    slider.addEventListener('change', reRender);
+    slider.addEventListener('mouseup', reRender);
+    slider.addEventListener('touchend', reRender);
+
+    // Attacher les événements du terrain (avec délai pour que le DOM soit prêt)
+    setTimeout(() => {
+        const court = document.getElementById('court');
+        if (court) {
+            // Supprimer les anciens écouteurs pour éviter les doublons
+            const newCourt = court.cloneNode(true);
+            court.parentNode.replaceChild(newCourt, court);
+            
+            newCourt.addEventListener('click', handleImpact);
+            newCourt.addEventListener('touchstart', handleTouch, { passive: false });
+            console.log("✅ Écouteurs attachés au terrain");
+        }
+    }, 50);
 }
 
 // ============================================================
-// 3b. GÉNÉRATION DU TERRAIN (CODE WEBJÉJÉ IDENTIQUE)
+// 3b. GÉNÉRATION DU TERRAIN (Webjéjé)
 // ============================================================
 
 function generateCourtHTML() {
@@ -445,7 +502,7 @@ function generateCourtHTML() {
     // Déterminer la classe de disposition
     let pClass = is9 ? 'layout-grid' : (m === 'leftright' ? 'layout-row' : 'layout-col');
 
-    // Styles pour les zones 3x3
+    // Styles pour les zones
     const style3Z = (i) => m === 'frontback' ? 
         (i === 1 ? `width:100%;height:${cSize}%` : `width:100%;height:${sideSize}%`) : 
         (i === 1 ? `width:${cSize}%;height:100%` : `width:${sideSize}%;height:100%`);
@@ -464,7 +521,7 @@ function generateCourtHTML() {
                 zones += `<div class="zone ${colors[i]}" data-points="${points[i]}" data-player="${playerCode}" data-type="${types[i]}" style="${style3Z(i)}">${points[i]}</div>`;
             }
         } else {
-            // Mode 9 zones - EXACTEMENT comme Webjéjé
+            // Mode 9 zones
             const types = ['corner', 'other', 'corner', 'other', 'center', 'other', 'corner', 'other', 'corner'];
             const pointsMap = {
                 center: badmintonCenterPoints,
@@ -486,17 +543,20 @@ function generateCourtHTML() {
         return zones;
     };
 
-    // Génération des zones Fautes
+    // Génération des zones Fautes (UNIQUEMENT pour le mode 9 zones)
     let faultHtml = '';
     if (is9) {
         const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
         const faultLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
+        // Les fautes sont positionnées à l'extérieur grâce au CSS
         faultHtml = `
-            <div class="fault-area fault-top fault-p1-top" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-top fault-p2-top" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom fault-p1-bot" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom fault-p2-bot" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-top" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
             <div class="fault-area fault-left" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-right" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-top" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
+            <div class="fault-area fault-left" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
             <div class="fault-area fault-right" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
         `;
     }
@@ -512,16 +572,19 @@ function generateCourtHTML() {
 }
 
 // ============================================================
-// 4. INTERACTIONS (IMPACTS)
+// 4. INTERACTIONS
 // ============================================================
 
 function handleImpact(e) {
     const court = document.getElementById('court');
-    if (!court) return;
+    if (!court) {
+        console.warn('❌ Court non trouvé');
+        return;
+    }
     
     const target = e.target.closest('.zone, .fault-area');
     if (!target) {
-        console.warn('Clic hors zone');
+        console.warn('❌ Clic hors zone');
         return;
     }
 
@@ -538,7 +601,11 @@ function handleImpact(e) {
     const isFault = type === 'fault';
     const finalPoints = (isFault && !badmintonFaultPenalty) ? 0 : points;
 
-    // ✅ IMPACT JAUNE (comme dans Webjéjé)
+    if (finalPoints === 0 && isFault) {
+        console.log('⚠️ Faute non pénalisée, pas de point');
+    }
+
+    // ✅ IMPACT JAUNE
     const wrapper = court.querySelector('.court-wrapper');
     if (wrapper) {
         const rect = wrapper.getBoundingClientRect();
@@ -548,6 +615,7 @@ function handleImpact(e) {
         impact.style.top = (e.clientY - rect.top) + 'px';
         wrapper.appendChild(impact);
         historyStack.push({ element: impact, player: scoringPlayer, points: finalPoints, type, zonePlayer: player });
+        console.log('✅ Impact visuel ajouté');
     }
 
     // Mettre à jour les scores
@@ -572,8 +640,10 @@ function handleTouch(e) {
     });
 }
 
-// Bouton "Faute joueur"
+// Bouton "Faute joueur" - CORRIGÉ
 window.faultPlayer = function(player) {
+    // player = le joueur qui commet la faute
+    // Le point va à l'adversaire
     const scoringPlayer = player === 'p1' ? 'p2' : 'p1';
     const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
     
@@ -581,6 +651,8 @@ window.faultPlayer = function(player) {
         alert('Les fautes ne sont pas pénalisées (case décochée)');
         return;
     }
+
+    console.log(`🟥 Faute de ${player} → ${scoringPlayer} marque ${fPt}pt`);
 
     matchPoints[scoringPlayer] += fPt;
     if (!ratioData[player]['fault']) ratioData[player]['fault'] = 0;
@@ -590,7 +662,8 @@ window.faultPlayer = function(player) {
     updateRatios();
 
     // Impact visuel (au centre du terrain)
-    const wrapper = document.querySelector('.court-wrapper');
+    const court = document.getElementById('court');
+    const wrapper = court?.querySelector('.court-wrapper');
     if (wrapper) {
         const rect = wrapper.getBoundingClientRect();
         const impact = document.createElement('div');
