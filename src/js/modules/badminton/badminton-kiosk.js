@@ -497,7 +497,7 @@ function generateCourtHTML() {
 
     const style9Z = (i) => `width:${(i % 3 === 1) ? cSize : sideSize}%;height:${(Math.floor(i / 3) === 1) ? cSize : sideSize}%`;
 
-    // Génération des zones pour un joueur (sans fautes)
+    // Zones de jeu (3x3)
     const genZones = (playerCode) => {
         let zones = '';
         if (!is9) {
@@ -529,31 +529,37 @@ function generateCourtHTML() {
         return zones;
     };
 
-    // ✅ Génération des fautes pour UNE moitié de terrain
+    // ✅ ZONES DE FAUTE EN "U" pour chaque moitié (comme Webjéjé)
     const genFaults = (playerCode) => {
         const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
         const faultLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
-        // Chaque moitié a ses propres fautes : haut, bas, gauche, droite
-        return `
-            <div class="fault-area fault-top" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-left" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-right" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
-        `;
+        // Retourne un U : haut + bas + côté extérieur (gauche pour p1, droite pour p2)
+        if (playerCode === 'p1') {
+            return `
+                <div class="fault-area fault-top" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+                <div class="fault-area fault-bottom" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+                <div class="fault-area fault-left" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+            `;
+        } else {
+            return `
+                <div class="fault-area fault-top" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+                <div class="fault-area fault-bottom" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+                <div class="fault-area fault-right" data-points="${fPt}" data-player="${playerCode}" data-type="fault">${faultLabel}</div>
+            `;
+        }
     };
 
-    // Construction du terrain
     return `<div class="court-wrapper ${is9 ? 'mode-9zones' : 'mode-3zones'}">
         <div class="court">
-            <!-- Moitié p1 (gauche) -->
-            <div class="player-area ${pClass}" id="area-p1" style="position:relative; overflow:visible;">
+            <!-- Moitié p1 (gauche) : U ouvert à droite (côté filet) -->
+            <div class="player-area ${pClass}" id="area-p1">
                 ${genZones('p1')}
                 ${is9 ? genFaults('p1') : ''}
             </div>
             <!-- Filet -->
             <div class="net"></div>
-            <!-- Moitié p2 (droite) -->
-            <div class="player-area ${pClass}" id="area-p2" style="position:relative; overflow:visible;">
+            <!-- Moitié p2 (droite) : U ouvert à gauche (côté filet) -->
+            <div class="player-area ${pClass}" id="area-p2">
                 ${genZones('p2')}
                 ${is9 ? genFaults('p2') : ''}
             </div>
