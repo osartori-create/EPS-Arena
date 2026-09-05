@@ -9,6 +9,7 @@ let currentClasse = '';
 let showExclus = false;
 let unsubscribe = null;
 
+// Fonction d'initialisation (appelée par le dispatcher ou directement)
 export function init(classe) {
     currentClasse = classe;
     initEliminationCore(classe);
@@ -26,6 +27,9 @@ export function init(classe) {
         console.log('🧹 [Élimination Prof] Nettoyage');
     };
 }
+
+// ✅ Alias pour compatibilité
+export { init as initEliminationProf };
 
 async function renderProf() {
     const container = document.getElementById('tournoi-prof-container');
@@ -170,3 +174,7 @@ window.tournoiImporter = function(event) {
     }
     event.target.value = '';
 };
+
+// ✅ EXPORTER initEliminationProf et init (alias)
+export { init as initEliminationProf };
+export { init };

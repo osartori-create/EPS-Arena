@@ -41,19 +41,38 @@ export async function loadTournoiVariant(classe, mode) {
         console.log(`📦 [Tournoi] Chargement de la variante "${mode}"...`);
         const module = await variantConfig.module();
         
-        if (module.init || module.default?.init) {
-            const initFn = module.init || module.default.init;
+        // ✅ Récupérer la fonction init (différentes possibilités)
+        const initFn = module.init || module.default?.init || module.initEliminationProf;
+        
+        if (typeof initFn === 'function') {
             currentUnload = await initFn(classe) || (() => {});
             console.log(`✅ [Tournoi] Variante "${mode}" chargée`);
         } else {
             console.error(`❌ La variante "${mode}" n'exporte pas init()`);
+            // Fallback
             const fallback = await getVariantConfig('elimination').module();
-            currentUnload = await fallback.init(classe) || (() => {});
+            const fallbackInit = fallback.init || fallback.default?.init || fallback.initEliminationProf;
+            if (typeof fallbackInit === 'function') {
+                currentUnload = await fallbackInit(classe) || (() => {});
+            } else {
+                currentUnload = () => {};
+            }
         }
     } catch (error) {
         console.error(`❌ Erreur chargement variante "${mode}":`, error);
-        const fallback = await getVariantConfig('elimination').module();
-        currentUnload = await fallback.init(classe) || (() => {});
+        // Fallback
+        try {
+            const fallback = await getVariantConfig('elimination').module();
+            const fallbackInit = fallback.init || fallback.default?.init || fallback.initEliminationProf;
+            if (typeof fallbackInit === 'function') {
+                currentUnload = await fallbackInit(classe) || (() => {});
+            } else {
+                currentUnload = () => {};
+            }
+        } catch (e) {
+            console.error('❌ Fallback échoué :', e);
+            currentUnload = () => {};
+        }
     }
 
     return currentUnload;

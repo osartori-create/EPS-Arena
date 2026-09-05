@@ -326,25 +326,32 @@ export function initActivities() {
         try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
     }
     if (disc === 'tournoi') {
-        try {
-            const container = document.getElementById('tournoi-prof-container');
-            if (container) {
-                const activeClasse = document.getElementById('selectClasse').value;
-                if (activeClasse) {
-                    // Charger la variante par défaut (élimination)
-                    loadTournoiVariant(activeClasse, 'elimination');
-                    // Initialiser l'interface professeur
-                    import('../../modules/tournoi/variantes/elimination/elimination-prof.js').then(module => {
+    try {
+        const container = document.getElementById('tournoi-prof-container');
+        if (container) {
+            const activeClasse = document.getElementById('selectClasse').value;
+            if (activeClasse) {
+                // Charger la variante par défaut (élimination)
+                loadTournoiVariant(activeClasse, 'elimination');
+                // ✅ Initialiser l'interface professeur
+                import('../../modules/tournoi/variantes/elimination/elimination-prof.js').then(module => {
+                    // ✅ Appeler la fonction init exportée (sans .initEliminationProf)
+                    if (typeof module.init === 'function') {
+                        module.init(activeClasse);
+                    } else if (typeof module.initEliminationProf === 'function') {
                         module.initEliminationProf(activeClasse);
-                    }).catch(err => console.error("Erreur chargement tournoi prof :", err));
-                } else {
-                    container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
-                }
+                    } else {
+                        console.error('❌ Aucune fonction init trouvée dans elimination-prof.js');
+                    }
+                }).catch(err => console.error("Erreur chargement tournoi prof :", err));
+            } else {
+                container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
             }
-        } catch (e) {
-            console.error("Erreur init Tournoi :", e);
         }
+    } catch (e) {
+        console.error("Erreur init Tournoi :", e);
     }
+}
 };
 
     // ============================================================
