@@ -278,16 +278,21 @@
 
             <!-- PARAMÈTRES BADMINTON -->
 <div id="viewBadmintonSettings" class="hidden space-y-4">
-    <!-- Sélecteur de mode de jeu (NOUVEAU) -->
+    
+    <!-- ════════════════════════════════════════════════════════════ -->
+    <!-- SÉLECTEUR DE MODE DE JEU (ajouté) -->
+    <!-- ════════════════════════════════════════════════════════════ -->
     <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">Mode de jeu</h3>
+        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🎯 Mode de jeu</h3>
         <div id="badminton-mode-selector" class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <!-- Rempli dynamiquement par JavaScript -->
         </div>
         <p class="text-xs text-slate-400 mt-3 text-center">Mode actif : <span id="badminton-mode-label" class="text-yellow-400 font-bold">Classique</span></p>
     </div>
 
-    <!-- Gestion des terrains (inchangée) -->
+    <!-- ════════════════════════════════════════════════════════════ -->
+    <!-- GESTION DES TERRAINS (existant) -->
+    <!-- ════════════════════════════════════════════════════════════ -->
     <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-black text-blue-400 uppercase text-sm">Terrains de Badminton (Groupes de niveau)</h3>
@@ -299,9 +304,15 @@
                 <option value="7">7</option>
                 <option value="8">8</option>
             </select>
-            <button onclick="generateBadmintonTeamsFromCurrentClass()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95 transition-transform">🔄 Générer Terrains</button>
-            <button onclick="exportBadmintonConfig()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400 active:scale-95 transition-transform">⬇️ Export JSON</button>
-            <button onclick="document.getElementById('importBadmintonFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400 active:scale-95 transition-transform">⬆️ Import JSON</button>
+            <button onclick="generateBadmintonTeamsFromCurrentClass()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95 transition-transform">
+                🔄 Générer Terrains
+            </button>
+            <button onclick="exportBadmintonConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95 transition-transform">
+                ⬇️ Export JSON
+            </button>
+            <button onclick="document.getElementById('importBadmintonFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400 active:scale-95 transition-transform">
+                ⬆️ Import JSON
+            </button>
             <input type="file" id="importBadmintonFile" class="hidden" accept=".json" onchange="importBadmintonConfig(event)">
         </div>
         <p class="text-xs text-slate-400 mb-4">Glissez les élèves. Les lettres (A, B, C...) s'attribuent automatiquement.</p>
@@ -326,7 +337,9 @@
         </div>
     </div>
 
-    <!-- PARAMÈTRES AVANCÉS DU TERRAIN (inchangés) -->
+    <!-- ════════════════════════════════════════════════════════════ -->
+    <!-- PARAMÈTRES AVANCÉS DU TERRAIN (existant) -->
+    <!-- ════════════════════════════════════════════════════════════ -->
     <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
         <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏸 Paramètres du terrain</h3>
         

@@ -20,6 +20,7 @@ export function initBadmintonModeSelector(containerId = 'badminton-mode-selector
         currentMode = 'terrain';
     }
 
+     window.badmintonMode = currentMode;
     renderSelector(container, modes);
 }
 
