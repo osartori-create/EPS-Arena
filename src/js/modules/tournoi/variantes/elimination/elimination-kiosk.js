@@ -1,5 +1,4 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-kiosk.js
-// Interface élève : code + bouton élimination
 
 import { ajouterElimination, getExclus, init as initEliminationCore } from './elimination-core.js';
 import { getJoueurs } from '../../tournoi-core.js';
@@ -7,14 +6,11 @@ import { getJoueurs } from '../../tournoi-core.js';
 let currentCode = '';
 let currentClasse = '';
 
-// ✅ Fonction d'initialisation (appelée par le dispatcher)
 export function init(classe) {
     currentClasse = classe;
     initEliminationCore(classe);
     renderKiosk();
-    return () => {
-        console.log('🧹 [Élimination Kiosk] Nettoyage');
-    };
+    return () => console.log('🧹 [Élimination Kiosk] Nettoyage');
 }
 
 function renderKiosk() {
@@ -41,22 +37,16 @@ function renderKiosk() {
                 ❌ Je suis éliminé
             </button>
 
-            <div id="tournoi-message" class="mt-4 text-sm text-slate-400 min-h-[60px]">
-                ${currentCode ? 'Entre ton code et clique sur le bouton quand tu es éliminé.' : 'Entre ton code pour commencer.'}
-            </div>
+            <div id="tournoi-message" class="mt-4 text-sm text-slate-400 min-h-[60px]">${currentCode ? 'Entre ton code et clique sur le bouton quand tu es éliminé.' : 'Entre ton code pour commencer.'}</div>
             
-            <div id="tournoi-stats" class="mt-4 text-xs text-slate-500">
-                ${currentCode ? getStats() : ''}
-            </div>
+            <div id="tournoi-stats" class="mt-4 text-xs text-slate-500">${currentCode ? getStats() : ''}</div>
         </div>
     `;
 
-    if (currentCode) {
-        document.getElementById('tournoi-btn-elimine').disabled = false;
-    }
+    if (currentCode) document.getElementById('tournoi-btn-elimine').disabled = false;
 }
 
-// Fonctions globales exposées pour les onclick
+// Fonctions globales
 window.tournoiSetCode = function(value) {
     currentCode = value.trim();
     const btn = document.getElementById('tournoi-btn-elimine');
@@ -75,26 +65,15 @@ window.tournoiSetCode = function(value) {
 };
 
 window.tournoiElimine = function() {
-    if (!currentCode) {
-        alert('Entre ton code d\'abord.');
-        return;
-    }
-
-    const exclus = getExclus();
-    if (exclus[currentCode]) {
-        alert('⚠️ Tu es exclu du suivi. Vois avec le professeur.');
-        return;
-    }
+    if (!currentCode) { alert('Entre ton code d\'abord.'); return; }
+    if (getExclus()[currentCode]) { alert('⚠️ Tu es exclu du suivi. Vois avec le professeur.'); return; }
 
     if (confirm(`Confirmer l'élimination du joueur ${currentCode} ?`)) {
         ajouterElimination(currentCode);
-        
         const btn = document.getElementById('tournoi-btn-elimine');
         btn.disabled = true;
         btn.textContent = '✅ Élimination enregistrée !';
-        
-        const message = document.getElementById('tournoi-message');
-        message.innerHTML = `✅ Élimination du joueur ${currentCode} enregistrée !<br><br>📱 Prends le temps de réfléchir à tes points perdus,<br>je te recharge avec 8pts, tu vas pouvoir bientôt retourner sur un terrain.`;
+        document.getElementById('tournoi-message').innerHTML = `✅ Élimination du joueur ${currentCode} enregistrée !<br><br>📱 Prends le temps de réfléchir à tes points perdus,<br>je te recharge avec 8pts, tu vas pouvoir bientôt retourner sur un terrain.`;
         
         setTimeout(() => {
             btn.textContent = '❌ Je suis éliminé';
@@ -111,7 +90,6 @@ function getStats() {
     return `📊 Éliminations : <span class="font-bold text-yellow-400">${info.eliminations || 0}</span>`;
 }
 
-// Pour l'intégration depuis eleve-app
 export function initTournoiKioskFromApp(classe) {
     const activityScreen = document.getElementById('activity-screen');
     let module = document.getElementById('tournoi-module');
@@ -124,6 +102,3 @@ export function initTournoiKioskFromApp(classe) {
     module.classList.remove('hidden');
     init(classe);
 }
-
-// ✅ Exporter une fonction d'init générique pour le dispatcher
-export { init as initKiosk };elimination-prof

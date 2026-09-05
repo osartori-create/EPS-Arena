@@ -1,16 +1,14 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-prof.js
-// Interface professeur : vue globale de la classe
 
-// ✅ Correction du chemin d'import
-import { getPhotoUrl } from '../../../services/admin-service.js';
-import { getJoueurs, getHistorique, getConfig, getCurrentClasse, exportTournoiData, importTournoiData } from '../../tournoi-core.js';
+// ✅ Chemin correct depuis variantes/elimination/ vers services/
+import { getPhotoUrl } from '../../../../services/admin-service.js';
+import { getJoueurs, getCurrentClasse, exportTournoiData, importTournoiData } from '../../tournoi-core.js';
 import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, init as initEliminationCore } from './elimination-core.js';
 
 let currentClasse = '';
 let showExclus = false;
 let unsubscribe = null;
 
-// ✅ Fonction d'initialisation (appelée par le dispatcher)
 export function init(classe) {
     currentClasse = classe;
     initEliminationCore(classe);
@@ -23,8 +21,6 @@ export function init(classe) {
     unsubscribe = () => window.removeEventListener('tournoi-updated', handler);
 
     renderProf();
-    
-    // Retourner une fonction de nettoyage
     return () => {
         if (unsubscribe) unsubscribe();
         console.log('🧹 [Élimination Prof] Nettoyage');
@@ -37,13 +33,9 @@ async function renderProf() {
 
     const joueurs = getJoueurs();
     const exclus = getExclus();
-    const config = getConfig();
-
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     const eleveMap = {};
-    eleves.forEach(e => {
-        eleveMap[e.id] = e;
-    });
+    eleves.forEach(e => { eleveMap[e.id] = e; });
 
     const codes = Object.keys(joueurs).sort((a, b) => parseInt(a) - parseInt(b));
     if (codes.length === 0) {
@@ -62,12 +54,11 @@ async function renderProf() {
                 <div>
                     <h3 class="font-black text-blue-400 uppercase text-sm">🏆 Tournoi Élimination</h3>
                     <p class="text-xs text-slate-400">Classe : ${currentClasse}</p>
-                    ${config.mode ? `<p class="text-xs text-slate-500">Variante : ${config.mode}</p>` : ''}
                 </div>
                 <div class="flex gap-2 flex-wrap">
-                    <button onclick="window.tournoiReinitialiser()" class="bg-red-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">🔄 Réinitialiser</button>
-                    <button onclick="window.tournoiExporter()" class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">⬇️ Export</button>
-                    <button onclick="document.getElementById('tournoiImportFile').click()" class="bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">⬆️ Import</button>
+                    <button onclick="window.tournoiReinitialiser()" class="bg-red-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">🔄 Réinitialiser</button>
+                    <button onclick="window.tournoiExporter()" class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">⬇️ Export</button>
+                    <button onclick="document.getElementById('tournoiImportFile').click()" class="bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">⬆️ Import</button>
                     <input type="file" id="tournoiImportFile" class="hidden" accept=".json" onchange="window.tournoiImporter(event)">
                     <label class="flex items-center gap-2 text-xs text-slate-400">
                         <input type="checkbox" id="tournoi-show-exclus" ${showExclus ? 'checked' : ''} onchange="window.tournoiToggleExclus()">
@@ -76,7 +67,6 @@ async function renderProf() {
                 </div>
             </div>
         </div>
-
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     `;
 
@@ -89,29 +79,18 @@ async function renderProf() {
     for (const code of sortedCodes) {
         const info = joueurs[code] || { eliminations: 0 };
         const isExclu = !!exclus[code];
-        
         if (isExclu && !showExclus) continue;
 
         const eleve = eleveMap[code];
         const nom = eleve ? `${eleve.prenom} ${eleve.nom}` : `Joueur ${code}`;
         const photoHtml = await getPhotoHtml(eleve?.id || code);
 
-        let statusColor = 'border-emerald-500';
-        let statusBg = 'bg-emerald-500/10';
-        let statusText = 'text-emerald-400';
-        if (info.eliminations >= 10) {
-            statusColor = 'border-red-500';
-            statusBg = 'bg-red-500/10';
-            statusText = 'text-red-400';
-        } else if (info.eliminations >= 5) {
-            statusColor = 'border-yellow-500';
-            statusBg = 'bg-yellow-500/10';
-            statusText = 'text-yellow-400';
-        }
+        let statusColor = 'border-emerald-500', statusBg = 'bg-emerald-500/10', statusText = 'text-emerald-400';
+        if (info.eliminations >= 10) { statusColor = 'border-red-500'; statusBg = 'bg-red-500/10'; statusText = 'text-red-400'; }
+        else if (info.eliminations >= 5) { statusColor = 'border-yellow-500'; statusBg = 'bg-yellow-500/10'; statusText = 'text-yellow-400'; }
 
         const sexeBg = eleve?.sexe === 'M' ? 'bg-blue-200 border-blue-400' : 
-                       eleve?.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 
-                       'bg-slate-200 border-slate-400';
+                       eleve?.sexe === 'F' ? 'bg-rose-200 border-rose-400' : 'bg-slate-200 border-slate-400';
 
         html += `
             <div class="bg-slate-900 p-4 rounded-2xl border-2 ${statusColor} ${statusBg}">
@@ -129,18 +108,9 @@ async function renderProf() {
                         </div>
                     </div>
                     <div class="flex flex-col gap-1">
-                        <button onclick="window.tournoiAjouterElim('${code}')" 
-                                class="bg-red-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-red-700 active:scale-95">
-                            -1
-                        </button>
-                        <button onclick="window.tournoiReinitialiserJoueur('${code}')" 
-                                class="bg-slate-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-slate-700 active:scale-95">
-                            ↺
-                        </button>
-                        <button onclick="window.tournoiToggleExclure('${code}')" 
-                                class="bg-slate-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-slate-700 active:scale-95">
-                            ${isExclu ? '➕' : '🚫'}
-                        </button>
+                        <button onclick="window.tournoiAjouterElim('${code}')" class="bg-red-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-red-700">-1</button>
+                        <button onclick="window.tournoiReinitialiserJoueur('${code}')" class="bg-slate-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-slate-700">↺</button>
+                        <button onclick="window.tournoiToggleExclure('${code}')" class="bg-slate-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-slate-700">${isExclu ? '➕' : '🚫'}</button>
                     </div>
                 </div>
             </div>
@@ -155,17 +125,12 @@ async function getPhotoHtml(id) {
     if (!id) return `<span class="text-xl">👤</span>`;
     try {
         const url = await getPhotoUrl(id);
-        if (url) {
-            return `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
-        }
-    } catch (e) { /* ignore */ }
+        if (url) return `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
+    } catch(e) {}
     return `<span class="text-xl">👤</span>`;
 }
 
-// ============================================================
-// FONCTIONS GLOBALES
-// ============================================================
-
+// Fonctions globales
 window.tournoiAjouterElim = function(code) {
     if (confirm(`Ajouter une élimination pour le joueur ${code} ?`)) {
         ajouterElimination(code);
@@ -195,9 +160,7 @@ window.tournoiReinitialiser = function() {
     renderProf();
 };
 
-window.tournoiExporter = function() {
-    exportTournoiData();
-};
+window.tournoiExporter = function() { exportTournoiData(); };
 
 window.tournoiImporter = function(event) {
     const file = event.target.files[0];
@@ -207,6 +170,3 @@ window.tournoiImporter = function(event) {
     }
     event.target.value = '';
 };
-
-// Exporter l'init pour le dispatcher
-export { init as initEliminationProf };

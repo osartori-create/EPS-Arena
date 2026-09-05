@@ -1,6 +1,7 @@
 // src/js/modules/tournoi/tournoi-core.js
 // Cœur commun à toutes les variantes
 
+// ✅ Chemin correct depuis modules/tournoi/ vers core/
 import { db, ref, onValue, set, update, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -66,8 +67,6 @@ export function getJoueurs() { return joueurs; }
 export function getHistorique() { return historique; }
 export function getConfig() { return config; }
 export function getCurrentClasse() { return currentClasse; }
-
-// ✅ EXPORT DE currentClasse (pour tournoi-dispatcher)
 export { currentClasse };
 
 // ============================================================
