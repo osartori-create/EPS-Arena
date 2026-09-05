@@ -1,6 +1,5 @@
 // src/js/modules/badminton/badminton-kiosk.js
 // Interface élève : Sélection Terrain -> Liste Round Robin -> Terrain 3D
-// Adapté de BadZ Impact (Webjéjé) et du module EPS-Arena.
 
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
@@ -27,12 +26,6 @@ let badmintonOtherPoints = 3;
 let badmintonCornerPoints = 3;
 let badmintonFaultPoints = 1;
 let badmintonFaultPenalty = true;
-let middleZoneSize = 33;
-let isFrontBackLayout = true;
-let centerPoints = 1;
-let otherPoints = 3;
-let cornerPoints = 3;
-let faultPoints = 1;
 
 // ============================================================
 // INIT
@@ -50,7 +43,7 @@ export function initBadmintonKiosk(classe) {
         const config = snap.val() || {};
         if (config.activite !== 'badminton') return;
 
-        console.log("📡 [Élève] Config Badminton reçue :", config); // ✅ LOG AJOUTÉ
+        console.log("📡 [Élève] Config reçue :", config);
 
         // Mise à jour des paramètres
         badmintonMode = config.mode || 'frontback';
@@ -61,17 +54,8 @@ export function initBadmintonKiosk(classe) {
         badmintonFaultPoints = config.faultPoints || 1;
         badmintonFaultPenalty = config.faultPenalty !== undefined ? config.faultPenalty : true;
 
-        // Synchroniser les variables locales
-        middleZoneSize = badmintonCenterSize;
-        centerPoints = badmintonCenterPoints;
-        otherPoints = badmintonOtherPoints;
-        cornerPoints = badmintonCornerPoints;
-        faultPoints = badmintonFaultPoints;
-        isFrontBackLayout = badmintonMode === 'frontback';
+        console.log("🏸 Mode :", badmintonMode, "Fautes pénalisées :", badmintonFaultPenalty);
 
-        console.log("🏸 [Élève] Mode appliqué :", badmintonMode); // ✅ LOG AJOUTÉ
-
-        // Récupérer les terrains
         terrainsConfig = {};
         for (let key in config) {
             if (!isNaN(parseInt(key))) {
@@ -79,14 +63,12 @@ export function initBadmintonKiosk(classe) {
             }
         }
 
-        // ✅ FORCER LE RE-RENDU APRÈS MISE À JOUR DES PARAMÈTRES
-        requestAnimationFrame(() => {
-            if (currentTerrain) {
-                renderMatchSetup();
-            } else {
-                renderTerrainSelection();
-            }
-        });
+        // Re-rendu
+        if (currentTerrain) {
+            renderMatchSetup();
+        } else {
+            renderTerrainSelection();
+        }
     });
 
     if (!resultsListenerAttached) {
@@ -129,7 +111,7 @@ window.retourTerrains = function() {
 };
 
 // ============================================================
-// 2. GESTION DU MATCH (Round Robin)
+// 2. ROUND ROBIN & CLASSEMENT
 // ============================================================
 
 function generateRoundRobin() {
@@ -157,6 +139,8 @@ function generateRoundRobin() {
 
 function renderMatchSetup() {
     const container = document.getElementById('badminton-content');
+    if (!container) return;
+
     const nbPlayers = terrainsConfig[currentTerrain] || 0;
     const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
     playersList = lettres.slice(0, nbPlayers);
@@ -169,10 +153,7 @@ function renderMatchSetup() {
     }
 
     if (matchSchedule.length === 0) {
-        console.log("🛠️ Génération du Round Robin...");
         generateRoundRobin();
-    } else {
-        console.log("♻️ Round Robin existant conservé, scores :", matchSchedule.map(m => `${m.p1}-${m.p2}: ${m.s1}-${m.s2}`));
     }
 
     let html = `
@@ -182,7 +163,7 @@ function renderMatchSetup() {
                     <h2 class="text-xl font-black text-white">Terrain ${currentTerrain}</h2>
                     <button onclick="window.retourTerrains()" class="bg-red-600 px-3 py-1 rounded-lg text-xs font-black text-white">← Terrain</button>
                 </div>
-                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Programmation (Round Robin)</h3>
+                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2">Programmation</h3>
                 <div class="space-y-2 max-h-64 overflow-y-auto pr-2">
                     ${matchSchedule.map(match => {
                         const isPlayed = match.s1 !== null;
@@ -228,35 +209,6 @@ window.selectMatchFromList = function(matchId) {
     renderCourtInterface();
 };
 
-// ============================================================
-// ÉCOUTE FIREBASE POUR LES SCORES
-// ============================================================
-
-function listenForScoreUpdates() {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
-    
-    onValue(resultsRef, (snap) => {
-        const data = snap.val() || {};
-        matchSchedule.forEach(m => {
-            const result = data[m.id];
-            if (result && result.terrain === currentTerrain) {
-                m.s1 = result.s1;
-                m.s2 = result.s2;
-            }
-        });
-        if (document.getElementById('court-zone') && !document.getElementById('court')) {
-            renderMatchSetup();
-        } else {
-            renderClassement();
-        }
-    });
-}
-
-// ============================================================
-// CLASSEMENT
-// ============================================================
-
 function renderClassement() {
     const container = document.getElementById('classement');
     if (!container) return;
@@ -267,11 +219,19 @@ function renderClassement() {
     matchSchedule.forEach(m => {
         if (m.s1 === null) return;
         if (m.s1 > m.s2) {
-            standings[m.p1].pts += 3; standings[m.p1].wins++; standings[m.p1].diff += (m.s1 - m.s2);
-            standings[m.p2].losses++; standings[m.p2].pts += 1; standings[m.p2].diff -= (m.s1 - m.s2);
+            standings[m.p1].pts += 3;
+            standings[m.p1].wins++;
+            standings[m.p1].diff += (m.s1 - m.s2);
+            standings[m.p2].losses++;
+            standings[m.p2].pts += 1;
+            standings[m.p2].diff -= (m.s1 - m.s2);
         } else {
-             standings[m.p2].pts += 3; standings[m.p2].wins++; standings[m.p2].diff += (m.s2 - m.s1);
-            standings[m.p1].losses++; standings[m.p1].pts += 1; standings[m.p1].diff -= (m.s2 - m.s1);
+            standings[m.p2].pts += 3;
+            standings[m.p2].wins++;
+            standings[m.p2].diff += (m.s2 - m.s1);
+            standings[m.p1].losses++;
+            standings[m.p1].pts += 1;
+            standings[m.p1].diff -= (m.s2 - m.s1);
         }
     });
 
@@ -290,12 +250,14 @@ function renderClassement() {
 }
 
 // ============================================================
-// 3. INTERFACE DU TERRAIN (VERSION UNIQUE ET CORRIGÉE)
+// 3. TERRAIN 3D (VERSION CORRIGÉE)
 // ============================================================
 
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
     if (!container) return;
+
+    console.log("🎨 Rendu du terrain, mode :", badmintonMode);
 
     const mode = badmintonMode;
     const centerSize = badmintonCenterSize;
@@ -309,6 +271,8 @@ function renderCourtInterface() {
 
     // Génération des zones selon le mode
     let zonesHtml = '';
+    let faultZonesHtml = '';
+
     if (mode === '4corners') {
         // 9 zones : 3x3
         const types = [
@@ -335,11 +299,11 @@ function renderCourtInterface() {
             }).join('')
         ).map(row => `<div class="flex flex-1">${row}</div>`).join('');
 
-        // Ajout des zones Fautes (sur les côtés)
+        // Zones Fautes sur les 4 côtés
         const faultColor = fPenalty ? 'bg-yellow-500 text-black' : 'bg-yellow-300 text-black opacity-50';
         const faultLabel = fPenalty ? `⚠️ ${fPoints}` : '⚠️ 0';
-        const faultZones = `
-            <div class="fault-area absolute top-0 left-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
+        faultZonesHtml = `
+            <div class="fault-area absolute top-0 left-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer hover:opacity-80"
                  data-points="${fPenalty ? fPoints : 0}" data-type="fault">${faultLabel}</div>
             <div class="fault-area absolute top-0 right-0 w-1/6 h-full ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
                  data-points="${fPenalty ? fPoints : 0}" data-type="fault">${faultLabel}</div>
@@ -348,7 +312,6 @@ function renderCourtInterface() {
             <div class="fault-area absolute top-0 left-0 w-full h-1/6 ${faultColor} flex items-center justify-center text-xs font-black cursor-pointer"
                  data-points="${fPenalty ? fPoints : 0}" data-type="fault">${faultLabel}</div>
         `;
-        zonesHtml += faultZones;
     } else {
         // Mode 3 zones (frontback ou leftright)
         const isFrontBack = mode === 'frontback';
@@ -395,13 +358,17 @@ function renderCourtInterface() {
         <div id="court" class="court-container relative w-full mx-auto mb-4 shadow-2xl" 
              style="background-color: #15803d; height: 55vh; border-radius: 15px; transform: perspective(1000px) rotateX(10deg);">
             <div class="absolute inset-0 flex">
+                <!-- Moitié P1 (gauche) -->
                 <div class="half-court w-1/2 h-full relative p-0">
                     ${zonesHtml.replace(/p1/g, 'p1')}
+                    ${faultZonesHtml.replace(/p1/g, 'p1')}
                     <div id="ratio-p1" class="absolute bottom-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
                 </div>
                 <div class="w-1 h-full bg-black"></div>
+                <!-- Moitié P2 (droite) -->
                 <div class="half-court w-1/2 h-full relative p-0">
                     ${zonesHtml.replace(/p1/g, 'p2')}
+                    ${faultZonesHtml.replace(/p1/g, 'p2')}
                     <div id="ratio-p2" class="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs font-bold">0%</div>
                 </div>
             </div>
@@ -416,71 +383,46 @@ function renderCourtInterface() {
     `;
 
     // Attacher les événements
-    document.getElementById('middle-zone-slider').addEventListener('input', updateZoneSize);
+    document.getElementById('middle-zone-slider').addEventListener('input', function() {
+        const val = parseInt(this.value);
+        document.getElementById('zone-size-display').innerText = val + '%';
+        // On ne redessine pas le terrain, on laisse le slider pour l'info
+    });
+
     document.getElementById('court').addEventListener('click', handleImpact);
     document.getElementById('court').addEventListener('touchstart', handleTouch, { passive: false });
-
-    updateZoneSize();
 }
 
 // ============================================================
-// 4. INTERACTIONS (ZONES, SLIDER, IMPACTS)
+// 4. INTERACTIONS (IMPACTS, SCORES, UNDO)
 // ============================================================
-
-function updateZoneSize() {
-    const slider = document.getElementById('middle-zone-slider');
-    if (!slider) return;
-
-    middleZoneSize = parseInt(slider.value);
-    document.getElementById('zone-size-display').innerText = middleZoneSize + '%';
-    
-    const sideSize = (100 - middleZoneSize) / 2;
-
-    document.querySelectorAll('#court .half-court').forEach((half) => {
-        const zones = half.querySelectorAll('.zone');
-        zones.forEach(zone => { zone.style.flex = 'none'; });
-
-        if (isFrontBackLayout) {
-            zones[0].style.height = sideSize + '%';
-            zones[1].style.height = middleZoneSize + '%';
-            zones[2].style.height = sideSize + '%';
-            zones[0].style.width = '100%';
-            zones[1].style.width = '100%';
-            zones[2].style.width = '100%';
-        } else {
-            zones[0].style.width = sideSize + '%';
-            zones[1].style.width = middleZoneSize + '%';
-            zones[2].style.width = sideSize + '%';
-            zones[0].style.height = '100%';
-            zones[1].style.height = '100%';
-            zones[2].style.height = '100%';
-        }
-    });
-}
 
 function handleImpact(e) {
     const court = document.getElementById('court');
-    const rect = court.getBoundingClientRect();
-    
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    if (!court) return;
     
     const target = e.target.closest('.zone, .fault-area');
-    if (!target) return;
+    if (!target) {
+        console.warn('Clic hors zone');
+        return;
+    }
 
     const player = target.dataset.player || 'p1';
     const points = parseInt(target.dataset.points) || 0;
     const type = target.dataset.type || 'extreme';
 
-    // Si c'est une faute et que les fautes ne sont pas pénalisées, points = 0
+    console.log(`🎯 Impact : joueur ${player}, points ${points}, type ${type}`);
+
+    // Si c'est une faute et que les fautes ne sont pas pénalisées
     const isFault = type === 'fault';
     const finalPoints = (isFault && !badmintonFaultPenalty) ? 0 : points;
 
-    // Marquer l'impact
+    // Marquer l'impact visuellement
+    const rect = court.getBoundingClientRect();
     const impact = document.createElement('div');
     impact.className = 'impact absolute w-3 h-3 bg-yellow-400 rounded-full';
-    impact.style.left = x + 'px';
-    impact.style.top = y + 'px';
+    impact.style.left = (e.clientX - rect.left) + 'px';
+    impact.style.top = (e.clientY - rect.top) + 'px';
     court.appendChild(impact);
 
     // Mettre à jour les scores
@@ -500,10 +442,11 @@ function handleImpact(e) {
 function handleTouch(e) {
     e.preventDefault();
     const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
     handleImpact({
         clientX: touch.clientX,
         clientY: touch.clientY,
-        target: document.elementFromPoint(touch.clientX, touch.clientY)
+        target: element
     });
 }
 
@@ -547,7 +490,7 @@ window.undoImpact = undoImpact;
 window.resetCourt = resetCourt;
 
 // ============================================================
-// 5. FIN DE MATCH (ENVOI FIREBASE)
+// 5. FIN DE MATCH
 // ============================================================
 
 window.endMatch = function() {
@@ -614,3 +557,28 @@ window.endMatch = function() {
         .catch(err => alert("Erreur envoi : " + err.message));
     }
 };
+
+// ============================================================
+// ÉCOUTE DES SCORES
+// ============================================================
+
+function listenForScoreUpdates() {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
+    
+    onValue(resultsRef, (snap) => {
+        const data = snap.val() || {};
+        matchSchedule.forEach(m => {
+            const result = data[m.id];
+            if (result && result.terrain === currentTerrain) {
+                m.s1 = result.s1;
+                m.s2 = result.s2;
+            }
+        });
+        if (document.getElementById('court-zone') && !document.getElementById('court')) {
+            renderMatchSetup();
+        } else {
+            renderClassement();
+        }
+    });
+}
