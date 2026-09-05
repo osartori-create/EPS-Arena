@@ -19,6 +19,7 @@ C:.
     │   index.html
     │   
     ├───css
+    │       evaluation.css
     │       style.css
     │       
     └───js
@@ -39,20 +40,18 @@ C:.
         ├───modules
         │   │   index.js
         │   │   
-        │   ├───arcathlon          (NOUVEAU)
-        │   │   │   arcalon-interface.js
-        │   │   │   arcalon-kiosk.js
-        │   │   │   arcalon-live.js
-        │   │   │   arcalon-tv.js
-        │   │   │   arcalon-utils.js
-        │   │   │   
+        │   ├───arcathlon
+        │   │       arcathlon-interface.js
+        │   │       arcathlon-kiosk.js
+        │   │       index.js
+        │   │       
         │   ├───badminton
-        │   │   │   badminton-interface.js
-        │   │   │   badminton-kiosk.js
-        │   │   │   badminton-live.js
-        │   │   │   badminton-stats.js
-        │   │   │   badminton-tv.js
-        │   │   │       
+        │   │       badminton-interface.js
+        │   │       badminton-kiosk.js
+        │   │       badminton-live.js
+        │   │       badminton-stats.js
+        │   │       badminton-tv.js
+        │   │       
         │   ├───co
         │   │       circuit-manager.js
         │   │       co-interface.js
@@ -76,6 +75,20 @@ C:.
         │   │       escalade-interface.js
         │   │       escalade-live.js
         │   │       escalade-tv-ui.js
+        │   │       
+        │   ├───evaluation
+        │   │       evaluation-fiche.js
+        │   │       evaluation-graphiques.js
+        │   │       evaluation-interface.js
+        │   │       evaluation-resultats.js
+        │   │       evaluation-saisie.js
+        │   │       evaluation-saut.js
+        │   │       evaluation-sprint.js
+        │   │       evaluation-stockage.js
+        │   │       evaluation-templates.js
+        │   │       evaluation-utils.js
+        │   │       evaluation-vma.js
+        │   │       index.js
         │   │       
         │   ├───multi
         │   │       multi-controller.js
