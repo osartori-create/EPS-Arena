@@ -1,7 +1,7 @@
 // src/js/modules/badminton/badminton-maniere.js
 // Mode "Avec la manière" : cases à cocher, points dangereux/centraux
 // Version avec arrêt automatique à 11 points, bonus ET seuil "Avec la manière" paramétrables
-// (seuil = bonus, configurable entre 3 et 8 points)
+// Colorisation garantie avec appearance: none
 
 import { 
     currentTerrain, matchSchedule, playersList, terrainsConfig,
@@ -14,8 +14,8 @@ import { db, ref, update } from '../../core/firebase-service.js';
 // CONSTANTES
 // ============================================================
 
-const SEUIL_GAGNANT = 11;           // Score à atteindre pour gagner (arrêt automatique)
-let BONUS_MANIERE = 5;              // Bonus "Avec la manière" ET SEUIL (paramétrable 3-8)
+const SEUIL_GAGNANT = 11;
+let BONUS_MANIERE = 5;
 
 // ============================================================
 // ÉTAT
@@ -67,7 +67,7 @@ export async function init(classe, config) {
 }
 
 // ============================================================
-// RENDU DES CASES À COCHER (AVEC STYLE INLINE GARANTI)
+// RENDU DES CASES À COCHER (AVEC APPEARANCE: NONE)
 // ============================================================
 
 function renderCourtInterface() {
@@ -83,36 +83,39 @@ function renderCourtInterface() {
     const p1 = currentMatch.p1;
     const p2 = currentMatch.p2;
 
+    // ✅ Styles avec appearance: none pour garantir la couleur
     function getDangerStyle(index, checked) {
         const isBonus = (index + 1) >= BONUS_MANIERE;
+        const baseStyle = 'appearance: none; -webkit-appearance: none; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s;';
         if (checked) {
-            return isBonus 
+            return baseStyle + (isBonus 
                 ? 'background-color: #34d399; border: 2px solid #ffffff; opacity: 1;' 
-                : 'background-color: #059669; border: 2px solid #ffffff; opacity: 1;';
+                : 'background-color: #059669; border: 2px solid #ffffff; opacity: 1;');
         } else {
-            return isBonus 
+            return baseStyle + (isBonus 
                 ? 'background-color: #064e3b; border: 2px solid #34d399; opacity: 0.7;' 
-                : 'background-color: #1a2e3a; border: 2px solid #065f46; opacity: 0.7;';
+                : 'background-color: #1a2e3a; border: 2px solid #065f46; opacity: 0.7;');
         }
     }
 
     function getCenterStyle(index, checked) {
         const isRouge = (index + 1) >= 7;
+        const baseStyle = 'appearance: none; -webkit-appearance: none; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s;';
         if (checked) {
-            return isRouge 
+            return baseStyle + (isRouge 
                 ? 'background-color: #f87171; border: 2px solid #ffffff; opacity: 1;' 
-                : 'background-color: #dc2626; border: 2px solid #ffffff; opacity: 1;';
+                : 'background-color: #dc2626; border: 2px solid #ffffff; opacity: 1;');
         } else {
-            return isRouge 
+            return baseStyle + (isRouge 
                 ? 'background-color: #7f1d1d; border: 2px solid #f87171; opacity: 0.7;' 
-                : 'background-color: #2a1a1a; border: 2px solid #7f1d1d; opacity: 0.7;';
+                : 'background-color: #2a1a1a; border: 2px solid #7f1d1d; opacity: 0.7;');
         }
     }
 
     function renderCheckboxes(player, playerId) {
         let html = '';
         
-        // Zone dangereuse (VERT) - Bonus = seuil "Avec la manière"
+        // Zone dangereuse (VERT)
         html += `<div class="mb-4">
             <p class="text-sm font-bold text-emerald-400 uppercase mb-2">🟢 Points gagnés en zone dangereuse (Bonus : ${BONUS_MANIERE} pts)</p>
             <div class="grid grid-cols-5 gap-2">`;
@@ -122,7 +125,6 @@ function renderCourtInterface() {
             html += `
                 <div class="flex items-center justify-center">
                     <input type="checkbox" 
-                           class="w-10 h-10 rounded-lg cursor-pointer transition-all"
                            style="${style}"
                            data-player="${player}" data-zone="danger" data-index="${i}" 
                            ${checked} 
@@ -149,7 +151,6 @@ function renderCourtInterface() {
             html += `
                 <div class="flex items-center justify-center">
                     <input type="checkbox" 
-                           class="w-10 h-10 rounded-lg cursor-pointer transition-all"
                            style="${style}"
                            data-player="${player}" data-zone="center" data-index="${i}" 
                            ${checked} 
@@ -235,7 +236,7 @@ function renderCourtInterface() {
 }
 
 // ============================================================
-// GESTION DES CASES À COCHER
+// GESTION DES CASES À COCHER (AVEC APPEARANCE: NONE)
 // ============================================================
 
 window.updateCheckbox = function(checkbox) {
@@ -251,30 +252,31 @@ window.updateCheckbox = function(checkbox) {
     const isBonus = isDanger && (index + 1) >= BONUS_MANIERE;
     const isRouge = !isDanger && (index + 1) >= 7;
     
-    let style = '';
+    const baseStyle = 'appearance: none; -webkit-appearance: none; width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s;';
+    let style = baseStyle;
     if (isDanger) {
         if (checkbox.checked) {
-            style = isBonus 
+            style += isBonus 
                 ? 'background-color: #34d399; border: 2px solid #ffffff; opacity: 1;' 
                 : 'background-color: #059669; border: 2px solid #ffffff; opacity: 1;';
         } else {
-            style = isBonus 
+            style += isBonus 
                 ? 'background-color: #064e3b; border: 2px solid #34d399; opacity: 0.7;' 
                 : 'background-color: #1a2e3a; border: 2px solid #065f46; opacity: 0.7;';
         }
     } else {
         if (checkbox.checked) {
-            style = isRouge 
+            style += isRouge 
                 ? 'background-color: #f87171; border: 2px solid #ffffff; opacity: 1;' 
                 : 'background-color: #dc2626; border: 2px solid #ffffff; opacity: 1;';
         } else {
-            style = isRouge 
+            style += isRouge 
                 ? 'background-color: #7f1d1d; border: 2px solid #f87171; opacity: 0.7;' 
                 : 'background-color: #2a1a1a; border: 2px solid #7f1d1d; opacity: 0.7;';
         }
     }
     
-    checkbox.style.cssText = 'width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s; ' + style;
+    checkbox.style.cssText = style;
     
     updateScores();
 };
@@ -314,7 +316,6 @@ function updateScores() {
         if (el) el.innerText = c.value;
     });
 
-    // Arrêt automatique
     if (!matchTermine && (matchPoints.p1 >= SEUIL_GAGNANT || matchPoints.p2 >= SEUIL_GAGNANT)) {
         matchTermine = true;
         setTimeout(() => {
@@ -368,7 +369,6 @@ window.endMatchManiere = function() {
     } else if (score2 > score1) {
         winner = p2; loser = p1; winnerScore = score2; loserScore = score1;
     } else {
-        // ✅ Match nul : le seuil est maintenant BONUS_MANIERE
         const avecManiere1 = score1 >= BONUS_MANIERE;
         const avecManiere2 = score2 >= BONUS_MANIERE;
         const pts1 = avecManiere1 ? 2 : 1;
@@ -391,7 +391,6 @@ window.endMatchManiere = function() {
         return;
     }
 
-    // ✅ Seuil "Avec la manière" = BONUS_MANIERE
     const winnerAvecManiere = winnerScore >= BONUS_MANIERE;
     const loserAvecManiere = loserScore >= BONUS_MANIERE;
 
@@ -439,7 +438,7 @@ function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecM
         score1, score2,
         pts1, pts2,
         avecManiere1, avecManiere2,
-        bonusManiere: BONUS_MANIERE, // Seuil utilisé
+        bonusManiere: BONUS_MANIERE,
         winner: winner || (score1 > score2 ? p1 : p2),
         loser: loser || (score1 > score2 ? p2 : p1),
         timestamp: Date.now()
