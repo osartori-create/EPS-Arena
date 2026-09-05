@@ -558,6 +558,104 @@ export function initActivities() {
     };
 
     // ============================================================
+// GESTION DES SOUS-ONGLETS (Live / TV)
+// ============================================================
+window.switchActivitySubTab = function(subTab) {
+    const disc = currentDiscipline;
+    
+    // Mettre à jour les boutons des sous-onglets
+    ['settings', 'live', 'tv'].forEach(tab => {
+        const btn = document.getElementById(`subtab-${tab}`);
+        if (btn) {
+            if (tab === subTab) {
+                btn.classList.remove('bg-slate-700', 'text-slate-300');
+                btn.classList.add('bg-blue-600', 'text-white');
+            } else {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-slate-700', 'text-slate-300');
+            }
+        }
+    });
+
+    // Masquer TOUTES les vues de réglages
+    const views = ['viewMultiSettings', 'viewCOSettings', 'viewOrientShowSettings', 
+                   'viewEscaladeSettings', 'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings'];
+    views.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+
+    // Masquer les anciennes vues Live et TV
+    const viewLive = document.getElementById('viewLive');
+    const viewTV = document.getElementById('viewTV');
+    if (viewLive) viewLive.classList.add('hidden');
+    if (viewTV) viewTV.style.display = 'none';
+
+    if (subTab === 'settings') {
+        // Afficher la vue de réglages correspondante
+        const map = {
+            'multi': 'viewMultiSettings',
+            'co': 'viewCOSettings',
+            'orientshow': 'viewOrientShowSettings',
+            'escalade': 'viewEscaladeSettings',
+            'badminton': 'viewBadmintonSettings',
+            'arcathlon': 'viewArcathlonSettings',
+            'evaluation': 'viewEvaluationSettings'
+        };
+        const targetView = document.getElementById(map[disc]);
+        if (targetView) {
+            targetView.classList.remove('hidden');
+            // Pour l'évaluation, réinitialiser l'interface
+            if (disc === 'evaluation') {
+                setTimeout(() => initEvaluationInterface(), 50);
+            }
+        }
+    } 
+    else if (subTab === 'live') {
+        // Afficher le Live
+        if (viewLive) viewLive.classList.remove('hidden');
+        const container = document.getElementById('live-content');
+        container.innerHTML = '<p>Chargement du Live...</p>';
+
+        // Charger le module Live correspondant
+        const liveModules = {
+            'badminton': () => import('../../modules/badminton/badminton-live.js').then(m => m.renderBadmintonLive()),
+            'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
+            'co': () => import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {})),
+            'orientshow': () => import('../../modules/orientshow/orientshow-live.js').then(m => m.renderOrientShowLive()),
+            'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
+        };
+
+        if (liveModules[disc]) {
+            liveModules[disc]().catch(err => console.error(`Erreur Live ${disc} :`, err));
+        } else {
+            container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
+        }
+    } 
+    else if (subTab === 'tv') {
+        // Afficher la TV
+        const tvViewEl = document.getElementById('viewTV');
+        if (tvViewEl) {
+            tvViewEl.style.display = 'block';
+            tvViewEl.style.height = '100vh';
+            setTimeout(() => {
+                // Charger le module TV correspondant
+                const tvModules = {
+                    'badminton': () => import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV()),
+                    'escalade': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
+                    'orientshow': () => import('../../modules/orientshow/orientshow-tv.js').then(m => m.renderOrientShowTV()),
+                    'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
+                };
+                if (tvModules[disc]) {
+                    tvModules[disc]().catch(err => console.error(`Erreur TV ${disc} :`, err));
+                } else {
+                    document.getElementById('tvGlobe').innerHTML = '<p class="text-slate-500 text-center">Mode TV non disponible pour cette discipline.</p>';
+                }
+            }, 100);
+        }
+    }
+};
+    // ============================================================
 // TRANSMISSION FIREBASE (CORRIGÉE)
 // ============================================================
 window.transmettreConfig = async function() {

@@ -1,155 +1,147 @@
 // src/js/modules/badminton/badminton-live.js
-// Sous-module "Impacts" - Live Professeur
+// Live Badminton : affichage des matchs en direct
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
-import { getLocalMapping } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
+import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 
-let currentClasse = '';
 let currentUnsub = null;
+let currentClasse = '';
 
 export function renderBadmintonLive() {
     const container = document.getElementById('live-content');
     if (!container) return;
 
-    const activeClasse = document.getElementById('selectClasse').value;
-    if (!activeClasse) {
-        container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+    const classe = document.getElementById('selectClasse')?.value || getCurrentClasse();
+    if (!classe) {
+        container.innerHTML = '<p class="text-slate-500 text-center">Sélectionnez une classe.</p>';
         return;
     }
 
-    currentClasse = activeClasse;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    currentClasse = classe;
 
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
-    onValue(configRef, (snap) => {
-        const config = snap.val() || {};
-        if (config.activite !== 'badminton') return;
-        
-        let terrainsConfig = {};
-        for (let key in config) {
-            if (!isNaN(parseInt(key))) {
-                terrainsConfig[parseInt(key)] = config[key];
+    // Récupérer le mapping local
+    const mapping = getLocalMapping(classe) || {};
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+
+    // Construire un map id -> nom + photo
+    const eleveMap = {};
+    eleves.forEach(e => {
+        eleveMap[e.id] = { nom: `${e.prenom} ${e.nom}`, sexe: e.sexe };
+    });
+
+    // Fonction pour retrouver l'élève à partir d'un code (ex: "1_A")
+    function getEleveFromCode(code) {
+        // Le code est de la forme "terrain_lettre" ou "terrain_lettre"
+        // On cherche dans le mapping local
+        for (const [key, value] of Object.entries(mapping)) {
+            // key = "classe_1_A" par exemple
+            const parts = key.split('_');
+            if (parts.length >= 3) {
+                const terrain = parts[1];
+                const lettre = parts[2];
+                if (`${terrain}_${lettre}` === code) {
+                    return eleveMap[value] || { nom: code, sexe: '' };
+                }
+                // Si c'est un tableau (plusieurs joueurs par lettre)
+                if (Array.isArray(value)) {
+                    const index = parseInt(lettre) - 1;
+                    if (index >= 0 && index < value.length) {
+                        const id = value[index];
+                        return eleveMap[id] || { nom: code, sexe: '' };
+                    }
+                }
             }
         }
+        return { nom: code, sexe: '' };
+    }
 
-        if (currentUnsub) currentUnsub();
-        const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
-        currentUnsub = onValue(resultsRef, (snap) => {
-            const data = snap.val() || {};
-            renderGrid(terrainsConfig, data);
-        });
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+
+    if (currentUnsub) currentUnsub();
+
+    currentUnsub = onValue(resultsRef, async (snap) => {
+        const data = snap.val() || {};
+        const matchs = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
+
+        if (matchs.length === 0) {
+            container.innerHTML = '<p class="text-slate-500 text-center">Aucun match terminé.</p>';
+            return;
+        }
+
+        let html = `
+            <div class="space-y-4">
+                <h3 class="font-black text-blue-400 uppercase text-sm">🏸 Derniers matchs</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        `;
+
+        for (const m of matchs.slice(0, 20)) {
+            const p1 = m.p1 || '?';
+            const p2 = m.p2 || '?';
+            const score1 = m.score1 || 0;
+            const score2 = m.score2 || 0;
+            const style1 = m.avecManiere1 ? '✅ avec manière' : '❌ sans manière';
+            const style2 = m.avecManiere2 ? '✅ avec manière' : '❌ sans manière';
+
+            // Récupérer les infos des joueurs
+            const joueur1 = getEleveFromCode(p1);
+            const joueur2 = getEleveFromCode(p2);
+
+            const photo1 = await getPhotoFromId(joueur1.id || p1);
+            const photo2 = await getPhotoFromId(joueur2.id || p2);
+
+            const winner = m.winner === p1 ? p1 : (m.winner === p2 ? p2 : '?');
+            const couleurGagnant = winner === p1 ? 'text-emerald-400' : (winner === p2 ? 'text-emerald-400' : 'text-yellow-400');
+
+            html += `
+                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="flex items-center gap-2">
+                            ${photo1}
+                            <span class="font-black text-white">${joueur1.nom}</span>
+                            <span class="text-xs text-slate-400">${p1}</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-3xl font-black text-yellow-400">${score1} - ${score2}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400">${p2}</span>
+                            <span class="font-black text-white">${joueur2.nom}</span>
+                            ${photo2}
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-xs">
+                        <span class="${score1 >= (m.bonusManiere || 5) ? 'text-emerald-400' : 'text-red-400'}">${style1}</span>
+                        <span class="text-slate-500">Points classement : ${m.pts1 || 0} / ${m.pts2 || 0}</span>
+                        <span class="${score2 >= (m.bonusManiere || 5) ? 'text-emerald-400' : 'text-red-400'}">${style2}</span>
+                    </div>
+                    <div class="text-center text-xs text-slate-500 mt-1">
+                        🏆 Gagnant : <span class="font-bold ${couleurGagnant}">${winner}</span>
+                        ${m.mode ? `| Mode : ${m.mode}` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        html += `</div></div>`;
+        container.innerHTML = html;
     });
 }
 
-async function renderGrid(terrainsConfig, data) {
-    const container = document.getElementById('live-content');
-    const mapping = getLocalMapping(currentClasse) || {};
-    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-
-    let html = '<h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏸 Badminton - Live Impacts</h3>';
-    html += '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">';
-
-    for (let t in terrainsConfig) {
-        const terrain = t;
-        const nbPlayers = terrainsConfig[t];
-        const playersList = lettres.slice(0, nbPlayers);
-
-        let terrainData = {};
-        playersList.forEach(p => terrainData[p] = { pts: 0, wins: 0, losses: 0, diff: 0, total: 0, middle: 0, extreme: 0 });
-
-        Object.values(data).forEach(m => {
-            if (String(m.terrain) !== String(terrain)) return;
-
-            if (m.s1 > m.s2) {
-                terrainData[m.p1].pts += 3; terrainData[m.p1].wins++; terrainData[m.p1].diff += (m.s1 - m.s2);
-                terrainData[m.p2].losses++; terrainData[m.p2].pts += 1; terrainData[m.p2].diff -= (m.s1 - m.s2);
-            } else {
-                terrainData[m.p2].pts += 3; terrainData[m.p2].wins++; terrainData[m.p2].diff += (m.s2 - m.s1);
-                terrainData[m.p1].losses++; terrainData[m.p1].pts += 1; terrainData[m.p1].diff -= (m.s2 - m.s1);
-            }
-
-            if (m.stats) {
-                let p1Stats = m.stats.p1 || { extreme: 0, middle: 0, total: 0 };
-                let p2Stats = m.stats.p2 || { extreme: 0, middle: 0, total: 0 };
-
-                terrainData[m.p1].extreme += p1Stats.extreme;
-                terrainData[m.p1].middle += p1Stats.middle;
-                terrainData[m.p1].total += p1Stats.total;
-
-                terrainData[m.p2].extreme += p2Stats.extreme;
-                terrainData[m.p2].middle += p2Stats.middle;
-                terrainData[m.p2].total += p2Stats.total;
-            }
-        });
-
-        const sortedPlayers = Object.entries(terrainData).sort((a, b) => b[1].pts - a[1].pts || b[1].diff - a[1].diff);
-
-        html += `<div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-            <h4 class="font-black text-yellow-400 text-xl mb-3">Terrain ${terrain}</h4>
-            <div class="space-y-2">
-                ${await Promise.all(sortedPlayers.map(async ([player, stats], idx) => {
-                    const pctBonus = stats.total > 0 ? Math.round((stats.extreme / stats.total) * 100) : 0;
-                    
-                    let bonusColor = 'text-red-400';
-                    if (pctBonus > 60) bonusColor = 'text-emerald-400';
-                    else if (pctBonus > 40) bonusColor = 'text-amber-400';
-
-                    const mappingKey = `${currentClasse}_${terrain}_${player}`;
-                    const eleveId = mapping[mappingKey];
-                    
-                    let nomEleve = player;
-                    let photoHtml = `<div class="w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm">👤</div>`;
-                    
-                    if (eleveId) {
-                        const localEleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-                        const eleve = localEleves.find(e => e.id === eleveId);
-                        nomEleve = eleve ? eleve.prenom : player;
-                        
-                        try {
-                            const photoUrl = await getPhotoUrl(eleveId);
-                            if (photoUrl) photoHtml = `<img src="${photoUrl}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">`;
-                        } catch(e) {}
-                    }
-
-                    return `<div onclick="loadPlayerStats('${player}', '${terrain}', '${currentClasse}')" 
-                                class="flex justify-between items-center bg-slate-900 p-2 rounded-xl border border-slate-700 cursor-pointer hover:border-blue-500">
-                                <div class="flex items-center gap-2">
-                                    ${photoHtml}
-                                    <span class="text-slate-500 w-5 font-black">${idx + 1}</span>
-                                    <span class="font-black text-white">${nomEleve}</span>
-                                    <span class="text-[10px] text-blue-400">(${player})</span>
-                                </div>
-                                <div class="flex gap-3 text-xs font-bold">
-                                    <span class="text-yellow-400">${stats.pts} pts</span>
-                                    <span class="text-blue-400">${stats.wins}V - ${stats.losses}D</span>
-                                    <span class="${bonusColor}">🎯 ${pctBonus}%</span>
-                                </div>
-                            </div>`;
-                }))}
-            </div>
-        </div>`;
-    }
-
-    html += '</div>';
-    
-    html += `<div class="mt-6">
-        <button onclick="window.exportBadmintonImpactCSV()" class="bg-green-600 px-6 py-3 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (Stats Impacts)</button>
-    </div>`;
-
-    container.innerHTML = html;
+// Fonction utilitaire pour récupérer la photo d'un élève
+async function getPhotoFromId(id) {
+    if (!id) return `<div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">👤</div>`;
+    try {
+        const url = await getPhotoUrl(id);
+        if (url) {
+            return `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">`;
+        }
+    } catch (e) { /* ignore */ }
+    return `<div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">👤</div>`;
 }
 
-// Chargement dynamique de la fiche élève (évite les erreurs de cascade)
-window.loadPlayerStats = async function(player, terrain, classe) {
-    try {
-        const module = await import('./badminton-stats.js');
-        module.openBadmintonPlayerStats(player, terrain, classe);
-    } catch (err) {
-        console.error("Erreur chargement Stats Badminton :", err);
-    }
-};
-
-window.exportBadmintonImpactCSV = function() {
-    alert("Export des stats Impacts en préparation !");
-};
+// Exporter pour le live
+export function initBadmintonLive() {
+    renderBadmintonLive();
+}
