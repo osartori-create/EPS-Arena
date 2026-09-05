@@ -360,75 +360,113 @@ function generateCourtHTML() {
     const cSize = badmintonCenterSize;
     const sideSize = (100 - cSize) / 2;
 
-    // Déterminer la disposition des zones (Webjéjé)
-    let pClass = is9 ? 'layout-grid' : (m === 'leftright' ? 'layout-row' : 'layout-col');
-    
-    // Styles pour les zones 3x3
-    const style3Z = (i) => m === 'frontback' ? 
-        (i === 1 ? `width:100%;height:${cSize}%` : `width:100%;height:${sideSize}%`) : 
-        (i === 1 ? `width:${cSize}%;height:100%` : `width:${sideSize}%;height:100%`);
-    
-    const style9Z = (i) => `width:${(i % 3 === 1) ? cSize : sideSize}%;height:${(Math.floor(i / 3) === 1) ? cSize : sideSize}%`;
-
-    // Génération des zones pour un joueur
-    const genZones = (playerCode) => {
-        let zones = '';
-        if (!is9) {
-            // Mode 3 zones
-            const points = [badmintonOtherPoints, badmintonCenterPoints, badmintonOtherPoints];
-            const types = ['extreme', 'center', 'extreme'];
-            const colors = ['zone-extreme', 'zone-center', 'zone-extreme'];
-            for (let i = 0; i < 3; i++) {
-                zones += `<div class="zone ${colors[i]}" data-points="${points[i]}" data-player="${playerCode}" data-type="${types[i]}" style="${style3Z(i)}">${points[i]}</div>`;
-            }
-        } else {
-            // Mode 9 zones (4 corners + fautes)
+    // ============================================================
+    // FONCTION : Génère une moitié de terrain (grille 3x3 + fautes)
+    // ============================================================
+    function generateHalf(player) {
+        let html = '';
+        
+        if (is9) {
+            // === MODE 9 ZONES (4 corners) ===
             // Grille 3x3 : corner, other, corner / other, center, other / corner, other, corner
-            const types = ['corner', 'other', 'corner', 'other', 'center', 'other', 'corner', 'other', 'corner'];
+            const grid = [
+                ['corner', 'other', 'corner'],
+                ['other', 'center', 'other'],
+                ['corner', 'other', 'corner']
+            ];
             const pointsMap = {
                 center: badmintonCenterPoints,
                 other: badmintonOtherPoints,
                 corner: badmintonCornerPoints
             };
             const colorsMap = {
-                center: 'zone-center',
-                other: 'zone-other',
-                corner: 'zone-corner'
+                center: 'bg-blue-500',
+                other: 'bg-purple-500',
+                corner: 'bg-orange-500'
             };
-            for (let i = 0; i < 9; i++) {
-                const type = types[i];
-                const pts = pointsMap[type] || 0;
-                const color = colorsMap[type] || '';
-                zones += `<div class="zone ${color}" data-points="${pts}" data-player="${playerCode}" data-type="${type}" style="${style9Z(i)}">${pts}</div>`;
-            }
-        }
-        return zones;
-    };
 
-    // Génération des zones Fautes (pour le mode 9 zones)
-    let faultHtml = '';
-    if (is9) {
-        const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
-        const faultLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
-        // Fautes selon le code Webjéjé
-        faultHtml = `
-            <div class="fault-area fault-top fault-p1-top" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-top fault-p2-top" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom fault-p1-bot" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-bottom fault-p2-bot" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-left" data-points="${fPt}" data-player="p2" data-type="fault">${faultLabel}</div>
-            <div class="fault-area fault-right" data-points="${fPt}" data-player="p1" data-type="fault">${faultLabel}</div>
-        `;
+            // Grille CSS 3x3
+            html += `<div class="grid grid-cols-3 gap-0 w-full h-full" style="padding: 8%;">`;
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const type = grid[row][col];
+                    const pts = pointsMap[type] || 0;
+                    const color = colorsMap[type] || 'bg-slate-500';
+                    // Tailles variables selon la position
+                    const isCenterRow = row === 1;
+                    const isCenterCol = col === 1;
+                    const width = isCenterCol ? cSize : sideSize;
+                    const height = isCenterRow ? cSize : sideSize;
+                    html += `
+                        <div class="zone ${color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80 border border-white/20"
+                             style="width:${width}%; height:${height}%; aspect-ratio:1/1;"
+                             data-points="${pts}" data-type="${type}" data-player="${player}">${pts}</div>
+                    `;
+                }
+            }
+            html += `</div>`;
+
+            // Zones Fautes (rouges) sur le pourtour
+            const fPt = badmintonFaultPenalty ? badmintonFaultPoints : 0;
+            const faultLabel = badmintonFaultPenalty ? `F ${fPt}` : 'F 0';
+            const faultColor = badmintonFaultPenalty ? 'bg-red-500' : 'bg-red-300 opacity-50';
+            // Haut
+            html += `<div class="absolute top-0 left-0 w-full h-[8%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                      data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>`;
+            // Bas
+            html += `<div class="absolute bottom-0 left-0 w-full h-[8%] ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                      data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>`;
+            // Gauche
+            html += `<div class="absolute top-0 left-0 w-[8%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                      data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>`;
+            // Droite
+            html += `<div class="absolute top-0 right-0 w-[8%] h-full ${faultColor} flex items-center justify-center text-white font-black text-xs cursor-pointer hover:opacity-80 z-10"
+                      data-points="${fPt}" data-type="fault" data-player="${player}">${faultLabel}</div>`;
+
+        } else {
+            // === MODE 3 ZONES (frontback ou leftright) ===
+            const isFrontBack = m === 'frontback';
+            const zones = [
+                { type: 'extreme', pts: badmintonOtherPoints, color: 'bg-red-500' },
+                { type: 'center', pts: badmintonCenterPoints, color: 'bg-blue-500' },
+                { type: 'extreme', pts: badmintonOtherPoints, color: 'bg-red-500' }
+            ];
+            const flexDir = isFrontBack ? 'flex-col' : 'flex-row';
+            html += `<div class="flex ${flexDir} w-full h-full">`;
+            zones.forEach((z, i) => {
+                const size = i === 1 ? cSize : sideSize;
+                const style = isFrontBack ? `height:${size}%; width:100%` : `width:${size}%; height:100%`;
+                html += `
+                    <div class="zone ${z.color} flex items-center justify-center text-white font-black text-sm cursor-pointer hover:opacity-80 border border-white/20"
+                         style="${style}"
+                         data-points="${z.pts}" data-type="${z.type}" data-player="${player}">${z.pts}</div>
+                `;
+            });
+            html += `</div>`;
+        }
+
+        return html;
     }
 
-    return `<div class="court-wrapper ${is9 ? 'mode-9zones' : 'mode-3zones'}">
-        <div class="court">
-            <div class="player-area ${pClass}" id="area-p1">${genZones('p1')}</div>
-            <div class="net"></div>
-            <div class="player-area ${pClass}" id="area-p2">${genZones('p2')}</div>
+    // ============================================================
+    // CONSTRUCTION DU TERRAIN COMPLET (2 moitiés)
+    // ============================================================
+    return `
+        <div class="court-wrapper relative w-full" style="aspect-ratio: 2/1; background: #1a5a2a; border: 2px solid #fff; border-radius: 8px; overflow: hidden;">
+            <div class="flex w-full h-full">
+                <!-- Moitié P1 (gauche) -->
+                <div class="relative w-1/2 h-full flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
+                    ${generateHalf('p1')}
+                </div>
+                <!-- Filet -->
+                <div class="w-1 h-full bg-white/90" style="box-shadow: 0 0 15px rgba(255,255,255,0.3);"></div>
+                <!-- Moitié P2 (droite) -->
+                <div class="relative w-1/2 h-full flex items-center justify-center" style="background: rgba(0,80,0,0.2);">
+                    ${generateHalf('p2')}
+                </div>
+            </div>
         </div>
-        ${faultHtml}
-    </div>`;
+    `;
 }
 
 // ============================================================
