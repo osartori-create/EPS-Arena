@@ -1,7 +1,7 @@
 // src/js/modules/evaluation/evaluation-templates.js
 // Templates HTML pour le module d'évaluation
 
-import { LIBELLES_TESTS, LIBELLES_GROUPES, COULEURS_GROUPES } from './evaluation-utils.js';
+import { LIBELLES_TESTS, LIBELLES_GROUPES, COULEURS_GROUPES, getVMAFromPalier } from './evaluation-utils.js';
 
 // ============================================================
 // MENU PRINCIPAL
@@ -100,7 +100,6 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
     const resultat = eleveEnCours ? data.eleves[eleveEnCours.id]?.resultats?.[testId] : null;
     const isCollectif = (mode === 'collectif');
 
-    // Statut de l'élève en cours
     const statut = eleveEnCours?.statut || 'present';
     let statutLabel = '✅ Présent';
     let statutClass = 'text-emerald-400';
@@ -109,7 +108,6 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
 
     return `
         <div class="space-y-4">
-            <!-- Barre de navigation -->
             <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <button onclick="window.evalRetourMenu()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
                     ← Retour
@@ -121,7 +119,6 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
             ${!isCollectif ? `
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500">
                 <div class="flex items-center gap-4">
-                    <!-- Photo de l'élève en cours -->
                     <div id="eval-eleve-photo" class="w-16 h-16 rounded-full border-2 flex items-center justify-center text-3xl overflow-hidden bg-slate-700 border-slate-500">
                         <span class="text-3xl">${eleveEnCours?.prenom?.charAt(0) || '👤'}</span>
                     </div>
@@ -162,13 +159,11 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
             </div>
             ` : ''}
 
-            <!-- Zone de saisie spécifique au test -->
             <div id="eval-zone-saisie" class="bg-slate-800 p-6 rounded-2xl border border-slate-700 min-h-[300px]">
                 <!-- Rempli dynamiquement -->
             </div>
 
             ${!isCollectif ? `
-            <!-- Actions -->
             <div class="flex gap-3">
                 <button onclick="window.evalPasserSuivant()" class="flex-1 bg-blue-600 py-4 rounded-xl font-black text-white text-lg active:scale-95">
                     ✅ Suivant
@@ -183,7 +178,7 @@ export function templatePassation(testId, eleveEnCours, eleveSuivant, eleves, da
 }
 
 // ============================================================
-// SAUT (slider + toise) – VERSION CORRECTE (SANS AFFICHAGE BLANC)
+// SAUT (slider + toise)
 // ============================================================
 
 export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
@@ -192,9 +187,7 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
 
     return `
         <div class="space-y-3">
-            <!-- Toise avec curseur intégré et score en jaune -->
             <div class="relative w-full h-40 bg-gradient-to-b from-emerald-800 to-emerald-600 rounded-2xl border-2 border-slate-600 overflow-hidden">
-                <!-- Graduations -->
                 <div class="absolute bottom-0 left-0 right-0 h-10 bg-emerald-900/50 flex items-end">
                     ${Array.from({ length: Math.floor((max - min) / 10) + 1 }, (_, i) => {
                         const val = min + i * 10;
@@ -208,42 +201,36 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                     }).join('')}
                 </div>
 
-                <!-- Bandes de couleur -->
                 <div class="absolute inset-0 flex pointer-events-none" style="opacity:0.25;">
                     <div class="h-full bg-red-500" style="width:${((110 - min) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-amber-500" style="width:${((140 - 110) / (max - min)) * 100}%;"></div>
                     <div class="h-full bg-emerald-500" style="width:${((max - 140) / (max - min)) * 100}%;"></div>
                 </div>
 
-                <!-- Repères -->
                 <div class="absolute inset-0 pointer-events-none">
                     <div class="absolute top-0 w-px h-full bg-red-500/50 border-l border-dashed border-red-400/50" style="left:${((110 - min) / (max - min)) * 100}%;"></div>
                     <div class="absolute top-0 w-px h-full bg-amber-500/50 border-l border-dashed border-amber-400/50" style="left:${((140 - min) / (max - min)) * 100}%;"></div>
                 </div>
 
-                <!-- Curseur -->
                 <div id="slider-bar" class="absolute bottom-0 w-1 h-28 bg-yellow-400 shadow-lg shadow-yellow-500/50 transition-all" 
                      style="left:${pct}%; transform: translateX(-50%);">
                     <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-yellow-400 rounded-full border-2 border-white shadow-lg"></div>
                 </div>
 
-                <!-- SCORE UNIQUEMENT EN JAUNE SUR LA TOISE -->
                 <div id="slider-score" class="absolute top-2 left-1/2 -translate-x-1/2 bg-black/70 px-4 py-1.5 rounded-xl z-10">
                     <span class="text-3xl font-black text-yellow-400">${valeur}</span>
                     <span class="text-xs text-white/70">${unite}</span>
                 </div>
             </div>
 
-            <!-- Champ de saisie manuelle -->
             <div class="flex items-center justify-center gap-2">
-    <button onclick="window.adjustSlider(-1)" class="bg-slate-700 w-14 h-14 rounded-2xl text-3xl font-black text-white active:scale-95 touch-manipulation">−</button>
-    <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
-           class="w-40 bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-center text-3xl font-black text-white">
-    <button onclick="window.adjustSlider(1)" class="bg-slate-700 w-14 h-14 rounded-2xl text-3xl font-black text-white active:scale-95 touch-manipulation">+</button>
-    <span class="text-sm text-slate-400 ml-1">cm</span>
-</div>
+                <button onclick="window.adjustSlider(-1)" class="bg-slate-700 w-14 h-14 rounded-2xl text-3xl font-black text-white active:scale-95 touch-manipulation">−</button>
+                <input type="number" id="eval-input-manuel" value="${valeur}" step="1" min="0"
+                       class="w-40 bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-center text-3xl font-black text-white">
+                <button onclick="window.adjustSlider(1)" class="bg-slate-700 w-14 h-14 rounded-2xl text-3xl font-black text-white active:scale-95 touch-manipulation">+</button>
+                <span class="text-sm text-slate-400 ml-1">cm</span>
+            </div>
 
-            <!-- Slider HTML (interactif) -->
             <input type="range" id="eval-slider" min="${min}" max="${max}" step="1" value="${Math.min(max, Math.max(min, valeur))}"
                    class="w-full h-3 bg-slate-700 rounded-full appearance-none cursor-pointer 
                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-8 [&::-webkit-slider-thumb]:h-8 
@@ -251,7 +238,6 @@ export function templateSliderSaut(valeur, min = 0, max = 250, unite = 'cm') {
                           [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-white"
                    oninput="window.evalUpdateSlider(this.value, 0, 250)">
 
-            <!-- Boutons -->
             <div class="flex gap-3">
                 <button onclick="window.evalValiderEssai()" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-lg active:scale-95">
                     ✅ Valider l'essai
@@ -349,7 +335,7 @@ export function templateVMA(colonnes, palierEnCours, palierValide, tempsRestant,
 }
 
 // ============================================================
-// TABLEAU DE BORD
+// TABLEAU DE BORD (MODIFICATION : colonne VMA ajoutée)
 // ============================================================
 
 export function templateTableauBord(data, classe) {
@@ -410,14 +396,24 @@ export function templateTableauBord(data, classe) {
                         <tr>
                             <th class="p-3 font-bold sticky left-0 bg-slate-900">Élève</th>
                             ${tests.map(testId => `
-                                <th class="p-3 font-bold text-center">${libellesCourts[testId]}</th>
+                                <th class="p-3 font-bold text-center">
+                                    ${testId === 'endurance' ? 'Palier' : libellesCourts[testId]}
+                                </th>
                             `).join('')}
+                            <th class="p-3 font-bold text-center bg-slate-900 text-emerald-400">VMA</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${eleves.map(e => {
                             const bgRow = e.statut === 'absent' ? 'opacity-40' : '';
                             const statutBadge = e.statut === 'absent' ? '🚫' : (e.statut === 'inapte' ? '⚠️' : '');
+                            const enduranceResult = e.resultats.endurance;
+                            let vmaAffichage = '--';
+                            if (enduranceResult && enduranceResult.palier !== undefined && enduranceResult.palier !== null) {
+                                const vma = getVMAFromPalier(enduranceResult.palier);
+                                if (vma !== null) vmaAffichage = vma.toFixed(1);
+                            }
+
                             return `
                                 <tr class="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer ${bgRow}" 
                                     onclick="window.evalOuvrirFiche('${e.id}')">
@@ -434,7 +430,7 @@ export function templateTableauBord(data, classe) {
                                         const couleur = COULEURS_GROUPES[r.groupe] || '#64748b';
                                         let valeur = '';
                                         switch (testId) {
-                                            case 'endurance': valeur = r.palier !== undefined ? `Pal.${r.palier}` : '--'; break;
+                                            case 'endurance': valeur = r.palier !== undefined ? r.palier : '--'; break;
                                             case 'force': 
                                             case 'souplesse': valeur = r.meilleur !== undefined ? r.meilleur : '--'; break;
                                             case 'vitesse': valeur = r.meilleur !== undefined ? r.meilleur.toFixed(1) : '--'; break;
@@ -452,6 +448,9 @@ export function templateTableauBord(data, classe) {
                                             </td>
                                         `;
                                     }).join('')}
+                                    <td class="p-3 text-center font-black text-emerald-400">
+                                        ${vmaAffichage}
+                                    </td>
                                 </tr>
                             `;
                         }).join('')}
@@ -471,7 +470,7 @@ export function templateTableauBord(data, classe) {
 }
 
 // ============================================================
-// FICHE ÉLÈVE
+// FICHE ÉLÈVE (MODIFICATION : affichage VMA)
 // ============================================================
 
 export function templateFicheEleve(eleve, data, modeEdition = false) {
@@ -567,11 +566,14 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
 
                             switch (testId) {
                                 case 'endurance':
-                                    affichageValeur = `Palier ${r.palier}`;
+                                    const vma = getVMAFromPalier(r.palier);
+                                    const vmaStr = vma !== null ? vma.toFixed(1) : '--';
+                                    affichageValeur = `Palier ${r.palier} → VMA : ${vmaStr} km/h`;
                                     if (modeEdition) {
                                         inputHtml = `
                                             <input type="number" id="edit-${testId}" value="${r.palier}" min="-1" max="20" 
                                                    class="w-20 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                            <span class="text-xs text-slate-500 ml-1">palier</span>
                                         `;
                                     }
                                     break;
@@ -730,7 +732,7 @@ export function templateModalPurge(classe, stats, libelles, nbEleves) {
 }
 
 // ============================================================
-// STATISTIQUES
+// STATISTIQUES (fonction interne)
 // ============================================================
 
 function calculerStatistiques(data) {
