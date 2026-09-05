@@ -6,7 +6,7 @@ import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade
 import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
-import { initBadmintonKiosk } from '../../modules/badminton/badminton-kiosk.js';
+import { initBadmintonKiosk } from '../../modules/badminton/index.js';
 import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
