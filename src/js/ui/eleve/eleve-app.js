@@ -9,6 +9,7 @@ import { showFeedback, showTeamMountain } from './eleve-actions.js';
 import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
 import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
+import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -78,7 +79,7 @@ export function initApp() {
                 if (config.activite === 'arcathlon') {
                     console.log('[eleve] Activité Arcathlon détectée (config principale)');
                     showLoginArcathlon();
-                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi'].includes(config.activite)) {
+                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
                     currentConfig = config;
                     showLogin();
                 } else {
@@ -144,51 +145,21 @@ function showLogin() {
         return;
     }
 
-    else if (config.activite === 'tournoi') {
-    loginScreen.classList.add('hidden');
-    activityScreen.classList.remove('hidden');
-    // Cacher les autres modules
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    document.getElementById('code-info')?.classList.add('hidden');
-    document.getElementById('btn-quit')?.classList.add('hidden');
-    document.getElementById('btn-back-terrain')?.classList.add('hidden');
-    
-
-    // Créer le conteneur du module tournoi s'il n'existe pas
-    let tournoiModule = document.getElementById('tournoi-module');
-    if (!tournoiModule) {
-        tournoiModule = document.createElement('div');
-        tournoiModule.id = 'tournoi-module';
-        tournoiModule.className = 'space-y-4 module';
-        activityScreen.appendChild(tournoiModule);
-    }
-    tournoiModule.classList.remove('hidden');
-
-    console.log('🏆 Lancement Tournoi pour classe :', selectedClass);
-    initTournoi(selectedClass, 'elimination');
-    return;
-}
     // SPÉCIAL TOURNOI
     if (config.activite === 'tournoi') {
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
-        // Cacher tous les autres modules
         escaladeModule.classList.add('hidden');
         coModule.classList.add('hidden');
         multiModule.classList.add('hidden');
         if (osModule) osModule.classList.add('hidden');
         badmintonModule.classList.add('hidden');
-        document.getElementById('code-info').classList.add('hidden');
-        document.getElementById('btn-quit').classList.add('hidden');
-        document.getElementById('btn-back-terrain').classList.add('hidden');
+        document.getElementById('code-info')?.classList.add('hidden');
+        document.getElementById('btn-quit')?.classList.add('hidden');
+        document.getElementById('btn-back-terrain')?.classList.add('hidden');
         document.getElementById('main-container').classList.remove('max-w-md');
         document.getElementById('main-container').classList.add('max-w-7xl');
-        
-        // Créer le module tournoi s'il n'existe pas
+
         let tournoiModule = document.getElementById('tournoi-module');
         if (!tournoiModule) {
             tournoiModule = document.createElement('div');
@@ -197,8 +168,37 @@ function showLogin() {
             activityScreen.appendChild(tournoiModule);
         }
         tournoiModule.classList.remove('hidden');
-        console.log('Lancement Tournoi pour classe :', selectedClass);
+        console.log('🏆 Lancement Tournoi pour classe :', selectedClass);
         initTournoi(selectedClass, config.mode || 'elimination');
+        return;
+    }
+
+    // SPÉCIAL BLOC CONTEST
+    if (config.activite === 'bloccontest') {
+        loginScreen.classList.add('hidden');
+        activityScreen.classList.remove('hidden');
+        escaladeModule.classList.add('hidden');
+        coModule.classList.add('hidden');
+        multiModule.classList.add('hidden');
+        if (osModule) osModule.classList.add('hidden');
+        badmintonModule.classList.add('hidden');
+        document.getElementById('code-info').classList.add('hidden');
+        document.getElementById('btn-quit').classList.add('hidden');
+        document.getElementById('btn-back-terrain').classList.remove('hidden');
+        document.getElementById('main-container').classList.remove('max-w-md');
+        document.getElementById('main-container').classList.add('max-w-7xl');
+
+        // Créer le conteneur du kiosk s'il n'existe pas
+        let blocContainer = document.getElementById('bloc-kiosk-container');
+        if (!blocContainer) {
+            blocContainer = document.createElement('div');
+            blocContainer.id = 'bloc-kiosk-container';
+            blocContainer.className = 'space-y-4 module';
+            activityScreen.appendChild(blocContainer);
+        }
+        blocContainer.classList.remove('hidden');
+        // On affiche un message d'attente (l'init se fera après sélection du code)
+        blocContainer.innerHTML = '<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration...</p></div>';
         return;
     }
 
@@ -415,6 +415,18 @@ function selectCode(code) {
                     </div>
                 `;
             });
+    } else if (currentConfig.activite === 'bloccontest') {
+        // Afficher le conteneur et initialiser le kiosk
+        let blocContainer = document.getElementById('bloc-kiosk-container');
+        if (!blocContainer) {
+            blocContainer = document.createElement('div');
+            blocContainer.id = 'bloc-kiosk-container';
+            blocContainer.className = 'space-y-4 module';
+            activityScreen.appendChild(blocContainer);
+        }
+        blocContainer.classList.remove('hidden');
+        // Initialiser le kiosk avec la classe et le code sélectionné
+        initBlocKiosk(selectedClass, code);
     } else {
         multiModule.classList.remove('hidden');
     }
