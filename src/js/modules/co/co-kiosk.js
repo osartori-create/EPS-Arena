@@ -1,8 +1,8 @@
 // src/js/modules/co/co-kiosk.js
 // Kiosk élève pour la Course d'orientation classique
-// Inspiré de CO‑Logic, adapté aux chemins Firebase EPS‑Arena
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
+import { MATRICE } from './matrice.js';
 
 let currentClasse = '';
 let currentCode = '';          // ex: "A1"
@@ -12,15 +12,15 @@ let valMode = 'step';
 let activeCategory = '';
 let startTime = null;
 let endTime = null;
-let sessions = {};             // Résultats déjà envoyés par l'élève
+let sessions = {};
 
 // État local
 let selectedCircuitId = null;
-let cartonDetails = [];        // [{ balise, userCode, status }]
+let cartonDetails = [];
 let activePosteIdx = null;
 let currentInput = '';
 
-// Listener Firebase
+// Listeners
 let configListener = null;
 let sessionsListener = null;
 let startTimeListener = null;
@@ -43,11 +43,15 @@ export function initCoKiosk(classe, code) {
     container.style.display = 'block';
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    console.log('[CO Kiosk] Initialisation pour', classe, code, 'profCode:', profCode);
 
-    // 1. Écouter la configuration
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/config`);
+    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/co`;
+
+    // 1. Écouter la configuration complète
+    const configRef = ref(db, `${basePath}/config`);
     configListener = onValue(configRef, (snap) => {
         const data = snap.val() || {};
+        console.log('[CO Kiosk] Config reçue :', data);
         circuits = data.circuits ? Object.values(data.circuits) : [];
         valMode = data.valMode || 'step';
         activeCategory = data.activeCategory || '';
@@ -57,21 +61,23 @@ export function initCoKiosk(classe, code) {
     });
 
     // 2. Écouter startTime / endTime
-    const startRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/startTime`);
+    const startRef = ref(db, `${basePath}/startTime`);
     startTimeListener = onValue(startRef, (snap) => {
         startTime = snap.val() || null;
         afficherInterface();
     });
-    const endRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/endTime`);
+    const endRef = ref(db, `${basePath}/endTime`);
     endTimeListener = onValue(endRef, (snap) => {
         endTime = snap.val() || null;
         afficherInterface();
     });
 
-    // 3. Écouter la catégorie active sur le bon chemin
-    const catRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/config/activeCategory`);
+    // 3. Écouter la catégorie active (sur le même chemin)
+    const catRef = ref(db, `${basePath}/config/activeCategory`);
     activeCategoryListener = onValue(catRef, (snap) => {
         activeCategory = snap.val() || '';
+        console.log('[CO Kiosk] Catégorie active mise à jour :', activeCategory);
+        // Mettre à jour l'affichage pour refléter le changement
         afficherInterface();
     });
 }
@@ -95,11 +101,9 @@ function chargerSessions() {
                 sessions[key] = p;
             }
         });
-        // Si un circuit est sélectionné, mettre à jour l'affichage du carton
         if (selectedCircuitId) {
             afficherCarton();
         }
-        // Mettre à jour le score global
         afficherScoreGlobal();
     });
 }
@@ -112,12 +116,11 @@ function afficherInterface() {
     if (!container) return;
     container.innerHTML = '';
 
-    // Vérifier la course
     const isActive = startTime && !endTime;
     const statusColor = !startTime ? 'text-slate-400' : (isActive ? 'text-emerald-400' : 'text-red-400');
     const statusText = !startTime ? '⏳ En attente du départ du professeur...' : (isActive ? '🏃 Course en cours !' : '⏱️ Course terminée.');
 
-    // Sélecteur de circuit
+    // Filtrer les circuits par catégorie active
     const circuitsFiltres = activeCategory ? circuits.filter(c => c.cat === activeCategory) : circuits;
     const circuitOptions = circuitsFiltres.map(c =>
         `<option value="${c.id}" ${c.id === selectedCircuitId ? 'selected' : ''}>${c.nom} (${c.cat})</option>`
@@ -161,11 +164,10 @@ function afficherInterface() {
     // Attacher l'événement de changement de circuit
     const select = document.getElementById('selectCircuit');
     if (select) {
-        // Supprimer les anciens écouteurs en clonant l'élément
-        const newSelect = select.cloneNode(true);
-        select.parentNode.replaceChild(newSelect, select);
-        newSelect.addEventListener('change', (e) => {
-            selectedCircuitId = e.target.value;
+        select.addEventListener('change', (e) => {
+            const val = e.target.value;
+            console.log('[CO Kiosk] Circuit sélectionné :', val);
+            selectedCircuitId = val;
             if (selectedCircuitId) {
                 afficherCarton();
             } else {
@@ -181,27 +183,24 @@ function afficherInterface() {
         afficherCarton();
     }
 
-    // Mettre à jour le score global
     afficherScoreGlobal();
 }
 
 // ============================================================
-// AFFICHAGE DU CARTON (pour un circuit sélectionné)
+// AFFICHAGE DU CARTON
 // ============================================================
 function afficherCarton() {
     const circuit = circuits.find(c => c.id === selectedCircuitId);
     if (!circuit) {
-        console.warn('Circuit non trouvé :', selectedCircuitId);
+        console.warn('[CO Kiosk] Circuit non trouvé :', selectedCircuitId, 'circuits disponibles :', circuits);
         return;
     }
 
-    console.log('Afficher carton pour circuit :', circuit.nom);
+    console.log('[CO Kiosk] Afficher carton pour circuit :', circuit.nom);
 
-    // Récupérer les données déjà enregistrées pour ce circuit (si l'élève a déjà commencé)
     const existing = Object.values(sessions).find(s => s.circuitId === selectedCircuitId);
     if (existing && existing.details) {
         cartonDetails = existing.details.map(d => ({ ...d }));
-        // On ne permet pas de modifier si le circuit est déjà complet
     } else {
         cartonDetails = circuit.balises.map(b => ({ balise: b, userCode: '', status: 'empty' }));
     }
@@ -230,7 +229,6 @@ function afficherCarton() {
         grid.appendChild(div);
     });
 
-    // Afficher le bouton "Valider" si mode final et que le circuit n'est pas déjà terminé
     const btnContainer = document.getElementById('btnFinishContainer');
     if (valMode === 'final' && !existing) {
         btnContainer.classList.remove('hidden');
@@ -239,15 +237,12 @@ function afficherCarton() {
     } else {
         btnContainer.classList.add('hidden');
     }
-
-    // Si mode step, on ne montre pas le bouton "Valider", la correction est immédiate.
 }
 
 // ============================================================
 // PAVÉ NUMÉRIQUE (modale)
 // ============================================================
 window.coOpenNumpad = function(idx) {
-    // Vérifier que le poste n'est pas déjà corrigé
     const det = cartonDetails[idx];
     if (det.status === 'correct' || det.status === 'wrong') {
         alert('Ce poste a déjà été corrigé.');
@@ -295,12 +290,10 @@ window.coNumpadOk = function() {
     const det = cartonDetails[idx];
     det.userCode = userCode;
 
-    // Correction immédiate si mode step
     if (valMode === 'step') {
         corrigerPoste(idx);
     }
 
-    // Mettre à jour l'affichage
     const valueEl = document.getElementById(`posteValue${idx}`);
     if (valueEl) valueEl.innerText = userCode || '---';
     const statusEl = document.getElementById(`posteStatus${idx}`);
@@ -332,8 +325,6 @@ function corrigerPoste(idx) {
     const det = cartonDetails[idx];
     const isGhost = String(det.balise).includes('*');
     const realBal = String(det.balise).replace('*', '');
-    // Utilisation de la matrice globale (doit être importée)
-    const MATRICE = window.MATRICE || {};
     const correctCode = isGhost ? '' : (MATRICE[realBal] ? MATRICE[realBal][currentCode] : null);
 
     if (det.userCode === correctCode) {
@@ -342,7 +333,6 @@ function corrigerPoste(idx) {
         det.status = 'wrong';
     }
 
-    // Synchroniser immédiatement
     synchroniserPassage();
 }
 
@@ -350,8 +340,6 @@ function corrigerPoste(idx) {
 // SOUMISSION DU CARTON (mode final)
 // ============================================================
 function soumettreCarton() {
-    // Corriger toutes les balises
-    const MATRICE = window.MATRICE || {};
     cartonDetails.forEach((det, idx) => {
         const isGhost = String(det.balise).includes('*');
         const realBal = String(det.balise).replace('*', '');
@@ -361,7 +349,6 @@ function soumettreCarton() {
         } else {
             det.status = 'wrong';
         }
-        // Mettre à jour l'affichage
         const statusEl = document.getElementById(`posteStatus${idx}`);
         if (statusEl) {
             statusEl.innerText = det.status === 'correct' ? '✅ Correct' : '❌ Erreur';
@@ -371,13 +358,9 @@ function soumettreCarton() {
         if (valueEl) valueEl.innerText = det.userCode || '---';
     });
 
-    // Désactiver le bouton "Valider"
     document.getElementById('btnFinishContainer').classList.add('hidden');
-
-    // Synchroniser
     synchroniserPassage();
 
-    // Afficher le score final
     const pts = cartonDetails.filter(d => d.status === 'correct').length;
     const total = cartonDetails.length;
     alert(`🏁 Score final : ${pts}/${total}`);
@@ -404,9 +387,7 @@ function synchroniserPassage() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const passagesRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`);
     push(passagesRef, data)
-        .then(() => {
-            afficherScoreGlobal();
-        })
+        .then(() => afficherScoreGlobal())
         .catch(err => {
             console.error('Erreur synchronisation :', err);
             alert('Erreur lors de l\'envoi. Réessayez.');

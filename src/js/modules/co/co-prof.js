@@ -71,7 +71,10 @@ export function initCOModeSelector() {
     // Appliquer le mode par défaut
     setCOMode('classique');
 }
-
+const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/co`;
+const configRef = ref(db, `${basePath}/config`); // pour circuits, valMode, activeCategory
+const startRef = ref(db, `${basePath}/startTime`);
+const endRef = ref(db, `${basePath}/endTime`);
 function setCOMode(mode) {
     currentMode = mode;
     const containerClassique = document.getElementById('co-classique-container');

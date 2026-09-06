@@ -309,10 +309,9 @@ function showLogin() {
     activityTitle.innerText = "Choisis ton code";
 
     // Générer les codes A1 à F6 (ou utiliser les groupes configurés)
-    // Pour l'instant, on génère A1..F6
     const letters = ['A','B','C','D','E','F'];
     letters.forEach(l => {
-        for (let i=1; i<=6; i++) {
+        for (let i = 1; i <= 6; i++) {
             const code = `${l}${i}`;
             const btn = document.createElement('button');
             btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
