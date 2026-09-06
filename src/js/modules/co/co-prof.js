@@ -399,17 +399,24 @@ export async function transmettre(classe) {
 
 export function renderLive(classe) {
     if (currentMode === 'classique') {
-        import('./co-live.js').then(module => {
-            module.renderCOLive();
-        }).catch(err => {
-            console.error('[CO] Erreur Live :', err);
-        });
+        return import('./co-live.js')
+            .then(module => {
+                return module.renderCOLive(); // ✅ Retourne la promesse
+            })
+            .catch(err => {
+                console.error('[CO] Erreur Live :', err);
+                // Retourner une promesse résolue pour ne pas casser la chaîne
+                return Promise.resolve();
+            });
     } else {
-        return import('./orientshow/orientshow-live.js').then(module => {
-            module.renderOrientShowLive();
-        }).catch(err => {
-            console.error('[CO] Erreur OrientShow Live :', err);
-        });
+        return import('./orientshow/orientshow-live.js')
+            .then(module => {
+                return module.renderOrientShowLive();
+            })
+            .catch(err => {
+                console.error('[CO] Erreur OrientShow Live :', err);
+                return Promise.resolve();
+            });
     }
 }
 
