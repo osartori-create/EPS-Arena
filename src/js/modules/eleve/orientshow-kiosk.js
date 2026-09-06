@@ -1,14 +1,12 @@
 // src/js/modules/eleve/orientshow-kiosk.js
 // Kiosk OrientShow – version élève (inspirée de vos fichiers originaux)
-// Utilisation de la création DOM pour éviter les erreurs de parsing HTML
+// ✅ Suppression de la dépendance startTime / endTime – les élèves peuvent valider directement
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
 let currentCode = '';          // ex: "NOIR_1"
 let matrix = {};
-let startTime = null;
-let endTime = null;
 let sessions = {};             // Validations déjà faites par l'élève
 let configListener = null;
 let sessionsListener = null;
@@ -31,10 +29,9 @@ export function initOrientShowKiosk(classe, code, config) {
         console.error('Conteneur orientshow-module introuvable');
         return;
     }
-    // Vider le conteneur
     container.innerHTML = '';
 
-    // 1. Écouter la configuration (matrix, startTime, endTime)
+    // 1. Écouter la configuration (matrix uniquement – plus de startTime/endTime)
     if (configListener) {
         configListener();
         configListener = null;
@@ -44,8 +41,6 @@ export function initOrientShowKiosk(classe, code, config) {
     configListener = onValue(configRef, (snap) => {
         const data = snap.val() || {};
         matrix = data.matrix || {};
-        startTime = data.startTime || null;
-        endTime = data.endTime || null;
         if (Object.keys(matrix).length > 0) {
             chargerSessions();
         } else {
@@ -56,8 +51,6 @@ export function initOrientShowKiosk(classe, code, config) {
     // 2. Si une config est passée en paramètre
     if (config && config.matrix) {
         matrix = config.matrix || {};
-        startTime = config.startTime || null;
-        endTime = config.endTime || null;
         if (Object.keys(matrix).length > 0) {
             chargerSessions();
         }
@@ -115,15 +108,12 @@ function chargerSessions() {
 }
 
 // ============================================================
-// AFFICHAGE DE L'INTERFACE (via création DOM)
+// AFFICHAGE DE L'INTERFACE
 // ============================================================
 function afficherInterface() {
     const container = document.getElementById('orientshow-module');
     if (!container) return;
-    container.innerHTML = ''; // Reset
-
-    // Vérifier la course
-    const isActive = startTime && !endTime;
+    container.innerHTML = '';
 
     // Calcul des points
     let totalPoints = 0;
@@ -149,8 +139,6 @@ function afficherInterface() {
     };
     const bgColor = colorClasses[color] || 'bg-slate-700 text-white border-slate-600';
 
-    // --- Création des éléments ---
-
     // En‑tête (info élève + score)
     const headerDiv = document.createElement('div');
     headerDiv.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4';
@@ -171,20 +159,11 @@ function afficherInterface() {
     `;
     container.appendChild(headerDiv);
 
-    // Statut de la course
-    const statusDiv = document.createElement('div');
-    statusDiv.className = 'text-center text-sm mb-4';
-    if (!startTime) {
-        statusDiv.className += ' text-slate-400';
-        statusDiv.textContent = '⏳ En attente du départ du professeur...';
-    } else if (endTime) {
-        statusDiv.className += ' text-red-400';
-        statusDiv.textContent = '⏱️ La course est terminée.';
-    } else {
-        statusDiv.className += ' text-emerald-400';
-        statusDiv.textContent = '🏃 Course en cours !';
-    }
-    container.appendChild(statusDiv);
+    // ✅ Message simplifié : plus de dépendance à startTime/endTime
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'text-center text-sm text-slate-400 mb-4';
+    infoDiv.textContent = '🎯 Sélectionne un circuit et saisis les deux lettres.';
+    container.appendChild(infoDiv);
 
     // Grille des circuits
     const gridDiv = document.createElement('div');
@@ -256,12 +235,7 @@ function selectCircuit(circuitId) {
         return;
     }
 
-    // Vérifier la course
-    if (!startTime || endTime) {
-        alert('La course n\'est pas active.');
-        return;
-    }
-
+    // ✅ Plus de vérification startTime/endTime – validation immédiate
     selectedCircuit = circuitId;
     const saisieZone = document.getElementById('saisieZone');
     document.getElementById('selectedCircuitLabel').textContent = `C${circuitId}`;
@@ -287,7 +261,7 @@ function validerCircuit() {
         return;
     }
 
-    // Vérifier si déjà validé (sécurité)
+    // Vérifier si déjà validé
     const found = Object.values(sessions).find(s => s.circuit === selectedCircuit);
     if (found) {
         alert('Ce circuit a déjà été validé.');
@@ -295,12 +269,7 @@ function validerCircuit() {
         return;
     }
 
-    // Vérifier la course
-    if (!startTime || endTime) {
-        alert('La course n\'est pas active.');
-        annulerSaisie();
-        return;
-    }
+    // ✅ Plus de vérification startTime/endTime
 
     const l1 = document.getElementById('l1').value.toUpperCase();
     const l2 = document.getElementById('l2').value.toUpperCase();
