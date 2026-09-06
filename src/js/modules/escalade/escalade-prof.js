@@ -127,8 +127,7 @@ export async function transmettre(classe) {
     
     localStorage.setItem(`eps_arena_local_mapping_${classe}`, JSON.stringify(localMapping));
     
-    const { ref, set } = await import('../../core/firebase-service.js');
-    const { db } = await import('../../core/firebase-service.js');
+    const { ref, set, db } = await import('../../core/firebase-service.js');
     await set(ref(db, `${baseProf}/${classe}/config`), configData);
     await set(ref(db, `${baseProf}/active_classes/${classe}`), true);
 }
@@ -153,21 +152,11 @@ export async function generateTeams(classe) {
 }
 
 // ============================================================
-// LIVE / TV
+// ALIAS POUR COMPATIBILITÉ AVEC activities.js
 // ============================================================
-
-export function renderLive(classe) {
-    import('./escalade-live.js').then(module => {
-        const data = window.lastLiveData || {};
-        module.renderEscaladeLive(data);
-    }).catch(err => console.error('Erreur Live Escalade :', err));
-}
-
-export function renderTV(classe) {
-    import('./escalade-tv-ui.js').then(module => {
-        module.renderEscaladeTV();
-    }).catch(err => console.error('Erreur TV Escalade :', err));
-}
+export const generateEscaladeTeams = generateTeams;
+export const initEscaladeProf = initProf;
+export const transmettreEscalade = transmettre;
 
 // ============================================================
 // EXPOSITION DES FONCTIONS GLOBALES (compatibilité HTML)
