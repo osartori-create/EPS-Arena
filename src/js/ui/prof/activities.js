@@ -88,13 +88,13 @@ export function initActivities() {
             if (multiView) multiView.classList.remove('hidden');
         }
         else if (disc === 'co') {
-            const coModule = getModule('co');
-            if (coModule && coModule.renderLive) {
-                const activeClasse = document.getElementById('selectClasse').value;
-                coModule.renderLive();
-            }
-            if (coView) coView.classList.remove('hidden');
-        }
+    const coModule = getModule('co');
+    if (coModule && coModule.initProf) {
+        const activeClasse = document.getElementById('selectClasse').value;
+        coModule.initProf(activeClasse);
+    }
+    if (coView) coView.classList.remove('hidden');
+}
         else if (disc === 'escalade') {
             if (escView) escView.classList.remove('hidden');
             const escaladeModule = getModule('escalade');
