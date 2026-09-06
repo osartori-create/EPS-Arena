@@ -236,7 +236,9 @@ function createMain() {
         gridHtml += `<div class="flex flex-1 gap-0">`;
         COULEURS.forEach(col => {
             const code = `${col}_${ligne}`;
-            gridHtml += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 flex-1" data-code="${code}"></div>`;
+            gridHtml += `<div class="os-dropzone bg-slate-800 border border-slate-700 min-h-[50px] flex flex-col gap-1 p-1 flex-1" data-code="${code}">
+                            <span class="text-[8px] text-slate-500 text-center">${code}</span>
+                         </div>`;
         });
         gridHtml += `</div></div>`;
     }

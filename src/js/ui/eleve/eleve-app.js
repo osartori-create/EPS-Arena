@@ -7,6 +7,7 @@ import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
 import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
+import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 
@@ -212,7 +213,12 @@ function showLogin() {
                             }
                             blocContainer.style.display = 'block';
                             blocContainer.classList.remove('hidden');
-                            initBlocKiosk(selectedClass, code);
+                            import('../../modules/escalade/escalade-kiosk-blocs.js').then(module => {
+                                module.initBlocKiosk(selectedClass, code);
+                            }).catch(err => {
+                                console.error('Erreur chargement Bloc Kiosk :', err);
+                                blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+                            });
                         };
                         codeList.appendChild(btn);
                     });
@@ -232,7 +238,6 @@ function showLogin() {
         codeList.innerHTML = '';
         activityTitle.innerText = "Choisis ton code";
 
-        // Récupérer les couleurs et leurs nombres depuis la config
         const couleurs = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
         let hasCodes = false;
         couleurs.forEach(couleur => {
@@ -249,13 +254,11 @@ function showLogin() {
                         document.getElementById('selected-code').innerText = code;
                         loginScreen.classList.add('hidden');
                         activityScreen.classList.remove('hidden');
-                        // Cacher tous les autres modules
                         escaladeModule.classList.add('hidden');
                         coModule.classList.add('hidden');
                         multiModule.classList.add('hidden');
                         if (osModule) osModule.classList.add('hidden');
                         badmintonModule.classList.add('hidden');
-                        // Afficher le conteneur OrientShow (kiosk)
                         let osKioskContainer = document.getElementById('os-kiosk-container');
                         if (!osKioskContainer) {
                             osKioskContainer = document.createElement('div');
@@ -265,7 +268,6 @@ function showLogin() {
                         }
                         osKioskContainer.style.display = 'block';
                         osKioskContainer.classList.remove('hidden');
-                        // Initialiser le kiosk OrientShow
                         import('../../modules/eleve/orientshow-kiosk.js').then(module => {
                             module.initOrientShowKiosk(selectedClass, code);
                         }).catch(err => {
@@ -289,9 +291,7 @@ function showLogin() {
     document.getElementById('btn-quit').classList.remove('hidden');
     document.getElementById('btn-back-terrain').classList.add('hidden');
 
-    // Clés à ignorer dans la boucle générique
     const ignoreKeys = ['activite', 'matrice', 'startTime', 'endTime', 'matrix', 'nbCircuits', 'nbCouleurs'];
-
     Object.keys(config).forEach(key => {
         if (ignoreKeys.includes(key)) return;
         let count = 0;
@@ -504,9 +504,10 @@ window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
 window.startChrono = () => { console.log("Chrono démarré"); };
 window.stopChrono = () => { console.log("Chrono arrêté"); };
-window.resetToLogin = () => { showLogin(); };
+window.validateOSPassage = validateOSPassage;
 
 export function getSelectedClass() { return selectedClass; }
 export function getSelectedCode() { return selectedCode; }
 export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
+export function resetToLogin() { showLogin(); }
