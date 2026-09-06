@@ -12,6 +12,7 @@ let selectedNum = null;
 let selectedCircuit = null;
 let lastSend = 0;
 const COOLDOWN = 30000;
+let configListener = null;
 
 // ============================================================
 // INIT
@@ -19,12 +20,15 @@ const COOLDOWN = 30000;
 export function initOrientShowKiosk(classe, code, config) {
     currentClasse = classe;
     
-    // Si une config est fournie, on l'utilise
-    if (config && config.matrix) {
-        console.log('[OrientShow Kiosk] Configuration reçue :', config);
-        matrix = config.matrix || {};
-        startTime = config.startTime || null;
-        endTime = config.endTime || null;
+    // Fonction pour mettre à jour l'interface avec la config
+    function updateFromConfig(configData) {
+        if (!configData || !configData.matrix) {
+            console.warn('[OrientShow Kiosk] Config invalide ou manquante');
+            return;
+        }
+        matrix = configData.matrix || {};
+        startTime = configData.startTime || null;
+        endTime = configData.endTime || null;
         
         const parts = code.split('_');
         if (parts.length === 2) {
@@ -35,27 +39,46 @@ export function initOrientShowKiosk(classe, code, config) {
         renderIdentitySelection();
         renderCircuits();
         updateUIState();
-        return;
     }
-    
-    // Fallback : écouter Firebase
-    console.log('[OrientShow Kiosk] Pas de config fournie, écoute Firebase...');
-    listenOrientShowConfig(classe, (configData) => {
-        if (configData) {
+
+    // Si une config est fournie, l'utiliser tout de suite
+    if (config && config.matrix) {
+        console.log('[OrientShow Kiosk] Configuration initiale reçue :', config);
+        updateFromConfig(config);
+    } else {
+        console.log('[OrientShow Kiosk] Pas de config fournie, attente...');
+        const container = document.getElementById('os-kiosk-container');
+        if (container) {
+            container.innerHTML = `<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>`;
+        }
+    }
+
+    // ✅ Écouter en temps réel les mises à jour de la config Firebase
+    if (configListener) {
+        configListener();
+        configListener = null;
+    }
+    configListener = listenOrientShowConfig(classe, (configData) => {
+        if (configData && configData.matrix) {
+            console.log('[OrientShow Kiosk] Mise à jour de la config reçue :', configData);
+            // Ne pas réinitialiser les sélections si elles existent
+            const oldMatrix = matrix;
+            const oldStartTime = startTime;
+            const oldEndTime = endTime;
             matrix = configData.matrix || {};
             startTime = configData.startTime || null;
             endTime = configData.endTime || null;
             
-            const parts = code.split('_');
-            if (parts.length === 2) {
-                selectedColor = parts[0];
-                selectedNum = parseInt(parts[1]);
+            // Si la course vient de démarrer ou de se terminer, mettre à jour l'interface
+            if (startTime !== oldStartTime || endTime !== oldEndTime) {
+                renderCircuits();
+                updateUIState();
+            } else if (JSON.stringify(matrix) !== JSON.stringify(oldMatrix)) {
+                // Si la matrice change, on peut aussi rafraîchir (mais on garde les sélections)
+                renderCircuits();
             }
-            
-            renderIdentitySelection();
-            renderCircuits();
-            updateUIState();
         } else {
+            console.warn('[OrientShow Kiosk] Config Firebase vide ou invalide');
             const container = document.getElementById('os-kiosk-container');
             if (container) {
                 container.innerHTML = `<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>`;
@@ -106,13 +129,16 @@ function renderCircuits() {
     html += `</div>`;
     container.innerHTML = html;
     
+    // Ajouter le statut de la course
+    let statusHtml = '';
     if (!startTime) {
-        container.innerHTML += '<p class="text-center text-slate-400 mt-4">⏳ En attente du départ du professeur...</p>';
+        statusHtml = '<p class="text-center text-slate-400 mt-4">⏳ En attente du départ du professeur...</p>';
     } else if (endTime) {
-        container.innerHTML += '<p class="text-center text-red-400 mt-4">⏱️ La course est terminée.</p>';
+        statusHtml = '<p class="text-center text-red-400 mt-4">⏱️ La course est terminée.</p>';
     } else {
-        container.innerHTML += '<p class="text-center text-emerald-400 mt-4">🏃 Course en cours !</p>';
+        statusHtml = '<p class="text-center text-emerald-400 mt-4">🏃 Course en cours !</p>';
     }
+    container.innerHTML += statusHtml;
 }
 
 // ============================================================
@@ -152,7 +178,6 @@ window.selectOSCircuit = function(circuit) {
     document.getElementById('os-letters-input').classList.remove('hidden');
 };
 
-// ✅ Export nommé de validateOSPassage pour l'importer dans eleve-app.js
 export function validateOSPassage() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     if (!selectedColor || !selectedNum) return alert('Choisissez votre identité (couleur + numéro).');
@@ -192,16 +217,16 @@ export function validateOSPassage() {
     }).catch(err => alert('Erreur envoi : ' + err.message));
 }
 
-// Attacher à window pour les onclick HTML
 window.validateOSPassage = validateOSPassage;
 
 function showFeedback(score) {
     const icon = score === 5 ? '🏆' : (score === 2 ? '🆗' : '❌');
-    const color = score === 5 ? '#065f46' : (score === 2 ? '#9a3412' : '#991b1b');
     alert(`${icon} Score : +${score} pts`);
 }
 
-// Nettoyage éventuel
 export function cleanupOrientShowKiosk() {
-    // Rien pour l'instant
+    if (configListener) {
+        configListener();
+        configListener = null;
+    }
 }
