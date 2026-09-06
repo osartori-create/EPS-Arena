@@ -301,6 +301,46 @@ function showLogin() {
         return;
     }
 
+    if (config.activite === 'co') {
+    loginScreen.classList.remove('hidden');
+    activityScreen.classList.add('hidden');
+    waitingScreen.classList.add('hidden');
+    codeList.innerHTML = '';
+    activityTitle.innerText = "Choisis ton code";
+
+    // Générer les codes A1 à F6 (ou utiliser les groupes configurés)
+    // Pour l'instant, on génère A1..F6
+    const letters = ['A','B','C','D','E','F'];
+    letters.forEach(l => {
+        for (let i=1; i<=6; i++) {
+            const code = `${l}${i}`;
+            const btn = document.createElement('button');
+            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
+            btn.innerText = code;
+            btn.onclick = () => {
+                selectedCode = code;
+                document.getElementById('selected-code').innerText = code;
+                loginScreen.classList.add('hidden');
+                activityScreen.classList.remove('hidden');
+                // Cacher les autres modules
+                escaladeModule.classList.add('hidden');
+                coModule.classList.remove('hidden');
+                coModule.style.display = 'block';
+                multiModule.classList.add('hidden');
+                if (osModule) osModule.classList.add('hidden');
+                badmintonModule.classList.add('hidden');
+                import('../../modules/co/co-kiosk.js').then(module => {
+                    module.initCoKiosk(selectedClass, code);
+                }).catch(err => {
+                    console.error('Erreur CO kiosk :', err);
+                    coModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+                });
+            };
+            codeList.appendChild(btn);
+        }
+    });
+    return;
+}
     // Pour les autres activités (escalade, co, multi)
     badmintonModule.classList.add('hidden');
     document.getElementById('code-info').classList.remove('hidden');
