@@ -12,19 +12,16 @@ import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js'
 import { getModule, getAllModules } from '../../modules/registry.js';
 import { initNatationInterface, transmettreNatationConfig } from '../../modules/natation/index.js';
 
-// ✅ Importer le module escalade (pour l'initialisation via le registre)
+// Imports nécessaires pour l’enregistrement des modules
 import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
-// ✅ Forcer l’enregistrement du module escalade
 import '../../modules/escalade/escalade-prof.js';
-// ✅ Forcer l’enregistrement du module multi
 import '../../modules/multi/multi-prof.js';
-// ✅ Forcer l’enregistrement du module CO (inclut la gestion OrientShow)
 import '../../modules/co/co-prof.js';
 
 let currentDiscipline = 'multi';
 
 // ============================================================
-// UTILITAIRE : COULEUR CLAIRE (gardée car utilisée ailleurs)
+// UTILITAIRES
 // ============================================================
 function isLightColor(hex) {
     const r = parseInt(hex.slice(1,3), 16);
@@ -34,9 +31,6 @@ function isLightColor(hex) {
     return luminance > 0.5;
 }
 
-// ============================================================
-// CHEMINS FIREBASE
-// ============================================================
 function getBaseProf() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     return `etablissements/0680013V/profs/${profCode}`;
@@ -47,13 +41,12 @@ function getBaseProf() {
 // ============================================================
 export function initActivities() {
     console.log("🚀 initActivities appelée !");
-    
-    // ✅ Les initialisations des modules qui ont un sélecteur interne sont déplacées dans le sélecteur
-    // On garde seulement les modules sans sélecteur : Escalade classique (fallback), Badminton, Arcathlon, Évaluation, Tournoi
-    try { console.log("→ Initialisation Escalade..."); initEscaladeInterface(6); console.log("✅ Escalade OK"); } catch (e) { console.error("❌ Erreur Escalade :", e); }
-    try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
-    try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
-    try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
+
+    // Initialisations par défaut (fallback)
+    try { initEscaladeInterface(6); } catch (e) { console.error("Erreur Escalade :", e); }
+    try { initBadmintonInterface(6); } catch (e) { console.error("Erreur Badminton :", e); }
+    try { initArcathlonInterface(); } catch (e) { console.error("Erreur Arcathlon :", e); }
+    try { initEvaluationInterface(); } catch (e) { console.error("Erreur Évaluation :", e); }
 
     // ============================================================
     // CHANGEMENT DE DISCIPLINE
@@ -62,111 +55,89 @@ export function initActivities() {
         currentDiscipline = disc;
         localStorage.setItem('eps_arena_current_discipline', disc);
 
-        const multiView = document.getElementById('viewMultiSettings');
-        const coView = document.getElementById('viewCOSettings');
-        const escView = document.getElementById('viewEscaladeSettings');
-        const bmtView = document.getElementById('viewBadmintonSettings');
-        const arcView = document.getElementById('viewArcathlonSettings');
-        const evalView = document.getElementById('viewEvaluationSettings');
-        const tournoiView = document.getElementById('viewTournoiSettings');
+        // Liste de toutes les vues de paramètres
+        const allViews = [
+            'viewMultiSettings',
+            'viewCOSettings',
+            'viewEscaladeSettings',
+            'viewBadmintonSettings',
+            'viewArcathlonSettings',
+            'viewEvaluationSettings',
+            'viewTournoiSettings',
+            'viewNatationSettings'
+        ];
 
         // Cacher toutes les vues
-        if (multiView) multiView.classList.add('hidden');
-        if (coView) coView.classList.add('hidden');
-        if (escView) escView.classList.add('hidden');
-        if (bmtView) bmtView.classList.add('hidden');
-        if (arcView) arcView.classList.add('hidden');
-        if (evalView) evalView.classList.add('hidden');
-        if (tournoiView) tournoiView.classList.add('hidden');
+        allViews.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
 
         // Afficher la vue correspondante
+        const viewMap = {
+            'multi': 'viewMultiSettings',
+            'co': 'viewCOSettings',
+            'escalade': 'viewEscaladeSettings',
+            'badminton': 'viewBadmintonSettings',
+            'arcathlon': 'viewArcathlonSettings',
+            'evaluation': 'viewEvaluationSettings',
+            'tournoi': 'viewTournoiSettings',
+            'natation': 'viewNatationSettings'
+        };
+
+        const targetId = viewMap[disc];
+        if (targetId) {
+            const targetView = document.getElementById(targetId);
+            if (targetView) targetView.classList.remove('hidden');
+        }
+
+        // Initialisations spécifiques
         if (disc === 'multi') {
             const multiModule = getModule('multi');
-            if (multiModule && multiModule.initProf) {
-                const activeClasse = document.getElementById('selectClasse').value;
-                multiModule.initProf(activeClasse);
+            if (multiModule?.initProf) {
+                const classe = document.getElementById('selectClasse').value;
+                multiModule.initProf(classe);
             }
-            if (multiView) multiView.classList.remove('hidden');
-        }
-        else if (disc === 'co') {
-    const coModule = getModule('co');
-    if (coModule && coModule.initProf) {
-        const activeClasse = document.getElementById('selectClasse').value;
-        coModule.initProf(activeClasse);
-    }
-    if (coView) coView.classList.remove('hidden');
-}
-else if (disc === 'natation') {
-    const view = document.getElementById('viewNatationSettings');
-    if (view) view.classList.remove('hidden');
-    initNatationInterface();  // ← charge automatiquement les élèves et les temps
-}
-        else if (disc === 'escalade') {
-            if (escView) escView.classList.remove('hidden');
+        } else if (disc === 'co') {
+            const coModule = getModule('co');
+            if (coModule?.initProf) {
+                const classe = document.getElementById('selectClasse').value;
+                coModule.initProf(classe);
+            }
+        } else if (disc === 'escalade') {
             const escaladeModule = getModule('escalade');
-            if (escaladeModule && escaladeModule.initProf) {
-                const activeClasse = document.getElementById('selectClasse').value;
-                escaladeModule.initProf(activeClasse);
+            if (escaladeModule?.initProf) {
+                const classe = document.getElementById('selectClasse').value;
+                escaladeModule.initProf(classe);
             } else {
                 // Fallback
                 initEscaladeInterface();
                 initSortableEscalade();
                 loadEscaladeAssignments();
             }
-            currentDiscipline = 'escalade';
-        }
-        else if (disc === 'badminton' && bmtView) bmtView.classList.remove('hidden');
-        else if (disc === 'arcathlon' && arcView) arcView.classList.remove('hidden');
-        else if (disc === 'evaluation' && evalView) evalView.classList.remove('hidden');
-        else if (disc === 'tournoi' && tournoiView) tournoiView.classList.remove('hidden');
-
-        // Mise à jour des boutons
-        const btnMulti = document.getElementById('btnDisc-multi');
-        const btnCo = document.getElementById('btnDisc-co');
-        const btnEsc = document.getElementById('btnDisc-escalade');
-        const btnBmt = document.getElementById('btnDisc-badminton');
-        const btnArc = document.getElementById('btnDisc-arcathlon');
-        const btnEval = document.getElementById('btnDisc-evaluation');
-        const btnTournoi = document.getElementById('btnDisc-tournoi');
-
-        const resetBtn = (btn) => { if (btn) { btn.classList.remove('border-blue-500'); btn.classList.add('border-slate-600'); } };
-        const setActive = (btn) => { if (btn) { btn.classList.remove('border-slate-600'); btn.classList.add('border-blue-500'); } };
-
-        resetBtn(btnMulti); resetBtn(btnCo); resetBtn(btnEsc);
-        resetBtn(btnBmt); resetBtn(btnArc); resetBtn(btnEval); resetBtn(btnTournoi);
-
-        if (disc === 'multi') setActive(btnMulti);
-        else if (disc === 'co') setActive(btnCo);
-        else if (disc === 'escalade') setActive(btnEsc);
-        else if (disc === 'badminton') setActive(btnBmt);
-        else if (disc === 'arcathlon') setActive(btnArc);
-        else if (disc === 'evaluation') setActive(btnEval);
-        else if (disc === 'tournoi') setActive(btnTournoi);
-
-        // Initialisations spécifiques (pour les modules qui n'ont pas de sélecteur)
-        if (disc === 'badminton') {
-            try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
-        }
-        if (disc === 'arcathlon') {
+        } else if (disc === 'badminton') {
+            try {
+                initBadmintonInterface();
+                initSortableBadminton();
+                loadBadmintonAssignments();
+            } catch (e) {}
+        } else if (disc === 'arcathlon') {
             try { initArcathlonInterface(); } catch (e) {}
-        }
-        if (disc === 'evaluation') {
+        } else if (disc === 'evaluation') {
             try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
-        }
-        if (disc === 'tournoi') {
+        } else if (disc === 'tournoi') {
             try {
                 const container = document.getElementById('tournoi-prof-container');
                 if (container) {
-                    const activeClasse = document.getElementById('selectClasse').value;
-                    if (activeClasse) {
-                        loadTournoiVariant(activeClasse, 'elimination');
-                        import('../../modules/tournoi/variantes/elimination/elimination-prof.js').then(module => {
-                            if (module.initProf) {
-                                module.initProf(activeClasse);
-                            } else {
-                                console.error('❌ initProf non trouvé');
-                            }
-                        }).catch(err => console.error("Erreur chargement tournoi prof :", err));
+                    const classe = document.getElementById('selectClasse').value;
+                    if (classe) {
+                        loadTournoiVariant(classe, 'elimination');
+                        import('../../modules/tournoi/variantes/elimination/elimination-prof.js')
+                            .then(module => {
+                                if (module.initProf) module.initProf(classe);
+                                else console.error('❌ initProf non trouvé');
+                            })
+                            .catch(err => console.error("Erreur chargement tournoi prof :", err));
                     } else {
                         container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
                     }
@@ -174,7 +145,20 @@ else if (disc === 'natation') {
             } catch (e) {
                 console.error("Erreur init Tournoi :", e);
             }
+        } else if (disc === 'natation') {
+            // La vue est déjà affichée, on initialise le module
+            initNatationInterface();
         }
+
+        // Mise à jour des boutons de discipline
+        const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation'];
+        btnIds.forEach(id => {
+            const btn = document.getElementById(`btnDisc-${id}`);
+            if (btn) {
+                btn.classList.remove('border-blue-500', 'border-slate-600');
+                btn.classList.add(id === disc ? 'border-blue-500' : 'border-slate-600');
+            }
+        });
     };
 
     // ============================================================
@@ -182,16 +166,12 @@ else if (disc === 'natation') {
     // ============================================================
     window.addEventListener('escalade-mode-changed', (e) => {
         const mode = e.detail.mode;
-        if (mode === 'bloc') {
-            currentDiscipline = 'bloccontest';
-        } else {
-            currentDiscipline = 'escalade';
-        }
+        currentDiscipline = (mode === 'bloc') ? 'bloccontest' : 'escalade';
         console.log('[activities] currentDiscipline mis à jour :', currentDiscipline);
     });
 
     // ============================================================
-    // GÉNÉRATION DES ÉQUIPES (dispatch vers les modules)
+    // GÉNÉRATION DES ÉQUIPES / GROUPES
     // ============================================================
     window.generateTeams = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
@@ -199,96 +179,96 @@ else if (disc === 'natation') {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // Cas particuliers : CO, Escalade, Badminton, Arcathlon, Multi
-        if (currentDiscipline === 'natation') {
-    generateNatationGroups();
-    return;
-}
-        if (currentDiscipline === 'co') {
-            const coModule = getModule('co');
-            if (coModule && coModule.generateTeams) {
-                await coModule.generateTeams(activeClasse);
-                return;
+        const dispatch = {
+            'natation': () => {
+                initNatationInterface(); // recharge la liste des élèves
+                alert('Liste des élèves mise à jour.');
+            },
+            'co': async () => {
+                const coModule = getModule('co');
+                if (coModule?.generateTeams) {
+                    await coModule.generateTeams(activeClasse);
+                } else {
+                    await populateReserveWithStudents(eleves);
+                    alert("Tous les élèves sont dans la réserve CO.");
+                }
+            },
+            'escalade': async () => {
+                const escaladeModule = getModule('escalade');
+                if (escaladeModule?.generateTeams) {
+                    await escaladeModule.generateTeams(activeClasse);
+                } else {
+                    const nbGroupes = Math.ceil(eleves.length / 3);
+                    initEscaladeInterface(nbGroupes, true);
+                    await populateReserveEscalade(eleves);
+                    alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes).`);
+                }
+            },
+            'bloccontest': async () => {
+                const escaladeModule = getModule('escalade');
+                if (escaladeModule?.generateTeams) {
+                    await escaladeModule.generateTeams(activeClasse);
+                }
+            },
+            'badminton': () => {
+                const joueurs = eleves.filter(e => e.code !== 'INAPTE');
+                const inaptes = eleves.filter(e => e.code === 'INAPTE');
+                generateBadmintonTeams([...joueurs, ...inaptes]);
+                alert("✅ Terrains générés par niveau de force !");
+            },
+            'arcathlon': () => {
+                generateArcathlonTeams();
+            },
+            'multi': async () => {
+                const multiModule = getModule('multi');
+                if (multiModule?.generateTeams) {
+                    await multiModule.generateTeams(activeClasse, eleves);
+                }
             }
-            // Fallback
-            await populateReserveWithStudents(eleves);
-            alert("Tous les élèves sont dans la réserve CO.");
-            return;
-        }
-        if (currentDiscipline === 'escalade' || currentDiscipline === 'bloccontest') {
-            const escaladeModule = getModule('escalade');
-            if (escaladeModule && escaladeModule.generateTeams) {
-                await escaladeModule.generateTeams(activeClasse);
-                return;
-            } else {
-                // Fallback
-                const nbGroupes = Math.ceil(eleves.length / 3);
-                initEscaladeInterface(nbGroupes, true);
-                await populateReserveEscalade(eleves);
-                alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
-                return;
-            }
-        }
-        if (currentDiscipline === 'badminton') {
-            const joueurs = eleves.filter(e => e.code !== 'INAPTE');
-            const inaptes = eleves.filter(e => e.code === 'INAPTE');
-            generateBadmintonTeams([...joueurs, ...inaptes]);
-            alert("✅ Terrains générés par niveau de force !");
-            return;
-        }
-        if (currentDiscipline === 'arcathlon') {
-            generateArcathlonTeams();
-            return;
-        }
-        if (currentDiscipline === 'natation') {
-    initNatationInterface(); // recharge les données
-    alert('Liste des élèves mise à jour.');
-    return;
-}
-        if (currentDiscipline === 'multi') {
-            const multiModule = getModule('multi');
-            if (multiModule && multiModule.generateTeams) {
-                await multiModule.generateTeams(activeClasse, eleves);
-                return;
-            }
-        }
+        };
 
-        alert("❌ Aucune génération définie pour cette discipline.");
+        if (dispatch[currentDiscipline]) {
+            await dispatch[currentDiscipline]();
+        } else {
+            alert("❌ Aucune génération définie pour cette discipline.");
+        }
     };
 
     // ============================================================
-    // GESTION DES SOUS-ONGLETS (Live / TV)
+    // SOUS-ONGLETS (Réglages / Live / TV)
     // ============================================================
     window.switchActivitySubTab = function(subTab) {
         const disc = currentDiscipline;
-        
+
+        // Mise à jour des boutons
         ['settings', 'live', 'tv'].forEach(tab => {
             const btn = document.getElementById(`subtab-${tab}`);
             if (btn) {
-                if (tab === subTab) {
-                    btn.classList.remove('bg-slate-700', 'text-slate-300');
-                    btn.classList.add('bg-blue-600', 'text-white');
-                } else {
-                    btn.classList.remove('bg-blue-600', 'text-white');
-                    btn.classList.add('bg-slate-700', 'text-slate-300');
-                }
+                btn.classList.remove('bg-blue-600', 'text-white', 'bg-slate-700', 'text-slate-300');
+                btn.classList.add(tab === subTab ? 'bg-blue-600' : 'bg-slate-700');
+                btn.classList.add(tab === subTab ? 'text-white' : 'text-slate-300');
             }
         });
 
-        // Masquer TOUTES les vues de réglages
-        const views = ['viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
-                       'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings'];
-        views.forEach(id => {
+        // Cacher toutes les vues de paramètres
+        const settingsViews = [
+            'viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
+            'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings',
+            'viewTournoiSettings', 'viewNatationSettings'
+        ];
+        settingsViews.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.add('hidden');
         });
 
+        // Cacher Live et TV
         const viewLive = document.getElementById('viewLive');
         const viewTV = document.getElementById('viewTV');
         if (viewLive) viewLive.classList.add('hidden');
         if (viewTV) viewTV.style.display = 'none';
 
         if (subTab === 'settings') {
+            // Afficher la vue de réglages de la discipline courante
             const map = {
                 'multi': 'viewMultiSettings',
                 'co': 'viewCOSettings',
@@ -296,45 +276,41 @@ else if (disc === 'natation') {
                 'badminton': 'viewBadmintonSettings',
                 'arcathlon': 'viewArcathlonSettings',
                 'evaluation': 'viewEvaluationSettings',
+                'tournoi': 'viewTournoiSettings',
+                'natation': 'viewNatationSettings',
                 'bloccontest': 'viewEscaladeSettings'
             };
-            const targetView = document.getElementById(map[disc] || 'viewMultiSettings');
-            if (targetView) {
-                targetView.classList.remove('hidden');
-                if (disc === 'evaluation') {
-                    setTimeout(() => initEvaluationInterface(), 50);
-                }
-                if (disc === 'escalade' || disc === 'bloccontest') {
-                    const escaladeModule = getModule('escalade');
-                    if (escaladeModule && escaladeModule.initProf) {
-                        const activeClasse = document.getElementById('selectClasse').value;
-                        escaladeModule.initProf(activeClasse);
-                    }
-                }
-                if (disc === 'multi') {
-                    const multiModule = getModule('multi');
-                    if (multiModule && multiModule.initProf) {
-                        const activeClasse = document.getElementById('selectClasse').value;
-                        multiModule.initProf(activeClasse);
-                    }
-                }
-                if (disc === 'co') {
-    const coModule = getModule('co');
-    if (coModule && typeof coModule.renderLive === 'function') {
-        const result = coModule.renderLive();
-        if (result && typeof result.catch === 'function') {
-            result.catch(console.error);
-        }
-    } else {
-        import('../../modules/co/co-live.js')
-            .then(m => m.renderCOLive())
-            .catch(console.error);
-    }
-    return;
-}
+            const targetId = map[disc];
+            if (targetId) {
+                const target = document.getElementById(targetId);
+                if (target) target.classList.remove('hidden');
             }
-        } 
-        else if (subTab === 'live') {
+            // Réinitialiser certains modules si nécessaire
+            if (disc === 'evaluation') setTimeout(() => initEvaluationInterface(), 50);
+            if (disc === 'escalade' || disc === 'bloccontest') {
+                const escaladeModule = getModule('escalade');
+                if (escaladeModule?.initProf) {
+                    const classe = document.getElementById('selectClasse').value;
+                    escaladeModule.initProf(classe);
+                }
+            }
+            if (disc === 'multi') {
+                const multiModule = getModule('multi');
+                if (multiModule?.initProf) {
+                    const classe = document.getElementById('selectClasse').value;
+                    multiModule.initProf(classe);
+                }
+            }
+            if (disc === 'co') {
+                const coModule = getModule('co');
+                if (coModule?.renderLive) {
+                    const result = coModule.renderLive();
+                    if (result?.catch) result.catch(console.error);
+                } else {
+                    import('../../modules/co/co-live.js').then(m => m.renderCOLive()).catch(console.error);
+                }
+            }
+        } else if (subTab === 'live') {
             if (viewLive) viewLive.classList.remove('hidden');
             const container = document.getElementById('live-content');
             container.innerHTML = '<p>Chargement du Live...</p>';
@@ -344,28 +320,19 @@ else if (disc === 'natation') {
                 'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
                 'co': () => {
                     const coModule = getModule('co');
-                    if (coModule && coModule.renderLive) {
-                        return coModule.renderLive();
-                    } else {
-                        return import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {}));
-                    }
+                    return coModule?.renderLive ? coModule.renderLive() : import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {}));
                 },
                 'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
                 'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
+                'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
             };
-
             if (liveModules[disc]) {
-    const result = liveModules[disc]();
-    if (result && typeof result.catch === 'function') {
-        result.catch(err => console.error(`Erreur Live ${disc} :`, err));
-    } else {
-        console.warn(`Le module Live pour ${disc} n'a pas retourné de promesse.`);
-    }
-} else {
+                const result = liveModules[disc]();
+                if (result?.catch) result.catch(err => console.error(`Erreur Live ${disc} :`, err));
+            } else {
                 container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
             }
-        } 
-        else if (subTab === 'tv') {
+        } else if (subTab === 'tv') {
             const tvViewEl = document.getElementById('viewTV');
             if (tvViewEl) {
                 tvViewEl.style.display = 'block';
@@ -376,14 +343,11 @@ else if (disc === 'natation') {
                         'escalade': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
                         'co': () => {
                             const coModule = getModule('co');
-                            if (coModule && coModule.renderTV) {
-                                return coModule.renderTV();
-                            } else {
-                                console.log('[TV] CO non disponible');
-                            }
+                            return coModule?.renderTV ? coModule.renderTV() : console.log('[TV] CO non disponible');
                         },
                         'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
                         'bloccontest': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
+                        'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
                     };
                     if (tvModules[disc]) {
                         tvModules[disc]().catch(err => console.error(`Erreur TV ${disc} :`, err));
@@ -396,105 +360,72 @@ else if (disc === 'natation') {
     };
 
     // ============================================================
-    // TRANSMISSION FIREBASE (dispatch vers les modules)
+    // TRANSMISSION FIREBASE
     // ============================================================
     window.transmettreConfig = async function() {
         const activeClasse = document.getElementById('selectClasse').value;
         if (!activeClasse) return alert("Sélectionnez une classe.");
-
         const baseProf = getBaseProf();
 
-        // ✅ Escalade / Bloc Contest
-        if (currentDiscipline === 'escalade' || currentDiscipline === 'bloccontest') {
-            const escaladeModule = getModule('escalade');
-            if (escaladeModule && escaladeModule.transmettre) {
-                try {
+        const handlers = {
+            'escalade': async () => {
+                const escaladeModule = getModule('escalade');
+                if (escaladeModule?.transmettre) {
                     await escaladeModule.transmettre(activeClasse);
                     return;
-                } catch (err) {
-                    console.error('Erreur transmission escalade :', err);
-                    alert('Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.');
-                    return;
                 }
-            }
-            // Fallback
-            const configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
-            configData.activite = 'escalade';
-            const localMapping = {};
-            Object.keys(configData).forEach(lettre => {
-                if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
-                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
-                    configData[lettre] = configData[lettre].length;
-                }
-            });
-            localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
-            try {
+                // Fallback
+                const configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+                configData.activite = 'escalade';
+                const localMapping = {};
+                Object.keys(configData).forEach(lettre => {
+                    if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
+                        localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
+                        configData[lettre] = configData[lettre].length;
+                    }
+                });
+                localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
                 await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
                 await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
                 alert("✅ Configuration Escalade transmise aux iPads !");
-            } catch (e) {
-                console.error("Erreur transmission :", e);
-                alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
-            }
-            return;
-        }
-
-        // ✅ Multi
-        if (currentDiscipline === 'multi') {
-            const multiModule = getModule('multi');
-            if (multiModule && multiModule.transmettre) {
-                await multiModule.transmettre(activeClasse);
-                return;
-            }
-        }
-
-        // ✅ CO (classique + OrientShow gérés par le module)
-        if (currentDiscipline === 'co') {
-            const coModule = getModule('co');
-            if (coModule && coModule.transmettre) {
-                await coModule.transmettre(activeClasse);
-                return;
-            }
-        }
-
-        // ✅ Badminton
-        if (currentDiscipline === 'badminton') {
-            await transmettreBadmintonConfig();
-            return;
-        }
-
-        // ✅ Arcathlon
-        if (currentDiscipline === 'arcathlon') {
-            await transmettreArcathlonConfig();
-            return;
-        }
-
-        if (currentDiscipline === 'natation') {
-    await transmettreNatationConfig();
-    return;
-}
-        // ✅ Tournoi
-        if (currentDiscipline === 'tournoi') {
-            const configData = {
-                activite: 'tournoi',
-                mode: window.tournoiMode || 'elimination'
-            };
-            try {
+            },
+            'bloccontest': async () => {
+                const escaladeModule = getModule('escalade');
+                if (escaladeModule?.transmettre) await escaladeModule.transmettre(activeClasse);
+            },
+            'multi': async () => {
+                const multiModule = getModule('multi');
+                if (multiModule?.transmettre) await multiModule.transmettre(activeClasse);
+            },
+            'co': async () => {
+                const coModule = getModule('co');
+                if (coModule?.transmettre) await coModule.transmettre(activeClasse);
+            },
+            'badminton': async () => { await transmettreBadmintonConfig(); },
+            'arcathlon': async () => { await transmettreArcathlonConfig(); },
+            'natation': async () => { await transmettreNatationConfig(); },
+            'tournoi': async () => {
+                const configData = { activite: 'tournoi', mode: window.tournoiMode || 'elimination' };
                 await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
                 await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
                 alert("✅ Module Tournoi activé pour les iPads !");
+            }
+        };
+
+        if (handlers[currentDiscipline]) {
+            try {
+                await handlers[currentDiscipline]();
             } catch (e) {
                 console.error("Erreur transmission :", e);
                 alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
             }
-            return;
+        } else {
+            alert("❌ Aucune transmission définie pour cette discipline.");
         }
-
-        alert("❌ Aucune transmission définie pour cette discipline.");
     };
 
     // ============================================================
-    // PURGE
+    // PURGE FIREBASE
     // ============================================================
     window.openPurgeModal = function() {
         const choix = prompt("Purge Firebase\n1- Purger la classe active (sauf OrientShow)\n2- Purger TOUTE la base (code RNE)");
@@ -531,15 +462,15 @@ else if (disc === 'natation') {
     };
 
     // ============================================================
-    // FONCTIONS CO (circuits) – conservées pour compatibilité HTML
+    // FONCTIONS CO (circuits)
     // ============================================================
     window.addCircuit = function() {
-        const cat = prompt("Catégorie (ex: Forêt, Étoiles) :");
-        if(!cat) return;
-        const nom = prompt("Nom du circuit (ex: 1, Rouge) :");
-        if(!nom) return;
-        const b = prompt("Liste des balises (ex: 31, 34*, 42) :");
-        if(b) {
+        const cat = prompt("Catégorie :");
+        if (!cat) return;
+        const nom = prompt("Nom du circuit :");
+        if (!nom) return;
+        const b = prompt("Liste des balises :");
+        if (b) {
             addCircuitCO(cat, nom, b);
             renderCircuits('circuitList', "");
         }
@@ -547,10 +478,10 @@ else if (disc === 'natation') {
     window.editCircuit = function(id) {
         const circ = getCircuits().find(c => c.id === id);
         const n = prompt("Modifier les balises :", circ.balises.join(', '));
-        if(n !== null) { editCircuitCO(id, n); renderCircuits('circuitList', ""); }
+        if (n !== null) { editCircuitCO(id, n); renderCircuits('circuitList', ""); }
     };
     window.delCircuit = function(id) {
-        if(confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
+        if (confirm("Supprimer ce circuit ?")) { delCircuit(id); renderCircuits('circuitList', ""); }
     };
 
     // ============================================================
@@ -566,7 +497,7 @@ else if (disc === 'natation') {
     };
 
     // ============================================================
-    // EXPORTS / IMPORTS (conservés pour compatibilité)
+    // EXPORTS / IMPORTS (conservés)
     // ============================================================
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
@@ -578,7 +509,7 @@ else if (disc === 'natation') {
     window.transmettreArcathlonConfig = transmettreArcathlonConfig;
 
     // ============================================================
-    // INITIALISATION SORTABLE (au cas où)
+    // INITIALISATION SORTABLE (fallback)
     // ============================================================
     try { initSortableEscalade(); } catch (e) {}
 }
