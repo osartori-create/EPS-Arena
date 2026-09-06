@@ -26,12 +26,22 @@ export function initOrientShowKiosk(classe, code, config) {
     currentClasse = classe;
     currentCode = code;
 
+    // Récupérer le conteneur (orientshow-module dans eleve.html)
+    const container = document.getElementById('orientshow-module');
+    if (!container) {
+        console.error('Conteneur orientshow-module introuvable');
+        return;
+    }
+    // Vider le conteneur avant de le remplir
+    container.innerHTML = '';
+
     // 1. Écouter la configuration (matrix, startTime, endTime)
     if (configListener) {
-        configListener.off();
+        configListener(); // se désabonner
         configListener = null;
     }
-    const configRef = ref(db, `etablissements/0680013V/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}/${classe}/orientshow/config`);
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/orientshow/config`);
     configListener = onValue(configRef, (snap) => {
         const data = snap.val() || {};
         matrix = data.matrix || {};
@@ -41,11 +51,7 @@ export function initOrientShowKiosk(classe, code, config) {
         if (Object.keys(matrix).length > 0) {
             chargerSessions();
         } else {
-            // Attendre la config
-            const container = document.getElementById('os-kiosk-container');
-            if (container) {
-                container.innerHTML = '<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>';
-            }
+            container.innerHTML = '<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>';
         }
     });
 
@@ -89,8 +95,9 @@ function playTone(freq, duration, type = 'sine') {
 // CHARGEMENT DES SESSIONS (validations de l'élève)
 // ============================================================
 function chargerSessions() {
+    // Se désabonner de l'ancien listener
     if (sessionsListener) {
-        sessionsListener.off();
+        sessionsListener(); // appel direct de la fonction de désabonnement
         sessionsListener = null;
     }
 
@@ -115,9 +122,9 @@ function chargerSessions() {
 // AFFICHAGE DE L'INTERFACE
 // ============================================================
 function afficherInterface() {
-    const container = document.getElementById('os-kiosk-container');
+    const container = document.getElementById('orientshow-module');
     if (!container) {
-        console.warn('Conteneur os-kiosk-container introuvable');
+        console.warn('Conteneur orientshow-module introuvable');
         return;
     }
 
@@ -398,11 +405,11 @@ function afficherFeedback(pts) {
 // ============================================================
 export function cleanupOrientShowKiosk() {
     if (configListener) {
-        configListener.off();
+        configListener();
         configListener = null;
     }
     if (sessionsListener) {
-        sessionsListener.off();
+        sessionsListener();
         sessionsListener = null;
     }
 }
