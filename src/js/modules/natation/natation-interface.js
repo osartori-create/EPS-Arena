@@ -19,10 +19,13 @@ export function initNatationInterface() {
         const div = document.createElement('div');
         div.id = 'viewNatationSettings';
         div.className = 'hidden space-y-4';
-        parent.appendChild(div);
+        parent.prepend(div); // ← met en premier
         setTimeout(() => initNatationInterface(), 50);
         return;
     }
+
+    // Si la vue est cachée, on l'affiche
+    container.classList.remove('hidden');
 
     currentClasse = getCurrentClasse();
     if (!currentClasse) {
@@ -30,14 +33,11 @@ export function initNatationInterface() {
         return;
     }
 
-    // Charger les données des élèves
+    // Charger les données...
     elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    // Trier par nom alphabétique pour attribuer les numéros
     elevesData.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-    // Attribuer les numéros (1, 2, 3...) en fonction de l'ordre alphabétique
     elevesData.forEach((e, idx) => { e.numero = idx + 1; });
 
-    // Charger les temps depuis Firebase (ou localStorage en attendant)
     chargerTemps();
 
     container.innerHTML = '';
