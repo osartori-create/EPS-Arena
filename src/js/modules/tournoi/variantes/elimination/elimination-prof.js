@@ -32,11 +32,9 @@ async function renderProf() {
     const joueurs = getJoueurs();
     const exclus = getExclus();
 
-    // ✅ Récupérer TOUS les élèves de la classe (triés alphabétiquement)
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     const elevesTries = eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
-    // ✅ Générer les codes (1 à N) dans l'ordre alphabétique
     const codes = elevesTries.map((_, index) => (index + 1).toString());
 
     if (codes.length === 0) {
@@ -49,12 +47,14 @@ async function renderProf() {
         return;
     }
 
+    // ✅ Grille à 4 colonnes pour iPad
     let html = `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
             <div class="flex justify-between items-center flex-wrap gap-2">
                 <div>
                     <h3 class="font-black text-blue-400 uppercase text-sm">🏆 Tournoi Élimination</h3>
                     <p class="text-xs text-slate-400">Classe : ${currentClasse} (${codes.length} élèves)</p>
+                    <p class="text-[10px] text-slate-500 mt-1">🚫 Cliquer sur "Exclure" pour les absents/inaptes</p>
                 </div>
                 <div class="flex gap-2 flex-wrap">
                     <button onclick="window.tournoiReinitialiser()" class="bg-red-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">🔄 Réinitialiser</button>
@@ -68,10 +68,9 @@ async function renderProf() {
                 </div>
             </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
     `;
 
-    // ✅ Trier les codes par nombre d'éliminations (descendant)
     const sortedCodes = [...codes].sort((a, b) => {
         const elimA = joueurs[a]?.eliminations || 0;
         const elimB = joueurs[b]?.eliminations || 0;
@@ -79,7 +78,6 @@ async function renderProf() {
     });
 
     for (const code of sortedCodes) {
-        // Trouver l'élève correspondant à ce code (index = code - 1)
         const index = parseInt(code) - 1;
         const eleve = elevesTries[index];
         if (!eleve) continue;
@@ -100,24 +98,24 @@ async function renderProf() {
                        'bg-slate-200 border-slate-400';
 
         html += `
-            <div class="bg-slate-900 p-4 rounded-2xl border-2 ${statusColor} ${statusBg}">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 ${sexeBg} flex items-center justify-center">
+            <div class="bg-slate-900 p-3 rounded-2xl border-2 ${statusColor} ${statusBg}">
+                <div class="flex items-center gap-2">
+                    <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 ${sexeBg} flex items-center justify-center text-2xl">
                         ${photoHtml}
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-black text-white text-sm truncate">${nom}</div>
-                        <div class="text-xs text-slate-400">Code ${code}</div>
-                        <div class="flex items-center gap-2 mt-1">
+                        <div class="text-xs text-slate-400">#${code}</div>
+                        <div class="flex items-center gap-2 mt-0.5">
                             <span class="${statusText} font-bold">${info.eliminations}</span>
-                            <span class="text-xs text-slate-500">éliminations</span>
-                            ${isExclu ? '<span class="text-xs text-red-400 font-bold">🚫 Exclu</span>' : ''}
+                            <span class="text-[10px] text-slate-500">élim.</span>
+                            ${isExclu ? '<span class="text-[10px] text-red-400 font-bold">🚫</span>' : ''}
                         </div>
                     </div>
                     <div class="flex flex-col gap-1">
-                        <button onclick="window.tournoiAjouterElim('${code}')" class="bg-red-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-red-700 active:scale-95">-1</button>
-                        <button onclick="window.tournoiReinitialiserJoueur('${code}')" class="bg-slate-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-slate-700 active:scale-95">↺</button>
-                        <button onclick="window.tournoiToggleExclure('${code}')" class="bg-slate-600 px-2 py-1 rounded-lg font-black text-xs text-white hover:bg-slate-700 active:scale-95">${isExclu ? '➕' : '🚫'}</button>
+                        <button onclick="window.tournoiAjouterElim('${code}')" class="bg-red-600 w-7 h-7 rounded-lg font-black text-xs text-white hover:bg-red-700 active:scale-95" title="Ajouter une élimination">-1</button>
+                        <button onclick="window.tournoiReinitialiserJoueur('${code}')" class="bg-slate-600 w-7 h-7 rounded-lg font-black text-xs text-white hover:bg-slate-700 active:scale-95" title="Réinitialiser les éliminations">↺</button>
+                        <button onclick="window.tournoiToggleExclure('${code}')" class="bg-slate-600 w-7 h-7 rounded-lg font-black text-xs text-white hover:bg-slate-700 active:scale-95" title="${isExclu ? 'Réintégrer' : 'Exclure du tournoi'}">${isExclu ? '➕' : '🚫'}</button>
                     </div>
                 </div>
             </div>
@@ -129,12 +127,12 @@ async function renderProf() {
 }
 
 async function getPhotoHtml(id) {
-    if (!id) return `<span class="text-xl">👤</span>`;
+    if (!id) return `<span class="text-2xl">👤</span>`;
     try {
         const url = await getPhotoUrl(id);
         if (url) return `<img src="${url}" class="w-full h-full object-cover rounded-full">`;
     } catch(e) {}
-    return `<span class="text-xl">👤</span>`;
+    return `<span class="text-2xl">👤</span>`;
 }
 
 // Fonctions globales

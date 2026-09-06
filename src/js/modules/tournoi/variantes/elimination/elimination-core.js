@@ -1,5 +1,5 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-core.js
-import { getJoueurs, getCurrentClasse, updateJoueur, ajouterHistorique } from '../../tournoi-core.js';
+import { getJoueurs, getCurrentClasse, updateJoueur, ajouterHistorique, getJoueursPath } from '../../tournoi-core.js';
 import { db, ref, onValue, set } from '../../../../core/firebase-service.js';
 
 let exclus = {};
@@ -40,7 +40,6 @@ export function reinitialiserTournoi() {
     setExclus({});
 }
 
-// ✅ Fonction d'initialisation du core (utilisée par kiosk et prof)
 export function initCore(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const exclusRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/exclus`);

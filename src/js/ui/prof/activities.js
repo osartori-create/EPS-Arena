@@ -792,6 +792,17 @@ window.transmettreConfig = async function() {
         transmettreArcathlonConfig();
         return;
     }
+    else if (currentDiscipline === 'tournoi') {
+    // ✅ Transmettre simplement l'activation du module Tournoi
+    const configData = {
+        activite: 'tournoi',
+        mode: window.tournoiMode || 'elimination'
+    };
+    await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+    await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+    alert("✅ Module Tournoi activé pour les iPads !");
+    return;
+}
     else {
         configData.activite = 'multi';
         if (window.lastTeams) {

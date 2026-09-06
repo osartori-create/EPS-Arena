@@ -11,6 +11,11 @@ function getBasePath(classe) {
     return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi`;
 }
 
+// ✅ Exporter ces fonctions pour qu'elles soient accessibles
+export function getJoueursPath(classe) { return `${getBasePath(classe)}/joueurs`; }
+export function getHistoriquePath(classe) { return `${getBasePath(classe)}/historique`; }
+export function getConfigPath(classe) { return `${getBasePath(classe)}/config`; }
+
 function getJoueursPath(classe) { return `${getBasePath(classe)}/joueurs`; }
 function getHistoriquePath(classe) { return `${getBasePath(classe)}/historique`; }
 function getConfigPath(classe) { return `${getBasePath(classe)}/config`; }
