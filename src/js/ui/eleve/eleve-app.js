@@ -263,22 +263,22 @@ function showLogin() {
                         badmintonModule.classList.add('hidden');
                         // Afficher le conteneur OrientShow (kiosk)
                         let osKioskContainer = document.getElementById('os-kiosk-container');
-                        if (!osKioskContainer) {
-                            osKioskContainer = document.createElement('div');
-                            osKioskContainer.id = 'os-kiosk-container';
-                            osKioskContainer.className = 'space-y-4 module';
-                            activityScreen.appendChild(osKioskContainer);
-                        }
-                        osKioskContainer.style.display = 'block';
-                        osKioskContainer.classList.remove('hidden');
-                        // Initialiser le kiosk OrientShow
-                        import('../../modules/eleve/orientshow-kiosk.js').then(module => {
-                            module.initOrientShowKiosk(selectedClass, code);
-                        }).catch(err => {
-                            console.error('Erreur chargement OrientShow Kiosk :', err);
-                            osKioskContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
-                        });
-                    };
+    if (!osKioskContainer) {
+        osKioskContainer = document.createElement('div');
+        osKioskContainer.id = 'os-kiosk-container';
+        osKioskContainer.className = 'space-y-4 module';
+        activityScreen.appendChild(osKioskContainer);
+    }
+    osKioskContainer.style.display = 'block';
+    osKioskContainer.classList.remove('hidden');
+    // ✅ Passer la config actuelle
+    import('../../modules/eleve/orientshow-kiosk.js').then(module => {
+        module.initOrientShowKiosk(selectedClass, code, currentConfig);
+    }).catch(err => {
+        console.error('Erreur chargement OrientShow Kiosk :', err);
+        osKioskContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+    });
+};
                     codeList.appendChild(btn);
                 }
             }

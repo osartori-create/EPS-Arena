@@ -12,57 +12,130 @@ let selectedCircuit = null;
 let lastSend = 0;
 const COOLDOWN = 30000;
 
-export function initOrientShowKiosk(classe, code) {
+// ============================================================
+// INIT (avec config optionnelle)
+// ============================================================
+export function initOrientShowKiosk(classe, code, config) {
     currentClasse = classe;
-    // code est le code identité (ex: "NOIR_1")
-    const parts = code.split('_');
-    if (parts.length === 2) {
-        selectedColor = parts[0];
-        selectedNum = parseInt(parts[1]);
-        // Mettre en surbrillance les boutons correspondants
-        document.querySelector(`.os-color-btn[data-color="${selectedColor}"]`)?.classList.add('border-blue-500');
-        document.querySelector(`.os-num-btn[data-num="${selectedNum}"]`)?.classList.add('border-blue-500');
+    
+    // ✅ Si une config est fournie, on l'utilise directement
+    if (config && config.matrix) {
+        console.log('[OrientShow Kiosk] Configuration reçue :', config);
+        matrix = config.matrix || {};
+        startTime = config.startTime || null;
+        endTime = config.endTime || null;
+        
+        // Extraire la couleur et le numéro du code
+        const parts = code.split('_');
+        if (parts.length === 2) {
+            selectedColor = parts[0];
+            selectedNum = parseInt(parts[1]);
+        }
+        
+        // Afficher l'interface
+        renderIdentitySelection();
+        renderCircuits();
+        updateUIState();
+        return;
     }
-    // Écouter la config
-    listenOrientShowConfig(classe, (config) => {
-        if (config) {
-            matrix = config.matrix || {};
-            startTime = config.startTime || null;
-            endTime = config.endTime || null;
-            updateUIState();
-            // Afficher les circuits
+    
+    // Fallback : écouter Firebase si config non fournie
+    console.log('[OrientShow Kiosk] Pas de config fournie, écoute Firebase...');
+    listenOrientShowConfig(classe, (configData) => {
+        if (configData) {
+            matrix = configData.matrix || {};
+            startTime = configData.startTime || null;
+            endTime = configData.endTime || null;
+            
+            const parts = code.split('_');
+            if (parts.length === 2) {
+                selectedColor = parts[0];
+                selectedNum = parseInt(parts[1]);
+            }
+            
+            renderIdentitySelection();
             renderCircuits();
+            updateUIState();
+        } else {
+            const container = document.getElementById('os-kiosk-container');
+            if (container) {
+                container.innerHTML = `<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>`;
+            }
         }
     });
-    // Rendre les boutons de sélection (couleur + numéro) si pas déjà fait
-    renderIdentitySelection();
 }
 
+// ============================================================
+// AFFICHAGE DE LA SÉLECTION D'IDENTITÉ
+// ============================================================
 function renderIdentitySelection() {
     const container = document.getElementById('os-identity-selector');
     if (!container) return;
-    // On ne refait pas le rendu si déjà fait
     if (container.children.length > 0) return;
+    
     let html = `<div class="grid grid-cols-5 gap-2">`;
     ['NOIR','ROUGE','BLEU','VERT','JAUNE'].forEach(col => {
-        html += `<button class="os-color-btn bg-slate-700 p-4 rounded-xl font-black text-xs uppercase border-2 border-transparent" data-color="${col}" onclick="window.selectOSColor('${col}')">${col}</button>`;
+        const active = col === selectedColor ? 'border-blue-500' : 'border-transparent';
+        html += `<button class="os-color-btn bg-slate-700 p-4 rounded-xl font-black text-xs uppercase border-2 ${active}" data-color="${col}" onclick="window.selectOSColor('${col}')">${col}</button>`;
     });
     html += `</div><div class="grid grid-cols-5 gap-2 mt-2">`;
     for (let i = 1; i <= 10; i++) {
-        html += `<button class="os-num-btn bg-slate-700 p-4 rounded-xl font-black text-lg border-2 border-transparent" data-num="${i}" onclick="window.selectOSNum(${i})">${i}</button>`;
+        const active = i === selectedNum ? 'border-blue-500' : 'border-transparent';
+        html += `<button class="os-num-btn bg-slate-700 p-4 rounded-xl font-black text-lg border-2 ${active}" data-num="${i}" onclick="window.selectOSNum(${i})">${i}</button>`;
     }
     html += `</div>`;
     container.innerHTML = html;
+}
 
-    // Pré-sélection si code déjà connu
-    if (selectedColor) {
-        document.querySelector(`.os-color-btn[data-color="${selectedColor}"]`)?.classList.add('border-blue-500');
+// ============================================================
+// AFFICHAGE DES CIRCUITS
+// ============================================================
+function renderCircuits() {
+    const container = document.getElementById('os-circuit-grid');
+    if (!container) return;
+    
+    // Vérifier que la config est chargée
+    if (!matrix || Object.keys(matrix).length === 0) {
+        container.innerHTML = '<p class="text-slate-400 text-center">⏳ En attente de la matrice des circuits...</p>';
+        return;
     }
-    if (selectedNum) {
-        document.querySelector(`.os-num-btn[data-num="${selectedNum}"]`)?.classList.add('border-blue-500');
+    
+    let html = `<div class="grid grid-cols-4 gap-2">`;
+    for (let c = 1; c <= 12; c++) {
+        const active = c === selectedCircuit ? 'border-blue-500' : 'border-transparent';
+        html += `<button class="os-circuit-btn bg-slate-700 p-4 rounded-xl font-black text-sm border-2 ${active}" data-circuit="${c}" onclick="window.selectOSCircuit(${c})">C${c}</button>`;
+    }
+    html += `</div>`;
+    container.innerHTML = html;
+    
+    // Si startTime est null, afficher un message
+    if (!startTime) {
+        container.innerHTML += '<p class="text-center text-slate-400 mt-4">⏳ En attente du départ du professeur...</p>';
+    } else if (endTime) {
+        container.innerHTML += '<p class="text-center text-red-400 mt-4">⏱️ La course est terminée.</p>';
+    } else {
+        container.innerHTML += '<p class="text-center text-emerald-400 mt-4">🏃 Course en cours !</p>';
     }
 }
 
+// ============================================================
+// MISE À JOUR DE L'ÉTAT
+// ============================================================
+function updateUIState() {
+    const state = document.getElementById('courseState');
+    if (!state) return;
+    if (!startTime) {
+        state.innerText = '⏳ En attente du départ...';
+    } else if (!endTime) {
+        state.innerText = '🏃‍♂️ Course en cours !';
+    } else {
+        state.innerText = '🛑 Course terminée.';
+    }
+}
+
+// ============================================================
+// ACTIONS GLOBALES (pour les onclick)
+// ============================================================
 window.selectOSColor = function(color) {
     selectedColor = color;
     document.querySelectorAll('.os-color-btn').forEach(b => b.classList.remove('border-blue-500'));
@@ -75,17 +148,6 @@ window.selectOSNum = function(num) {
     document.querySelector(`.os-num-btn[data-num="${num}"]`)?.classList.add('border-blue-500');
 };
 
-function renderCircuits() {
-    const container = document.getElementById('os-circuit-grid');
-    if (!container) return;
-    let html = `<div class="grid grid-cols-4 gap-2">`;
-    for (let c = 1; c <= 12; c++) {
-        html += `<button class="os-circuit-btn bg-slate-700 p-4 rounded-xl font-black text-sm border-2 border-transparent" data-circuit="${c}" onclick="window.selectOSCircuit(${c})">C${c}</button>`;
-    }
-    html += `</div>`;
-    container.innerHTML = html;
-}
-
 window.selectOSCircuit = function(circuit) {
     selectedCircuit = circuit;
     document.querySelectorAll('.os-circuit-btn').forEach(b => b.classList.remove('border-blue-500'));
@@ -93,7 +155,7 @@ window.selectOSCircuit = function(circuit) {
     document.getElementById('os-letters-input').classList.remove('hidden');
 };
 
-export function validateOSPassage() {
+window.validateOSPassage = function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     if (!selectedColor || !selectedNum) return alert('Choisissez votre identité (couleur + numéro).');
     if (!selectedCircuit) return alert('Choisissez un circuit.');
@@ -127,29 +189,13 @@ export function validateOSPassage() {
     }).then(() => {
         lastSend = now;
         showFeedback(score);
-        // Réinitialiser les champs
         document.getElementById('os-l1').value = '';
         document.getElementById('os-l2').value = '';
     }).catch(err => alert('Erreur envoi : ' + err.message));
 };
 
-window.validateOSPassage = validateOSPassage;
-
 function showFeedback(score) {
     const icon = score === 5 ? '🏆' : (score === 2 ? '🆗' : '❌');
     const color = score === 5 ? '#065f46' : (score === 2 ? '#9a3412' : '#991b1b');
-    // Utiliser un toast ou une alerte
     alert(`${icon} Score : +${score} pts`);
-}
-
-function updateUIState() {
-    const state = document.getElementById('courseState');
-    if (!state) return;
-    if (!startTime) {
-        state.innerText = '⏳ En attente du départ...';
-    } else if (!endTime) {
-        state.innerText = '🏃‍♂️ Course en cours !';
-    } else {
-        state.innerText = '🛑 Course terminée.';
-    }
 }
