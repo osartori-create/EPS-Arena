@@ -46,11 +46,24 @@ C:.
         │   │       index.js
         │   │       
         │   ├───badminton
+        │   │       badminton-charts.js
+        │   │       badminton-common.js
+        │   │       badminton-core.js
+        │   │       badminton-dispatcher.js
+        │   │       badminton-events.js
+        │   │       badminton-firebase.js
         │   │       badminton-interface.js
         │   │       badminton-kiosk.js
         │   │       badminton-live.js
+        │   │       badminton-maniere.js
+        │   │       badminton-registry.js
         │   │       badminton-stats.js
+        │   │       badminton-terrain.js
         │   │       badminton-tv.js
+        │   │       badminton-ui-prof.js
+        │   │       badminton-ui.js
+        │   │       badminton-utils.js
+        │   │       index.js
         │   │       
         │   ├───co
         │   │       circuit-manager.js
@@ -85,6 +98,7 @@ C:.
         │   │       evaluation-saut.js
         │   │       evaluation-sprint.js
         │   │       evaluation-stockage.js
+        │   │       evaluation-sync.js
         │   │       evaluation-templates.js
         │   │       evaluation-utils.js
         │   │       evaluation-vma.js
@@ -103,9 +117,21 @@ C:.
         │   │       poursuite-controller.js
         │   │       
         │   ├───sprint
-        │   └───teams
-        │           team-generator.js
-        │           
+        │   ├───teams
+        │   │       team-generator.js
+        │   │       
+        │   └───tournoi
+        │       │   tournoi-core.js
+        │       │   tournoi-dispatcher.js
+        │       │   tournoi-registry.js
+        │       │   
+        │       └───variantes
+        │           └───elimination
+        │                   elimination-core.js
+        │                   elimination-kiosk.js
+        │                   elimination-prof.js
+        │                   index.js
+        │                   
         ├───services
         │       admin-service.js
         │       export-idocéo.js
