@@ -53,7 +53,9 @@ function setEscaladeMode(mode) {
     escaladeMode = mode;
     const classicContainer = document.getElementById('escalade-classic-container');
     const blocContainer = document.getElementById('bloc-prof-container');
-    
+    window.dispatchEvent(new CustomEvent('escalade-mode-changed', { 
+    detail: { mode: escaladeMode } 
+}));
     if (mode === 'classic') {
         if (classicContainer) classicContainer.style.display = '';
         if (blocContainer) blocContainer.style.display = 'none';
