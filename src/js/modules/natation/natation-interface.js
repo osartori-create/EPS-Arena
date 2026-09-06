@@ -1,11 +1,12 @@
 // src/js/modules/natation/natation-interface.js
 import { getPhotoUrl } from '../../services/admin-service.js';
-import { db, ref, set, update } from '../../core/firebase-service.js';
+import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
 
 let currentClasse = '';
 let elevesData = [];
-let tempsData = {}; // stockage local des temps par élèveId
+let tempsData = {};
+let tempsUnsubscribe = null; // pour nettoyer l'écoute plus tard
 
 // ============================================================
 // INITIALISATION
@@ -62,12 +63,14 @@ function onClassChange() {
 // CHARGEMENT DES TEMPS (Firebase + local)
 // ============================================================
 function chargerTemps() {
+    if (tempsUnsubscribe) {
+        tempsUnsubscribe();
+        tempsUnsubscribe = null;
+    }
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
-    onValue(tempsRef, (snap) => {
-        const data = snap.val() || {};
-        tempsData = data;
-        // Mettre à jour l'affichage
+    tempsUnsubscribe = onValue(tempsRef, (snap) => {
+        tempsData = snap.val() || {};
         const grid = document.getElementById('natation-grid');
         if (grid) renderGrid(grid);
     });
