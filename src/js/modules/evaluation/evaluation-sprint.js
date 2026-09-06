@@ -17,8 +17,7 @@ let chronoElapsed = 0;
 let rafId = null;
 const maxEssais = 3;
 
-// Ordre circulaire : index dans la liste triée
-let ordreIndex = 0; // index de l'élève en cours dans la liste triée
+let ordreIndex = 0;
 let listeTriee = [];
 
 // ============================================================
@@ -41,14 +40,16 @@ export function initSaisieSprint(zone, eleve, data, testId, eleves) {
         }
     });
 
-    // Créer la liste triée par nom
     listeTriee = [...currentEleves].sort((a, b) => a.nom.localeCompare(b.nom));
 
-    // Sélectionner le premier élève qui n'a pas 3 essais (ou le premier)
     const premier = listeTriee.find(e => (essaisParEleve[e.id]?.length || 0) < maxEssais) || listeTriee[0];
     eleveSelectionne = premier?.id || null;
     ordreIndex = listeTriee.findIndex(e => e.id === eleveSelectionne);
     if (ordreIndex === -1) ordreIndex = 0;
+
+    // ✅ Réinitialiser le chrono au démarrage
+    chronoElapsed = 0;
+    chronoRunning = false;
 
     afficherSprint();
 }
@@ -79,7 +80,6 @@ function afficherSprint() {
     const meilleurSel = essaisSel.length > 0 ? Math.min(...essaisSel) : null;
     const estTermineSel = essaisSel.length >= maxEssais;
 
-    // Prochain élève : on prend le suivant dans la liste triée (en sautant ceux qui ont 3 essais)
     let prochainEleve = null;
     let prochainIndex = ordreIndex;
     let compteur = 0;
@@ -93,8 +93,8 @@ function afficherSprint() {
         compteur++;
     }
 
-    // Valeur du chrono
-    const affichageChrono = chronoElapsed > 0 ? (chronoElapsed / 1000).toFixed(1) : (essaisSel.length > 0 ? essaisSel[essaisSel.length - 1].toFixed(1) : '0.0');
+    // ✅ CORRECTION : afficher toujours la valeur actuelle du chrono
+    const affichageChrono = (chronoElapsed / 1000).toFixed(1);
 
     zoneSaisie.innerHTML = `
         <div class="space-y-4">
@@ -231,10 +231,9 @@ function afficherSprint() {
         document.querySelectorAll('.sprint-menu-dropdown').forEach(m => m.classList.add('hidden'));
     });
 
-    // Gestion du bouton principal (Démarrer / Arrêter) : on attache un écouteur unique
+    // Gestion du bouton principal
     const mainBtn = document.getElementById('sprint-main-btn');
     if (mainBtn) {
-        // Supprimer les écouteurs précédents (évite les doublons)
         mainBtn.replaceWith(mainBtn.cloneNode(true));
         const newBtn = document.getElementById('sprint-main-btn');
         if (newBtn) {
@@ -252,7 +251,7 @@ function afficherSprint() {
 }
 
 // ============================================================
-// CHARGEMENT DES PHOTOS (élève sélectionné + prochain)
+// CHARGEMENT DES PHOTOS
 // ============================================================
 
 async function chargerPhotoSprint(eleveId, elementId) {
@@ -360,7 +359,6 @@ function templateColonnesSprint(colonnes, eleveSelectionneId, essaisParEleve) {
 // ============================================================
 
 function selectionnerEleve(eleveId) {
-    // Si le chrono tourne, on demande confirmation pour arrêter
     if (chronoRunning) {
         if (!confirm('Un chrono est en cours. Arrêter et sélectionner un autre élève ?')) return;
         arreterChrono();
@@ -369,7 +367,7 @@ function selectionnerEleve(eleveId) {
     ordreIndex = listeTriee.findIndex(e => e.id === eleveSelectionne);
     if (ordreIndex === -1) ordreIndex = 0;
 
-    // ✅ FORCER LA RÉINITIALISATION DU CHRONO ET DE L'AFFICHAGE
+    // ✅ FORCER LA RÉINITIALISATION DU CHRONO
     resetChrono();
 
     afficherSprint();
@@ -415,20 +413,17 @@ function arreterChrono() {
             groupe: groupe
         });
 
-        // ✅ Synchroniser si c'est le 3ème essai
         if (essaisParEleve[eleveSelectionne].length >= maxEssais) {
-            import('./evaluation-stockage.js').then(module => {
-                module.synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'vitesse', meilleur);
-            });
+            synchroniserAvecAdmin(currentData.classe, eleveSelectionne, 'vitesse', meilleur);
         }
     }
 
-    // Passer au prochain élève dans l'ordre circulaire
+    chronoElapsed = 0;
+
     const eleveActuel = currentEleves.find(e => e.id === eleveSelectionne);
     const essaisActuels = essaisParEleve[eleveSelectionne] || [];
     const aFini = essaisActuels.length >= maxEssais;
 
-    // Trouver le prochain élève valide dans la liste triée
     let prochain = null;
     let prochainIndex = ordreIndex;
     let compteur = 0;
@@ -442,7 +437,6 @@ function arreterChrono() {
         compteur++;
     }
 
-    // Message de confirmation
     let message = `✅ Essai enregistré (${essaisActuels.length}/${maxEssais})`;
     if (aFini) {
         message += `\n🏁 ${eleveActuel?.prenom} a terminé ses 3 essais !`;
@@ -455,12 +449,10 @@ function arreterChrono() {
 
     if (prochain && confirm(message)) {
         selectionnerEleve(prochain.id);
-        // Ne pas re-afficher tout de suite car selectionnerEleve le fait
     } else if (!prochain) {
         alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
         afficherSprint();
     } else {
-        // L'utilisateur a annulé, on reste sur le même élève
         afficherSprint();
     }
 }
@@ -490,7 +482,7 @@ function resetChrono() {
         btn.textContent = '▶ Démarrer';
         btn.className = 'w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform bg-emerald-600 text-white';
     }
-    afficherSprint(); // <- Met à jour l'affichage
+    afficherSprint();
 }
 
 function annulerDernierEssai() {
