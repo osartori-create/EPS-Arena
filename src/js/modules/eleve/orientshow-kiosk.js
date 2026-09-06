@@ -1,41 +1,65 @@
 // src/js/modules/eleve/orientshow-kiosk.js
-// Kiosk OrientShow (version élève) – inspiré de vos fichiers originaux
+// Kiosk OrientShow – version élève (inspirée de vos fichiers originaux)
+// Architecture Firebase EPS‑Arena : orientshow/config + orientshow/passages
 
-import { db, ref, onValue, push, set, update } from '../../core/firebase-service.js';
+import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
 let currentCode = '';          // ex: "NOIR_1"
-let currentEleveId = '';      // ex: "NOIR_1" (ou un ID unique)
 let matrix = {};
-let sessions = {};
-let listener = null;
+let startTime = null;
+let endTime = null;
+let sessions = {};             // Validations déjà faites par l'élève
+let configListener = null;
+let sessionsListener = null;
 let audioCtx = null;
 
 // État local
 let selectedCircuit = null;
-let antiCheat = {};
+let lastSend = 0;
+const COOLDOWN = 30000;        // 30s entre deux validations
 
 // ============================================================
 // INITIALISATION
 // ============================================================
-export function initOrientShowKiosk(classe, code) {
+export function initOrientShowKiosk(classe, code, config) {
     currentClasse = classe;
     currentCode = code;
-    currentEleveId = code; // On utilise le code comme identifiant unique (NOIR_1)
 
-    // 1. Récupérer la matrice des codes
-    const matrixRef = ref(db, 'settings/matrix');
-    onValue(matrixRef, (snap) => {
-        matrix = snap.val() || {};
-        // Si la matrice est vide, on utilise une matrice par défaut
-        if (Object.keys(matrix).length === 0) {
-            matrix = getDefaultMatrix();
+    // 1. Écouter la configuration (matrix, startTime, endTime)
+    if (configListener) {
+        configListener.off();
+        configListener = null;
+    }
+    const configRef = ref(db, `etablissements/0680013V/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}/${classe}/orientshow/config`);
+    configListener = onValue(configRef, (snap) => {
+        const data = snap.val() || {};
+        matrix = data.matrix || {};
+        startTime = data.startTime || null;
+        endTime = data.endTime || null;
+        // Si la config est chargée, on charge les sessions
+        if (Object.keys(matrix).length > 0) {
+            chargerSessions();
+        } else {
+            // Attendre la config
+            const container = document.getElementById('os-kiosk-container');
+            if (container) {
+                container.innerHTML = '<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>';
+            }
         }
-        // Une fois la matrice chargée, on peut afficher l'interface
-        chargerSessions();
     });
 
-    // 2. Initialiser l'audio (au premier clic)
+    // 2. Si une config est passée en paramètre (fallback), on l'utilise directement
+    if (config && config.matrix) {
+        matrix = config.matrix || {};
+        startTime = config.startTime || null;
+        endTime = config.endTime || null;
+        if (Object.keys(matrix).length > 0) {
+            chargerSessions();
+        }
+    }
+
+    // 3. Initialiser l'audio (au premier clic)
     document.addEventListener('click', initAudio, { once: true });
 }
 
@@ -47,31 +71,42 @@ function initAudio() {
 
 function playTone(freq, duration, type = 'sine') {
     if (!audioCtx) return;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) { /* ignorer les erreurs audio */ }
 }
 
 // ============================================================
-// CHARGEMENT DES SESSIONS (validations)
+// CHARGEMENT DES SESSIONS (validations de l'élève)
 // ============================================================
 function chargerSessions() {
-    // Nettoyer l'ancien listener
-    if (listener) {
-        listener.off();
-        listener = null;
+    if (sessionsListener) {
+        sessionsListener.off();
+        sessionsListener = null;
     }
 
-    const sessionsRef = ref(db, `sessions/${currentClasse}/${currentEleveId}`);
-    listener = onValue(sessionsRef, (snap) => {
-        sessions = snap.val() || {};
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/orientshow/passages`;
+    const sessionsRef = ref(db, path);
+    sessionsListener = onValue(sessionsRef, (snap) => {
+        const data = snap.val() || {};
+        // Filtrer les validations de cet élève
+        sessions = {};
+        Object.keys(data).forEach(key => {
+            const passage = data[key];
+            if (passage.code === currentCode) {
+                sessions[key] = passage;
+            }
+        });
         afficherInterface();
     });
 }
@@ -82,55 +117,71 @@ function chargerSessions() {
 function afficherInterface() {
     const container = document.getElementById('os-kiosk-container');
     if (!container) {
-        console.error('Conteneur os-kiosk-container introuvable');
+        console.warn('Conteneur os-kiosk-container introuvable');
         return;
     }
 
-    // On calcule le total des points
+    // Vérifier si la course est active (startTime présent et endTime absent)
+    const isActive = startTime && !endTime;
+
+    // Calculer le total des points
     let totalPoints = 0;
     const validations = {};
     for (let i = 1; i <= 12; i++) {
-        const key = `C${i}`;
-        if (sessions[key]) {
-            totalPoints += sessions[key].score || 0;
-            validations[i] = sessions[key];
+        const circuit = `C${i}`;
+        const found = Object.values(sessions).find(s => s.circuit === i);
+        if (found) {
+            totalPoints += found.score || 0;
+            validations[i] = found;
         } else {
             validations[i] = null;
         }
     }
 
-    // Récupérer la couleur et le numéro pour l'affichage
+    // Récupérer la couleur et le numéro
     const [color, num] = currentCode.split('_');
     const colorClasses = {
-        NOIR: 'bg-black text-white',
-        ROUGE: 'bg-red-600 text-white',
-        BLEU: 'bg-blue-600 text-white',
-        VERT: 'bg-green-600 text-white',
-        JAUNE: 'bg-yellow-500 text-black'
+        NOIR: 'bg-black text-white border-slate-600',
+        ROUGE: 'bg-red-600 text-white border-red-900',
+        BLEU: 'bg-blue-600 text-white border-blue-900',
+        VERT: 'bg-green-600 text-white border-green-900',
+        JAUNE: 'bg-yellow-500 text-black border-yellow-700'
     };
-    const bgColor = colorClasses[color] || 'bg-slate-700 text-white';
+    const bgColor = colorClasses[color] || 'bg-slate-700 text-white border-slate-600';
+
+    // État de la course
+    let statusHtml = '';
+    if (!startTime) {
+        statusHtml = '<div class="text-center text-slate-400 text-sm mb-4">⏳ En attente du départ du professeur...</div>';
+    } else if (endTime) {
+        statusHtml = '<div class="text-center text-red-400 text-sm mb-4">⏱️ La course est terminée.</div>';
+    } else {
+        statusHtml = '<div class="text-center text-emerald-400 text-sm mb-4">🏃 Course en cours !</div>';
+    }
 
     // Construction du HTML
     let html = `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center text-2xl font-black ${bgColor}">
+                    <div class="w-14 h-14 rounded-full border-2 flex items-center justify-center text-3xl font-black ${bgColor}">
                         ${num}
                     </div>
                     <div>
-                        <div class="text-sm font-bold text-slate-400">${color}</div>
+                        <div class="text-xs font-bold text-slate-400 uppercase">${color}</div>
                         <div class="text-xl font-black text-white">${currentCode}</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-xs text-slate-400">Score</div>
-                    <div class="text-3xl font-black text-emerald-400">${totalPoints} pts</div>
+                    <div class="text-xs text-slate-400 uppercase font-bold">Score</div>
+                    <div class="text-3xl font-black text-yellow-400">${totalPoints}</div>
                 </div>
             </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-3 mb-4">
+        ${statusHtml}
+
+        <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-4">
     `;
 
     for (let i = 1; i <= 12; i++) {
@@ -142,29 +193,29 @@ function afficherInterface() {
 
         if (val) {
             const pts = val.score || 0;
-            if (pts === 5) {
-                statusClass = 'bg-emerald-600 hover:bg-emerald-700';
+            if (pts >= 5) {
+                statusClass = 'bg-emerald-600 border-emerald-400';
                 statusText = `C${i} ✅`;
-                disabled = 'opacity-70 cursor-default';
-                onclick = ''; // pas de clic
-            } else if (pts === 2) {
-                statusClass = 'bg-orange-500 hover:bg-orange-600';
+                disabled = 'opacity-60 cursor-default';
+                onclick = '';
+            } else if (pts >= 2) {
+                statusClass = 'bg-orange-500 border-orange-400';
                 statusText = `C${i} 🆗`;
-                disabled = 'opacity-70 cursor-default';
+                disabled = 'opacity-60 cursor-default';
                 onclick = '';
             } else {
-                statusClass = 'bg-red-600 hover:bg-red-700';
+                statusClass = 'bg-red-600 border-red-400';
                 statusText = `C${i} ❌`;
-                disabled = 'opacity-70 cursor-default';
+                disabled = 'opacity-60 cursor-default';
                 onclick = '';
             }
         }
 
         html += `
             <button id="btnCircuit${i}" 
-                    class="circuit-btn ${statusClass} rounded-xl p-4 font-black text-white text-xl border-2 border-slate-600 ${disabled} transition-all active:scale-95"
-                    ${onclick ? `onclick="${onclick}"` : 'disabled'}
-                    data-circuit="${i}">
+                    class="circuit-btn ${statusClass} rounded-xl p-4 font-black text-white text-lg border-2 ${!disabled ? 'border-slate-600 hover:scale-105' : 'border-slate-500'} transition-all active:scale-95 ${disabled}"
+                    data-circuit="${i}"
+                    ${onclick ? `onclick="${onclick}"` : 'disabled'}>
                 ${statusText}
             </button>
         `;
@@ -173,26 +224,26 @@ function afficherInterface() {
     html += `
         </div>
 
-        <!-- Zone de saisie (visible uniquement si un circuit est sélectionné) -->
+        <!-- Zone de saisie -->
         <div id="saisieZone" class="hidden bg-slate-800 p-4 rounded-2xl border border-slate-700">
-            <div class="text-center mb-4">
+            <div class="text-center mb-3">
                 <span class="text-sm text-slate-400">Circuit sélectionné :</span>
                 <span id="selectedCircuitLabel" class="text-2xl font-black text-white ml-2"></span>
             </div>
             <div class="flex justify-center items-center gap-6 mb-4">
-                <input type="text" id="l1" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500" maxlength="1" oninput="this.value=this.value.toUpperCase(); if(this.value) document.getElementById('l2').focus()">
-                <input type="text" id="l2" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500" maxlength="1" oninput="this.value=this.value.toUpperCase()">
+                <input type="text" id="l1" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500 text-white" maxlength="1" oninput="this.value=this.value.toUpperCase(); if(this.value) document.getElementById('l2').focus()">
+                <input type="text" id="l2" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500 text-white" maxlength="1" oninput="this.value=this.value.toUpperCase()">
             </div>
             <div class="flex gap-4">
                 <button onclick="window.annulerSaisie()" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white active:scale-95">Annuler</button>
-                <button onclick="window.validerCircuit()" class="flex-1 bg-blue-600 py-3 rounded-xl font-black text-white active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.5)]">Valider</button>
+                <button onclick="window.validerCircuit()" class="flex-1 bg-blue-600 py-3 rounded-xl font-black text-white active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.4)]">Valider</button>
             </div>
         </div>
     `;
 
     container.innerHTML = html;
 
-    // Exposer les fonctions globalement pour les onclick
+    // Exposer les fonctions globalement
     window.selectCircuit = selectCircuit;
     window.annulerSaisie = annulerSaisie;
     window.validerCircuit = validerCircuit;
@@ -203,9 +254,15 @@ function afficherInterface() {
 // ============================================================
 function selectCircuit(circuitId) {
     // Vérifier si déjà validé
-    const key = `C${circuitId}`;
-    if (sessions[key]) {
+    const found = Object.values(sessions).find(s => s.circuit === circuitId);
+    if (found) {
         alert('Ce circuit a déjà été validé.');
+        return;
+    }
+
+    // Vérifier que la course est active
+    if (!startTime || endTime) {
+        alert('La course n\'est pas active.');
         return;
     }
 
@@ -214,7 +271,7 @@ function selectCircuit(circuitId) {
     document.getElementById('saisieZone').classList.remove('hidden');
     document.getElementById('l1').value = '';
     document.getElementById('l2').value = '';
-    document.getElementById('l1').focus();
+    setTimeout(() => document.getElementById('l1').focus(), 100);
 }
 
 function annulerSaisie() {
@@ -232,9 +289,18 @@ function validerCircuit() {
         alert('Sélectionnez d\'abord un circuit.');
         return;
     }
-    const key = `C${selectedCircuit}`;
-    if (sessions[key]) {
+
+    // Vérifier si déjà validé (sécurité)
+    const found = Object.values(sessions).find(s => s.circuit === selectedCircuit);
+    if (found) {
         alert('Ce circuit a déjà été validé.');
+        annulerSaisie();
+        return;
+    }
+
+    // Vérifier la course
+    if (!startTime || endTime) {
+        alert('La course n\'est pas active.');
         annulerSaisie();
         return;
     }
@@ -246,21 +312,22 @@ function validerCircuit() {
         return;
     }
 
-    // Anti‑triche : 30s entre deux validations pour le même élève
+    // Anti‑triche : cooldown
     const now = Date.now();
-    const diff = (now - (antiCheat[currentEleveId] || 0)) / 1000;
-    if (diff < 30) {
-        alert(`⏳ Trop rapide ! Attends encore ${Math.ceil(30 - diff)}s.`);
+    if (now - lastSend < COOLDOWN) {
+        const wait = Math.ceil((COOLDOWN - (now - lastSend)) / 1000);
+        alert(`⏳ Trop rapide ! Attends encore ${wait}s.`);
         return;
     }
 
-    // Récupérer la couleur et la matrice
+    // Récupérer la couleur
     const [color] = currentCode.split('_');
-    const codeVerite = matrix[selectedCircuit]?.[color] || [];
 
-    // Calcul du score (identique à vos fichiers)
+    // Calcul du score avec la matrice
+    const codeVerite = matrix[selectedCircuit]?.[color] || [];
     let pts = 0;
     let truth = [...codeVerite];
+
     if (l1 !== '') {
         const idx1 = truth.indexOf(l1);
         if (idx1 !== -1) { pts += 2.5; truth.splice(idx1, 1); }
@@ -277,10 +344,20 @@ function validerCircuit() {
     else playTone(150, 0.4, 'sawtooth');
 
     // Enregistrer dans Firebase
-    const sessionRef = ref(db, `sessions/${currentClasse}/${currentEleveId}/${key}`);
-    set(sessionRef, { score: pts, realTime: Date.now() })
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const passagesRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/orientshow/passages`);
+
+    const passageData = {
+        code: currentCode,
+        circuit: selectedCircuit,
+        lettres: [l1, l2],
+        score: pts,
+        timestamp: now
+    };
+
+    push(passagesRef, passageData)
         .then(() => {
-            antiCheat[currentEleveId] = Date.now();
+            lastSend = now;
             afficherFeedback(pts);
             annulerSaisie();
         })
@@ -294,18 +371,22 @@ function validerCircuit() {
 // FEEDBACK
 // ============================================================
 function afficherFeedback(pts) {
-    const container = document.getElementById('os-kiosk-container');
+    // Récupérer le score total actuel
+    let total = 0;
+    Object.values(sessions).forEach(s => { total += s.score || 0; });
+    total += pts;
+
     const overlay = document.createElement('div');
     overlay.className = 'fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center transition-all';
 
     const icon = pts === 5 ? '🏆' : (pts === 2 ? '🆗' : '❌');
-    const color = pts === 5 ? '#065f46' : (pts === 2 ? '#9a3412' : '#991b1b');
-    overlay.style.backgroundColor = color;
+    const bgColor = pts === 5 ? '#065f46' : (pts === 2 ? '#9a3412' : '#991b1b');
 
     overlay.innerHTML = `
         <div class="text-8xl mb-4">${icon}</div>
-        <div class="text-6xl font-black text-white mb-2">+${pts} PTS</div>
-        <button onclick="this.parentElement.remove()" class="mt-8 px-12 py-4 bg-white/10 border-2 border-white rounded-2xl text-white font-black text-xl active:scale-95 transition-transform">
+        <div class="text-5xl font-black text-white mb-2">+${pts} PTS</div>
+        <div class="text-xl font-bold text-yellow-400 mb-8">TOTAL : ${total} PTS</div>
+        <button onclick="this.parentElement.remove()" class="px-12 py-4 bg-white/10 border-2 border-white rounded-2xl text-white font-black text-xl active:scale-95 transition-transform">
             SUIVANT ➔
         </button>
     `;
@@ -313,31 +394,15 @@ function afficherFeedback(pts) {
 }
 
 // ============================================================
-// MATRICE PAR DÉFAUT (si Firebase est vide)
-// ============================================================
-function getDefaultMatrix() {
-    return {
-        1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
-        2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
-        3: { NOIR: ['C','L'], ROUGE: ['H','U'], BLEU: ['I','B'], VERT: ['O','I'], JAUNE: ['T','E'] },
-        4: { NOIR: ['R','V'], ROUGE: ['E','E'], BLEU: ['C','R'], VERT: ['T','N'], JAUNE: ['O','I'] },
-        5: { NOIR: ['A','B'], ROUGE: ['J','O'], BLEU: ['O','U'], VERT: ['N','E'], JAUNE: ['C','S'] },
-        6: { NOIR: ['F','M'], ROUGE: ['I','E'], BLEU: ['C','R'], VERT: ['U','O'], JAUNE: ['S','U'] },
-        7: { NOIR: ['G','H'], ROUGE: ['U','A'], BLEU: ['E','C'], VERT: ['U','H'], JAUNE: ['X','E'] },
-        8: { NOIR: ['I','J'], ROUGE: ['V','E'], BLEU: ['R','A'], VERT: ['E','N'], JAUNE: ['S','S'] },
-        9: { NOIR: ['K','N'], ROUGE: ['R','Y'], BLEU: ['A','L'], VERT: ['F','O'], JAUNE: ['T','N'] },
-        10: { NOIR: ['O','S'], ROUGE: ['C','E'], BLEU: ['E','I'], VERT: ['A','Z'], JAUNE: ['N','E'] },
-        11: { NOIR: ['P','T'], ROUGE: ['A','U'], BLEU: ['L','Y'], VERT: ['U','A'], JAUNE: ['D','U'] },
-        12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
-    };
-}
-
-// ============================================================
 // NETTOYAGE
 // ============================================================
 export function cleanupOrientShowKiosk() {
-    if (listener) {
-        listener.off();
-        listener = null;
+    if (configListener) {
+        configListener.off();
+        configListener = null;
+    }
+    if (sessionsListener) {
+        sessionsListener.off();
+        sessionsListener = null;
     }
 }
