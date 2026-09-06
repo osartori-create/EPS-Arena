@@ -32,18 +32,34 @@ export function initCOModeSelector() {
     coView.prepend(selector);
 
     // Créer les conteneurs s'ils n'existent pas
-    if (!document.getElementById('co-classique-container')) {
-        const container = document.createElement('div');
-        container.id = 'co-classique-container';
-        container.className = 'space-y-4';
-        selector.after(container);
+    let classiqueContainer = document.getElementById('co-classique-container');
+    let orientContainer = document.getElementById('co-orientshow-container');
+
+    if (!classiqueContainer) {
+        classiqueContainer = document.createElement('div');
+        classiqueContainer.id = 'co-classique-container';
+        classiqueContainer.className = 'space-y-4';
+        // Insérer après le sélecteur
+        selector.after(classiqueContainer);
     }
-    if (!document.getElementById('co-orientshow-container')) {
-        const container = document.createElement('div');
-        container.id = 'co-orientshow-container';
-        container.className = 'space-y-4';
-        container.style.display = 'none';
-        coView.appendChild(container);
+    if (!orientContainer) {
+        orientContainer = document.createElement('div');
+        orientContainer.id = 'co-orientshow-container';
+        orientContainer.className = 'space-y-4';
+        orientContainer.style.display = 'none';
+        coView.appendChild(orientContainer);
+    }
+
+    // ✅ Déplacer le contenu existant (sauf le sélecteur) dans le conteneur classique
+    // Si coView a des enfants qui ne sont pas le sélecteur, on les déplace
+    const childrenToMove = [];
+    for (const child of coView.children) {
+        if (child.id !== 'co-mode-selector' && child.id !== 'co-classique-container' && child.id !== 'co-orientshow-container') {
+            childrenToMove.push(child);
+        }
+    }
+    for (const child of childrenToMove) {
+        classiqueContainer.appendChild(child);
     }
 
     document.getElementById('co-mode-classique').addEventListener('click', () => setCOMode('classique'));
@@ -64,22 +80,21 @@ function setCOMode(mode) {
         const btnOrient = document.getElementById('co-mode-orientshow');
         if (btnClassique) btnClassique.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
         if (btnOrient) btnOrient.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-        // Initialiser CO classique dans le conteneur
-        // Vider le conteneur classique avant de le remplir
-        if (containerClassique) containerClassique.innerHTML = '';
-        initCOInterface();
-        initSortableCO();
-        loadCOAssignments();
+        // Initialiser CO classique dans le conteneur (si vide)
+        if (containerClassique && containerClassique.children.length === 0) {
+            initCOInterface();
+            initSortableCO();
+            loadCOAssignments();
+        }
     } else {
         if (containerClassique) containerClassique.style.display = 'none';
         if (containerOrientShow) {
             containerOrientShow.style.display = '';
-            // ✅ Vider le conteneur avant de le remplir
+            // ✅ Vider le conteneur avant de le remplir (éviter doublons)
             containerOrientShow.innerHTML = '';
             // ✅ Appeler l’initialisation OrientShow avec le conteneur
             import('./orientshow/orientshow-prof.js').then(module => {
                 if (module.initProf) {
-                    // On passe le conteneur
                     module.initProf(currentClasse, containerOrientShow);
                 }
             });

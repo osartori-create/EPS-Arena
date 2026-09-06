@@ -1,5 +1,5 @@
 // src/js/ui/prof/activities.js
-import { initCOInterface, populateReserveWithStudents, initSortableCO, loadCOAssignments, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
+import { populateReserveWithStudents, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
 import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
@@ -47,7 +47,8 @@ function getBaseProf() {
 export function initActivities() {
     console.log("🚀 initActivities appelée !");
     
-    try { console.log("→ Initialisation CO..."); initCOInterface(); console.log("✅ CO OK"); } catch (e) { console.error("❌ Erreur CO :", e); }
+    // ✅ Les initialisations des modules qui ont un sélecteur interne sont déplacées dans le sélecteur
+    // On garde seulement les modules sans sélecteur : Escalade classique (fallback), Badminton, Arcathlon, Évaluation, Tournoi
     try { console.log("→ Initialisation Escalade..."); initEscaladeInterface(6); console.log("✅ Escalade OK"); } catch (e) { console.error("❌ Erreur Escalade :", e); }
     try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
@@ -136,13 +137,7 @@ export function initActivities() {
         else if (disc === 'evaluation') setActive(btnEval);
         else if (disc === 'tournoi') setActive(btnTournoi);
 
-        // Initialisations spécifiques
-        if (disc === 'co') {
-            // CO déjà initialisé via coModule.initProf
-        }
-        if (disc === 'escalade') {
-            // déjà fait plus haut
-        }
+        // Initialisations spécifiques (pour les modules qui n'ont pas de sélecteur)
         if (disc === 'badminton') {
             try { initBadmintonInterface(); initSortableBadminton(); loadBadmintonAssignments(); } catch (e) {}
         }
@@ -554,7 +549,6 @@ export function initActivities() {
     // ============================================================
     // INITIALISATION SORTABLE (au cas où)
     // ============================================================
-    try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}
 }
 
