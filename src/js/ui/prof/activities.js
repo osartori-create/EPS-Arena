@@ -52,79 +52,78 @@ export function initActivities() {
     // CHANGEMENT DE DISCIPLINE
     // ============================================================
     window.switchDiscipline = function(disc) {
-    currentDiscipline = disc;
-    localStorage.setItem('eps_arena_current_discipline', disc);
+        currentDiscipline = disc;
+        localStorage.setItem('eps_arena_current_discipline', disc);
 
-    // --- Récupérer toutes les vues ---
-    const allViews = [
-        'viewMultiSettings',
-        'viewCOSettings',
-        'viewEscaladeSettings',
-        'viewBadmintonSettings',
-        'viewArcathlonSettings',
-        'viewEvaluationSettings',
-        'viewTournoiSettings',
-        'viewNatationSettings'
-    ];
+        // Liste de toutes les vues de paramètres
+        const allViews = [
+            'viewMultiSettings',
+            'viewCOSettings',
+            'viewEscaladeSettings',
+            'viewBadmintonSettings',
+            'viewArcathlonSettings',
+            'viewEvaluationSettings',
+            'viewTournoiSettings',
+            'viewNatationSettings'
+        ];
 
-    // --- Masquer TOUTES les vues de manière FORCÉE ---
-    allViews.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-            el.classList.add('hidden');
-            el.style.display = 'none';   // <--- ajout
+        // --- Masquer TOUTES les vues de manière FORCÉE ---
+        allViews.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            }
+        });
+
+        // --- Cacher spécifiquement les conteneurs internes de CO ---
+        const coClassique = document.getElementById('co-classique-container');
+        const coOrientShow = document.getElementById('co-orientshow-container');
+        if (coClassique) {
+            coClassique.style.display = 'none';
+            coClassique.innerHTML = ''; // Vide pour être sûr
         }
-    });
-
-    // --- Masquer spécifiquement les conteneurs internes de CO ---
-    const coClassique = document.getElementById('co-classique-container');
-    const coOrientShow = document.getElementById('co-orientshow-container');
-    if (coClassique) coClassique.style.display = 'none';
-    if (coOrientShow) coOrientShow.style.display = 'none';
-
-    // --- Afficher la vue demandée ---
-    const viewMap = {
-        'multi': 'viewMultiSettings',
-        'co': 'viewCOSettings',
-        'escalade': 'viewEscaladeSettings',
-        'badminton': 'viewBadmintonSettings',
-        'arcathlon': 'viewArcathlonSettings',
-        'evaluation': 'viewEvaluationSettings',
-        'tournoi': 'viewTournoiSettings',
-        'natation': 'viewNatationSettings'
-    };
-
-    const targetId = viewMap[disc];
-    if (targetId) {
-        const targetView = document.getElementById(targetId);
-        if (targetView) {
-            targetView.classList.remove('hidden');
-            targetView.style.display = '';   // restaure la valeur par défaut
+        if (coOrientShow) {
+            coOrientShow.style.display = 'none';
+            coOrientShow.innerHTML = '';
         }
-    }
 
-    // --- Si on est en CO, réinitialiser le module (il rétablira les conteneurs internes) ---
-    if (disc === 'co') {
-        const coModule = getModule('co');
-        if (coModule && coModule.initProf) {
-            const activeClasse = document.getElementById('selectClasse').value;
-            setTimeout(() => coModule.initProf(activeClasse), 50);
+        // --- Afficher la vue demandée ---
+        const viewMap = {
+            'multi': 'viewMultiSettings',
+            'co': 'viewCOSettings',
+            'escalade': 'viewEscaladeSettings',
+            'badminton': 'viewBadmintonSettings',
+            'arcathlon': 'viewArcathlonSettings',
+            'evaluation': 'viewEvaluationSettings',
+            'tournoi': 'viewTournoiSettings',
+            'natation': 'viewNatationSettings'
+        };
+
+        const targetId = viewMap[disc];
+        if (targetId) {
+            const targetView = document.getElementById(targetId);
+            if (targetView) {
+                targetView.classList.remove('hidden');
+                targetView.style.display = ''; // Restaure l'affichage normal (CSS)
+            }
         }
-    }
 
+        // --- Si on est en CO, réinitialiser le module pour afficher le bon conteneur ---
+        if (disc === 'co') {
+            const coModule = getModule('co');
+            if (coModule && coModule.initProf) {
+                const activeClasse = document.getElementById('selectClasse').value;
+                setTimeout(() => coModule.initProf(activeClasse), 50);
+            }
+        }
 
-        // Initialisations spécifiques
+        // --- Initialisations spécifiques pour les autres disciplines ---
         if (disc === 'multi') {
             const multiModule = getModule('multi');
             if (multiModule?.initProf) {
                 const classe = document.getElementById('selectClasse').value;
                 multiModule.initProf(classe);
-            }
-        } else if (disc === 'co') {
-            const coModule = getModule('co');
-            if (coModule?.initProf) {
-                const classe = document.getElementById('selectClasse').value;
-                coModule.initProf(classe);
             }
         } else if (disc === 'escalade') {
             const escaladeModule = getModule('escalade');
@@ -347,6 +346,11 @@ export function initActivities() {
                 'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
                 'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
                 'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
+                'tournoi': () => {
+                    // Le tournoi n'a pas de live spécifique pour l'instant, on affiche un message
+                    container.innerHTML = '<p class="text-slate-500">Live non disponible pour le tournoi.</p>';
+                    return Promise.resolve();
+                }
             };
             if (liveModules[disc]) {
                 const result = liveModules[disc]();
@@ -365,11 +369,16 @@ export function initActivities() {
                         'escalade': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
                         'co': () => {
                             const coModule = getModule('co');
-                            return coModule?.renderTV ? coModule.renderTV() : console.log('[TV] CO non disponible');
+                            return coModule?.renderTV ? coModule.renderTV() : Promise.resolve();
                         },
                         'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
                         'bloccontest': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
                         'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
+                        'tournoi': () => {
+                            // TV non disponible pour le tournoi
+                            document.getElementById('tvGlobe').innerHTML = '<p class="text-slate-500 text-center">Mode TV non disponible pour le tournoi.</p>';
+                            return Promise.resolve();
+                        }
                     };
                     if (tvModules[disc]) {
                         tvModules[disc]().catch(err => console.error(`Erreur TV ${disc} :`, err));
@@ -534,6 +543,14 @@ export function initActivities() {
     // INITIALISATION SORTABLE (fallback)
     // ============================================================
     try { initSortableEscalade(); } catch (e) {}
+
+    // ============================================================
+    // LANCEMENT DE LA DISCIPLINE PAR DÉFAUT
+    // ============================================================
+    setTimeout(() => {
+        const savedDisc = localStorage.getItem('eps_arena_current_discipline') || 'multi';
+        window.switchDiscipline(savedDisc);
+    }, 100);
 }
 
 // ============================================================
