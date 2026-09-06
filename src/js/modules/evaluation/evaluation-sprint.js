@@ -360,6 +360,7 @@ function templateColonnesSprint(colonnes, eleveSelectionneId, essaisParEleve) {
 // ============================================================
 
 function selectionnerEleve(eleveId) {
+    // Si le chrono tourne, on demande confirmation pour arrêter
     if (chronoRunning) {
         if (!confirm('Un chrono est en cours. Arrêter et sélectionner un autre élève ?')) return;
         arreterChrono();
@@ -367,6 +368,10 @@ function selectionnerEleve(eleveId) {
     eleveSelectionne = eleveId;
     ordreIndex = listeTriee.findIndex(e => e.id === eleveSelectionne);
     if (ordreIndex === -1) ordreIndex = 0;
+
+    // ✅ FORCER LA RÉINITIALISATION DU CHRONO ET DE L'AFFICHAGE
+    resetChrono();
+
     afficherSprint();
 }
 
@@ -485,7 +490,7 @@ function resetChrono() {
         btn.textContent = '▶ Démarrer';
         btn.className = 'w-full py-6 rounded-2xl font-black text-3xl uppercase shadow-xl active:scale-95 transition-transform bg-emerald-600 text-white';
     }
-    afficherSprint();
+    afficherSprint(); // <- Met à jour l'affichage
 }
 
 function annulerDernierEssai() {
