@@ -55,71 +55,60 @@ export function initActivities() {
     currentDiscipline = disc;
     localStorage.setItem('eps_arena_current_discipline', disc);
 
-    // Fonction pour cacher une vue proprement
-    function hideView(el) {
-        if (!el) return;
-        el.classList.add('hidden');
-        el.style.display = ''; // supprime tout style inline
-    }
-
-    // Fonction pour afficher une vue
-    function showView(el) {
-        if (!el) return;
-        el.classList.remove('hidden');
-        el.style.display = ''; // supprime tout style inline pour éviter conflit
-    }
-
-    // Récupérer toutes les vues de paramètres
-    const views = [
-        document.getElementById('viewMultiSettings'),
-        document.getElementById('viewCOSettings'),
-        document.getElementById('viewEscaladeSettings'),
-        document.getElementById('viewBadmintonSettings'),
-        document.getElementById('viewArcathlonSettings'),
-        document.getElementById('viewEvaluationSettings'),
-        document.getElementById('viewTournoiSettings'),
-        document.getElementById('viewNatationSettings')
+    // --- Récupérer toutes les vues ---
+    const allViews = [
+        'viewMultiSettings',
+        'viewCOSettings',
+        'viewEscaladeSettings',
+        'viewBadmintonSettings',
+        'viewArcathlonSettings',
+        'viewEvaluationSettings',
+        'viewTournoiSettings',
+        'viewNatationSettings'
     ];
 
-    // Cacher toutes les vues
-    views.forEach(hideView);
+    // --- Masquer TOUTES les vues de manière FORCÉE ---
+    allViews.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.add('hidden');
+            el.style.display = 'none';   // <--- ajout
+        }
+    });
 
-    // Cacher spécifiquement les conteneurs internes de CO (au cas où)
+    // --- Masquer spécifiquement les conteneurs internes de CO ---
     const coClassique = document.getElementById('co-classique-container');
     const coOrientShow = document.getElementById('co-orientshow-container');
-    if (coClassique) { coClassique.style.display = 'none'; coClassique.classList.add('hidden'); }
-    if (coOrientShow) { coOrientShow.style.display = 'none'; coOrientShow.classList.add('hidden'); }
+    if (coClassique) coClassique.style.display = 'none';
+    if (coOrientShow) coOrientShow.style.display = 'none';
 
-    // Afficher la vue demandée
-    let targetView = null;
-    switch (disc) {
-        case 'multi': targetView = document.getElementById('viewMultiSettings'); break;
-        case 'co': targetView = document.getElementById('viewCOSettings'); break;
-        case 'escalade': targetView = document.getElementById('viewEscaladeSettings'); break;
-        case 'badminton': targetView = document.getElementById('viewBadmintonSettings'); break;
-        case 'arcathlon': targetView = document.getElementById('viewArcathlonSettings'); break;
-        case 'evaluation': targetView = document.getElementById('viewEvaluationSettings'); break;
-        case 'tournoi': targetView = document.getElementById('viewTournoiSettings'); break;
-        case 'natation': targetView = document.getElementById('viewNatationSettings'); break;
-        default: targetView = null;
+    // --- Afficher la vue demandée ---
+    const viewMap = {
+        'multi': 'viewMultiSettings',
+        'co': 'viewCOSettings',
+        'escalade': 'viewEscaladeSettings',
+        'badminton': 'viewBadmintonSettings',
+        'arcathlon': 'viewArcathlonSettings',
+        'evaluation': 'viewEvaluationSettings',
+        'tournoi': 'viewTournoiSettings',
+        'natation': 'viewNatationSettings'
+    };
+
+    const targetId = viewMap[disc];
+    if (targetId) {
+        const targetView = document.getElementById(targetId);
+        if (targetView) {
+            targetView.classList.remove('hidden');
+            targetView.style.display = '';   // restaure la valeur par défaut
+        }
     }
 
-    if (targetView) {
-        showView(targetView);
-        // Si c'est CO, on réinitialise le sélecteur de mode
-        if (disc === 'co') {
-            // On va appeler initProf du module CO
-            const coModule = getModule('co');
-            if (coModule && coModule.initProf) {
-                const activeClasse = document.getElementById('selectClasse').value;
-                // On laisse le soin à initProf de réafficher les conteneurs appropriés
-                coModule.initProf(activeClasse);
-            } else {
-                // Fallback
-                import('../../modules/co/co-prof.js').then(m => {
-                    if (m.initCOModeSelector) m.initCOModeSelector();
-                });
-            }
+    // --- Si on est en CO, réinitialiser le module (il rétablira les conteneurs internes) ---
+    if (disc === 'co') {
+        const coModule = getModule('co');
+        if (coModule && coModule.initProf) {
+            const activeClasse = document.getElementById('selectClasse').value;
+            setTimeout(() => coModule.initProf(activeClasse), 50);
         }
     }
 
