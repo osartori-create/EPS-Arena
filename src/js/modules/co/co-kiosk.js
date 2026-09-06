@@ -68,11 +68,10 @@ export function initCoKiosk(classe, code) {
         afficherInterface();
     });
 
-    // 3. ✅ Écouter la catégorie active sur le bon chemin
+    // 3. Écouter la catégorie active sur le bon chemin
     const catRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/config/activeCategory`);
     activeCategoryListener = onValue(catRef, (snap) => {
         activeCategory = snap.val() || '';
-        // Mettre à jour l'affichage
         afficherInterface();
     });
 }
@@ -162,7 +161,10 @@ function afficherInterface() {
     // Attacher l'événement de changement de circuit
     const select = document.getElementById('selectCircuit');
     if (select) {
-        select.addEventListener('change', (e) => {
+        // Supprimer les anciens écouteurs en clonant l'élément
+        const newSelect = select.cloneNode(true);
+        select.parentNode.replaceChild(newSelect, select);
+        newSelect.addEventListener('change', (e) => {
             selectedCircuitId = e.target.value;
             if (selectedCircuitId) {
                 afficherCarton();
@@ -174,7 +176,8 @@ function afficherInterface() {
 
     // Si un circuit était déjà sélectionné, le rétablir
     if (selectedCircuitId) {
-        document.getElementById('selectCircuit').value = selectedCircuitId;
+        const selectEl = document.getElementById('selectCircuit');
+        if (selectEl) selectEl.value = selectedCircuitId;
         afficherCarton();
     }
 
@@ -187,7 +190,12 @@ function afficherInterface() {
 // ============================================================
 function afficherCarton() {
     const circuit = circuits.find(c => c.id === selectedCircuitId);
-    if (!circuit) return;
+    if (!circuit) {
+        console.warn('Circuit non trouvé :', selectedCircuitId);
+        return;
+    }
+
+    console.log('Afficher carton pour circuit :', circuit.nom);
 
     // Récupérer les données déjà enregistrées pour ce circuit (si l'élève a déjà commencé)
     const existing = Object.values(sessions).find(s => s.circuitId === selectedCircuitId);
@@ -239,6 +247,13 @@ function afficherCarton() {
 // PAVÉ NUMÉRIQUE (modale)
 // ============================================================
 window.coOpenNumpad = function(idx) {
+    // Vérifier que le poste n'est pas déjà corrigé
+    const det = cartonDetails[idx];
+    if (det.status === 'correct' || det.status === 'wrong') {
+        alert('Ce poste a déjà été corrigé.');
+        return;
+    }
+
     activePosteIdx = idx;
     currentInput = '';
     const overlay = document.createElement('div');
@@ -248,7 +263,7 @@ window.coOpenNumpad = function(idx) {
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
             <div class="text-center mb-4">
                 <p class="text-sm font-bold text-slate-400">Saisie du code</p>
-                <p class="text-xs text-slate-500">Poste ${idx+1} - Balise ${cartonDetails[idx].balise}</p>
+                <p class="text-xs text-slate-500">Poste ${idx+1} - Balise ${det.balise}</p>
                 <div id="coNumpadDisplay" class="bg-black rounded-xl py-4 mt-2 text-4xl font-mono font-black text-white border-2 border-slate-600">---</div>
             </div>
             <div class="grid grid-cols-3 gap-3">
@@ -317,6 +332,8 @@ function corrigerPoste(idx) {
     const det = cartonDetails[idx];
     const isGhost = String(det.balise).includes('*');
     const realBal = String(det.balise).replace('*', '');
+    // Utilisation de la matrice globale (doit être importée)
+    const MATRICE = window.MATRICE || {};
     const correctCode = isGhost ? '' : (MATRICE[realBal] ? MATRICE[realBal][currentCode] : null);
 
     if (det.userCode === correctCode) {
@@ -334,6 +351,7 @@ function corrigerPoste(idx) {
 // ============================================================
 function soumettreCarton() {
     // Corriger toutes les balises
+    const MATRICE = window.MATRICE || {};
     cartonDetails.forEach((det, idx) => {
         const isGhost = String(det.balise).includes('*');
         const realBal = String(det.balise).replace('*', '');
@@ -387,7 +405,6 @@ function synchroniserPassage() {
     const passagesRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`);
     push(passagesRef, data)
         .then(() => {
-            // Mettre à jour le score global
             afficherScoreGlobal();
         })
         .catch(err => {
@@ -405,17 +422,6 @@ function afficherScoreGlobal() {
     const scoreEl = document.getElementById('scoreGlobal');
     if (scoreEl) scoreEl.innerText = totalPts;
 }
-
-// ============================================================
-// MATRICE (reprise depuis matrice.js)
-// ============================================================
-// On importe la matrice depuis le fichier existant, ou on la définit ici
-// Pour simplifier, on suppose que la matrice est accessible globalement
-// Dans la vraie intégration, on importera depuis ./matrice.js
-
-// import { MATRICE } from './matrice.js'; // à décommenter
-// Pour l'instant, on définit une variable vide, mais le code utilisera MATRICE
-const MATRICE = window.MATRICE || {};
 
 // ============================================================
 // NETTOYAGE
