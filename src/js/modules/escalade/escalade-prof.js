@@ -152,6 +152,23 @@ export async function generateTeams(classe) {
 }
 
 // ============================================================
+// LIVE / TV
+// ============================================================
+
+export function renderLive(classe) {
+    import('./escalade-live.js').then(module => {
+        const data = window.lastLiveData || {};
+        module.renderEscaladeLive(data);
+    }).catch(err => console.error('Erreur Live Escalade :', err));
+}
+
+export function renderTV(classe) {
+    import('./escalade-tv-ui.js').then(module => {
+        module.renderEscaladeTV();
+    }).catch(err => console.error('Erreur TV Escalade :', err));
+}
+
+// ============================================================
 // ALIAS POUR COMPATIBILITÉ AVEC activities.js
 // ============================================================
 export const generateEscaladeTeams = generateTeams;
