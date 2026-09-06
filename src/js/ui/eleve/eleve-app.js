@@ -177,11 +177,13 @@ function showLogin() {
     if (config.activite === 'bloccontest') {
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
+        // Cacher tous les autres modules
         escaladeModule.classList.add('hidden');
         coModule.classList.add('hidden');
         multiModule.classList.add('hidden');
         if (osModule) osModule.classList.add('hidden');
         badmintonModule.classList.add('hidden');
+        // Cacher l'info de code (car on va afficher les blocs directement)
         document.getElementById('code-info').classList.add('hidden');
         document.getElementById('btn-quit').classList.add('hidden');
         document.getElementById('btn-back-terrain').classList.remove('hidden');
@@ -196,6 +198,7 @@ function showLogin() {
             blocContainer.className = 'space-y-4 module';
             activityScreen.appendChild(blocContainer);
         }
+        blocContainer.style.display = 'block';
         blocContainer.classList.remove('hidden');
         // On affiche un message d'attente (l'init se fera après sélection du code)
         blocContainer.innerHTML = '<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration...</p></div>';
@@ -424,9 +427,15 @@ function selectCode(code) {
             blocContainer.className = 'space-y-4 module';
             activityScreen.appendChild(blocContainer);
         }
+        blocContainer.style.display = 'block';
         blocContainer.classList.remove('hidden');
         // Initialiser le kiosk avec la classe et le code sélectionné
-        initBlocKiosk(selectedClass, code);
+        import('../../modules/escalade/escalade-kiosk-blocs.js').then(module => {
+            module.initBlocKiosk(selectedClass, code);
+        }).catch(err => {
+            console.error('Erreur chargement Bloc Kiosk :', err);
+            blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+        });
     } else {
         multiModule.classList.remove('hidden');
     }

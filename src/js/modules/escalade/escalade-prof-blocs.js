@@ -1,5 +1,5 @@
 // src/js/modules/escalade/escalade-prof-blocs.js
-// Interface professeur Bloc Contest
+// Interface professeur Bloc Contest – partage les groupes de l’escalade classique
 
 import {
     listenBlocConfig,
@@ -14,6 +14,7 @@ import {
     genererCSVBlocContest
 } from './escalade-blocs-core.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
+import { db, ref, set } from '../../core/firebase-service.js';
 
 let currentClasse = '';
 let config = null;
@@ -26,7 +27,7 @@ let validationsListener = null;
 // ============================================================
 export function initBlocProf(classe) {
     currentClasse = classe;
-    // Créer le conteneur s'il n'existe pas
+    // Créer le conteneur s’il n’existe pas
     let container = document.getElementById('bloc-prof-container');
     if (!container) {
         const parent = document.getElementById('viewEscaladeSettings');
@@ -34,90 +35,14 @@ export function initBlocProf(classe) {
         container = document.createElement('div');
         container.id = 'bloc-prof-container';
         container.className = 'space-y-4 mt-6';
-        container.style.display = 'none'; // caché par défaut (sera affiché par le sélecteur)
+        container.style.display = 'none'; // caché par défaut (mode classique)
         parent.appendChild(container);
     }
 
-    // Récupérer les groupes depuis la configuration escalade classique
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${classe}`) || '{}');
-    const groupes = {};
-    // On extrait les groupes (les clés qui ne sont pas 'reserve' ou 'nbGroupes')
-    Object.keys(assignments).forEach(key => {
-        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
-            groupes[key] = assignments[key];
-        }
-    });
-
-    // Si pas de groupes, on génère une répartition par défaut
-    if (Object.keys(groupes).length === 0) {
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-        if (eleves.length === 0) {
-            container.innerHTML = '<p class="text-slate-500">Aucun élève dans cette classe.</p>';
-            return;
-        }
-        const nbGroupes = Math.ceil(eleves.length / 3);
-        const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        for (let i = 0; i < nbGroupes; i++) {
-            const lettre = lettres[i] || `G${i+1}`;
-            groupes[lettre] = [];
-        }
-        eleves.forEach((e, index) => {
-            const g = lettres[index % nbGroupes];
-            groupes[g].push(e.id);
-        });
-        // Sauvegarder pour l'escalade classique
-        const newAssignments = { ...assignments, ...groupes, nbGroupes };
-        localStorage.setItem(`eps_arena_escalade_assignments_${classe}`, JSON.stringify(newAssignments));
-        // Afficher la sauvegarde
-        console.log('✅ Groupes Bloc Contest sauvegardés dans eps_arena_escalade_assignments');
-    }
-
-    // Vérifier si une config Bloc Contest existe déjà
+    // Écouter la config
     if (configListener) configListener();
     configListener = listenBlocConfig(classe, (data) => {
         config = data;
-        // Si pas de config, on en crée une par défaut avec les groupes
-        if (!config) {
-            const blocs = [];
-            // Créer 10 blocs par défaut
-            for (let i = 1; i <= 10; i++) {
-                blocs.push({
-                    id: `bloc${i}`,
-                    label: `Bloc ${i}`,
-                    couleur: '#3b82f6',
-                    ordre: i
-                });
-            }
-            const configData = {
-                groupes: groupes,
-                blocs: blocs,
-                score: {
-                    valeurInitiale: 100,
-                    decote: 10,
-                    mode: 'fige'
-                },
-                actif: true,
-                dateCreation: new Date().toISOString()
-            };
-            setBlocConfig(classe, configData)
-                .then(() => {
-                    console.log('✅ Configuration Bloc Contest créée par défaut');
-                    // Recharger la config
-                    configListener();
-                })
-                .catch(err => console.error('❌ Erreur création config Bloc Contest :', err));
-            return;
-        }
-
-        // Si config existe mais les groupes sont vides, on les met à jour
-        if (!config.groupes || Object.keys(config.groupes).length === 0) {
-            config.groupes = groupes;
-            updateBlocConfig(classe, { groupes: groupes })
-                .then(() => console.log('✅ Groupes mis à jour dans la config Bloc Contest'))
-                .catch(err => console.error('❌ Erreur mise à jour des groupes :', err));
-        }
-
-        // Écouter les validations
         if (validationsListener) validationsListener();
         validationsListener = listenValidations(classe, (validData) => {
             validations = validData;
@@ -133,19 +58,57 @@ function afficherInterface() {
     const container = document.getElementById('bloc-prof-container');
     if (!container) return;
 
-    // Si pas de config, afficher un message
+    // Si pas de config, afficher un message + bouton pour créer
     if (!config) {
         container.innerHTML = `
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
-                <p class="text-slate-400">Configuration Bloc Contest en cours de création...</p>
+                <p class="text-slate-400">Aucune configuration Bloc Contest pour cette classe.</p>
+                <button onclick="window.creerConfigBloc()" class="mt-4 bg-blue-600 px-6 py-3 rounded-xl font-black text-white text-sm uppercase active:scale-95">
+                    ⚙️ Créer la configuration
+                </button>
             </div>
         `;
         return;
     }
 
-    // Récupérer les données agrégées
+    // Récupérer les groupes depuis la configuration escalade classique (partage)
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
+    const groupes = {};
+    Object.keys(assignments).forEach(key => {
+        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
+            groupes[key] = assignments[key];
+        }
+    });
+
+    // Si pas de groupes, on génère une répartition par défaut
+    if (Object.keys(groupes).length === 0) {
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        if (eleves.length === 0) {
+            container.innerHTML = '<p class="text-slate-500">Aucun élève dans cette classe.</p>';
+            return;
+        }
+        const nbGroupes = Math.ceil(eleves.length / 3);
+        const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        for (let i = 0; i < nbGroupes; i++) {
+            const lettre = lettres[i] || `G${i+1}`;
+            groupes[lettre] = [];
+        }
+        eleves.forEach((e, index) => {
+            const g = lettres[index % nbGroupes];
+            groupes[g].push(e.id);
+        });
+        // Sauvegarder pour l’escalade classique
+        const newAssignments = { ...assignments, ...groupes, nbGroupes };
+        localStorage.setItem(`eps_arena_escalade_assignments_${currentClasse}`, JSON.stringify(newAssignments));
+    }
+
+    // Mettre à jour la config avec les groupes (si besoin)
+    if (!config.groupes || Object.keys(config.groupes).length === 0) {
+        config.groupes = groupes;
+        // On ne sauvegarde pas automatiquement, on laisse l’utilisateur cliquer sur "Créer" ou "Transmettre"
+    }
+
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    const groupes = config.groupes || {};
     const blocs = config.blocs || [];
     const params = config.score || { valeurInitiale: 100, decote: 10, mode: 'fige' };
     const dataAgregees = agregerDonnees(validations, blocs, eleves, groupes, params);
@@ -157,7 +120,7 @@ function afficherInterface() {
             <div>
                 <h3 class="font-black text-blue-400 uppercase text-sm">🧗 Bloc Contest</h3>
                 <p class="text-xs text-slate-400">Classe : ${currentClasse}</p>
-                <p class="text-xs text-slate-500">Groupes partagés avec l'escalade classique</p>
+                <p class="text-[10px] text-slate-500">Groupes partagés avec l’escalade classique</p>
             </div>
             <div class="flex gap-2 flex-wrap">
                 <button onclick="window.modifierConfigBloc()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
@@ -233,9 +196,69 @@ function afficherInterface() {
 // Actions (exposées globalement)
 // ============================================================
 
+window.creerConfigBloc = function() {
+    const activeClasse = currentClasse;
+    if (!activeClasse) return alert('Sélectionnez une classe.');
+
+    // Récupérer les groupes depuis l’escalade classique
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+    const groupes = {};
+    Object.keys(assignments).forEach(key => {
+        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
+            groupes[key] = assignments[key];
+        }
+    });
+
+    if (Object.keys(groupes).length === 0) {
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+        if (eleves.length === 0) return alert('Aucun élève dans cette classe.');
+        const nbGroupes = Math.ceil(eleves.length / 3);
+        const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        for (let i = 0; i < nbGroupes; i++) {
+            const lettre = lettres[i] || `G${i+1}`;
+            groupes[lettre] = [];
+        }
+        eleves.forEach((e, index) => {
+            const g = lettres[index % nbGroupes];
+            groupes[g].push(e.id);
+        });
+        const newAssignments = { ...assignments, ...groupes, nbGroupes };
+        localStorage.setItem(`eps_arena_escalade_assignments_${activeClasse}`, JSON.stringify(newAssignments));
+    }
+
+    // Créer des blocs par défaut (ex: 10 blocs)
+    const blocs = [];
+    for (let i = 1; i <= 10; i++) {
+        blocs.push({
+            id: `bloc${i}`,
+            label: `Bloc ${i}`,
+            couleur: '#3b82f6',
+            ordre: i
+        });
+    }
+
+    const configData = {
+        groupes: groupes,
+        blocs: blocs,
+        score: {
+            valeurInitiale: 100,
+            decote: 10,
+            mode: 'fige'
+        },
+        actif: true,
+        dateCreation: new Date().toISOString()
+    };
+
+    setBlocConfig(activeClasse, configData)
+        .then(() => {
+            alert('✅ Configuration Bloc Contest créée et enregistrée !');
+            initBlocProf(activeClasse);
+        })
+        .catch(err => alert('❌ Erreur : ' + err.message));
+};
+
 window.modifierConfigBloc = function() {
     if (!config) return alert('Aucune configuration.');
-    // Ouvrir un modal de modification (simplifié ici)
     const newValeur = prompt('Valeur initiale des blocs (actuelle : ' + config.score.valeurInitiale + ')', config.score.valeurInitiale);
     if (newValeur === null) return;
     const newDecote = prompt('Décote par validation (actuelle : ' + config.score.decote + ')', config.score.decote);
@@ -266,7 +289,13 @@ window.reinitialiserValidationsBloc = function() {
 window.exporterCSVBloc = function() {
     if (!config) return alert('Aucune configuration.');
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    const groupes = config.groupes || {};
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
+    const groupes = {};
+    Object.keys(assignments).forEach(key => {
+        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
+            groupes[key] = assignments[key];
+        }
+    });
     const blocs = config.blocs || [];
     const params = config.score || { valeurInitiale: 100, decote: 10, mode: 'fige' };
     const dataAgregees = agregerDonnees(validations, blocs, eleves, groupes, params);
@@ -288,7 +317,7 @@ window.transmettreConfigBloc = function() {
     const mainConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
     set(mainConfigRef, { activite: 'bloccontest' })
         .then(() => {
-            alert('✅ Configuration transmise aux iPads !');
+            alert('✅ Bloc Contest activé pour les iPads !');
         })
         .catch(err => alert('❌ Erreur : ' + err.message));
 };
