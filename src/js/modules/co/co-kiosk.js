@@ -123,7 +123,7 @@ function afficherInterface() {
     // Filtrer les circuits par catégorie active
     const circuitsFiltres = activeCategory ? circuits.filter(c => c.cat === activeCategory) : circuits;
     const circuitOptions = circuitsFiltres.map(c =>
-        `<option value="${c.id}" ${c.id === selectedCircuitId ? 'selected' : ''}>${c.nom} (${c.cat})</option>`
+        `<option value="${c.id}" ${c.id == selectedCircuitId ? 'selected' : ''}>${c.nom} (${c.cat})</option>`
     ).join('');
 
     let html = `
@@ -190,7 +190,8 @@ function afficherInterface() {
 // AFFICHAGE DU CARTON
 // ============================================================
 function afficherCarton() {
-    const circuit = circuits.find(c => c.id === selectedCircuitId);
+    // ✅ Correction : comparaison non stricte pour gérer les types (string vs number)
+    const circuit = circuits.find(c => c.id == selectedCircuitId);
     if (!circuit) {
         console.warn('[CO Kiosk] Circuit non trouvé :', selectedCircuitId, 'circuits disponibles :', circuits);
         return;
@@ -198,7 +199,7 @@ function afficherCarton() {
 
     console.log('[CO Kiosk] Afficher carton pour circuit :', circuit.nom);
 
-    const existing = Object.values(sessions).find(s => s.circuitId === selectedCircuitId);
+    const existing = Object.values(sessions).find(s => s.circuitId == selectedCircuitId);
     if (existing && existing.details) {
         cartonDetails = existing.details.map(d => ({ ...d }));
     } else {
