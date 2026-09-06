@@ -1,7 +1,8 @@
 // src/js/modules/eleve/orientshow-kiosk.js
 // Kiosk OrientShow pour les élèves
 
-import { listenOrientShowConfig, sendOrientShowPassage } from '../../core/firebase-service.js';
+import { db, ref, onValue, sendOrientShowPassage } from '../../core/firebase-service.js';
+// Note : sendOrientShowPassage est déjà dans firebase-service.js
 
 let currentClasse = '';
 let matrix = {};
@@ -53,36 +54,32 @@ export function initOrientShowKiosk(classe, code, config) {
         }
     }
 
-    // ✅ Écouter en temps réel les mises à jour de la config Firebase
+    // ✅ Écouter en temps réel la configuration sur le chemin /config (pas /orientshow/config)
     if (configListener) {
         configListener();
         configListener = null;
     }
-    configListener = listenOrientShowConfig(classe, (configData) => {
-        if (configData && configData.matrix) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
+    configListener = onValue(configRef, (snap) => {
+        const configData = snap.val();
+        if (configData && configData.activite === 'orientshow' && configData.matrix) {
             console.log('[OrientShow Kiosk] Mise à jour de la config reçue :', configData);
-            // Ne pas réinitialiser les sélections si elles existent
-            const oldMatrix = matrix;
-            const oldStartTime = startTime;
-            const oldEndTime = endTime;
+            // Mettre à jour les variables
             matrix = configData.matrix || {};
-            startTime = configData.startTime || null;
-            endTime = configData.endTime || null;
-            
-            // Si la course vient de démarrer ou de se terminer, mettre à jour l'interface
-            if (startTime !== oldStartTime || endTime !== oldEndTime) {
+            const newStartTime = configData.startTime || null;
+            const newEndTime = configData.endTime || null;
+            // Vérifier si la course a changé d'état
+            const courseChanged = (newStartTime !== startTime) || (newEndTime !== endTime);
+            startTime = newStartTime;
+            endTime = newEndTime;
+            // Re-rendre si la course a changé ou si la matrice a changé
+            if (courseChanged || JSON.stringify(matrix) !== JSON.stringify(configData.matrix)) {
                 renderCircuits();
                 updateUIState();
-            } else if (JSON.stringify(matrix) !== JSON.stringify(oldMatrix)) {
-                // Si la matrice change, on peut aussi rafraîchir (mais on garde les sélections)
-                renderCircuits();
             }
         } else {
-            console.warn('[OrientShow Kiosk] Config Firebase vide ou invalide');
-            const container = document.getElementById('os-kiosk-container');
-            if (container) {
-                container.innerHTML = `<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>`;
-            }
+            console.warn('[OrientShow Kiosk] Config Firebase vide ou invalide', configData);
         }
     });
 }
