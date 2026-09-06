@@ -294,20 +294,30 @@ export function initActivities() {
         if (disc === 'multi' && multiView) multiView.classList.remove('hidden');
         else if (disc === 'co' && coView) coView.classList.remove('hidden');
         else if (disc === 'orientshow' && osView) osView.classList.remove('hidden');
-        else if (disc === 'escalade' && escView) {
-            escView.classList.remove('hidden');
-            // Initialiser le module escalade via le registre
-            const escaladeModule = getModule('escalade');
-            if (escaladeModule && escaladeModule.initProf) {
-                const activeClasse = document.getElementById('selectClasse').value;
-                escaladeModule.initProf(activeClasse);
-            } else {
-                // Fallback : initialisation classique
-                initEscaladeInterface();
-                initSortableEscalade();
-                loadEscaladeAssignments();
-            }
-        }
+        else if (disc === 'escalade') {
+    // Cacher les autres vues
+    // ... (comme avant)
+    // Afficher la vue Escalade
+    const escView = document.getElementById('viewEscaladeSettings');
+    if (escView) escView.classList.remove('hidden');
+    
+    // Initialiser le module escalade
+    const escaladeModule = getModule('escalade');
+    if (escaladeModule && escaladeModule.initProf) {
+        const activeClasse = document.getElementById('selectClasse').value;
+        escaladeModule.initProf(activeClasse);
+    } else {
+        // Fallback
+        initEscaladeInterface();
+        initSortableEscalade();
+        loadEscaladeAssignments();
+    }
+    // Mettre à jour currentDiscipline
+    currentDiscipline = 'escalade';
+    // Mettre à jour les boutons (comme avant)
+    // ...
+    return;
+}
         else if (disc === 'badminton' && bmtView) bmtView.classList.remove('hidden');
         else if (disc === 'arcathlon' && arcView) arcView.classList.remove('hidden');
         else if (disc === 'evaluation' && evalView) evalView.classList.remove('hidden');
