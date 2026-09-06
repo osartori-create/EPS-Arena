@@ -7,7 +7,7 @@ import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
 import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
-import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
+import { initOrientShowKiosk } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 
