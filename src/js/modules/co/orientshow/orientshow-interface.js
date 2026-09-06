@@ -70,7 +70,10 @@ export function initOrientShowInterface(container) {
     }
 
     // Éviter les doubles initialisations
-    if (currentContainer.dataset.initialized === 'true') return;
+    if (currentContainer.dataset.initialized === 'true') {
+        console.log('[OrientShow] Déjà initialisé, on réutilise');
+        return;
+    }
     currentContainer.dataset.initialized = 'true';
 
     // Vider le conteneur
@@ -122,7 +125,8 @@ export function initOrientShowInterface(container) {
     }
 
     attachClassChangeListener();
-    loadOrientShowAssignments();
+    // Charger les affectations après un court délai pour éviter les conflits
+    setTimeout(() => loadOrientShowAssignments(), 100);
 }
 
 // ============================================================
@@ -348,18 +352,22 @@ export function stopOrientShow() {
 }
 
 // ============================================================
-// CHARGEMENT DES AFFECTATIONS
+// CHARGEMENT DES AFFECTATIONS (CORRIGÉ)
 // ============================================================
 export async function loadOrientShowAssignments() {
-    if (isLoading) return;
+    // Vérifier le verrou
+    if (isLoading) {
+        console.log('⏳ Chargement déjà en cours, ignoré.');
+        return;
+    }
     isLoading = true;
 
     try {
         const garconsContainer = document.getElementById('os-reserve-garcons');
         const fillesContainer = document.getElementById('os-reserve-filles');
         if (!garconsContainer || !fillesContainer) {
-            isLoading = false;
-            return;
+            console.warn('Conteneurs de réserve introuvables');
+            return; // sera suivi du finally
         }
 
         const classe = getCurrentClasse();
@@ -367,8 +375,7 @@ export async function loadOrientShowAssignments() {
             document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
             garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
             fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
-            isLoading = false;
-            return;
+            return; // sera suivi du finally
         }
 
         const mapping = getLocalMapping(classe) || {};
