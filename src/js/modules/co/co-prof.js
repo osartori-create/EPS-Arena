@@ -32,13 +32,12 @@ export function initCOModeSelector() {
         selector.style.display = 'flex';
     }
 
-    // Créer les conteneurs s'ils n'existent pas (sans les ajouter plusieurs fois)
+    // Créer les conteneurs s'ils n'existent pas
     let containerClassique = document.getElementById('co-classique-container');
     if (!containerClassique) {
         containerClassique = document.createElement('div');
         containerClassique.id = 'co-classique-container';
         containerClassique.className = 'space-y-4';
-        // Insérer après le sélecteur
         selector.after(containerClassique);
     }
 
@@ -48,14 +47,12 @@ export function initCOModeSelector() {
         containerOrientShow.id = 'co-orientshow-container';
         containerOrientShow.className = 'space-y-4';
         containerOrientShow.style.display = 'none';
-        // Insérer après le conteneur classique
         containerClassique.after(containerOrientShow);
     }
 
     // Attacher les événements (éviter les doublons)
     const btnClassique = document.getElementById('co-mode-classique');
     const btnOrient = document.getElementById('co-mode-orientshow');
-    // On clone et remplace pour supprimer les anciens écouteurs
     const newBtnClassique = btnClassique.cloneNode(true);
     const newBtnOrient = btnOrient.cloneNode(true);
     btnClassique.parentNode.replaceChild(newBtnClassique, btnClassique);
@@ -75,7 +72,11 @@ function setCOMode(mode) {
 
     if (mode === 'classique') {
         if (containerClassique) containerClassique.style.display = '';
-        if (containerOrientShow) containerOrientShow.style.display = 'none';
+        if (containerOrientShow) {
+            containerOrientShow.style.display = 'none';
+            // Nettoyer l'attribut pour permettre une réinitialisation future
+            delete containerOrientShow.dataset.initialized;
+        }
         const btnClassique = document.getElementById('co-mode-classique');
         const btnOrient = document.getElementById('co-mode-orientshow');
         if (btnClassique) btnClassique.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
@@ -85,10 +86,15 @@ function setCOMode(mode) {
         initSortableCO();
         loadCOAssignments();
     } else {
-        if (containerClassique) containerClassique.style.display = 'none';
+        if (containerClassique) {
+            containerClassique.style.display = 'none';
+            // Nettoyer l'attribut pour permettre une réinitialisation future
+            delete containerClassique.dataset.initialized;
+        }
         if (containerOrientShow) {
             containerOrientShow.style.display = '';
-            // Vider le conteneur avant de le remplir
+            // ✅ Supprimer l'attribut d'initialisation avant de vider le conteneur
+            delete containerOrientShow.dataset.initialized;
             containerOrientShow.innerHTML = '';
             // ✅ Appeler l’initialisation OrientShow avec le conteneur
             import('./orientshow/orientshow-prof.js').then(module => {

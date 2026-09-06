@@ -65,19 +65,14 @@ export function saveMatrixToFirebase() {
 export function initOrientShowInterface(container) {
     currentContainer = container || document.getElementById('viewOrientShowSettings');
     if (!currentContainer) {
-        console.error('Conteneur OrientShow introuvable');
+        console.error('[OrientShow] Conteneur introuvable');
         return;
     }
 
-    // Éviter les doubles initialisations
-    if (currentContainer.dataset.initialized === 'true') {
-        console.log('[OrientShow] Déjà initialisé, on réutilise');
-        return;
-    }
-    currentContainer.dataset.initialized = 'true';
-
-    // Vider le conteneur
+    // ✅ On vide le conteneur à chaque appel pour une reconstruction propre
     currentContainer.innerHTML = '';
+    // Supprimer l'ancien marqueur d'initialisation
+    delete currentContainer.dataset.initialized;
 
     // Créer la structure
     const header = createHeader();
@@ -89,6 +84,7 @@ export function initOrientShowInterface(container) {
     const matrixContainer = createMatrixContainer();
     currentContainer.appendChild(matrixContainer);
 
+    // Réinitialiser la matrice par défaut
     resetMatrix();
 
     const classe = getCurrentClasse();
