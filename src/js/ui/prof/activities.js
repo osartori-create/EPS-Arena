@@ -15,6 +15,9 @@ import { getModule, getAllModules } from '../../modules/registry.js';
 // ✅ Importer le module escalade (pour l'initialisation via le registre)
 import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
 
+// ✅ IMPORTANT : forcer l’enregistrement du module escalade
+import '../../modules/escalade/escalade-prof.js';
+
 let currentDiscipline = 'multi';
 
 // ============================================================
