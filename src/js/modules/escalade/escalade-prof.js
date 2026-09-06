@@ -6,7 +6,6 @@ import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, l
 import { initBlocProf, cleanupBlocProf, transmettreConfigBloc } from './escalade-prof-blocs.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
-import { transmettreConfigBloc } from './escalade-prof-blocs.js';
 
 let currentMode = 'classic'; // 'classic' | 'bloc'
 let currentClasse = '';
