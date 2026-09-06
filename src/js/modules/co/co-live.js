@@ -59,7 +59,7 @@ export function renderCOLive() {
         html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">`;
 
         for (const [code, sessions] of Object.entries(byCode)) {
-            // Calculer les totaux
+            // Calculer les totaux pour ce code
             let totalPts = 0;
             let totalMax = 0;
             let dernierCircuit = null;
@@ -74,80 +74,87 @@ export function renderCOLive() {
                 }
             });
 
-            // Trouver l'élève associé
-            let eleve = null;
-            let eleveId = null;
+            // 🔍 Récupérer TOUS les élèves associés à ce code
+            let elevesAssocies = [];
 
-            // Méthode 1 : mapping local
-            for (const [key, ids] of Object.entries(mapping)) {
-                if (key.endsWith(`_${code}`) && Array.isArray(ids) && ids.length > 0) {
-                    eleveId = ids[0];
-                    eleve = eleves.find(e => e.id === eleveId);
+            // Méthode 1 : mapping local (tableau d'IDs)
+            for (const [key, value] of Object.entries(mapping)) {
+                if (key.endsWith(`_${code}`)) {
+                    if (Array.isArray(value)) {
+                        // Cas : mapping[A1] = ["id1", "id2"]
+                        elevesAssocies = value.map(id => eleves.find(e => e.id === id)).filter(Boolean);
+                    } else if (typeof value === 'string') {
+                        // Cas : mapping[A1] = "id1"
+                        const eleve = eleves.find(e => e.id === value);
+                        if (eleve) elevesAssocies.push(eleve);
+                    }
                     break;
                 }
             }
 
-            // Méthode 2 : studentsMap (pour compatibilité)
-            if (!eleve && studentsMap[code]) {
+            // Méthode 2 : studentsMap (fallback)
+            if (elevesAssocies.length === 0 && studentsMap[code]) {
                 const nomComplet = studentsMap[code];
                 const parts = nomComplet ? nomComplet.split(' ') : [code, ''];
-                eleve = {
+                elevesAssocies.push({
                     prenom: parts[0] || code,
                     nom: parts.slice(1).join(' ') || '',
                     id: code
-                };
-                eleveId = code;
+                });
             }
 
-            // Méthode 3 : fallback
-            if (!eleve) {
-                eleve = {
+            // Méthode 3 : fallback ultime (code seul)
+            if (elevesAssocies.length === 0) {
+                elevesAssocies.push({
                     prenom: code,
                     nom: '',
                     id: code
-                };
-                eleveId = code;
+                });
             }
 
-            const nom = eleve ? `${eleve.prenom} ${eleve.nom}`.trim() || code : code;
-            let photoHtml = '<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>';
-            if (eleveId) {
-                try {
-                    const url = await getPhotoUrl(eleveId);
-                    if (url) {
-                        photoHtml = `<img src="${url}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-500">`;
-                    }
-                } catch (e) {}
+            // Pour chaque élève associé à ce code, créer une carte
+            for (const eleve of elevesAssocies) {
+                const nom = eleve ? `${eleve.prenom} ${eleve.nom}`.trim() || code : code;
+                let photoHtml = '<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>';
+                if (eleve.id) {
+                    try {
+                        const url = await getPhotoUrl(eleve.id);
+                        if (url) {
+                            photoHtml = `<img src="${url}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-500">`;
+                        }
+                    } catch (e) {}
+                }
+
+                const pct = totalMax > 0 ? Math.round((totalPts / totalMax) * 100) : 0;
+                const couleurPct = pct >= 80 ? 'text-emerald-400' : (pct >= 50 ? 'text-yellow-400' : 'text-red-400');
+
+                html += `
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                        <div class="flex items-center gap-3 mb-2">
+                            ${photoHtml}
+                            <div>
+                                <div class="font-black text-white text-lg">${nom}</div>
+                                <div class="text-xs text-slate-400">Code : ${code}</div>
+                                ${elevesAssocies.length > 1 ? '<div class="text-xs text-amber-400">⚠️ Poste partagé</div>' : ''}
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <span class="text-3xl font-black text-yellow-400">${totalPts}</span>
+                                <span class="text-sm text-slate-500"> / ${totalMax}</span>
+                            </div>
+                            <span class="${couleurPct} font-black text-lg">${pct}%</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
+                            <div class="h-full ${pct >= 80 ? 'bg-emerald-500' : (pct >= 50 ? 'bg-yellow-500' : 'bg-red-500')} rounded-full transition-all" style="width:${pct}%"></div>
+                        </div>
+                        <div class="text-[10px] text-slate-500 mt-2">
+                            ${sessions.length} circuit(s) validé(s)
+                            ${dernierCircuit ? `· Dernier : ${dernierCircuit}` : ''}
+                        </div>
+                    </div>
+                `;
             }
-
-            const pct = totalMax > 0 ? Math.round((totalPts / totalMax) * 100) : 0;
-            const couleurPct = pct >= 80 ? 'text-emerald-400' : (pct >= 50 ? 'text-yellow-400' : 'text-red-400');
-
-            html += `
-                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                    <div class="flex items-center gap-3 mb-2">
-                        ${photoHtml}
-                        <div>
-                            <div class="font-black text-white text-lg">${nom}</div>
-                            <div class="text-xs text-slate-400">Code : ${code}</div>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <span class="text-3xl font-black text-yellow-400">${totalPts}</span>
-                            <span class="text-sm text-slate-500"> / ${totalMax}</span>
-                        </div>
-                        <span class="${couleurPct} font-black text-lg">${pct}%</span>
-                    </div>
-                    <div class="w-full h-2 bg-slate-700 rounded-full mt-2 overflow-hidden">
-                        <div class="h-full ${pct >= 80 ? 'bg-emerald-500' : (pct >= 50 ? 'bg-yellow-500' : 'bg-red-500')} rounded-full transition-all" style="width:${pct}%"></div>
-                    </div>
-                    <div class="text-[10px] text-slate-500 mt-2">
-                        ${sessions.length} circuit(s) validé(s)
-                        ${dernierCircuit ? `· Dernier : ${dernierCircuit}` : ''}
-                    </div>
-                </div>
-            `;
         }
 
         html += `</div>`;
