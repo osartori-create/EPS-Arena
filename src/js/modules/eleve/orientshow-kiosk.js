@@ -1,6 +1,6 @@
 // src/js/modules/eleve/orientshow-kiosk.js
 // Kiosk OrientShow – version élève (inspirée de vos fichiers originaux)
-// ✅ Suppression de la dépendance startTime / endTime – les élèves peuvent valider directement
+// ✅ Ajout d’un bouton Retour et masquage de l’affichage du code en double
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -24,6 +24,10 @@ export function initOrientShowKiosk(classe, code, config) {
     currentClasse = classe;
     currentCode = code;
 
+    // Masquer le panneau "Code sélectionné" pour éviter le doublon
+    const codeInfo = document.getElementById('code-info');
+    if (codeInfo) codeInfo.style.display = 'none';
+
     const container = document.getElementById('orientshow-module');
     if (!container) {
         console.error('Conteneur orientshow-module introuvable');
@@ -31,7 +35,7 @@ export function initOrientShowKiosk(classe, code, config) {
     }
     container.innerHTML = '';
 
-    // 1. Écouter la configuration (matrix uniquement – plus de startTime/endTime)
+    // 1. Écouter la configuration (matrix uniquement)
     if (configListener) {
         configListener();
         configListener = null;
@@ -139,7 +143,7 @@ function afficherInterface() {
     };
     const bgColor = colorClasses[color] || 'bg-slate-700 text-white border-slate-600';
 
-    // En‑tête (info élève + score)
+    // En‑tête (info élève + score) – avec la pastille de couleur
     const headerDiv = document.createElement('div');
     headerDiv.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4';
     headerDiv.innerHTML = `
@@ -159,7 +163,7 @@ function afficherInterface() {
     `;
     container.appendChild(headerDiv);
 
-    // ✅ Message simplifié : plus de dépendance à startTime/endTime
+    // Message informatif
     const infoDiv = document.createElement('div');
     infoDiv.className = 'text-center text-sm text-slate-400 mb-4';
     infoDiv.textContent = '🎯 Sélectionne un circuit et saisis les deux lettres.';
@@ -219,9 +223,40 @@ function afficherInterface() {
     `;
     container.appendChild(saisieDiv);
 
-    // Attacher les événements aux boutons de saisie
-    document.getElementById('btnAnnulerSaisie').addEventListener('click', annulerSaisie);
-    document.getElementById('btnValiderCircuit').addEventListener('click', validerCircuit);
+    // Bouton Retour (pour revenir au choix du code)
+    const footerDiv = document.createElement('div');
+    footerDiv.className = 'mt-4 text-center';
+    const backBtn = document.createElement('button');
+    backBtn.className = 'bg-slate-700 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95 transition-transform';
+    backBtn.textContent = '← Retour choix du code';
+    backBtn.addEventListener('click', () => {
+        // Nettoyer les écouteurs
+        cleanupOrientShowKiosk();
+        // Cacher le module
+        const container = document.getElementById('orientshow-module');
+        if (container) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+        }
+        // Rétablir l'affichage du panneau "Code sélectionné"
+        const codeInfo = document.getElementById('code-info');
+        if (codeInfo) codeInfo.style.display = '';
+        // Appeler resetToLogin pour revenir à la grille des codes
+        if (typeof window.resetToLogin === 'function') {
+            window.resetToLogin();
+        } else {
+            // Fallback : recharger la page
+            location.reload();
+        }
+    });
+    footerDiv.appendChild(backBtn);
+    container.appendChild(footerDiv);
+
+    // Attacher les événements aux boutons de saisie (s'ils existent déjà, on les remplace)
+    const annulerBtn = document.getElementById('btnAnnulerSaisie');
+    const validerBtn = document.getElementById('btnValiderCircuit');
+    if (annulerBtn) annulerBtn.addEventListener('click', annulerSaisie);
+    if (validerBtn) validerBtn.addEventListener('click', validerCircuit);
 }
 
 // ============================================================
@@ -235,7 +270,6 @@ function selectCircuit(circuitId) {
         return;
     }
 
-    // ✅ Plus de vérification startTime/endTime – validation immédiate
     selectedCircuit = circuitId;
     const saisieZone = document.getElementById('saisieZone');
     document.getElementById('selectedCircuitLabel').textContent = `C${circuitId}`;
@@ -268,8 +302,6 @@ function validerCircuit() {
         annulerSaisie();
         return;
     }
-
-    // ✅ Plus de vérification startTime/endTime
 
     const l1 = document.getElementById('l1').value.toUpperCase();
     const l2 = document.getElementById('l2').value.toUpperCase();
