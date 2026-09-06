@@ -10,7 +10,7 @@ import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonCon
 import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
 import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { getModule, getAllModules } from '../../modules/registry.js';
-import { initNatationInterface, generateNatationGroups, transmettreNatationConfig, loadNatationAssignments } from '../../modules/natation/index.js';
+import { initNatationInterface, transmettreNatationConfig } from '../../modules/natation/index.js';
 
 // ✅ Importer le module escalade (pour l'initialisation via le registre)
 import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
@@ -99,8 +99,7 @@ export function initActivities() {
 else if (disc === 'natation') {
     const view = document.getElementById('viewNatationSettings');
     if (view) view.classList.remove('hidden');
-    initNatationInterface();
-    loadNatationAssignments();
+    initNatationInterface();  // ← charge automatiquement les élèves et les temps
 }
         else if (disc === 'escalade') {
             if (escView) escView.classList.remove('hidden');
@@ -241,6 +240,11 @@ else if (disc === 'natation') {
             generateArcathlonTeams();
             return;
         }
+        if (currentDiscipline === 'natation') {
+    initNatationInterface(); // recharge les données
+    alert('Liste des élèves mise à jour.');
+    return;
+}
         if (currentDiscipline === 'multi') {
             const multiModule = getModule('multi');
             if (multiModule && multiModule.generateTeams) {
