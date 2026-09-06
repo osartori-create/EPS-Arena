@@ -1,4 +1,5 @@
 // src/js/modules/eleve/orientshow-kiosk.js
+// Kiosk OrientShow pour les élèves
 
 import { listenOrientShowConfig, sendOrientShowPassage } from '../../core/firebase-service.js';
 
@@ -13,33 +14,31 @@ let lastSend = 0;
 const COOLDOWN = 30000;
 
 // ============================================================
-// INIT (avec config optionnelle)
+// INIT
 // ============================================================
 export function initOrientShowKiosk(classe, code, config) {
     currentClasse = classe;
     
-    // ✅ Si une config est fournie, on l'utilise directement
+    // Si une config est fournie, on l'utilise
     if (config && config.matrix) {
         console.log('[OrientShow Kiosk] Configuration reçue :', config);
         matrix = config.matrix || {};
         startTime = config.startTime || null;
         endTime = config.endTime || null;
         
-        // Extraire la couleur et le numéro du code
         const parts = code.split('_');
         if (parts.length === 2) {
             selectedColor = parts[0];
             selectedNum = parseInt(parts[1]);
         }
         
-        // Afficher l'interface
         renderIdentitySelection();
         renderCircuits();
         updateUIState();
         return;
     }
     
-    // Fallback : écouter Firebase si config non fournie
+    // Fallback : écouter Firebase
     console.log('[OrientShow Kiosk] Pas de config fournie, écoute Firebase...');
     listenOrientShowConfig(classe, (configData) => {
         if (configData) {
@@ -94,7 +93,6 @@ function renderCircuits() {
     const container = document.getElementById('os-circuit-grid');
     if (!container) return;
     
-    // Vérifier que la config est chargée
     if (!matrix || Object.keys(matrix).length === 0) {
         container.innerHTML = '<p class="text-slate-400 text-center">⏳ En attente de la matrice des circuits...</p>';
         return;
@@ -108,7 +106,6 @@ function renderCircuits() {
     html += `</div>`;
     container.innerHTML = html;
     
-    // Si startTime est null, afficher un message
     if (!startTime) {
         container.innerHTML += '<p class="text-center text-slate-400 mt-4">⏳ En attente du départ du professeur...</p>';
     } else if (endTime) {
@@ -155,7 +152,8 @@ window.selectOSCircuit = function(circuit) {
     document.getElementById('os-letters-input').classList.remove('hidden');
 };
 
-window.validateOSPassage = function() {
+// ✅ Export nommé de validateOSPassage pour l'importer dans eleve-app.js
+export function validateOSPassage() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     if (!selectedColor || !selectedNum) return alert('Choisissez votre identité (couleur + numéro).');
     if (!selectedCircuit) return alert('Choisissez un circuit.');
@@ -192,10 +190,18 @@ window.validateOSPassage = function() {
         document.getElementById('os-l1').value = '';
         document.getElementById('os-l2').value = '';
     }).catch(err => alert('Erreur envoi : ' + err.message));
-};
+}
+
+// Attacher à window pour les onclick HTML
+window.validateOSPassage = validateOSPassage;
 
 function showFeedback(score) {
     const icon = score === 5 ? '🏆' : (score === 2 ? '🆗' : '❌');
     const color = score === 5 ? '#065f46' : (score === 2 ? '#9a3412' : '#991b1b');
     alert(`${icon} Score : +${score} pts`);
+}
+
+// Nettoyage éventuel
+export function cleanupOrientShowKiosk() {
+    // Rien pour l'instant
 }
