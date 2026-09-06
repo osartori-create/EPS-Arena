@@ -55,57 +55,58 @@ export function initActivities() {
     currentDiscipline = disc;
     localStorage.setItem('eps_arena_current_discipline', disc);
 
-    // Liste de toutes les vues de paramètres
-    const allViews = [
-        'viewMultiSettings',
-        'viewCOSettings',
-        'viewEscaladeSettings',
-        'viewBadmintonSettings',
-        'viewArcathlonSettings',
-        'viewEvaluationSettings',
-        'viewTournoiSettings',
-        'viewNatationSettings'
-    ];
+    // --- 1. Récupérer toutes les vues ---
+    const multiView = document.getElementById('viewMultiSettings');
+    const coView = document.getElementById('viewCOSettings');
+    const escView = document.getElementById('viewEscaladeSettings');
+    const bmtView = document.getElementById('viewBadmintonSettings');
+    const arcView = document.getElementById('viewArcathlonSettings');
+    const evalView = document.getElementById('viewEvaluationSettings');
+    const tournoiView = document.getElementById('viewTournoiSettings');
+    const natationView = document.getElementById('viewNatationSettings');
 
-    // Cacher toutes les vues
-    allViews.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add('hidden');
+    // --- 2. Masquer TOUTES les vues (y compris CO) ---
+    [multiView, coView, escView, bmtView, arcView, evalView, tournoiView, natationView].forEach(el => {
+        if (el) {
+            el.classList.add('hidden');
+            el.style.display = ''; // supprime tout display inline
+        }
     });
 
-    // === GESTION SPÉCIFIQUE DES CONTENEURS CO ===
-    // On cache les deux conteneurs internes de CO par défaut
+    // --- 3. Cacher spécifiquement les conteneurs internes de CO ---
     const coClassique = document.getElementById('co-classique-container');
     const coOrientShow = document.getElementById('co-orientshow-container');
     if (coClassique) coClassique.style.display = 'none';
     if (coOrientShow) coOrientShow.style.display = 'none';
 
-    // Afficher la vue correspondante
-    const viewMap = {
-        'multi': 'viewMultiSettings',
-        'co': 'viewCOSettings',
-        'escalade': 'viewEscaladeSettings',
-        'badminton': 'viewBadmintonSettings',
-        'arcathlon': 'viewArcathlonSettings',
-        'evaluation': 'viewEvaluationSettings',
-        'tournoi': 'viewTournoiSettings',
-        'natation': 'viewNatationSettings'
-    };
-
-    const targetId = viewMap[disc];
-    if (targetId) {
-        const targetView = document.getElementById(targetId);
-        if (targetView) targetView.classList.remove('hidden');
+    // --- 4. Afficher la vue demandée ---
+    let targetView = null;
+    switch (disc) {
+        case 'multi': targetView = multiView; break;
+        case 'co': targetView = coView; break;
+        case 'escalade': targetView = escView; break;
+        case 'badminton': targetView = bmtView; break;
+        case 'arcathlon': targetView = arcView; break;
+        case 'evaluation': targetView = evalView; break;
+        case 'tournoi': targetView = tournoiView; break;
+        case 'natation': targetView = natationView; break;
+        default: targetView = null;
     }
 
-    // Si on est en CO, on réaffiche le bon conteneur (classique par défaut)
-    if (disc === 'co') {
-        // Le conteneur classique est affiché par défaut par co-prof.js
-        // On s'assure qu'il est visible
-        if (coClassique) coClassique.style.display = '';
-        if (coOrientShow) coOrientShow.style.display = 'none';
-        // Le sélecteur de mode (boutons) est déjà dans viewCOSettings
-        // On pourrait appeler initCOModeSelector() mais il est déjà appelé par initProf
+    if (targetView) {
+        targetView.classList.remove('hidden');
+        targetView.style.display = ''; // s'assurer qu'il est visible
+    }
+
+    // --- 5. Si on est en CO, réactiver le bon conteneur via co-prof.js ---
+    if (disc === 'co' && coView) {
+        setTimeout(() => {
+            const coModule = getModule('co');
+            if (coModule && coModule.initProf) {
+                const activeClasse = document.getElementById('selectClasse').value;
+                coModule.initProf(activeClasse);
+            }
+        }, 50);
     }
 
 

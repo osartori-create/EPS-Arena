@@ -19,7 +19,8 @@ export function initNatationInterface() {
         const div = document.createElement('div');
         div.id = 'viewNatationSettings';
         div.className = 'hidden space-y-4';
-        parent.prepend(div); // ← met en premier
+        // 🔽 Remplacer prepend() par appendChild()
+        parent.appendChild(div);
         setTimeout(() => initNatationInterface(), 50);
         return;
     }
