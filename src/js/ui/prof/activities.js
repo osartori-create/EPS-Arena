@@ -52,44 +52,62 @@ export function initActivities() {
     // CHANGEMENT DE DISCIPLINE
     // ============================================================
     window.switchDiscipline = function(disc) {
-        currentDiscipline = disc;
-        localStorage.setItem('eps_arena_current_discipline', disc);
+    currentDiscipline = disc;
+    localStorage.setItem('eps_arena_current_discipline', disc);
 
-        // Liste de toutes les vues de paramètres
-        const allViews = [
-            'viewMultiSettings',
-            'viewCOSettings',
-            'viewEscaladeSettings',
-            'viewBadmintonSettings',
-            'viewArcathlonSettings',
-            'viewEvaluationSettings',
-            'viewTournoiSettings',
-            'viewNatationSettings'
-        ];
+    // Liste de toutes les vues de paramètres
+    const allViews = [
+        'viewMultiSettings',
+        'viewCOSettings',
+        'viewEscaladeSettings',
+        'viewBadmintonSettings',
+        'viewArcathlonSettings',
+        'viewEvaluationSettings',
+        'viewTournoiSettings',
+        'viewNatationSettings'
+    ];
 
-        // Cacher toutes les vues
-        allViews.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.add('hidden');
-        });
+    // Cacher toutes les vues
+    allViews.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
 
-        // Afficher la vue correspondante
-        const viewMap = {
-            'multi': 'viewMultiSettings',
-            'co': 'viewCOSettings',
-            'escalade': 'viewEscaladeSettings',
-            'badminton': 'viewBadmintonSettings',
-            'arcathlon': 'viewArcathlonSettings',
-            'evaluation': 'viewEvaluationSettings',
-            'tournoi': 'viewTournoiSettings',
-            'natation': 'viewNatationSettings'
-        };
+    // === GESTION SPÉCIFIQUE DES CONTENEURS CO ===
+    // On cache les deux conteneurs internes de CO par défaut
+    const coClassique = document.getElementById('co-classique-container');
+    const coOrientShow = document.getElementById('co-orientshow-container');
+    if (coClassique) coClassique.style.display = 'none';
+    if (coOrientShow) coOrientShow.style.display = 'none';
 
-        const targetId = viewMap[disc];
-        if (targetId) {
-            const targetView = document.getElementById(targetId);
-            if (targetView) targetView.classList.remove('hidden');
-        }
+    // Afficher la vue correspondante
+    const viewMap = {
+        'multi': 'viewMultiSettings',
+        'co': 'viewCOSettings',
+        'escalade': 'viewEscaladeSettings',
+        'badminton': 'viewBadmintonSettings',
+        'arcathlon': 'viewArcathlonSettings',
+        'evaluation': 'viewEvaluationSettings',
+        'tournoi': 'viewTournoiSettings',
+        'natation': 'viewNatationSettings'
+    };
+
+    const targetId = viewMap[disc];
+    if (targetId) {
+        const targetView = document.getElementById(targetId);
+        if (targetView) targetView.classList.remove('hidden');
+    }
+
+    // Si on est en CO, on réaffiche le bon conteneur (classique par défaut)
+    if (disc === 'co') {
+        // Le conteneur classique est affiché par défaut par co-prof.js
+        // On s'assure qu'il est visible
+        if (coClassique) coClassique.style.display = '';
+        if (coOrientShow) coOrientShow.style.display = 'none';
+        // Le sélecteur de mode (boutons) est déjà dans viewCOSettings
+        // On pourrait appeler initCOModeSelector() mais il est déjà appelé par initProf
+    }
+
 
         // Initialisations spécifiques
         if (disc === 'multi') {
