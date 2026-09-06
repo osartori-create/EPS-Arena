@@ -80,7 +80,6 @@ function setCOMode(mode) {
         const btnOrient = document.getElementById('co-mode-orientshow');
         if (btnClassique) btnClassique.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
         if (btnOrient) btnOrient.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-        // Initialiser CO classique
         initCOInterface();
         initSortableCO();
         loadCOAssignments();
@@ -93,20 +92,13 @@ function setCOMode(mode) {
             containerOrientShow.style.display = '';
             delete containerOrientShow.dataset.initialized;
             containerOrientShow.innerHTML = '';
-            // ✅ Initialiser OrientShow
+            // ✅ Importer et initialiser OrientShow avec le bon chemin
             import('./orientshow/orientshow-prof.js').then(module => {
                 if (module.initProf) {
                     module.initProf(currentClasse, containerOrientShow);
-                    // ✅ Forcer le chargement des affectations après un délai
-                    setTimeout(() => {
-                        import('../../orientshow/orientshow-interface.js').then(m => {
-                            if (m.loadOrientShowAssignments) {
-                                console.log('[CO] Forçage du chargement des affectations OrientShow');
-                                m.loadOrientShowAssignments();
-                            }
-                        });
-                    }, 300);
                 }
+            }).catch(err => {
+                console.error('[CO] Erreur chargement OrientShow :', err);
             });
         }
         const btnClassique = document.getElementById('co-mode-classique');
