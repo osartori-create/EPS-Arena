@@ -1,12 +1,12 @@
 // src/js/modules/co/co-detail.js
 // Modale de détail et correction manuelle des résultats pour la CO classique
 
-import { db, ref, update } from '../../core/firebase-service.js';
+import { db, ref, set, update } from '../../core/firebase-service.js';
 import { MATRICE } from './matrice.js';
 
 let currentClasse = '';
 let currentCode = '';
-let currentPassages = {}; // { circuitId: passageData }
+let currentPassages = {};
 
 // ============================================================
 // OUVERTURE DE LA MODALE
@@ -15,23 +15,19 @@ export function openCoDetail(classe, code, passages) {
     currentClasse = classe;
     currentCode = code;
     
-    // ✅ CORRECTION : parser si passages est une chaîne JSON
     if (typeof passages === 'string') {
         try {
             currentPassages = JSON.parse(passages);
         } catch (e) {
-            console.warn('[CO-Detail] Erreur parsing JSON :', e);
             currentPassages = {};
         }
     } else {
         currentPassages = passages || {};
     }
 
-    // Récupérer les élèves pour le nom
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
     const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
     
-    // Trouver le nom de l'élève
     let eleveNom = code;
     for (const [key, value] of Object.entries(mapping)) {
         if (key.endsWith(`_${code}`)) {
@@ -46,7 +42,6 @@ export function openCoDetail(classe, code, passages) {
         }
     }
 
-    // Créer la modale
     const modal = document.createElement('div');
     modal.id = 'co-detail-modal';
     modal.className = 'fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4';
@@ -67,18 +62,14 @@ export function openCoDetail(classe, code, passages) {
         </div>
     `;
     document.body.appendChild(modal);
-
     renderDetailContent();
 }
 
-// ============================================================
-// RENDU DU CONTENU DE LA MODALE
-// ============================================================
 function renderDetailContent() {
     const container = document.getElementById('co-detail-content');
     if (!container) return;
 
-    const circuitKeys = Object.keys(currentPassages);
+    const circuitKeys = Object.keys(currentPassages).filter(k => currentPassages[k] && currentPassages[k].details);
     if (circuitKeys.length === 0) {
         container.innerHTML = '<p class="text-slate-400 text-center">Aucun circuit validé.</p>';
         return;
@@ -86,14 +77,10 @@ function renderDetailContent() {
 
     let totalPts = 0;
     let totalMax = 0;
-
     let html = '';
+
     circuitKeys.forEach((circuitId, idx) => {
         const data = currentPassages[circuitId];
-        if (!data || !data.details) {
-            // Ignorer les entrées mal formées
-            return;
-        }
         totalPts += data.pts || 0;
         totalMax += data.total || 0;
 
@@ -148,26 +135,18 @@ function renderDetailContent() {
     container.innerHTML = html;
 }
 
-// ============================================================
-// TOGGLE EXPANSION D'UN CIRCUIT
-// ============================================================
 window.toggleCircuitDetail = function(header) {
     const content = header.nextElementSibling;
-    if (content) {
-        content.classList.toggle('hidden');
-    }
+    if (content) content.classList.toggle('hidden');
 };
 
-// ============================================================
-// FORCER LA CORRECTION D'UN POSTE
-// ============================================================
+// ✅ CORRECTION : utilisation de `set` au lieu de `update` pour les valeurs primitives
 window.forcerCorrection = function(circuitId, posteIdx) {
     if (!confirm(`Forcer la correction du poste ${posteIdx + 1} ?`)) return;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`;
 
-    // Trouver la clé du passage correspondant
     let passageKey = null;
     for (const [key, value] of Object.entries(currentPassages)) {
         if (value.circuitId === circuitId || key === circuitId) {
@@ -181,17 +160,20 @@ window.forcerCorrection = function(circuitId, posteIdx) {
         return;
     }
 
-    const updatePath = `${basePath}/${passageKey}/details/${posteIdx}/status`;
-    const updateRef = ref(db, updatePath);
-    update(updateRef, 'correct')
+    // Mettre à jour le statut du poste
+    const statusPath = `${basePath}/${passageKey}/details/${posteIdx}/status`;
+    const statusRef = ref(db, statusPath);
+    set(statusRef, 'correct')
         .then(() => {
             if (currentPassages[passageKey] && currentPassages[passageKey].details) {
                 currentPassages[passageKey].details[posteIdx].status = 'correct';
                 const pts = currentPassages[passageKey].details.filter(d => d.status === 'correct').length;
                 currentPassages[passageKey].pts = pts;
                 const ptsRef = ref(db, `${basePath}/${passageKey}/pts`);
-                update(ptsRef, pts);
+                return set(ptsRef, pts);
             }
+        })
+        .then(() => {
             renderDetailContent();
             alert('✅ Correction forcée !');
         })
@@ -201,13 +183,9 @@ window.forcerCorrection = function(circuitId, posteIdx) {
         });
 };
 
-// ============================================================
-// FERMETURE DE LA MODALE
-// ============================================================
 window.closeCoDetail = function() {
     const modal = document.getElementById('co-detail-modal');
     if (modal) modal.remove();
 };
 
-// ✅ Exposition globale pour les onclick HTML
 window.openCoDetail = openCoDetail;

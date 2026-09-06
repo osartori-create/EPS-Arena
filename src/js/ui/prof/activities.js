@@ -305,11 +305,17 @@ export function initActivities() {
                 }
                 if (disc === 'co') {
     const coModule = getModule('co');
-    if (coModule && coModule.renderLive) {
-        coModule.renderLive();
+    if (coModule && typeof coModule.renderLive === 'function') {
+        const result = coModule.renderLive();
+        if (result && typeof result.catch === 'function') {
+            result.catch(console.error);
+        }
     } else {
-        import('../../modules/co/co-live.js').then(m => m.renderCOLive()).catch(console.error);
+        import('../../modules/co/co-live.js')
+            .then(m => m.renderCOLive())
+            .catch(console.error);
     }
+    return;
 }
             }
         } 
