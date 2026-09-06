@@ -17,10 +17,9 @@ export function initNatationInterface() {
         const parent = document.getElementById('viewActivities');
         if (!parent) return;
         const div = document.createElement('div');
-        div.id = 'viewNatationSettings';
-        div.className = 'hidden space-y-4';
-        // 🔽 Remplacer prepend() par appendChild()
-        parent.appendChild(div);
+div.id = 'viewNatationSettings';
+div.className = 'hidden space-y-4';
+parent.appendChild(div); // au lieu de prepend
         setTimeout(() => initNatationInterface(), 50);
         return;
     }

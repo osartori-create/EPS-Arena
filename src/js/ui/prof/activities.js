@@ -55,58 +55,72 @@ export function initActivities() {
     currentDiscipline = disc;
     localStorage.setItem('eps_arena_current_discipline', disc);
 
-    // --- 1. Récupérer toutes les vues ---
-    const multiView = document.getElementById('viewMultiSettings');
-    const coView = document.getElementById('viewCOSettings');
-    const escView = document.getElementById('viewEscaladeSettings');
-    const bmtView = document.getElementById('viewBadmintonSettings');
-    const arcView = document.getElementById('viewArcathlonSettings');
-    const evalView = document.getElementById('viewEvaluationSettings');
-    const tournoiView = document.getElementById('viewTournoiSettings');
-    const natationView = document.getElementById('viewNatationSettings');
+    // Fonction pour cacher une vue proprement
+    function hideView(el) {
+        if (!el) return;
+        el.classList.add('hidden');
+        el.style.display = ''; // supprime tout style inline
+    }
 
-    // --- 2. Masquer TOUTES les vues (y compris CO) ---
-    [multiView, coView, escView, bmtView, arcView, evalView, tournoiView, natationView].forEach(el => {
-        if (el) {
-            el.classList.add('hidden');
-            el.style.display = ''; // supprime tout display inline
-        }
-    });
+    // Fonction pour afficher une vue
+    function showView(el) {
+        if (!el) return;
+        el.classList.remove('hidden');
+        el.style.display = ''; // supprime tout style inline pour éviter conflit
+    }
 
-    // --- 3. Cacher spécifiquement les conteneurs internes de CO ---
+    // Récupérer toutes les vues de paramètres
+    const views = [
+        document.getElementById('viewMultiSettings'),
+        document.getElementById('viewCOSettings'),
+        document.getElementById('viewEscaladeSettings'),
+        document.getElementById('viewBadmintonSettings'),
+        document.getElementById('viewArcathlonSettings'),
+        document.getElementById('viewEvaluationSettings'),
+        document.getElementById('viewTournoiSettings'),
+        document.getElementById('viewNatationSettings')
+    ];
+
+    // Cacher toutes les vues
+    views.forEach(hideView);
+
+    // Cacher spécifiquement les conteneurs internes de CO (au cas où)
     const coClassique = document.getElementById('co-classique-container');
     const coOrientShow = document.getElementById('co-orientshow-container');
-    if (coClassique) coClassique.style.display = 'none';
-    if (coOrientShow) coOrientShow.style.display = 'none';
+    if (coClassique) { coClassique.style.display = 'none'; coClassique.classList.add('hidden'); }
+    if (coOrientShow) { coOrientShow.style.display = 'none'; coOrientShow.classList.add('hidden'); }
 
-    // --- 4. Afficher la vue demandée ---
+    // Afficher la vue demandée
     let targetView = null;
     switch (disc) {
-        case 'multi': targetView = multiView; break;
-        case 'co': targetView = coView; break;
-        case 'escalade': targetView = escView; break;
-        case 'badminton': targetView = bmtView; break;
-        case 'arcathlon': targetView = arcView; break;
-        case 'evaluation': targetView = evalView; break;
-        case 'tournoi': targetView = tournoiView; break;
-        case 'natation': targetView = natationView; break;
+        case 'multi': targetView = document.getElementById('viewMultiSettings'); break;
+        case 'co': targetView = document.getElementById('viewCOSettings'); break;
+        case 'escalade': targetView = document.getElementById('viewEscaladeSettings'); break;
+        case 'badminton': targetView = document.getElementById('viewBadmintonSettings'); break;
+        case 'arcathlon': targetView = document.getElementById('viewArcathlonSettings'); break;
+        case 'evaluation': targetView = document.getElementById('viewEvaluationSettings'); break;
+        case 'tournoi': targetView = document.getElementById('viewTournoiSettings'); break;
+        case 'natation': targetView = document.getElementById('viewNatationSettings'); break;
         default: targetView = null;
     }
 
     if (targetView) {
-        targetView.classList.remove('hidden');
-        targetView.style.display = ''; // s'assurer qu'il est visible
-    }
-
-    // --- 5. Si on est en CO, réactiver le bon conteneur via co-prof.js ---
-    if (disc === 'co' && coView) {
-        setTimeout(() => {
+        showView(targetView);
+        // Si c'est CO, on réinitialise le sélecteur de mode
+        if (disc === 'co') {
+            // On va appeler initProf du module CO
             const coModule = getModule('co');
             if (coModule && coModule.initProf) {
                 const activeClasse = document.getElementById('selectClasse').value;
+                // On laisse le soin à initProf de réafficher les conteneurs appropriés
                 coModule.initProf(activeClasse);
+            } else {
+                // Fallback
+                import('../../modules/co/co-prof.js').then(m => {
+                    if (m.initCOModeSelector) m.initCOModeSelector();
+                });
             }
-        }, 50);
+        }
     }
 
 
