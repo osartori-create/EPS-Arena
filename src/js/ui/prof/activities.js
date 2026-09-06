@@ -89,9 +89,9 @@ export function initActivities() {
         }
         else if (disc === 'co') {
             const coModule = getModule('co');
-            if (coModule && coModule.initProf) {
+            if (coModule && coModule.renderLive) {
                 const activeClasse = document.getElementById('selectClasse').value;
-                coModule.initProf(activeClasse);
+                coModule.renderLive();
             }
             if (coView) coView.classList.remove('hidden');
         }
