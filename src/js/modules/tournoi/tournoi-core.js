@@ -11,14 +11,10 @@ function getBasePath(classe) {
     return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi`;
 }
 
-// ✅ Exporter ces fonctions pour qu'elles soient accessibles
+// ✅ Ces fonctions sont exportées et utilisées par les variantes
 export function getJoueursPath(classe) { return `${getBasePath(classe)}/joueurs`; }
 export function getHistoriquePath(classe) { return `${getBasePath(classe)}/historique`; }
 export function getConfigPath(classe) { return `${getBasePath(classe)}/config`; }
-
-function getJoueursPath(classe) { return `${getBasePath(classe)}/joueurs`; }
-function getHistoriquePath(classe) { return `${getBasePath(classe)}/historique`; }
-function getConfigPath(classe) { return `${getBasePath(classe)}/config`; }
 
 export function initTournoiCore(classe) {
     currentClasse = classe;
@@ -54,7 +50,14 @@ export function ajouterHistorique(entry) { push(ref(db, getHistoriquePath(curren
 
 export function exportTournoiData() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
-    const data = { version: 1, classe: currentClasse, date: new Date().toISOString().slice(0,10).replace(/-/g,''), joueurs, historique, config };
+    const data = {
+        version: 1,
+        classe: currentClasse,
+        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
+        joueurs,
+        historique,
+        config
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -72,7 +75,9 @@ export function importTournoiData(file) {
             setHistorique(data.historique || []);
             setConfig(data.config || {});
             alert('✅ Tournoi importé avec succès !');
-        } catch (err) { alert('❌ Erreur d\'import : ' + err.message); }
+        } catch (err) {
+            alert('❌ Erreur d\'import : ' + err.message);
+        }
     };
     reader.readAsText(file);
 }
