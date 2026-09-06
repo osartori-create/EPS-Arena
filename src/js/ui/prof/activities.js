@@ -304,12 +304,13 @@ export function initActivities() {
                     }
                 }
                 if (disc === 'co') {
-                    const coModule = getModule('co');
-                    if (coModule && coModule.initProf) {
-                        const activeClasse = document.getElementById('selectClasse').value;
-                        coModule.initProf(activeClasse);
-                    }
-                }
+    const coModule = getModule('co');
+    if (coModule && coModule.renderLive) {
+        coModule.renderLive();
+    } else {
+        import('../../modules/co/co-live.js').then(m => m.renderCOLive()).catch(console.error);
+    }
+}
             }
         } 
         else if (subTab === 'live') {

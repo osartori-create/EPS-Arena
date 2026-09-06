@@ -400,12 +400,15 @@ export async function transmettre(classe) {
 export function renderLive(classe) {
     if (currentMode === 'classique') {
         import('./co-live.js').then(module => {
-            const data = window.lastLiveData || {};
-            module.renderCOLive(data);
+            module.renderCOLive();
+        }).catch(err => {
+            console.error('[CO] Erreur Live :', err);
         });
     } else {
         import('./orientshow/orientshow-live.js').then(module => {
             module.renderOrientShowLive();
+        }).catch(err => {
+            console.error('[CO] Erreur OrientShow Live :', err);
         });
     }
 }

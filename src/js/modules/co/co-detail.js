@@ -14,7 +14,7 @@ let currentPassages = {}; // { circuitId: passageData }
 export function openCoDetail(classe, code, passages) {
     currentClasse = classe;
     currentCode = code;
-    currentPassages = passages; // { circuitId: { pts, total, details, time, timestamp } }
+    currentPassages = passages || {};
 
     // Récupérer les élèves pour le nom
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
@@ -57,7 +57,6 @@ export function openCoDetail(classe, code, passages) {
     `;
     document.body.appendChild(modal);
 
-    // Remplir le contenu
     renderDetailContent();
 }
 
@@ -130,9 +129,7 @@ function renderDetailContent() {
         `;
     });
 
-    // Mettre à jour le score total
     document.getElementById('co-detail-score').innerText = `${totalPts} / ${totalMax} pts`;
-
     container.innerHTML = html;
 }
 
@@ -156,18 +153,8 @@ window.forcerCorrection = function(circuitId, posteIdx) {
     const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`;
 
     // Trouver la clé du passage correspondant
-    const passagesRef = ref(db, basePath);
-    // On va chercher dans currentPassages pour trouver la clé
-    // currentPassages est un objet avec des clés Firebase comme "-Nxyz..." ou des circuitId
-    // On va parcourir les clés pour trouver celle qui correspond
-
-    // On a besoin de la clé Firebase (pushId)
-    // Pour simplifier, on va utiliser le circuitId comme clé (si c'est un pushId)
-    // Sinon, on fait une recherche
     let passageKey = null;
-    const passagesData = currentPassages;
-    for (const [key, value] of Object.entries(passagesData)) {
-        // Si la valeur a un circuitId qui correspond
+    for (const [key, value] of Object.entries(currentPassages)) {
         if (value.circuitId === circuitId || key === circuitId) {
             passageKey = key;
             break;
@@ -179,7 +166,6 @@ window.forcerCorrection = function(circuitId, posteIdx) {
         return;
     }
 
-    // Mise à jour dans Firebase
     const updatePath = `${basePath}/${passageKey}/details/${posteIdx}/status`;
     const updateRef = ref(db, updatePath);
     update(updateRef, 'correct')
@@ -187,14 +173,11 @@ window.forcerCorrection = function(circuitId, posteIdx) {
             // Mettre à jour localement
             if (currentPassages[passageKey] && currentPassages[passageKey].details) {
                 currentPassages[passageKey].details[posteIdx].status = 'correct';
-                // Recalculer les points
                 const pts = currentPassages[passageKey].details.filter(d => d.status === 'correct').length;
                 currentPassages[passageKey].pts = pts;
-                // Mettre à jour Firebase le pts aussi
                 const ptsRef = ref(db, `${basePath}/${passageKey}/pts`);
                 update(ptsRef, pts);
             }
-            // Re-rendre le contenu
             renderDetailContent();
             alert('✅ Correction forcée !');
         })
@@ -211,3 +194,6 @@ window.closeCoDetail = function() {
     const modal = document.getElementById('co-detail-modal');
     if (modal) modal.remove();
 };
+
+// ✅ Exposition globale pour les onclick HTML
+window.openCoDetail = openCoDetail;
