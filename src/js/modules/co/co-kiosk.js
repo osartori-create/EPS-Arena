@@ -1,5 +1,6 @@
 // src/js/modules/co/co-kiosk.js
 // Kiosk élève pour la Course d'orientation classique
+// Utilise la matrice pour corriger les codes saisis par l'élève
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 import { MATRICE } from './matrice.js';
@@ -72,12 +73,11 @@ export function initCoKiosk(classe, code) {
         afficherInterface();
     });
 
-    // 3. Écouter la catégorie active (sur le même chemin)
+    // 3. Écouter la catégorie active
     const catRef = ref(db, `${basePath}/config/activeCategory`);
     activeCategoryListener = onValue(catRef, (snap) => {
         activeCategory = snap.val() || '';
         console.log('[CO Kiosk] Catégorie active mise à jour :', activeCategory);
-        // Mettre à jour l'affichage pour refléter le changement
         afficherInterface();
     });
 }

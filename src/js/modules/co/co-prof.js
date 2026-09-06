@@ -15,6 +15,19 @@ let startTime = null;
 let endTime = null;
 
 // ============================================================
+// UTILITAIRE : récupération du code professeur de manière robuste
+// ============================================================
+function getProfCode() {
+    let code = localStorage.getItem('eps_arena_profCode');
+    // Si la valeur est un objet HTMLInputElement ou une chaîne bizarre, on prend DEFAULT
+    if (!code || typeof code !== 'string' || code === '[object HTMLInputElement]' || code.includes('HTMLInputElement')) {
+        console.warn('[CO] ProfCode invalide, utilisation de DEFAULT');
+        code = 'DEFAULT';
+    }
+    return code;
+}
+
+// ============================================================
 // SÉLECTEUR DE MODE
 // ============================================================
 export function initCOModeSelector() {
@@ -24,7 +37,6 @@ export function initCOModeSelector() {
         return;
     }
 
-    // Créer ou récupérer le sélecteur
     let selector = document.getElementById('co-mode-selector');
     if (!selector) {
         selector = document.createElement('div');
@@ -39,7 +51,6 @@ export function initCOModeSelector() {
         selector.style.display = 'flex';
     }
 
-    // Créer les conteneurs s'ils n'existent pas
     let containerClassique = document.getElementById('co-classique-container');
     if (!containerClassique) {
         containerClassique = document.createElement('div');
@@ -57,7 +68,6 @@ export function initCOModeSelector() {
         containerClassique.after(containerOrientShow);
     }
 
-    // Attacher les événements (éviter les doublons)
     const btnClassique = document.getElementById('co-mode-classique');
     const btnOrient = document.getElementById('co-mode-orientshow');
     const newBtnClassique = btnClassique.cloneNode(true);
@@ -68,13 +78,9 @@ export function initCOModeSelector() {
     newBtnClassique.addEventListener('click', () => setCOMode('classique'));
     newBtnOrient.addEventListener('click', () => setCOMode('orientshow'));
 
-    // Appliquer le mode par défaut
     setCOMode('classique');
 }
-const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/co`;
-const configRef = ref(db, `${basePath}/config`); // pour circuits, valMode, activeCategory
-const startRef = ref(db, `${basePath}/startTime`);
-const endRef = ref(db, `${basePath}/endTime`);
+
 function setCOMode(mode) {
     currentMode = mode;
     const containerClassique = document.getElementById('co-classique-container');
@@ -83,10 +89,8 @@ function setCOMode(mode) {
     if (mode === 'classique') {
         if (containerClassique) {
             containerClassique.style.display = '';
-            // Vider et reconstruire l'interface classique
             containerClassique.innerHTML = '';
             renderClassiqueConfig(currentClasse, containerClassique);
-            // Initialiser les groupes (postesGrid, réserves) après la construction du DOM
             initCOInterface();
             initSortableCO();
             loadCOAssignments();
@@ -127,13 +131,12 @@ function setCOMode(mode) {
 // RENDU DE LA CONFIGURATION CLASSIQUE
 // ============================================================
 function renderClassiqueConfig(classe, container) {
-    // Écouter les données Firebase pour les circuits, valMode, activeCategory, chrono
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/config`);
-    const startRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/startTime`);
-    const endRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/endTime`);
+    const profCode = getProfCode();
+    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/co`;
+    const configRef = ref(db, `${basePath}/config`);
+    const startRef = ref(db, `${basePath}/startTime`);
+    const endRef = ref(db, `${basePath}/endTime`);
 
-    // Écouter la config
     onValue(configRef, (snap) => {
         const data = snap.val() || {};
         circuits = data.circuits ? Object.values(data.circuits) : [];
@@ -142,7 +145,6 @@ function renderClassiqueConfig(classe, container) {
         actualiserAffichageClassique(container);
     });
 
-    // Écouter le chrono
     onValue(startRef, (snap) => {
         startTime = snap.val() || null;
         actualiserChrono();
@@ -152,17 +154,11 @@ function renderClassiqueConfig(classe, container) {
         actualiserChrono();
     });
 
-    // Première construction
     actualiserAffichageClassique(container);
 }
 
 function actualiserAffichageClassique(container) {
     if (!container) return;
-    // On garde le contenu existant ? On va tout reconstruire ?
-    // Pour éviter de perdre les références, on vide et on reconstruit seulement le haut (configuration)
-    // On conserve les éléments de groupes (postesGrid, réserves) qui sont ajoutés par co-interface.js
-    // On va donc insérer un élément de configuration en haut du conteneur
-    // On supprime l'ancien config s'il existe
     const oldConfig = document.getElementById('co-classique-config');
     if (oldConfig) oldConfig.remove();
 
@@ -170,7 +166,6 @@ function actualiserAffichageClassique(container) {
     configDiv.id = 'co-classique-config';
     configDiv.className = 'space-y-4 mb-6';
 
-    // HTML de configuration
     let html = '';
 
     // Mode validation
@@ -243,8 +238,6 @@ function actualiserAffichageClassique(container) {
 
     configDiv.innerHTML = html;
     container.prepend(configDiv);
-
-    // Mettre à jour le chrono
     actualiserChrono();
 }
 
@@ -298,7 +291,7 @@ window.coAjouterCircuit = function() {
         balises: balises.split(',').map(b => b.trim())
     };
 
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const profCode = getProfCode();
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${newCircuit.id}`);
     set(configRef, newCircuit);
 };
@@ -308,23 +301,21 @@ window.coEditerCircuit = function(id) {
     if (!circ) return;
     const nouvellesBalises = prompt(`Modifier les balises du circuit "${circ.nom}" :`, circ.balises.join(', '));
     if (nouvellesBalises === null) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const profCode = getProfCode();
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${id}/balises`);
     set(configRef, nouvellesBalises.split(',').map(b => b.trim()));
 };
 
 window.coSupprimerCircuit = function(id) {
     if (!confirm('Supprimer ce circuit définitivement ?')) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const profCode = getProfCode();
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${id}`);
     set(configRef, null);
 };
 
 window.coSupprimerCategorie = function(cat) {
     if (!confirm(`Supprimer toute la catégorie "${cat}" et ses circuits ?`)) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits`);
-    // On va filtrer côté client
+    const profCode = getProfCode();
     const idsASupprimer = circuits.filter(c => c.cat === cat).map(c => c.id);
     idsASupprimer.forEach(id => {
         const refCircuit = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${id}`);
@@ -333,20 +324,20 @@ window.coSupprimerCategorie = function(cat) {
 };
 
 window.coActiverCategorie = function(cat) {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const profCode = getProfCode();
     const catRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/activeCategory`);
     set(catRef, cat);
 };
 
 window.coSetValMode = function(mode) {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const profCode = getProfCode();
     const modeRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/valMode`);
     set(modeRef, mode);
 };
 
 window.coToggleChrono = function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const profCode = getProfCode();
     const startRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/startTime`);
     const endRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/endTime`);
 
@@ -374,7 +365,6 @@ export function initProf(classe) {
 
 export function initKiosk(classe, code) {
     if (currentMode === 'classique') {
-        // Le kiosk classique sera importé ici
         import('./classique/classique-kiosk.js').then(module => {
             if (module.initKiosk) module.initKiosk(classe, code);
         });
