@@ -71,6 +71,24 @@ export async function transmettre(classe) {
         nbCouleurs: 5
     };
 
+    // ✅ Ajouter les comptes de couleurs pour l'affichage des codes élèves
+    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+    const couleurs = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
+    couleurs.forEach(couleur => {
+        let count = 0;
+        for (const key of Object.keys(mapping)) {
+            if (key.startsWith(`${activeClasse}_${couleur}_`)) {
+                const ids = mapping[key];
+                if (Array.isArray(ids)) {
+                    count += ids.length;
+                } else {
+                    count++;
+                }
+            }
+        }
+        if (count > 0) configData[couleur] = count;
+    });
+
     // ✅ Ajouter uniquement si valide
     if (startTime !== null && !isNaN(startTime)) configData.startTime = startTime;
     if (endTime !== null && !isNaN(endTime)) configData.endTime = endTime;

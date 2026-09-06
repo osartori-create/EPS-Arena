@@ -238,6 +238,7 @@ function showLogin() {
         codeList.innerHTML = '';
         activityTitle.innerText = "Choisis ton code";
 
+        // Récupérer les couleurs et leurs nombres
         const couleurs = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
         let hasCodes = false;
         couleurs.forEach(couleur => {
@@ -254,11 +255,13 @@ function showLogin() {
                         document.getElementById('selected-code').innerText = code;
                         loginScreen.classList.add('hidden');
                         activityScreen.classList.remove('hidden');
+                        // Cacher les autres modules
                         escaladeModule.classList.add('hidden');
                         coModule.classList.add('hidden');
                         multiModule.classList.add('hidden');
                         if (osModule) osModule.classList.add('hidden');
                         badmintonModule.classList.add('hidden');
+                        // Afficher le conteneur OrientShow (kiosk)
                         let osKioskContainer = document.getElementById('os-kiosk-container');
                         if (!osKioskContainer) {
                             osKioskContainer = document.createElement('div');
@@ -268,6 +271,7 @@ function showLogin() {
                         }
                         osKioskContainer.style.display = 'block';
                         osKioskContainer.classList.remove('hidden');
+                        // Initialiser le kiosk OrientShow
                         import('../../modules/eleve/orientshow-kiosk.js').then(module => {
                             module.initOrientShowKiosk(selectedClass, code);
                         }).catch(err => {
@@ -469,6 +473,8 @@ function selectCode(code) {
         initEscaladeKiosk(selectedClass, selectedCode);
     } else if (currentConfig.activite === 'co') {
         coModule.classList.remove('hidden');
+        // Ici on pourrait lancer le kiosk CO
+        console.log('CO kiosk à implémenter');
     } else if (currentConfig.activite === 'arcathlon') {
         let arcModule = document.getElementById('arcathlon-module');
         if (!arcModule) {
@@ -494,18 +500,40 @@ function selectCode(code) {
                     </div>
                 `;
             });
+    } else if (currentConfig.activite === 'bloccontest') {
+        let blocContainer = document.getElementById('bloc-kiosk-container');
+        if (!blocContainer) {
+            blocContainer = document.createElement('div');
+            blocContainer.id = 'bloc-kiosk-container';
+            blocContainer.className = 'space-y-4 module';
+            activityScreen.appendChild(blocContainer);
+        }
+        blocContainer.style.display = 'block';
+        blocContainer.classList.remove('hidden');
+        import('../../modules/escalade/escalade-kiosk-blocs.js').then(module => {
+            module.initBlocKiosk(selectedClass, code);
+        }).catch(err => {
+            console.error('Erreur chargement Bloc Kiosk :', err);
+            blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+        });
     } else {
         multiModule.classList.remove('hidden');
     }
 }
 
-// Exposition globale
+// ============================================================
+// EXPOSITION GLOBALE
+// ============================================================
 window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
 window.startChrono = () => { console.log("Chrono démarré"); };
 window.stopChrono = () => { console.log("Chrono arrêté"); };
 window.validateOSPassage = validateOSPassage;
+window.resetToLogin = resetToLogin;
 
+// ============================================================
+// EXPORTS
+// ============================================================
 export function getSelectedClass() { return selectedClass; }
 export function getSelectedCode() { return selectedCode; }
 export function getDB() { return db; }
