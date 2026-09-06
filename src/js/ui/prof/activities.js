@@ -10,6 +10,7 @@ import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonCon
 import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
 import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { getModule, getAllModules } from '../../modules/registry.js';
+import { initNatationInterface, generateNatationGroups, transmettreNatationConfig, loadNatationAssignments } from '../../modules/natation/index.js';
 
 // ✅ Importer le module escalade (pour l'initialisation via le registre)
 import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
@@ -94,6 +95,12 @@ export function initActivities() {
         coModule.initProf(activeClasse);
     }
     if (coView) coView.classList.remove('hidden');
+}
+else if (disc === 'natation') {
+    const view = document.getElementById('viewNatationSettings');
+    if (view) view.classList.remove('hidden');
+    initNatationInterface();
+    loadNatationAssignments();
 }
         else if (disc === 'escalade') {
             if (escView) escView.classList.remove('hidden');
@@ -194,6 +201,10 @@ export function initActivities() {
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
         // Cas particuliers : CO, Escalade, Badminton, Arcathlon, Multi
+        if (currentDiscipline === 'natation') {
+    generateNatationGroups();
+    return;
+}
         if (currentDiscipline === 'co') {
             const coModule = getModule('co');
             if (coModule && coModule.generateTeams) {
@@ -454,6 +465,10 @@ export function initActivities() {
             return;
         }
 
+        if (currentDiscipline === 'natation') {
+    await transmettreNatationConfig();
+    return;
+}
         // ✅ Tournoi
         if (currentDiscipline === 'tournoi') {
             const configData = {
