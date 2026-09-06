@@ -261,24 +261,20 @@ function showLogin() {
                         multiModule.classList.add('hidden');
                         if (osModule) osModule.classList.add('hidden');
                         badmintonModule.classList.add('hidden');
-                        // Afficher le conteneur OrientShow (kiosk)
-                        let osKioskContainer = document.getElementById('os-kiosk-container');
-    if (!osKioskContainer) {
-        osKioskContainer = document.createElement('div');
-        osKioskContainer.id = 'os-kiosk-container';
-        osKioskContainer.className = 'space-y-4 module';
-        activityScreen.appendChild(osKioskContainer);
-    }
-    osKioskContainer.style.display = 'block';
-    osKioskContainer.classList.remove('hidden');
-    // ✅ Passer la config actuelle
-    import('../../modules/eleve/orientshow-kiosk.js').then(module => {
-        module.initOrientShowKiosk(selectedClass, code, currentConfig);
-    }).catch(err => {
-        console.error('Erreur chargement OrientShow Kiosk :', err);
-        osKioskContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
-    });
-};
+                        
+                        // ✅ Utiliser le conteneur existant orientshow-module
+                        if (osModule) {
+                            osModule.classList.remove('hidden');
+                            osModule.style.display = 'block';
+                            // ✅ Initialiser le kiosk avec la config
+                            import('../../modules/eleve/orientshow-kiosk.js').then(module => {
+                                module.initOrientShowKiosk(selectedClass, code, currentConfig);
+                            }).catch(err => {
+                                console.error('Erreur chargement OrientShow Kiosk :', err);
+                                osModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+                            });
+                        }
+                    };
                     codeList.appendChild(btn);
                 }
             }
@@ -456,26 +452,46 @@ function showLoginArcathlon() {
     };
 }
 
+// ============================================================
+// SÉLECTION D'UN CODE (dispatch vers les activités)
+// ============================================================
 function selectCode(code) {
     selectedCode = code;
     document.getElementById('selected-code').innerText = code;
     loginScreen.classList.add('hidden');
     activityScreen.classList.remove('hidden');
     
+    // Cacher tous les modules par défaut
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
     if (osModule) osModule.classList.add('hidden');
     badmintonModule.classList.add('hidden');
 
+    // Dispatch selon l'activité
     if (currentConfig.activite === 'escalade') {
         escaladeModule.classList.remove('hidden');
         initEscaladeKiosk(selectedClass, selectedCode);
-    } else if (currentConfig.activite === 'co') {
+    } 
+    else if (currentConfig.activite === 'co') {
         coModule.classList.remove('hidden');
         // Ici on pourrait lancer le kiosk CO
         console.log('CO kiosk à implémenter');
-    } else if (currentConfig.activite === 'arcathlon') {
+    } 
+    else if (currentConfig.activite === 'orientshow') {
+        // Utiliser le conteneur existant
+        if (osModule) {
+            osModule.classList.remove('hidden');
+            osModule.style.display = 'block';
+            import('../../modules/eleve/orientshow-kiosk.js').then(module => {
+                module.initOrientShowKiosk(selectedClass, code, currentConfig);
+            }).catch(err => {
+                console.error('Erreur chargement OrientShow Kiosk :', err);
+                osModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+            });
+        }
+    } 
+    else if (currentConfig.activite === 'arcathlon') {
         let arcModule = document.getElementById('arcathlon-module');
         if (!arcModule) {
             arcModule = document.createElement('div');
@@ -500,7 +516,8 @@ function selectCode(code) {
                     </div>
                 `;
             });
-    } else if (currentConfig.activite === 'bloccontest') {
+    } 
+    else if (currentConfig.activite === 'bloccontest') {
         let blocContainer = document.getElementById('bloc-kiosk-container');
         if (!blocContainer) {
             blocContainer = document.createElement('div');
@@ -516,7 +533,8 @@ function selectCode(code) {
             console.error('Erreur chargement Bloc Kiosk :', err);
             blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
         });
-    } else {
+    } 
+    else {
         multiModule.classList.remove('hidden');
     }
 }
