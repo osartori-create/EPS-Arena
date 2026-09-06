@@ -51,6 +51,11 @@ export function initBlocProf(classe) {
     });
 }
 
+export function cleanupBlocProf() {
+    if (configListener) { configListener(); configListener = null; }
+    if (validationsListener) { validationsListener(); validationsListener = null; }
+}
+
 // ============================================================
 // Affichage de l’interface
 // ============================================================
@@ -266,13 +271,13 @@ window.modifierConfigBloc = function() {
     const mode = confirm('Mode figé ? (OK = figé, Annuler = évolutif)') ? 'fige' : 'evolutif';
 
     const updates = {
-    score: {
-        valeurInitiale: parseInt(newValeur, 10) || 100,
-        decote: parseInt(newDecote, 10) || 10,
-        mode: mode
-    }
-};
-updateBlocConfig(currentClasse, updates)
+        score: {
+            valeurInitiale: parseInt(newValeur, 10) || 100,
+            decote: parseInt(newDecote, 10) || 10,
+            mode: mode
+        }
+    };
+    updateBlocConfig(currentClasse, updates)
         .then(() => {
             alert('✅ Configuration mise à jour.');
         })
@@ -312,32 +317,11 @@ window.exporterCSVBloc = function() {
     URL.revokeObjectURL(url);
 };
 
-window.transmettreConfigBloc = function() {
-    if (!config) return alert('Aucune configuration.');
-    // Mettre à jour l’activité dans la config principale pour que les élèves voient le module
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const mainConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
-    set(mainConfigRef, { activite: 'bloccontest' })
-        .then(() => {
-            alert('✅ Bloc Contest activé pour les iPads !');
-        })
-        .catch(err => alert('❌ Erreur : ' + err.message));
-};
-
 // ============================================================
-// Nettoyage
-// ============================================================
-export function cleanupBlocProf() {
-    if (configListener) { configListener(); configListener = null; }
-    if (validationsListener) { validationsListener(); validationsListener = null; }
-}
-
-// ============================================================
-// TRANSMISSION (exposée pour le bouton)
+// TRANSMISSION (exposée pour le bouton et pour import)
 // ============================================================
 export function transmettreConfigBloc() {
     if (!config) return alert('Aucune configuration.');
-    // Mettre à jour l’activité dans la config principale pour que les élèves voient le module
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const mainConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
     set(mainConfigRef, { activite: 'bloccontest' })
