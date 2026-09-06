@@ -266,11 +266,13 @@ window.modifierConfigBloc = function() {
     const mode = confirm('Mode figé ? (OK = figé, Annuler = évolutif)') ? 'fige' : 'evolutif';
 
     const updates = {
-        'score.valeurInitiale': parseInt(newValeur, 10) || 100,
-        'score.decote': parseInt(newDecote, 10) || 10,
-        'score.mode': mode
-    };
-    updateBlocConfig(currentClasse, updates)
+    score: {
+        valeurInitiale: parseInt(newValeur, 10) || 100,
+        decote: parseInt(newDecote, 10) || 10,
+        mode: mode
+    }
+};
+updateBlocConfig(currentClasse, updates)
         .then(() => {
             alert('✅ Configuration mise à jour.');
         })
