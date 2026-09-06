@@ -46,7 +46,7 @@ export async function generateTeams(classe) {
 }
 
 // ============================================================
-// TRANSMISSION FIREBASE
+// TRANSMISSION FIREBASE (CORRIGÉE)
 // ============================================================
 
 export async function transmettre(classe) {
@@ -57,28 +57,23 @@ export async function transmettre(classe) {
     const baseProf = `etablissements/0680013V/profs/${profCode}`;
     
     const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-    
-    // Récupérer les timestamps avec vérification
     const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
     const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
-    
-    const startTime = startTimeStr ? parseInt(startTimeStr) : null;
-    const endTime = endTimeStr ? parseInt(endTimeStr) : null;
-    
+
+    // ✅ Conversion sécurisée
+    const startTime = (startTimeStr && startTimeStr !== 'null' && startTimeStr !== 'undefined') ? parseInt(startTimeStr) : null;
+    const endTime = (endTimeStr && endTimeStr !== 'null' && endTimeStr !== 'undefined') ? parseInt(endTimeStr) : null;
+
     const configData = {
         activite: 'orientshow',
         matrix: matrix,
         nbCircuits: 12,
         nbCouleurs: 5
     };
-    
-    // Ajouter les timestamps uniquement s'ils sont valides
-    if (startTime && !isNaN(startTime)) {
-        configData.startTime = startTime;
-    }
-    if (endTime && !isNaN(endTime)) {
-        configData.endTime = endTime;
-    }
+
+    // ✅ Ajouter uniquement si valide
+    if (startTime !== null && !isNaN(startTime)) configData.startTime = startTime;
+    if (endTime !== null && !isNaN(endTime)) configData.endTime = endTime;
 
     try {
         console.log("📡 Configuration OrientShow envoyée :", configData);

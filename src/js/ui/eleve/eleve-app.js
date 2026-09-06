@@ -7,7 +7,6 @@ import { BAREME_ESCALADE } from '../../config/constants.js';
 import { initEscaladeKiosk, sendEscalade as sendEscaladeAction } from '../../modules/eleve/escalade-kiosk.js';
 import { showFeedback, showTeamMountain } from './eleve-actions.js';
 import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher.js';
-import { initOrientShowKiosk, validateOSPassage } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 
@@ -174,52 +173,127 @@ function showLogin() {
     }
 
     // SPÉCIAL BLOC CONTEST
-    // SPÉCIAL BLOC CONTEST
-if (config.activite === 'bloccontest') {
-    // On affiche la grille des codes comme pour les autres activités
-    loginScreen.classList.remove('hidden');
-    activityScreen.classList.add('hidden');
-    waitingScreen.classList.add('hidden');
-    codeList.innerHTML = '';
-    activityTitle.innerText = "Choisis ton code";
+    if (config.activite === 'bloccontest') {
+        loginScreen.classList.remove('hidden');
+        activityScreen.classList.add('hidden');
+        waitingScreen.classList.add('hidden');
+        codeList.innerHTML = '';
+        activityTitle.innerText = "Choisis ton code";
 
-    // Récupérer la config Bloc Contest pour obtenir les groupes
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const blocConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/bloccontest/config`);
-    onValue(blocConfigRef, (snap) => {
-        const blocConfig = snap.val();
-        if (blocConfig && blocConfig.groupes) {
-            const groupes = blocConfig.groupes;
-            Object.keys(groupes).forEach(lettre => {
-                const membres = groupes[lettre] || [];
-                membres.forEach((eleveId, index) => {
-                    const code = `${lettre}${index + 1}`;
+        const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+        const blocConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/bloccontest/config`);
+        onValue(blocConfigRef, (snap) => {
+            const blocConfig = snap.val();
+            if (blocConfig && blocConfig.groupes) {
+                const groupes = blocConfig.groupes;
+                Object.keys(groupes).forEach(lettre => {
+                    const membres = groupes[lettre] || [];
+                    membres.forEach((eleveId, index) => {
+                        const code = `${lettre}${index + 1}`;
+                        const btn = document.createElement('button');
+                        btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
+                        btn.innerText = code;
+                        btn.onclick = () => {
+                            selectedCode = code;
+                            document.getElementById('selected-code').innerText = code;
+                            loginScreen.classList.add('hidden');
+                            activityScreen.classList.remove('hidden');
+                            escaladeModule.classList.add('hidden');
+                            coModule.classList.add('hidden');
+                            multiModule.classList.add('hidden');
+                            if (osModule) osModule.classList.add('hidden');
+                            badmintonModule.classList.add('hidden');
+                            let blocContainer = document.getElementById('bloc-kiosk-container');
+                            if (!blocContainer) {
+                                blocContainer = document.createElement('div');
+                                blocContainer.id = 'bloc-kiosk-container';
+                                blocContainer.className = 'space-y-4 module';
+                                activityScreen.appendChild(blocContainer);
+                            }
+                            blocContainer.style.display = 'block';
+                            blocContainer.classList.remove('hidden');
+                            initBlocKiosk(selectedClass, code);
+                        };
+                        codeList.appendChild(btn);
+                    });
+                });
+            } else {
+                codeList.innerHTML = '<p class="text-slate-400 text-center">⏳ En attente de la configuration du professeur...</p>';
+            }
+        }, { onlyOnce: true });
+        return;
+    }
+
+    // SPÉCIAL ORIENTSHOW (via CO)
+    if (config.activite === 'orientshow') {
+        loginScreen.classList.remove('hidden');
+        activityScreen.classList.add('hidden');
+        waitingScreen.classList.add('hidden');
+        codeList.innerHTML = '';
+        activityTitle.innerText = "Choisis ton code";
+
+        // Récupérer les couleurs et leurs nombres depuis la config
+        const couleurs = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
+        let hasCodes = false;
+        couleurs.forEach(couleur => {
+            const count = config[couleur];
+            if (count && typeof count === 'number' && count > 0) {
+                hasCodes = true;
+                for (let i = 1; i <= count; i++) {
+                    const code = `${couleur}_${i}`;
                     const btn = document.createElement('button');
                     btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
                     btn.innerText = code;
                     btn.onclick = () => {
-                        // Appel à la fonction dédiée
-                        selectCodeBloc(code);
+                        selectedCode = code;
+                        document.getElementById('selected-code').innerText = code;
+                        loginScreen.classList.add('hidden');
+                        activityScreen.classList.remove('hidden');
+                        // Cacher tous les autres modules
+                        escaladeModule.classList.add('hidden');
+                        coModule.classList.add('hidden');
+                        multiModule.classList.add('hidden');
+                        if (osModule) osModule.classList.add('hidden');
+                        badmintonModule.classList.add('hidden');
+                        // Afficher le conteneur OrientShow (kiosk)
+                        let osKioskContainer = document.getElementById('os-kiosk-container');
+                        if (!osKioskContainer) {
+                            osKioskContainer = document.createElement('div');
+                            osKioskContainer.id = 'os-kiosk-container';
+                            osKioskContainer.className = 'space-y-4 module';
+                            activityScreen.appendChild(osKioskContainer);
+                        }
+                        osKioskContainer.style.display = 'block';
+                        osKioskContainer.classList.remove('hidden');
+                        // Initialiser le kiosk OrientShow
+                        import('../../modules/eleve/orientshow-kiosk.js').then(module => {
+                            module.initOrientShowKiosk(selectedClass, code);
+                        }).catch(err => {
+                            console.error('Erreur chargement OrientShow Kiosk :', err);
+                            osKioskContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+                        });
                     };
                     codeList.appendChild(btn);
-                });
-            });
-        } else {
+                }
+            }
+        });
+        if (!hasCodes) {
             codeList.innerHTML = '<p class="text-slate-400 text-center">⏳ En attente de la configuration du professeur...</p>';
         }
-    }, { onlyOnce: true });
+        return;
+    }
 
-    return;
-}
-
-    // Pour les autres activités (escalade, co, multi, orientshow)
+    // Pour les autres activités (escalade, co, multi)
     badmintonModule.classList.add('hidden');
     document.getElementById('code-info').classList.remove('hidden');
     document.getElementById('btn-quit').classList.remove('hidden');
     document.getElementById('btn-back-terrain').classList.add('hidden');
 
+    // Clés à ignorer dans la boucle générique
+    const ignoreKeys = ['activite', 'matrice', 'startTime', 'endTime', 'matrix', 'nbCircuits', 'nbCouleurs'];
+
     Object.keys(config).forEach(key => {
-        if (key === 'activite' || key === 'matrice' || key === 'startTime' || key === 'endTime') return;
+        if (ignoreKeys.includes(key)) return;
         let count = 0;
         if (typeof config[key] === 'number') count = config[key];
         else if (Array.isArray(config[key])) count = config[key].length;
@@ -395,11 +469,6 @@ function selectCode(code) {
         initEscaladeKiosk(selectedClass, selectedCode);
     } else if (currentConfig.activite === 'co') {
         coModule.classList.remove('hidden');
-    } else if (currentConfig.activite === 'orientshow') {
-        if (osModule) {
-            osModule.classList.remove('hidden');
-            initOrientShowKiosk(selectedClass, selectedCode);
-        }
     } else if (currentConfig.activite === 'arcathlon') {
         let arcModule = document.getElementById('arcathlon-module');
         if (!arcModule) {
@@ -425,55 +494,19 @@ function selectCode(code) {
                     </div>
                 `;
             });
-    
     } else {
         multiModule.classList.remove('hidden');
     }
 }
 
-function selectCodeBloc(code) {
-    selectedCode = code;
-    document.getElementById('selected-code').innerText = code;
-    loginScreen.classList.add('hidden');
-    activityScreen.classList.remove('hidden');
-    
-    // Cacher tous les autres modules
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    
-    // Afficher le conteneur Bloc Contest
-    let blocContainer = document.getElementById('bloc-kiosk-container');
-    if (!blocContainer) {
-        blocContainer = document.createElement('div');
-        blocContainer.id = 'bloc-kiosk-container';
-        blocContainer.className = 'space-y-4 module';
-        activityScreen.appendChild(blocContainer);
-    }
-    blocContainer.style.display = 'block';
-    blocContainer.classList.remove('hidden');
-    // Appeler l’initialisation du kiosk
-    import('../../modules/escalade/escalade-kiosk-blocs.js')
-        .then(module => {
-            module.initBlocKiosk(selectedClass, code);
-        })
-        .catch(err => {
-            console.error('Erreur chargement Bloc Kiosk :', err);
-            blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
-        });
-}
 // Exposition globale
 window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
 window.startChrono = () => { console.log("Chrono démarré"); };
 window.stopChrono = () => { console.log("Chrono arrêté"); };
-window.validateOSPassage = validateOSPassage;
-window.resetToLogin = resetToLogin;
+window.resetToLogin = () => { showLogin(); };
 
 export function getSelectedClass() { return selectedClass; }
 export function getSelectedCode() { return selectedCode; }
 export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
-export function resetToLogin() { showLogin(); }
