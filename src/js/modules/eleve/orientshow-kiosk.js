@@ -1,229 +1,343 @@
 // src/js/modules/eleve/orientshow-kiosk.js
-// Kiosk OrientShow pour les élèves
+// Kiosk OrientShow (version élève) – inspiré de vos fichiers originaux
 
-import { db, ref, onValue, sendOrientShowPassage } from '../../core/firebase-service.js';
-// Note : sendOrientShowPassage est déjà dans firebase-service.js
+import { db, ref, onValue, push, set, update } from '../../core/firebase-service.js';
 
 let currentClasse = '';
+let currentCode = '';          // ex: "NOIR_1"
+let currentEleveId = '';      // ex: "NOIR_1" (ou un ID unique)
 let matrix = {};
-let startTime = null;
-let endTime = null;
-let selectedColor = '';
-let selectedNum = null;
+let sessions = {};
+let listener = null;
+let audioCtx = null;
+
+// État local
 let selectedCircuit = null;
-let lastSend = 0;
-const COOLDOWN = 30000;
-let configListener = null;
+let antiCheat = {};
 
 // ============================================================
-// INIT
+// INITIALISATION
 // ============================================================
-export function initOrientShowKiosk(classe, code, config) {
+export function initOrientShowKiosk(classe, code) {
     currentClasse = classe;
-    
-    // Fonction pour mettre à jour l'interface avec la config
-    function updateFromConfig(configData) {
-        if (!configData || !configData.matrix) {
-            console.warn('[OrientShow Kiosk] Config invalide ou manquante');
-            return;
+    currentCode = code;
+    currentEleveId = code; // On utilise le code comme identifiant unique (NOIR_1)
+
+    // 1. Récupérer la matrice des codes
+    const matrixRef = ref(db, 'settings/matrix');
+    onValue(matrixRef, (snap) => {
+        matrix = snap.val() || {};
+        // Si la matrice est vide, on utilise une matrice par défaut
+        if (Object.keys(matrix).length === 0) {
+            matrix = getDefaultMatrix();
         }
-        matrix = configData.matrix || {};
-        startTime = configData.startTime || null;
-        endTime = configData.endTime || null;
-        
-        const parts = code.split('_');
-        if (parts.length === 2) {
-            selectedColor = parts[0];
-            selectedNum = parseInt(parts[1]);
-        }
-        
-        renderIdentitySelection();
-        renderCircuits();
-        updateUIState();
+        // Une fois la matrice chargée, on peut afficher l'interface
+        chargerSessions();
+    });
+
+    // 2. Initialiser l'audio (au premier clic)
+    document.addEventListener('click', initAudio, { once: true });
+}
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+}
+
+function playTone(freq, duration, type = 'sine') {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+// ============================================================
+// CHARGEMENT DES SESSIONS (validations)
+// ============================================================
+function chargerSessions() {
+    // Nettoyer l'ancien listener
+    if (listener) {
+        listener.off();
+        listener = null;
     }
 
-    // Si une config est fournie, l'utiliser tout de suite
-    if (config && config.matrix) {
-        console.log('[OrientShow Kiosk] Configuration initiale reçue :', config);
-        updateFromConfig(config);
-    } else {
-        console.log('[OrientShow Kiosk] Pas de config fournie, attente...');
-        const container = document.getElementById('os-kiosk-container');
-        if (container) {
-            container.innerHTML = `<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration du professeur...</p></div>`;
-        }
-    }
-
-    // ✅ Écouter en temps réel la configuration sur le chemin /config (pas /orientshow/config)
-    if (configListener) {
-        configListener();
-        configListener = null;
-    }
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
-    configListener = onValue(configRef, (snap) => {
-        const configData = snap.val();
-        if (configData && configData.activite === 'orientshow' && configData.matrix) {
-            console.log('[OrientShow Kiosk] Mise à jour de la config reçue :', configData);
-            // Mettre à jour les variables
-            matrix = configData.matrix || {};
-            const newStartTime = configData.startTime || null;
-            const newEndTime = configData.endTime || null;
-            // Vérifier si la course a changé d'état
-            const courseChanged = (newStartTime !== startTime) || (newEndTime !== endTime);
-            startTime = newStartTime;
-            endTime = newEndTime;
-            // Re-rendre si la course a changé ou si la matrice a changé
-            if (courseChanged || JSON.stringify(matrix) !== JSON.stringify(configData.matrix)) {
-                renderCircuits();
-                updateUIState();
-            }
-        } else {
-            console.warn('[OrientShow Kiosk] Config Firebase vide ou invalide', configData);
-        }
+    const sessionsRef = ref(db, `sessions/${currentClasse}/${currentEleveId}`);
+    listener = onValue(sessionsRef, (snap) => {
+        sessions = snap.val() || {};
+        afficherInterface();
     });
 }
 
 // ============================================================
-// AFFICHAGE DE LA SÉLECTION D'IDENTITÉ
+// AFFICHAGE DE L'INTERFACE
 // ============================================================
-function renderIdentitySelection() {
-    const container = document.getElementById('os-identity-selector');
-    if (!container) return;
-    if (container.children.length > 0) return;
-    
-    let html = `<div class="grid grid-cols-5 gap-2">`;
-    ['NOIR','ROUGE','BLEU','VERT','JAUNE'].forEach(col => {
-        const active = col === selectedColor ? 'border-blue-500' : 'border-transparent';
-        html += `<button class="os-color-btn bg-slate-700 p-4 rounded-xl font-black text-xs uppercase border-2 ${active}" data-color="${col}" onclick="window.selectOSColor('${col}')">${col}</button>`;
-    });
-    html += `</div><div class="grid grid-cols-5 gap-2 mt-2">`;
-    for (let i = 1; i <= 10; i++) {
-        const active = i === selectedNum ? 'border-blue-500' : 'border-transparent';
-        html += `<button class="os-num-btn bg-slate-700 p-4 rounded-xl font-black text-lg border-2 ${active}" data-num="${i}" onclick="window.selectOSNum(${i})">${i}</button>`;
-    }
-    html += `</div>`;
-    container.innerHTML = html;
-}
-
-// ============================================================
-// AFFICHAGE DES CIRCUITS
-// ============================================================
-function renderCircuits() {
-    const container = document.getElementById('os-circuit-grid');
-    if (!container) return;
-    
-    if (!matrix || Object.keys(matrix).length === 0) {
-        container.innerHTML = '<p class="text-slate-400 text-center">⏳ En attente de la matrice des circuits...</p>';
+function afficherInterface() {
+    const container = document.getElementById('os-kiosk-container');
+    if (!container) {
+        console.error('Conteneur os-kiosk-container introuvable');
         return;
     }
-    
-    let html = `<div class="grid grid-cols-4 gap-2">`;
-    for (let c = 1; c <= 12; c++) {
-        const active = c === selectedCircuit ? 'border-blue-500' : 'border-transparent';
-        html += `<button class="os-circuit-btn bg-slate-700 p-4 rounded-xl font-black text-sm border-2 ${active}" data-circuit="${c}" onclick="window.selectOSCircuit(${c})">C${c}</button>`;
+
+    // On calcule le total des points
+    let totalPoints = 0;
+    const validations = {};
+    for (let i = 1; i <= 12; i++) {
+        const key = `C${i}`;
+        if (sessions[key]) {
+            totalPoints += sessions[key].score || 0;
+            validations[i] = sessions[key];
+        } else {
+            validations[i] = null;
+        }
     }
-    html += `</div>`;
+
+    // Récupérer la couleur et le numéro pour l'affichage
+    const [color, num] = currentCode.split('_');
+    const colorClasses = {
+        NOIR: 'bg-black text-white',
+        ROUGE: 'bg-red-600 text-white',
+        BLEU: 'bg-blue-600 text-white',
+        VERT: 'bg-green-600 text-white',
+        JAUNE: 'bg-yellow-500 text-black'
+    };
+    const bgColor = colorClasses[color] || 'bg-slate-700 text-white';
+
+    // Construction du HTML
+    let html = `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center text-2xl font-black ${bgColor}">
+                        ${num}
+                    </div>
+                    <div>
+                        <div class="text-sm font-bold text-slate-400">${color}</div>
+                        <div class="text-xl font-black text-white">${currentCode}</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-slate-400">Score</div>
+                    <div class="text-3xl font-black text-emerald-400">${totalPoints} pts</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-4">
+    `;
+
+    for (let i = 1; i <= 12; i++) {
+        const val = validations[i];
+        let statusClass = 'bg-slate-700 hover:bg-slate-600';
+        let statusText = `C${i}`;
+        let disabled = '';
+        let onclick = `onclick="window.selectCircuit(${i})"`;
+
+        if (val) {
+            const pts = val.score || 0;
+            if (pts === 5) {
+                statusClass = 'bg-emerald-600 hover:bg-emerald-700';
+                statusText = `C${i} ✅`;
+                disabled = 'opacity-70 cursor-default';
+                onclick = ''; // pas de clic
+            } else if (pts === 2) {
+                statusClass = 'bg-orange-500 hover:bg-orange-600';
+                statusText = `C${i} 🆗`;
+                disabled = 'opacity-70 cursor-default';
+                onclick = '';
+            } else {
+                statusClass = 'bg-red-600 hover:bg-red-700';
+                statusText = `C${i} ❌`;
+                disabled = 'opacity-70 cursor-default';
+                onclick = '';
+            }
+        }
+
+        html += `
+            <button id="btnCircuit${i}" 
+                    class="circuit-btn ${statusClass} rounded-xl p-4 font-black text-white text-xl border-2 border-slate-600 ${disabled} transition-all active:scale-95"
+                    ${onclick ? `onclick="${onclick}"` : 'disabled'}
+                    data-circuit="${i}">
+                ${statusText}
+            </button>
+        `;
+    }
+
+    html += `
+        </div>
+
+        <!-- Zone de saisie (visible uniquement si un circuit est sélectionné) -->
+        <div id="saisieZone" class="hidden bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <div class="text-center mb-4">
+                <span class="text-sm text-slate-400">Circuit sélectionné :</span>
+                <span id="selectedCircuitLabel" class="text-2xl font-black text-white ml-2"></span>
+            </div>
+            <div class="flex justify-center items-center gap-6 mb-4">
+                <input type="text" id="l1" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500" maxlength="1" oninput="this.value=this.value.toUpperCase(); if(this.value) document.getElementById('l2').focus()">
+                <input type="text" id="l2" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500" maxlength="1" oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="flex gap-4">
+                <button onclick="window.annulerSaisie()" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white active:scale-95">Annuler</button>
+                <button onclick="window.validerCircuit()" class="flex-1 bg-blue-600 py-3 rounded-xl font-black text-white active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.5)]">Valider</button>
+            </div>
+        </div>
+    `;
+
     container.innerHTML = html;
-    
-    // Ajouter le statut de la course
-    let statusHtml = '';
-    if (!startTime) {
-        statusHtml = '<p class="text-center text-slate-400 mt-4">⏳ En attente du départ du professeur...</p>';
-    } else if (endTime) {
-        statusHtml = '<p class="text-center text-red-400 mt-4">⏱️ La course est terminée.</p>';
-    } else {
-        statusHtml = '<p class="text-center text-emerald-400 mt-4">🏃 Course en cours !</p>';
-    }
-    container.innerHTML += statusHtml;
+
+    // Exposer les fonctions globalement pour les onclick
+    window.selectCircuit = selectCircuit;
+    window.annulerSaisie = annulerSaisie;
+    window.validerCircuit = validerCircuit;
 }
 
 // ============================================================
-// MISE À JOUR DE L'ÉTAT
+// SÉLECTION D'UN CIRCUIT
 // ============================================================
-function updateUIState() {
-    const state = document.getElementById('courseState');
-    if (!state) return;
-    if (!startTime) {
-        state.innerText = '⏳ En attente du départ...';
-    } else if (!endTime) {
-        state.innerText = '🏃‍♂️ Course en cours !';
-    } else {
-        state.innerText = '🛑 Course terminée.';
+function selectCircuit(circuitId) {
+    // Vérifier si déjà validé
+    const key = `C${circuitId}`;
+    if (sessions[key]) {
+        alert('Ce circuit a déjà été validé.');
+        return;
     }
+
+    selectedCircuit = circuitId;
+    document.getElementById('selectedCircuitLabel').innerText = `C${circuitId}`;
+    document.getElementById('saisieZone').classList.remove('hidden');
+    document.getElementById('l1').value = '';
+    document.getElementById('l2').value = '';
+    document.getElementById('l1').focus();
+}
+
+function annulerSaisie() {
+    selectedCircuit = null;
+    document.getElementById('saisieZone').classList.add('hidden');
+    document.getElementById('l1').value = '';
+    document.getElementById('l2').value = '';
 }
 
 // ============================================================
-// ACTIONS GLOBALES (pour les onclick)
+// VALIDATION D'UN CIRCUIT
 // ============================================================
-window.selectOSColor = function(color) {
-    selectedColor = color;
-    document.querySelectorAll('.os-color-btn').forEach(b => b.classList.remove('border-blue-500'));
-    document.querySelector(`.os-color-btn[data-color="${color}"]`)?.classList.add('border-blue-500');
-};
+function validerCircuit() {
+    if (!selectedCircuit) {
+        alert('Sélectionnez d\'abord un circuit.');
+        return;
+    }
+    const key = `C${selectedCircuit}`;
+    if (sessions[key]) {
+        alert('Ce circuit a déjà été validé.');
+        annulerSaisie();
+        return;
+    }
 
-window.selectOSNum = function(num) {
-    selectedNum = num;
-    document.querySelectorAll('.os-num-btn').forEach(b => b.classList.remove('border-blue-500'));
-    document.querySelector(`.os-num-btn[data-num="${num}"]`)?.classList.add('border-blue-500');
-};
+    const l1 = document.getElementById('l1').value.toUpperCase();
+    const l2 = document.getElementById('l2').value.toUpperCase();
+    if (!l1 && !l2) {
+        alert('Saisissez au moins une lettre.');
+        return;
+    }
 
-window.selectOSCircuit = function(circuit) {
-    selectedCircuit = circuit;
-    document.querySelectorAll('.os-circuit-btn').forEach(b => b.classList.remove('border-blue-500'));
-    document.querySelector(`.os-circuit-btn[data-circuit="${circuit}"]`)?.classList.add('border-blue-500');
-    document.getElementById('os-letters-input').classList.remove('hidden');
-};
-
-export function validateOSPassage() {
-    if (!currentClasse) return alert('Sélectionnez une classe.');
-    if (!selectedColor || !selectedNum) return alert('Choisissez votre identité (couleur + numéro).');
-    if (!selectedCircuit) return alert('Choisissez un circuit.');
-    if (!startTime || endTime) return alert('La course n\'est pas active.');
-
-    const l1 = document.getElementById('os-l1').value.toUpperCase();
-    const l2 = document.getElementById('os-l2').value.toUpperCase();
-    if (!l1 && !l2) return alert('Saisissez au moins une lettre.');
-
+    // Anti‑triche : 30s entre deux validations pour le même élève
     const now = Date.now();
-    if (now - lastSend < COOLDOWN) {
-        const wait = Math.ceil((COOLDOWN - (now - lastSend)) / 1000);
-        return alert(`⏳ Attendez encore ${wait}s.`);
+    const diff = (now - (antiCheat[currentEleveId] || 0)) / 1000;
+    if (diff < 30) {
+        alert(`⏳ Trop rapide ! Attends encore ${Math.ceil(30 - diff)}s.`);
+        return;
     }
 
-    // Calcul du score
-    const truth = matrix[selectedCircuit]?.[selectedColor] || ['', ''];
-    let score = 0;
-    let truthCopy = [...truth];
-    if (l1 && truthCopy.includes(l1)) { score += 2.5; truthCopy = truthCopy.filter(l => l !== l1); }
-    if (l2 && truthCopy.includes(l2)) { score += 2.5; truthCopy = truthCopy.filter(l => l !== l2); }
-    score = Math.floor(score === 5 ? 5 : (score > 0 ? 2 : 0));
+    // Récupérer la couleur et la matrice
+    const [color] = currentCode.split('_');
+    const codeVerite = matrix[selectedCircuit]?.[color] || [];
 
-    const code = `${selectedColor}_${selectedNum}`;
-    sendOrientShowPassage(currentClasse, {
-        code,
-        circuit: selectedCircuit,
-        lettres: [l1, l2],
-        score,
-        timestamp: now
-    }).then(() => {
-        lastSend = now;
-        showFeedback(score);
-        document.getElementById('os-l1').value = '';
-        document.getElementById('os-l2').value = '';
-    }).catch(err => alert('Erreur envoi : ' + err.message));
+    // Calcul du score (identique à vos fichiers)
+    let pts = 0;
+    let truth = [...codeVerite];
+    if (l1 !== '') {
+        const idx1 = truth.indexOf(l1);
+        if (idx1 !== -1) { pts += 2.5; truth.splice(idx1, 1); }
+    }
+    if (l2 !== '') {
+        const idx2 = truth.indexOf(l2);
+        if (idx2 !== -1) { pts += 2.5; truth.splice(idx2, 1); }
+    }
+    pts = Math.floor(pts === 5 ? 5 : (pts > 0 ? 2 : 0));
+
+    // Son de feedback
+    if (pts === 5) playTone(880, 0.3, 'sine');
+    else if (pts === 2) playTone(440, 0.2, 'sine');
+    else playTone(150, 0.4, 'sawtooth');
+
+    // Enregistrer dans Firebase
+    const sessionRef = ref(db, `sessions/${currentClasse}/${currentEleveId}/${key}`);
+    set(sessionRef, { score: pts, realTime: Date.now() })
+        .then(() => {
+            antiCheat[currentEleveId] = Date.now();
+            afficherFeedback(pts);
+            annulerSaisie();
+        })
+        .catch(err => {
+            console.error('Erreur enregistrement :', err);
+            alert('Erreur lors de la validation. Réessayez.');
+        });
 }
 
-window.validateOSPassage = validateOSPassage;
+// ============================================================
+// FEEDBACK
+// ============================================================
+function afficherFeedback(pts) {
+    const container = document.getElementById('os-kiosk-container');
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center transition-all';
 
-function showFeedback(score) {
-    const icon = score === 5 ? '🏆' : (score === 2 ? '🆗' : '❌');
-    alert(`${icon} Score : +${score} pts`);
+    const icon = pts === 5 ? '🏆' : (pts === 2 ? '🆗' : '❌');
+    const color = pts === 5 ? '#065f46' : (pts === 2 ? '#9a3412' : '#991b1b');
+    overlay.style.backgroundColor = color;
+
+    overlay.innerHTML = `
+        <div class="text-8xl mb-4">${icon}</div>
+        <div class="text-6xl font-black text-white mb-2">+${pts} PTS</div>
+        <button onclick="this.parentElement.remove()" class="mt-8 px-12 py-4 bg-white/10 border-2 border-white rounded-2xl text-white font-black text-xl active:scale-95 transition-transform">
+            SUIVANT ➔
+        </button>
+    `;
+    document.body.appendChild(overlay);
 }
 
+// ============================================================
+// MATRICE PAR DÉFAUT (si Firebase est vide)
+// ============================================================
+function getDefaultMatrix() {
+    return {
+        1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
+        2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
+        3: { NOIR: ['C','L'], ROUGE: ['H','U'], BLEU: ['I','B'], VERT: ['O','I'], JAUNE: ['T','E'] },
+        4: { NOIR: ['R','V'], ROUGE: ['E','E'], BLEU: ['C','R'], VERT: ['T','N'], JAUNE: ['O','I'] },
+        5: { NOIR: ['A','B'], ROUGE: ['J','O'], BLEU: ['O','U'], VERT: ['N','E'], JAUNE: ['C','S'] },
+        6: { NOIR: ['F','M'], ROUGE: ['I','E'], BLEU: ['C','R'], VERT: ['U','O'], JAUNE: ['S','U'] },
+        7: { NOIR: ['G','H'], ROUGE: ['U','A'], BLEU: ['E','C'], VERT: ['U','H'], JAUNE: ['X','E'] },
+        8: { NOIR: ['I','J'], ROUGE: ['V','E'], BLEU: ['R','A'], VERT: ['E','N'], JAUNE: ['S','S'] },
+        9: { NOIR: ['K','N'], ROUGE: ['R','Y'], BLEU: ['A','L'], VERT: ['F','O'], JAUNE: ['T','N'] },
+        10: { NOIR: ['O','S'], ROUGE: ['C','E'], BLEU: ['E','I'], VERT: ['A','Z'], JAUNE: ['N','E'] },
+        11: { NOIR: ['P','T'], ROUGE: ['A','U'], BLEU: ['L','Y'], VERT: ['U','A'], JAUNE: ['D','U'] },
+        12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
+    };
+}
+
+// ============================================================
+// NETTOYAGE
+// ============================================================
 export function cleanupOrientShowKiosk() {
-    if (configListener) {
-        configListener();
-        configListener = null;
+    if (listener) {
+        listener.off();
+        listener = null;
     }
 }
