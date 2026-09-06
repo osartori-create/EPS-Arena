@@ -116,7 +116,6 @@ export function initOrientShowInterface() {
     }
 
     attachClassChangeListener();
-    loadOrientShowAssignments();
 }
 
 // --------------------------------------------------------------
@@ -319,76 +318,60 @@ function onClassChange() {
 // 6. CHARGEMENT DES AFFECTATIONS (avec verrou)
 // --------------------------------------------------------------
 export async function loadOrientShowAssignments() {
-    // Éviter les chargements simultanés
+    console.log('[OrientShow] loadOrientShowAssignments appelée');
+    
+    // Éviter les appels simultanés
     if (isLoading) {
-        console.log('⏳ Chargement déjà en cours, ignoré.');
+        console.log('[OrientShow] ⏳ Chargement déjà en cours, ignoré.');
         return;
     }
     isLoading = true;
 
     try {
-        // Vérifier que les éléments de la réserve existent
-        if (!document.getElementById('os-reserve-garcons') || !document.getElementById('os-reserve-filles')) {
-            const container = document.getElementById('viewOrientShowSettings');
-            if (container) {
-                const main = createMain();
-                const header = container.querySelector('.flex.justify-between');
-                if (header) {
-                    container.insertBefore(main, header.nextSibling);
-                } else {
-                    container.prepend(main);
-                }
-                if (!document.getElementById('os-matrix-container')) {
-                    const matrixContainer = createMatrixContainer();
-                    container.appendChild(matrixContainer);
-                }
-                resetMatrix();
-            }
-            // On rappelle une seule fois après un délai
-            setTimeout(() => loadOrientShowAssignments(), 50);
-            isLoading = false;
-            return;
-        }
-
-        if (!document.getElementById('os-postesGrid')) {
-            const container = document.getElementById('viewOrientShowSettings');
-            if (container) {
-                const main = createMain();
-                const header = container.querySelector('.flex.justify-between');
-                if (header) {
-                    container.insertBefore(main, header.nextSibling);
-                } else {
-                    container.prepend(main);
-                }
-            }
-            setTimeout(() => loadOrientShowAssignments(), 50);
-            isLoading = false;
-            return;
-        }
-
-        const classe = getCurrentClasse();
-        if (!classe) {
-            document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
-            document.getElementById('os-reserve-garcons').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
-            document.getElementById('os-reserve-filles').innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
-            isLoading = false;
-            return;
-        }
-
-        const mapping = getLocalMapping(classe) || {};
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-
-        // 🔥 Nettoyage complet avant de remplir
-        document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
+        // Récupérer les conteneurs de la réserve
         const garconsContainer = document.getElementById('os-reserve-garcons');
         const fillesContainer = document.getElementById('os-reserve-filles');
+        console.log('[OrientShow] Conteneurs trouvés :', {
+            garcons: !!garconsContainer,
+            filles: !!fillesContainer
+        });
+
+        if (!garconsContainer || !fillesContainer) {
+            console.warn('[OrientShow] ❌ Conteneurs de réserve introuvables');
+            return;
+        }
+
+        // Récupérer la classe active
+        const classe = getCurrentClasse();
+        console.log('[OrientShow] Classe active :', classe);
+
+        if (!classe) {
+            // Pas de classe sélectionnée : vider tout
+            document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
+            garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
+            fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Sélectionnez une classe.</p>';
+            return;
+        }
+
+        // Récupérer le mapping local (affectations) et les élèves
+        const mapping = getLocalMapping(classe) || {};
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+        console.log('[OrientShow] Mapping reçu :', Object.keys(mapping).length, 'entrées');
+        console.log('[OrientShow] Nombre d\'élèves :', eleves.length);
+
+        // Nettoyer les zones de dépôt
+        document.querySelectorAll('.os-dropzone').forEach(el => el.innerHTML = '');
+        // Vider la réserve
         garconsContainer.innerHTML = '';
         fillesContainer.innerHTML = '';
 
-        // Placer selon le mapping
+        // Ensemble des IDs déjà placés
         const placedIds = new Set();
+
+        // Parcourir le mapping pour placer les élèves dans les dropzones
         for (const [key, eleveIds] of Object.entries(mapping)) {
             const ids = Array.isArray(eleveIds) ? eleveIds : [eleveIds];
+            // La clé est de la forme "classe_NOIR_1" ou "classe_ROUGE_2"
             const codePart = key.replace(`${classe}_`, '');
             const match = codePart.match(/^([A-Z]+)_(\d+)$/);
             if (match) {
@@ -402,34 +385,53 @@ export async function loadOrientShowAssignments() {
                             const card = await createEleveCard(eleve);
                             dropzone.appendChild(card);
                             placedIds.add(eleveId);
+                        } else {
+                            console.warn(`[OrientShow] Élève ${eleveId} non trouvé dans la classe`);
                         }
                     }
+                } else {
+                    console.warn(`[OrientShow] Dropzone introuvable pour ${color}_${num}`);
                 }
+            } else {
+                console.warn(`[OrientShow] Clé de mapping ignorée : ${key}`);
             }
         }
 
-        // Répartition des non placés par sexe
+        // Élèves non placés : répartition par sexe dans la réserve
         const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
-        const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
-        const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
-        const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'F').sort((a, b) => a.nom.localeCompare(b.nom));
+        const garcons = nonPlaces.filter(e => e.sexe === 'M' || e.sexe === 'm').sort((a, b) => a.nom.localeCompare(b.nom));
+        const filles = nonPlaces.filter(e => e.sexe === 'F' || e.sexe === 'f').sort((a, b) => a.nom.localeCompare(b.nom));
+        const autres = nonPlaces.filter(e => e.sexe !== 'M' && e.sexe !== 'm' && e.sexe !== 'F' && e.sexe !== 'f').sort((a, b) => a.nom.localeCompare(b.nom));
 
+        console.log(`[OrientShow] Réserve : ${garcons.length} garçons, ${filles.length} filles, ${autres.length} autres`);
+
+        // Ajouter les garçons
         for (const eleve of garcons) {
             garconsContainer.appendChild(await createEleveCard(eleve));
         }
+        // Ajouter les filles
         for (const eleve of filles) {
             fillesContainer.appendChild(await createEleveCard(eleve));
         }
+        // Ajouter les autres (par défaut dans garçons)
         for (const eleve of autres) {
             garconsContainer.appendChild(await createEleveCard(eleve));
         }
 
-        if (garconsContainer.children.length === 0) garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
-        if (fillesContainer.children.length === 0) fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
+        // Messages si aucun élève dans une colonne
+        if (garconsContainer.children.length === 0) {
+            garconsContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucun garçon</p>';
+        }
+        if (fillesContainer.children.length === 0) {
+            fillesContainer.innerHTML = '<p class="text-slate-500 text-xs">Aucune fille</p>';
+        }
 
+        // Réinitialiser Sortable
         initSortableOS();
+
+        console.log('[OrientShow] ✅ Chargement des affectations terminé');
     } catch (err) {
-        console.error('Erreur lors du chargement des affectations :', err);
+        console.error('[OrientShow] ❌ Erreur loadOrientShowAssignments :', err);
     } finally {
         isLoading = false;
     }

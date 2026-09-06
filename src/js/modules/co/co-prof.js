@@ -74,7 +74,6 @@ function setCOMode(mode) {
         if (containerClassique) containerClassique.style.display = '';
         if (containerOrientShow) {
             containerOrientShow.style.display = 'none';
-            // Nettoyer l'attribut pour permettre une réinitialisation future
             delete containerOrientShow.dataset.initialized;
         }
         const btnClassique = document.getElementById('co-mode-classique');
@@ -88,18 +87,25 @@ function setCOMode(mode) {
     } else {
         if (containerClassique) {
             containerClassique.style.display = 'none';
-            // Nettoyer l'attribut pour permettre une réinitialisation future
             delete containerClassique.dataset.initialized;
         }
         if (containerOrientShow) {
             containerOrientShow.style.display = '';
-            // ✅ Supprimer l'attribut d'initialisation avant de vider le conteneur
             delete containerOrientShow.dataset.initialized;
             containerOrientShow.innerHTML = '';
-            // ✅ Appeler l’initialisation OrientShow avec le conteneur
+            // ✅ Initialiser OrientShow
             import('./orientshow/orientshow-prof.js').then(module => {
                 if (module.initProf) {
                     module.initProf(currentClasse, containerOrientShow);
+                    // ✅ Forcer le chargement des affectations après un délai
+                    setTimeout(() => {
+                        import('../../orientshow/orientshow-interface.js').then(m => {
+                            if (m.loadOrientShowAssignments) {
+                                console.log('[CO] Forçage du chargement des affectations OrientShow');
+                                m.loadOrientShowAssignments();
+                            }
+                        });
+                    }, 300);
                 }
             });
         }
