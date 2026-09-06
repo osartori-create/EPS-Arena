@@ -1,6 +1,6 @@
 // src/js/modules/eleve/orientshow-kiosk.js
 // Kiosk OrientShow – version élève
-// ✅ Retour automatique à l’écran de sélection des codes après 3 secondes
+// ✅ Anti-triche par code (cooldown individuel) et retour automatique après 3 secondes
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -14,8 +14,8 @@ let audioCtx = null;
 
 // État local
 let selectedCircuit = null;
-let lastSend = 0;
-const COOLDOWN = 30000;        // 30s entre deux validations
+let lastSendByCode = {};       // ✅ Stockage du dernier envoi par code (anti‑triche individuel)
+const COOLDOWN = 30000;        // 30s entre deux validations pour le même code
 
 // ============================================================
 // INITIALISATION
@@ -255,7 +255,7 @@ function annulerSaisie() {
 }
 
 // ============================================================
-// VALIDATION D'UN CIRCUIT
+// VALIDATION D'UN CIRCUIT (avec cooldown par code)
 // ============================================================
 function validerCircuit() {
     if (!selectedCircuit) {
@@ -277,10 +277,12 @@ function validerCircuit() {
         return;
     }
 
+    // ✅ Anti‑triche : cooldown par code (et non global)
     const now = Date.now();
+    const lastSend = lastSendByCode[currentCode] || 0;
     if (now - lastSend < COOLDOWN) {
         const wait = Math.ceil((COOLDOWN - (now - lastSend)) / 1000);
-        alert(`⏳ Trop rapide ! Attends encore ${wait}s.`);
+        alert(`⏳ Trop rapide pour le code ${currentCode} ! Attends encore ${wait}s.`);
         return;
     }
 
@@ -316,7 +318,8 @@ function validerCircuit() {
 
     push(passagesRef, passageData)
         .then(() => {
-            lastSend = now;
+            // ✅ Enregistrer le moment de la validation pour ce code
+            lastSendByCode[currentCode] = now;
             afficherFeedback(pts);
             annulerSaisie();
         })
@@ -354,18 +357,14 @@ function afficherFeedback(pts) {
     // Fonction de retour
     const retour = () => {
         overlay.remove();
-        // Nettoyer les écouteurs
         cleanupOrientShowKiosk();
-        // Cacher le module
         const container = document.getElementById('orientshow-module');
         if (container) {
             container.style.display = 'none';
             container.innerHTML = '';
         }
-        // Rétablir l'affichage du panneau "Code sélectionné"
         const codeInfo = document.getElementById('code-info');
         if (codeInfo) codeInfo.style.display = '';
-        // Appeler resetToLogin
         if (typeof window.resetToLogin === 'function') {
             window.resetToLogin();
         } else {
@@ -373,10 +372,7 @@ function afficherFeedback(pts) {
         }
     };
 
-    // Clic sur le bouton "SUIVANT" → retour immédiat
     overlay.querySelector('.btn-fermer-feedback').addEventListener('click', retour);
-
-    // Retour automatique après 3 secondes
     setTimeout(retour, 3000);
 }
 
