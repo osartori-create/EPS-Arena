@@ -20,17 +20,11 @@ let currentClasse = '';
 
 export function initProf(classe) {
     currentClasse = classe || document.getElementById('selectClasse')?.value || '';
-    // Utiliser le conteneur dédié
     const container = document.getElementById('co-orientshow-container');
     if (container) {
-        // On déplace l'interface existante dans le conteneur
-        // Mais initOrientShowInterface utilise le conteneur #viewOrientShowSettings
-        // On va plutôt réinitialiser l'interface pour qu'elle utilise le conteneur
-        // On appelle la fonction d'init avec un paramètre optionnel
         initOrientShowInterface(container);
         loadOrientShowAssignments();
     } else {
-        // Fallback : utiliser le conteneur existant
         initOrientShowInterface();
         loadOrientShowAssignments();
     }
@@ -38,7 +32,6 @@ export function initProf(classe) {
 
 export function initKiosk(classe, code) {
     console.log('[OrientShow] Kiosk init pour', classe, code);
-    // Appel à orientshow-kiosk
     import('../../eleve/orientshow-kiosk.js').then(module => {
         module.initOrientShowKiosk(classe, code);
     });
@@ -63,10 +56,14 @@ export async function transmettre(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const baseProf = `etablissements/0680013V/profs/${profCode}`;
     
-    // Utiliser la matrice existante
     const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-    const startTime = localStorage.getItem('eps_arena_os_startTime');
-    const endTime = localStorage.getItem('eps_arena_os_endTime');
+    
+    // Récupérer les timestamps avec vérification
+    const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
+    const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
+    
+    const startTime = startTimeStr ? parseInt(startTimeStr) : null;
+    const endTime = endTimeStr ? parseInt(endTimeStr) : null;
     
     const configData = {
         activite: 'orientshow',
@@ -75,8 +72,13 @@ export async function transmettre(classe) {
         nbCouleurs: 5
     };
     
-    if (startTime) configData.startTime = parseInt(startTime);
-    if (endTime) configData.endTime = parseInt(endTime);
+    // Ajouter les timestamps uniquement s'ils sont valides
+    if (startTime && !isNaN(startTime)) {
+        configData.startTime = startTime;
+    }
+    if (endTime && !isNaN(endTime)) {
+        configData.endTime = endTime;
+    }
 
     try {
         console.log("📡 Configuration OrientShow envoyée :", configData);
