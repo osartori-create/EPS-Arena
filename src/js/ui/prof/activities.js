@@ -262,23 +262,15 @@ export function initActivities() {
         console.error("❌ Erreur initBadmintonModeSelector :", e);
     }
 
+    try {
+        initEscaladeModeSelector();
+        console.log("✅ Sélecteur de mode Escalade initialisé");
+    } catch (e) {
+        console.error("❌ Erreur initEscaladeModeSelector :", e);
+    }
     // Palette de couleurs pour Multi-activités
     initPalette();
 
-    // ✅ Ajout du bouton Bloc Contest dans le sélecteur de discipline
-    const disciplineSelector = document.getElementById('disciplineSelector');
-    if (disciplineSelector) {
-        // Vérifier si le bouton existe déjà
-        if (!document.getElementById('btnDisc-bloccontest')) {
-            const btnBloc = document.createElement('button');
-            btnBloc.id = 'btnDisc-bloccontest';
-            btnBloc.className = 'bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform';
-            btnBloc.innerHTML = '🧗 Bloc Contest';
-            btnBloc.onclick = () => switchDiscipline('bloccontest');
-            disciplineSelector.appendChild(btnBloc);
-            console.log("✅ Bouton Bloc Contest ajouté");
-        }
-    }
 
     // ============================================================
     // CHANGEMENT DE DISCIPLINE
@@ -1022,7 +1014,79 @@ function initPalette() {
         `<div onclick="window.toggleCouleur('${c}')" data-couleur="${c}" class="w-8 h-8 rounded-full border-2 border-slate-600 cursor-pointer active:scale-90" style="background-color: ${c}"></div>`
     ).join('');
 }
+// ============================================================
+// SÉLECTEUR DE MODE ESCALADE (Classique / Bloc Contest)
+// ============================================================
+function initEscaladeModeSelector() {
+    const escView = document.getElementById('viewEscaladeSettings');
+    if (!escView) return;
+    // Ne pas dupliquer
+    if (document.getElementById('escalade-mode-selector')) return;
+    
+    const selector = document.createElement('div');
+    selector.id = 'escalade-mode-selector';
+    selector.className = 'flex gap-2 mb-4 bg-slate-800 p-3 rounded-2xl border border-slate-700';
+    selector.innerHTML = `
+        <button id="escalade-mode-classic" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white">🧗 Escalade classique</button>
+        <button id="escalade-mode-bloc" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">🧗 Bloc Contest</button>
+    `;
+    // Insérer en haut de la vue
+    escView.prepend(selector);
+    
+    // Gestion des clics
+    document.getElementById('escalade-mode-classic').addEventListener('click', () => {
+        setEscaladeMode('classic');
+    });
+    document.getElementById('escalade-mode-bloc').addEventListener('click', () => {
+        setEscaladeMode('bloc');
+    });
 
+    // Par défaut, afficher le mode classique
+    setEscaladeMode('classic');
+}
+
+function setEscaladeMode(mode) {
+    const escView = document.getElementById('viewEscaladeSettings');
+    const classicContainer = document.getElementById('escalade-classic-container');
+    const blocContainer = document.getElementById('bloc-prof-container');
+    
+    if (mode === 'classic') {
+        if (classicContainer) classicContainer.style.display = '';
+        if (blocContainer) blocContainer.style.display = 'none';
+        const btnClassic = document.getElementById('escalade-mode-classic');
+        const btnBloc = document.getElementById('escalade-mode-bloc');
+        if (btnClassic) {
+            btnClassic.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
+        }
+        if (btnBloc) {
+            btnBloc.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
+        }
+        // Réinitialiser l'interface classique
+        initEscaladeInterface();
+        initSortableEscalade();
+        loadEscaladeAssignments();
+    } else {
+        if (classicContainer) classicContainer.style.display = 'none';
+        if (blocContainer) {
+            blocContainer.style.display = '';
+            // Initialiser Bloc Contest
+            const activeClasse = document.getElementById('selectClasse').value;
+            if (activeClasse) {
+                initBlocProf(activeClasse);
+            } else {
+                blocContainer.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+            }
+        }
+        const btnClassic = document.getElementById('escalade-mode-classic');
+        const btnBloc = document.getElementById('escalade-mode-bloc');
+        if (btnBloc) {
+            btnBloc.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
+        }
+        if (btnClassic) {
+            btnClassic.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
+        }
+    }
+}
 window.toggleCouleur = function(couleur) {
     const el = document.querySelector(`[data-couleur="${couleur}"]`);
     if (el) {
