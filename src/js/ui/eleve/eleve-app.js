@@ -174,36 +174,43 @@ function showLogin() {
     }
 
     // SPÉCIAL BLOC CONTEST
-    if (config.activite === 'bloccontest') {
-        loginScreen.classList.add('hidden');
-        activityScreen.classList.remove('hidden');
-        // Cacher tous les autres modules
-        escaladeModule.classList.add('hidden');
-        coModule.classList.add('hidden');
-        multiModule.classList.add('hidden');
-        if (osModule) osModule.classList.add('hidden');
-        badmintonModule.classList.add('hidden');
-        // Cacher l'info de code (car on va afficher les blocs directement)
-        document.getElementById('code-info').classList.add('hidden');
-        document.getElementById('btn-quit').classList.add('hidden');
-        document.getElementById('btn-back-terrain').classList.remove('hidden');
-        document.getElementById('main-container').classList.remove('max-w-md');
-        document.getElementById('main-container').classList.add('max-w-7xl');
+    // SPÉCIAL BLOC CONTEST
+if (config.activite === 'bloccontest') {
+    // On affiche la grille des codes comme pour les autres activités
+    loginScreen.classList.remove('hidden');
+    activityScreen.classList.add('hidden');
+    waitingScreen.classList.add('hidden');
+    codeList.innerHTML = '';
+    activityTitle.innerText = "Choisis ton code";
 
-        // Créer le conteneur du kiosk s'il n'existe pas
-        let blocContainer = document.getElementById('bloc-kiosk-container');
-        if (!blocContainer) {
-            blocContainer = document.createElement('div');
-            blocContainer.id = 'bloc-kiosk-container';
-            blocContainer.className = 'space-y-4 module';
-            activityScreen.appendChild(blocContainer);
+    // Récupérer la config Bloc Contest pour obtenir les groupes
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const blocConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/bloccontest/config`);
+    onValue(blocConfigRef, (snap) => {
+        const blocConfig = snap.val();
+        if (blocConfig && blocConfig.groupes) {
+            const groupes = blocConfig.groupes;
+            Object.keys(groupes).forEach(lettre => {
+                const membres = groupes[lettre] || [];
+                membres.forEach((eleveId, index) => {
+                    const code = `${lettre}${index + 1}`;
+                    const btn = document.createElement('button');
+                    btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
+                    btn.innerText = code;
+                    btn.onclick = () => {
+                        // Appel à la fonction dédiée
+                        selectCodeBloc(code);
+                    };
+                    codeList.appendChild(btn);
+                });
+            });
+        } else {
+            codeList.innerHTML = '<p class="text-slate-400 text-center">⏳ En attente de la configuration du professeur...</p>';
         }
-        blocContainer.style.display = 'block';
-        blocContainer.classList.remove('hidden');
-        // On affiche un message d'attente (l'init se fera après sélection du code)
-        blocContainer.innerHTML = '<div class="text-center py-10 text-slate-400"><p>⏳ En attente de la configuration...</p></div>';
-        return;
-    }
+    }, { onlyOnce: true });
+
+    return;
+}
 
     // Pour les autres activités (escalade, co, multi, orientshow)
     badmintonModule.classList.add('hidden');
@@ -418,29 +425,45 @@ function selectCode(code) {
                     </div>
                 `;
             });
-    } else if (currentConfig.activite === 'bloccontest') {
-        // Afficher le conteneur et initialiser le kiosk
-        let blocContainer = document.getElementById('bloc-kiosk-container');
-        if (!blocContainer) {
-            blocContainer = document.createElement('div');
-            blocContainer.id = 'bloc-kiosk-container';
-            blocContainer.className = 'space-y-4 module';
-            activityScreen.appendChild(blocContainer);
-        }
-        blocContainer.style.display = 'block';
-        blocContainer.classList.remove('hidden');
-        // Initialiser le kiosk avec la classe et le code sélectionné
-        import('../../modules/escalade/escalade-kiosk-blocs.js').then(module => {
-            module.initBlocKiosk(selectedClass, code);
-        }).catch(err => {
-            console.error('Erreur chargement Bloc Kiosk :', err);
-            blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
-        });
+    
     } else {
         multiModule.classList.remove('hidden');
     }
 }
 
+function selectCodeBloc(code) {
+    selectedCode = code;
+    document.getElementById('selected-code').innerText = code;
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    
+    // Cacher tous les autres modules
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    
+    // Afficher le conteneur Bloc Contest
+    let blocContainer = document.getElementById('bloc-kiosk-container');
+    if (!blocContainer) {
+        blocContainer = document.createElement('div');
+        blocContainer.id = 'bloc-kiosk-container';
+        blocContainer.className = 'space-y-4 module';
+        activityScreen.appendChild(blocContainer);
+    }
+    blocContainer.style.display = 'block';
+    blocContainer.classList.remove('hidden');
+    // Appeler l’initialisation du kiosk
+    import('../../modules/escalade/escalade-kiosk-blocs.js')
+        .then(module => {
+            module.initBlocKiosk(selectedClass, code);
+        })
+        .catch(err => {
+            console.error('Erreur chargement Bloc Kiosk :', err);
+            blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+        });
+}
 // Exposition globale
 window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
