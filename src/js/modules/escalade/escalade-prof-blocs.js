@@ -329,3 +329,21 @@ export function cleanupBlocProf() {
     if (configListener) { configListener(); configListener = null; }
     if (validationsListener) { validationsListener(); validationsListener = null; }
 }
+
+// ============================================================
+// TRANSMISSION (exposée pour le bouton)
+// ============================================================
+export function transmettreConfigBloc() {
+    if (!config) return alert('Aucune configuration.');
+    // Mettre à jour l’activité dans la config principale pour que les élèves voient le module
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const mainConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
+    set(mainConfigRef, { activite: 'bloccontest' })
+        .then(() => {
+            alert('✅ Bloc Contest activé pour les iPads !');
+        })
+        .catch(err => alert('❌ Erreur : ' + err.message));
+}
+
+// Rendre la fonction accessible depuis le HTML (via window)
+window.transmettreConfigBloc = transmettreConfigBloc;
