@@ -405,7 +405,7 @@ export function renderLive(classe) {
             console.error('[CO] Erreur Live :', err);
         });
     } else {
-        import('./orientshow/orientshow-live.js').then(module => {
+        return import('./orientshow/orientshow-live.js').then(module => {
             module.renderOrientShowLive();
         }).catch(err => {
             console.error('[CO] Erreur OrientShow Live :', err);

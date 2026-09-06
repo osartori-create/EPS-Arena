@@ -340,8 +340,13 @@ export function initActivities() {
             };
 
             if (liveModules[disc]) {
-                liveModules[disc]().catch(err => console.error(`Erreur Live ${disc} :`, err));
-            } else {
+    const result = liveModules[disc]();
+    if (result && typeof result.catch === 'function') {
+        result.catch(err => console.error(`Erreur Live ${disc} :`, err));
+    } else {
+        console.warn(`Le module Live pour ${disc} n'a pas retourné de promesse.`);
+    }
+} else {
                 container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
             }
         } 
