@@ -256,14 +256,6 @@ export function initActivities() {
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
     try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
 
-    // ✅ Sélecteur de mode Badminton (existant)
-    try {
-        // initBadmintonModeSelector(); // à décommenter si vous l'avez déplacé
-        console.log("✅ Sélecteur de mode Badminton initialisé");
-    } catch (e) {
-        console.error("❌ Erreur initBadmintonModeSelector :", e);
-    }
-
     // Palette de couleurs pour Multi-activités
     initPalette();
 
@@ -298,29 +290,23 @@ export function initActivities() {
         else if (disc === 'co' && coView) coView.classList.remove('hidden');
         else if (disc === 'orientshow' && osView) osView.classList.remove('hidden');
         else if (disc === 'escalade') {
-    // Cacher les autres vues
-    // ... (comme avant)
-    // Afficher la vue Escalade
-    const escView = document.getElementById('viewEscaladeSettings');
-    if (escView) escView.classList.remove('hidden');
-    
-    // Initialiser le module escalade
-    const escaladeModule = getModule('escalade');
-    if (escaladeModule && escaladeModule.initProf) {
-        const activeClasse = document.getElementById('selectClasse').value;
-        escaladeModule.initProf(activeClasse);
-    } else {
-        // Fallback
-        initEscaladeInterface();
-        initSortableEscalade();
-        loadEscaladeAssignments();
-    }
-    // Mettre à jour currentDiscipline
-    currentDiscipline = 'escalade';
-    // Mettre à jour les boutons (comme avant)
-    // ...
-    return;
-}
+            // Afficher la vue Escalade
+            if (escView) escView.classList.remove('hidden');
+            
+            // Initialiser le module escalade
+            const escaladeModule = getModule('escalade');
+            if (escaladeModule && escaladeModule.initProf) {
+                const activeClasse = document.getElementById('selectClasse').value;
+                escaladeModule.initProf(activeClasse);
+            } else {
+                // Fallback
+                initEscaladeInterface();
+                initSortableEscalade();
+                loadEscaladeAssignments();
+            }
+            // Mettre à jour currentDiscipline
+            currentDiscipline = 'escalade';
+        }
         else if (disc === 'badminton' && bmtView) bmtView.classList.remove('hidden');
         else if (disc === 'arcathlon' && arcView) arcView.classList.remove('hidden');
         else if (disc === 'evaluation' && evalView) evalView.classList.remove('hidden');
@@ -354,9 +340,6 @@ export function initActivities() {
         // Initialisations spécifiques
         if (disc === 'co') {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
-        }
-        if (disc === 'escalade') {
-            // déjà fait plus haut
         }
         if (disc === 'orientshow') {
             try { setTimeout(() => { initOrientShowInterface(); loadOrientShowAssignments(); }, 100); } catch (e) {}
