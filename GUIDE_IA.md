@@ -6,7 +6,6 @@ Application web EPS (Éducation Physique et Sportive) pour gérer des activités
 
 ## 2. Architecture des dossiers (Exhaustive)
 
-```text
 C:.
 │   eleve.html
 │   GUIDE_IA.md
@@ -39,6 +38,7 @@ C:.
         │       
         ├───modules
         │   │   index.js
+        │   │   registry.js
         │   │   
         │   ├───arcathlon
         │   │       arcathlon-interface.js
@@ -66,11 +66,21 @@ C:.
         │   │       index.js
         │   │       
         │   ├───co
-        │   │       circuit-manager.js
-        │   │       co-interface.js
-        │   │       co-live.js
-        │   │       matrice.js
-        │   │       
+        │   │   │   circuit-manager.js
+        │   │   │   co-detail.js
+        │   │   │   co-interface.js
+        │   │   │   co-kiosk.js
+        │   │   │   co-live.js
+        │   │   │   co-prof.js
+        │   │   │   matrice.js
+        │   │   │   
+        │   │   ├───classique
+        │   │   │       classique-prof.js
+        │   │   │       
+        │   │   └───orientshow
+        │   │           orientshow-interface.js
+        │   │           orientshow-prof.js
+        │   │           
         │   ├───commun
         │   │       calculateur.js
         │   │       convertisseur.js
@@ -83,10 +93,15 @@ C:.
         │   │       orientshow-kiosk.js
         │   │       
         │   ├───escalade
+        │   │       escalade-blocs-core.js
+        │   │       escalade-blocs-firebase.js
         │   │       escalade-calculations.js
         │   │       escalade-controller.js
         │   │       escalade-interface.js
+        │   │       escalade-kiosk-blocs.js
         │   │       escalade-live.js
+        │   │       escalade-prof-blocs.js
+        │   │       escalade-prof.js
         │   │       escalade-tv-ui.js
         │   │       
         │   ├───evaluation
@@ -107,6 +122,7 @@ C:.
         │   ├───multi
         │   │       multi-controller.js
         │   │       multi-live.js
+        │   │       multi-prof.js
         │   │       
         │   ├───orientshow
         │   │       orientshow-interface.js
@@ -158,6 +174,7 @@ C:.
                 format.js
                 index.js
                 validation.js
+                
 3. Structure Firebase (TRÈS IMPORTANT - RGPD)
 Chemin hiérarchique exact :
 
