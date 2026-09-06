@@ -17,7 +17,7 @@ import { getModesList } from '../../modules/badminton/badminton-registry.js';
 import { initBadmintonModeSelector, setBadmintonMode } from '../../modules/badminton/badminton-ui-prof.js';
 
 let currentDiscipline = 'multi';
-
+let escaladeMode = 'classic';
 // ============================================================
 // UTILITAIRE : COULEUR CLAIRE ?
 // ============================================================
@@ -765,6 +765,10 @@ export function initActivities() {
         let configData = {};
         let localMapping = {};
 
+        if (currentDiscipline === 'bloccontest' || escaladeMode === 'bloc') {
+    await transmettreConfigBloc();
+    return;
+}
         if (currentDiscipline === 'co') {
             configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
             configData.activite = 'co';
@@ -872,13 +876,10 @@ export function initActivities() {
             return;
         }
         else if (currentDiscipline === 'bloccontest') {
-            // Rien à transmettre ici, la config est déjà dans le sous-chemin bloccontest
-            // On active juste l'activité pour les élèves
-            await set(ref(db, `${baseProf}/${activeClasse}/config`), { activite: 'bloccontest' });
-            await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
-            alert("✅ Bloc Contest activé pour les iPads !");
-            return;
-        }
+    // On appelle la fonction de transmission dédiée
+    await transmettreConfigBloc();
+    return;
+}
         else {
             configData.activite = 'multi';
             if (window.lastTeams) {
@@ -1046,45 +1047,30 @@ function initEscaladeModeSelector() {
 }
 
 function setEscaladeMode(mode) {
-    const escView = document.getElementById('viewEscaladeSettings');
+    escaladeMode = mode;
     const classicContainer = document.getElementById('escalade-classic-container');
     const blocContainer = document.getElementById('bloc-prof-container');
     
     if (mode === 'classic') {
+        currentDiscipline = 'escalade'; // ← on reste sur escalade
         if (classicContainer) classicContainer.style.display = '';
         if (blocContainer) blocContainer.style.display = 'none';
-        const btnClassic = document.getElementById('escalade-mode-classic');
-        const btnBloc = document.getElementById('escalade-mode-bloc');
-        if (btnClassic) {
-            btnClassic.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
-        }
-        if (btnBloc) {
-            btnBloc.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-        }
-        // Réinitialiser l'interface classique
+        document.getElementById('escalade-mode-classic').className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
+        document.getElementById('escalade-mode-bloc').className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
         initEscaladeInterface();
         initSortableEscalade();
         loadEscaladeAssignments();
     } else {
+        currentDiscipline = 'bloccontest'; // ← on passe en bloccontest
         if (classicContainer) classicContainer.style.display = 'none';
         if (blocContainer) {
             blocContainer.style.display = '';
-            // Initialiser Bloc Contest
             const activeClasse = document.getElementById('selectClasse').value;
-            if (activeClasse) {
-                initBlocProf(activeClasse);
-            } else {
-                blocContainer.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
-            }
+            if (activeClasse) initBlocProf(activeClasse);
+            else blocContainer.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
         }
-        const btnClassic = document.getElementById('escalade-mode-classic');
-        const btnBloc = document.getElementById('escalade-mode-bloc');
-        if (btnBloc) {
-            btnBloc.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
-        }
-        if (btnClassic) {
-            btnClassic.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-        }
+        document.getElementById('escalade-mode-bloc').className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
+        document.getElementById('escalade-mode-classic').className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
     }
 }
 window.toggleCouleur = function(couleur) {
