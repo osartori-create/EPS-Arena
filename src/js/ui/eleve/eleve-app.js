@@ -114,6 +114,12 @@ function showWaiting() {
 }
 
 function showLogin() {
+    // Réinitialiser les codes actifs
+    const codeInfo = document.getElementById('code-info');
+    if (codeInfo) {
+        document.getElementById('selected-code').innerText = '--';
+    }
+    
     waitingScreen.classList.add('hidden');
     activityScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
@@ -230,7 +236,7 @@ function showLogin() {
         return;
     }
 
-    // SPÉCIAL ORIENTSHOW (via CO)
+    // SPÉCIAL ORIENTSHOW (via CO) – avec pastilles de couleur
     if (config.activite === 'orientshow') {
         loginScreen.classList.remove('hidden');
         activityScreen.classList.add('hidden');
@@ -240,16 +246,27 @@ function showLogin() {
 
         // Récupérer les couleurs et leurs nombres
         const couleurs = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
+        // Mapping couleur -> classes Tailwind
+        const colorMap = {
+            NOIR: 'bg-black text-white border-slate-600',
+            ROUGE: 'bg-red-600 text-white border-red-900',
+            BLEU: 'bg-blue-600 text-white border-blue-900',
+            VERT: 'bg-green-600 text-white border-green-900',
+            JAUNE: 'bg-yellow-500 text-black border-yellow-700'
+        };
         let hasCodes = false;
         couleurs.forEach(couleur => {
             const count = config[couleur];
             if (count && typeof count === 'number' && count > 0) {
                 hasCodes = true;
+                const colorClass = colorMap[couleur] || 'bg-slate-700 text-white border-slate-600';
                 for (let i = 1; i <= count; i++) {
                     const code = `${couleur}_${i}`;
                     const btn = document.createElement('button');
-                    btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
-                    btn.innerText = code;
+                    // Pastille avec le numéro au centre
+                    btn.className = `w-16 h-16 rounded-full border-2 ${colorClass} font-black text-2xl flex items-center justify-center transition-transform active:scale-95 hover:scale-105`;
+                    btn.textContent = i; // Affiche seulement le numéro
+                    btn.dataset.code = code; // Stocke le code complet
                     btn.onclick = () => {
                         selectedCode = code;
                         document.getElementById('selected-code').innerText = code;
@@ -262,11 +279,10 @@ function showLogin() {
                         if (osModule) osModule.classList.add('hidden');
                         badmintonModule.classList.add('hidden');
                         
-                        // ✅ Utiliser le conteneur existant orientshow-module
+                        // Utiliser le conteneur existant orientshow-module
                         if (osModule) {
                             osModule.classList.remove('hidden');
                             osModule.style.display = 'block';
-                            // ✅ Initialiser le kiosk avec la config
                             import('../../modules/eleve/orientshow-kiosk.js').then(module => {
                                 module.initOrientShowKiosk(selectedClass, code, currentConfig);
                             }).catch(err => {
@@ -475,11 +491,9 @@ function selectCode(code) {
     } 
     else if (currentConfig.activite === 'co') {
         coModule.classList.remove('hidden');
-        // Ici on pourrait lancer le kiosk CO
         console.log('CO kiosk à implémenter');
     } 
     else if (currentConfig.activite === 'orientshow') {
-        // Utiliser le conteneur existant
         if (osModule) {
             osModule.classList.remove('hidden');
             osModule.style.display = 'block';
@@ -555,4 +569,22 @@ export function getSelectedClass() { return selectedClass; }
 export function getSelectedCode() { return selectedCode; }
 export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
-export function resetToLogin() { showLogin(); }
+
+export function resetToLogin() {
+    // Réinitialiser la sélection
+    selectedCode = '';
+    document.getElementById('selected-code').innerText = '--';
+    // Cacher le conteneur du kiosk si présent
+    if (osModule) {
+        osModule.style.display = 'none';
+        osModule.innerHTML = '';
+    }
+    // Nettoyer les écouteurs du kiosk
+    import('../../modules/eleve/orientshow-kiosk.js').then(module => {
+        if (module.cleanupOrientShowKiosk) {
+            module.cleanupOrientShowKiosk();
+        }
+    }).catch(() => {});
+    // Revenir à l'écran de connexion
+    showLogin();
+}

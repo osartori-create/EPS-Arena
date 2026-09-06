@@ -1,6 +1,6 @@
 // src/js/modules/eleve/orientshow-kiosk.js
-// Kiosk OrientShow – version élève (inspirée de vos fichiers originaux)
-// ✅ Ajout d’un bouton Retour et masquage de l’affichage du code en double
+// Kiosk OrientShow – version élève
+// ✅ Retour automatique à l’écran de sélection des codes après 3 secondes
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -223,47 +223,15 @@ function afficherInterface() {
     `;
     container.appendChild(saisieDiv);
 
-    // Bouton Retour (pour revenir au choix du code)
-    const footerDiv = document.createElement('div');
-    footerDiv.className = 'mt-4 text-center';
-    const backBtn = document.createElement('button');
-    backBtn.className = 'bg-slate-700 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95 transition-transform';
-    backBtn.textContent = '← Retour choix du code';
-    backBtn.addEventListener('click', () => {
-        // Nettoyer les écouteurs
-        cleanupOrientShowKiosk();
-        // Cacher le module
-        const container = document.getElementById('orientshow-module');
-        if (container) {
-            container.style.display = 'none';
-            container.innerHTML = '';
-        }
-        // Rétablir l'affichage du panneau "Code sélectionné"
-        const codeInfo = document.getElementById('code-info');
-        if (codeInfo) codeInfo.style.display = '';
-        // Appeler resetToLogin pour revenir à la grille des codes
-        if (typeof window.resetToLogin === 'function') {
-            window.resetToLogin();
-        } else {
-            // Fallback : recharger la page
-            location.reload();
-        }
-    });
-    footerDiv.appendChild(backBtn);
-    container.appendChild(footerDiv);
-
-    // Attacher les événements aux boutons de saisie (s'ils existent déjà, on les remplace)
-    const annulerBtn = document.getElementById('btnAnnulerSaisie');
-    const validerBtn = document.getElementById('btnValiderCircuit');
-    if (annulerBtn) annulerBtn.addEventListener('click', annulerSaisie);
-    if (validerBtn) validerBtn.addEventListener('click', validerCircuit);
+    // Attacher les événements aux boutons de saisie
+    document.getElementById('btnAnnulerSaisie').addEventListener('click', annulerSaisie);
+    document.getElementById('btnValiderCircuit').addEventListener('click', validerCircuit);
 }
 
 // ============================================================
 // SÉLECTION D'UN CIRCUIT
 // ============================================================
 function selectCircuit(circuitId) {
-    // Vérifier si déjà validé
     const found = Object.values(sessions).find(s => s.circuit === circuitId);
     if (found) {
         alert('Ce circuit a déjà été validé.');
@@ -295,7 +263,6 @@ function validerCircuit() {
         return;
     }
 
-    // Vérifier si déjà validé
     const found = Object.values(sessions).find(s => s.circuit === selectedCircuit);
     if (found) {
         alert('Ce circuit a déjà été validé.');
@@ -310,7 +277,6 @@ function validerCircuit() {
         return;
     }
 
-    // Anti‑triche
     const now = Date.now();
     if (now - lastSend < COOLDOWN) {
         const wait = Math.ceil((COOLDOWN - (now - lastSend)) / 1000);
@@ -318,7 +284,6 @@ function validerCircuit() {
         return;
     }
 
-    // Calcul du score
     const [color] = currentCode.split('_');
     const codeVerite = matrix[selectedCircuit]?.[color] || [];
     let pts = 0;
@@ -334,12 +299,10 @@ function validerCircuit() {
     }
     pts = Math.floor(pts === 5 ? 5 : (pts > 0 ? 2 : 0));
 
-    // Son
     if (pts === 5) playTone(880, 0.3, 'sine');
     else if (pts === 2) playTone(440, 0.2, 'sine');
     else playTone(150, 0.4, 'sawtooth');
 
-    // Enregistrer dans Firebase
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const passagesRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/orientshow/passages`);
 
@@ -364,7 +327,7 @@ function validerCircuit() {
 }
 
 // ============================================================
-// FEEDBACK
+// FEEDBACK (avec retour automatique après 3 secondes)
 // ============================================================
 function afficherFeedback(pts) {
     let total = 0;
@@ -376,6 +339,7 @@ function afficherFeedback(pts) {
 
     const icon = pts === 5 ? '🏆' : (pts === 2 ? '🆗' : '❌');
     const bgColor = pts === 5 ? '#065f46' : (pts === 2 ? '#9a3412' : '#991b1b');
+    overlay.style.backgroundColor = bgColor;
 
     overlay.innerHTML = `
         <div class="text-8xl mb-4">${icon}</div>
@@ -387,9 +351,33 @@ function afficherFeedback(pts) {
     `;
     document.body.appendChild(overlay);
 
-    overlay.querySelector('.btn-fermer-feedback').addEventListener('click', () => {
+    // Fonction de retour
+    const retour = () => {
         overlay.remove();
-    });
+        // Nettoyer les écouteurs
+        cleanupOrientShowKiosk();
+        // Cacher le module
+        const container = document.getElementById('orientshow-module');
+        if (container) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+        }
+        // Rétablir l'affichage du panneau "Code sélectionné"
+        const codeInfo = document.getElementById('code-info');
+        if (codeInfo) codeInfo.style.display = '';
+        // Appeler resetToLogin
+        if (typeof window.resetToLogin === 'function') {
+            window.resetToLogin();
+        } else {
+            location.reload();
+        }
+    };
+
+    // Clic sur le bouton "SUIVANT" → retour immédiat
+    overlay.querySelector('.btn-fermer-feedback').addEventListener('click', retour);
+
+    // Retour automatique après 3 secondes
+    setTimeout(retour, 3000);
 }
 
 // ============================================================
