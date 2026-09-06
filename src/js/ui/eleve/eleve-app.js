@@ -546,7 +546,6 @@ window.sendEscalade = sendEscaladeAction;
 window.sendBalise = () => { console.log("Balise envoyée"); };
 window.startChrono = () => { console.log("Chrono démarré"); };
 window.stopChrono = () => { console.log("Chrono arrêté"); };
-window.validateOSPassage = validateOSPassage;
 window.resetToLogin = resetToLogin;
 
 // ============================================================
