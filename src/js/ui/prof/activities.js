@@ -10,14 +10,10 @@ import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignment
 import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
 import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
 import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
-
-// ✅ Imports pour le registre et le module escalade
 import { getModule, getAllModules } from '../../modules/registry.js';
-import { initEscaladeProf, generateEscaladeTeams, transmettreEscalade } from '../../modules/escalade/escalade-prof.js';
 
-// ✅ NOUVEAUX IMPORTS POUR LE SÉLECTEUR DE MODE BADMINTON
-import { getModesList } from '../../modules/badminton/badminton-registry.js';
-import { initBadmintonModeSelector, setBadmintonMode } from '../../modules/badminton/badminton-ui-prof.js';
+// ✅ Importer le module escalade (pour l'initialisation via le registre)
+import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
 
 let currentDiscipline = 'multi';
 
@@ -250,18 +246,16 @@ function getBaseProf() {
 export function initActivities() {
     console.log("🚀 initActivities appelée !");
     
-    // Initialisations existantes (non migrées)
     try { console.log("→ Initialisation CO..."); initCOInterface(); console.log("✅ CO OK"); } catch (e) { console.error("❌ Erreur CO :", e); }
-    // L'escalade est maintenant gérée par le registre, on n'appelle plus initEscaladeInterface ici
-    // On laisse l'initialisation se faire via switchDiscipline ou via le sélecteur
+    try { console.log("→ Initialisation Escalade..."); initEscaladeInterface(6); console.log("✅ Escalade OK"); } catch (e) { console.error("❌ Erreur Escalade :", e); }
     try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
     try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
     try { console.log("→ Initialisation Évaluation..."); initEvaluationInterface(); console.log("✅ Évaluation OK"); } catch (e) { console.error("❌ Erreur Évaluation :", e); }
 
-    // ✅ NOUVEAU : Initialisation du sélecteur de mode Badminton
+    // ✅ Sélecteur de mode Badminton (existant)
     try {
-        initBadmintonModeSelector();
+        // initBadmintonModeSelector(); // à décommenter si vous l'avez déplacé
         console.log("✅ Sélecteur de mode Badminton initialisé");
     } catch (e) {
         console.error("❌ Erreur initBadmintonModeSelector :", e);
@@ -269,17 +263,6 @@ export function initActivities() {
 
     // Palette de couleurs pour Multi-activités
     initPalette();
-
-    // ✅ Écoute des changements de mode escalade pour mettre à jour currentDiscipline
-    window.addEventListener('escalade-mode-changed', (e) => {
-        const mode = e.detail.mode;
-        if (mode === 'bloc') {
-            currentDiscipline = 'bloccontest';
-        } else {
-            currentDiscipline = 'escalade';
-        }
-        console.log('[activities] currentDiscipline mis à jour :', currentDiscipline);
-    });
 
     // ============================================================
     // CHANGEMENT DE DISCIPLINE
@@ -307,37 +290,60 @@ export function initActivities() {
         if (evalView) evalView.classList.add('hidden');
         if (tournoiView) tournoiView.classList.add('hidden');
 
-        // Gestion spéciale pour l'escalade (module migré)
-        if (disc === 'escalade') {
-            if (escView) escView.classList.remove('hidden');
+        // Afficher la vue correspondante
+        if (disc === 'multi' && multiView) multiView.classList.remove('hidden');
+        else if (disc === 'co' && coView) coView.classList.remove('hidden');
+        else if (disc === 'orientshow' && osView) osView.classList.remove('hidden');
+        else if (disc === 'escalade' && escView) {
+            escView.classList.remove('hidden');
             // Initialiser le module escalade via le registre
             const escaladeModule = getModule('escalade');
             if (escaladeModule && escaladeModule.initProf) {
                 const activeClasse = document.getElementById('selectClasse').value;
                 escaladeModule.initProf(activeClasse);
             } else {
-                console.warn('Module escalade non trouvé');
+                // Fallback : initialisation classique
+                initEscaladeInterface();
+                initSortableEscalade();
+                loadEscaladeAssignments();
             }
-            // Mettre à jour les boutons
-            updateDisciplineButtons(disc);
-            return;
         }
-
-        // Gestion des autres disciplines (non migrées)
-        if (disc === 'multi' && multiView) multiView.classList.remove('hidden');
-        else if (disc === 'co' && coView) coView.classList.remove('hidden');
-        else if (disc === 'orientshow' && osView) osView.classList.remove('hidden');
         else if (disc === 'badminton' && bmtView) bmtView.classList.remove('hidden');
         else if (disc === 'arcathlon' && arcView) arcView.classList.remove('hidden');
         else if (disc === 'evaluation' && evalView) evalView.classList.remove('hidden');
         else if (disc === 'tournoi' && tournoiView) tournoiView.classList.remove('hidden');
 
         // Mise à jour des boutons
-        updateDisciplineButtons(disc);
+        const btnMulti = document.getElementById('btnDisc-multi');
+        const btnCo = document.getElementById('btnDisc-co');
+        const btnOs = document.getElementById('btnDisc-orientshow');
+        const btnEsc = document.getElementById('btnDisc-escalade');
+        const btnBmt = document.getElementById('btnDisc-badminton');
+        const btnArc = document.getElementById('btnDisc-arcathlon');
+        const btnEval = document.getElementById('btnDisc-evaluation');
+        const btnTournoi = document.getElementById('btnDisc-tournoi');
 
-        // Initialisations spécifiques pour les disciplines non migrées
+        const resetBtn = (btn) => { if (btn) { btn.classList.remove('border-blue-500'); btn.classList.add('border-slate-600'); } };
+        const setActive = (btn) => { if (btn) { btn.classList.remove('border-slate-600'); btn.classList.add('border-blue-500'); } };
+
+        resetBtn(btnMulti); resetBtn(btnCo); resetBtn(btnOs); resetBtn(btnEsc);
+        resetBtn(btnBmt); resetBtn(btnArc); resetBtn(btnEval); resetBtn(btnTournoi);
+
+        if (disc === 'multi') setActive(btnMulti);
+        else if (disc === 'co') setActive(btnCo);
+        else if (disc === 'orientshow') setActive(btnOs);
+        else if (disc === 'escalade') setActive(btnEsc);
+        else if (disc === 'badminton') setActive(btnBmt);
+        else if (disc === 'arcathlon') setActive(btnArc);
+        else if (disc === 'evaluation') setActive(btnEval);
+        else if (disc === 'tournoi') setActive(btnTournoi);
+
+        // Initialisations spécifiques
         if (disc === 'co') {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
+        }
+        if (disc === 'escalade') {
+            // déjà fait plus haut
         }
         if (disc === 'orientshow') {
             try { setTimeout(() => { initOrientShowInterface(); loadOrientShowAssignments(); }, 100); } catch (e) {}
@@ -376,6 +382,19 @@ export function initActivities() {
     };
 
     // ============================================================
+    // ÉCOUTE DU CHANGEMENT DE MODE ESCALADE
+    // ============================================================
+    window.addEventListener('escalade-mode-changed', (e) => {
+        const mode = e.detail.mode;
+        if (mode === 'bloc') {
+            currentDiscipline = 'bloccontest';
+        } else {
+            currentDiscipline = 'escalade';
+        }
+        console.log('[activities] currentDiscipline mis à jour :', currentDiscipline);
+    });
+
+    // ============================================================
     // GÉNÉRATION DES ÉQUIPES (MULTI-ACTIVITÉS)
     // ============================================================
     window.generateTeams = async function() {
@@ -384,21 +403,26 @@ export function initActivities() {
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length === 0) return alert("Aucun élève dans cette classe.");
 
-        // Cas particuliers : CO, Escalade (classique ou Bloc), OrientShow, Badminton, Arcathlon
+        // Cas particuliers : CO, Escalade, OrientShow, Badminton, Arcathlon, Bloc Contest
         if (currentDiscipline === 'co') {
             await populateReserveWithStudents(eleves);
             alert("Tous les élèves sont dans la réserve CO.");
             return;
         }
         if (currentDiscipline === 'escalade' || currentDiscipline === 'bloccontest') {
-            // Déléguer au module escalade
+            // Déléguer au module escalade via le registre
             const escaladeModule = getModule('escalade');
             if (escaladeModule && escaladeModule.generateTeams) {
                 await escaladeModule.generateTeams(activeClasse);
+                return;
             } else {
-                alert("Module escalade non disponible.");
+                // Fallback : escalade classique
+                const nbGroupes = Math.ceil(eleves.length / 3);
+                initEscaladeInterface(nbGroupes, true);
+                await populateReserveEscalade(eleves);
+                alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
+                return;
             }
-            return;
         }
         if (currentDiscipline === 'orientshow') {
             alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
@@ -614,266 +638,262 @@ export function initActivities() {
     };
 
     // ============================================================
-// GESTION DES SOUS-ONGLETS (Live / TV)
-// ============================================================
-window.switchActivitySubTab = function(subTab) {
-    const disc = currentDiscipline;
-    
-    // Mettre à jour les boutons des sous-onglets
-    ['settings', 'live', 'tv'].forEach(tab => {
-        const btn = document.getElementById(`subtab-${tab}`);
-        if (btn) {
-            if (tab === subTab) {
-                btn.classList.remove('bg-slate-700', 'text-slate-300');
-                btn.classList.add('bg-blue-600', 'text-white');
-            } else {
-                btn.classList.remove('bg-blue-600', 'text-white');
-                btn.classList.add('bg-slate-700', 'text-slate-300');
-            }
-        }
-    });
-
-    // Masquer TOUTES les vues de réglages
-    const views = ['viewMultiSettings', 'viewCOSettings', 'viewOrientShowSettings', 
-                   'viewEscaladeSettings', 'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings'];
-    views.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add('hidden');
-    });
-
-    // Masquer les anciennes vues Live et TV
-    const viewLive = document.getElementById('viewLive');
-    const viewTV = document.getElementById('viewTV');
-    if (viewLive) viewLive.classList.add('hidden');
-    if (viewTV) viewTV.style.display = 'none';
-
-    if (subTab === 'settings') {
-        // Afficher la vue de réglages correspondante
-        const map = {
-            'multi': 'viewMultiSettings',
-            'co': 'viewCOSettings',
-            'orientshow': 'viewOrientShowSettings',
-            'escalade': 'viewEscaladeSettings',
-            'badminton': 'viewBadmintonSettings',
-            'arcathlon': 'viewArcathlonSettings',
-            'evaluation': 'viewEvaluationSettings',
-            'bloccontest': 'viewEscaladeSettings'
-        };
-        const targetView = document.getElementById(map[disc]);
-        if (targetView) {
-            targetView.classList.remove('hidden');
-            // Si c'est l'escalade, s'assurer que le module est initialisé
-            if (disc === 'escalade' || disc === 'bloccontest') {
-                const escaladeModule = getModule('escalade');
-                if (escaladeModule && escaladeModule.initProf) {
-                    const activeClasse = document.getElementById('selectClasse').value;
-                    escaladeModule.initProf(activeClasse);
-                }
-            }
-            // Pour l'évaluation, réinitialiser l'interface
-            if (disc === 'evaluation') {
-                setTimeout(() => initEvaluationInterface(), 50);
-            }
-        }
-    } 
-    else if (subTab === 'live') {
-        // Afficher le Live
-        if (viewLive) viewLive.classList.remove('hidden');
-        const container = document.getElementById('live-content');
-        container.innerHTML = '<p>Chargement du Live...</p>';
-
-        // Charger le module Live correspondant
-        const liveModules = {
-            'badminton': () => import('../../modules/badminton/badminton-live.js').then(m => m.renderBadmintonLive()),
-            'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
-            'co': () => import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {})),
-            'orientshow': () => import('../../modules/orientshow/orientshow-live.js').then(m => m.renderOrientShowLive()),
-            'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
-            'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
-        };
-
-        if (liveModules[disc]) {
-            liveModules[disc]().catch(err => console.error(`Erreur Live ${disc} :`, err));
-        } else {
-            container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
-        }
-    } 
-    else if (subTab === 'tv') {
-        // Afficher la TV
-        const tvViewEl = document.getElementById('viewTV');
-        if (tvViewEl) {
-            tvViewEl.style.display = 'block';
-            tvViewEl.style.height = '100vh';
-            setTimeout(() => {
-                // Charger le module TV correspondant
-                const tvModules = {
-                    'badminton': () => import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV()),
-                    'escalade': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
-                    'orientshow': () => import('../../modules/orientshow/orientshow-tv.js').then(m => m.renderOrientShowTV()),
-                    'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
-                    'bloccontest': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
-                };
-                if (tvModules[disc]) {
-                    tvModules[disc]().catch(err => console.error(`Erreur TV ${disc} :`, err));
+    // GESTION DES SOUS-ONGLETS (Live / TV)
+    // ============================================================
+    window.switchActivitySubTab = function(subTab) {
+        const disc = currentDiscipline;
+        
+        ['settings', 'live', 'tv'].forEach(tab => {
+            const btn = document.getElementById(`subtab-${tab}`);
+            if (btn) {
+                if (tab === subTab) {
+                    btn.classList.remove('bg-slate-700', 'text-slate-300');
+                    btn.classList.add('bg-blue-600', 'text-white');
                 } else {
-                    document.getElementById('tvGlobe').innerHTML = '<p class="text-slate-500 text-center">Mode TV non disponible pour cette discipline.</p>';
+                    btn.classList.remove('bg-blue-600', 'text-white');
+                    btn.classList.add('bg-slate-700', 'text-slate-300');
                 }
-            }, 100);
+            }
+        });
+
+        // Masquer TOUTES les vues de réglages
+        const views = ['viewMultiSettings', 'viewCOSettings', 'viewOrientShowSettings', 
+                       'viewEscaladeSettings', 'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings'];
+        views.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+
+        const viewLive = document.getElementById('viewLive');
+        const viewTV = document.getElementById('viewTV');
+        if (viewLive) viewLive.classList.add('hidden');
+        if (viewTV) viewTV.style.display = 'none';
+
+        if (subTab === 'settings') {
+            const map = {
+                'multi': 'viewMultiSettings',
+                'co': 'viewCOSettings',
+                'orientshow': 'viewOrientShowSettings',
+                'escalade': 'viewEscaladeSettings',
+                'badminton': 'viewBadmintonSettings',
+                'arcathlon': 'viewArcathlonSettings',
+                'evaluation': 'viewEvaluationSettings',
+                'bloccontest': 'viewEscaladeSettings'
+            };
+            const targetView = document.getElementById(map[disc] || 'viewMultiSettings');
+            if (targetView) {
+                targetView.classList.remove('hidden');
+                if (disc === 'evaluation') {
+                    setTimeout(() => initEvaluationInterface(), 50);
+                }
+                if (disc === 'escalade' || disc === 'bloccontest') {
+                    // S'assurer que le sélecteur de mode est présent
+                    const escaladeModule = getModule('escalade');
+                    if (escaladeModule && escaladeModule.initProf) {
+                        const activeClasse = document.getElementById('selectClasse').value;
+                        escaladeModule.initProf(activeClasse);
+                    }
+                }
+            }
+        } 
+        else if (subTab === 'live') {
+            if (viewLive) viewLive.classList.remove('hidden');
+            const container = document.getElementById('live-content');
+            container.innerHTML = '<p>Chargement du Live...</p>';
+
+            const liveModules = {
+                'badminton': () => import('../../modules/badminton/badminton-live.js').then(m => m.renderBadmintonLive()),
+                'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
+                'co': () => import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {})),
+                'orientshow': () => import('../../modules/orientshow/orientshow-live.js').then(m => m.renderOrientShowLive()),
+                'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
+                'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
+            };
+
+            if (liveModules[disc]) {
+                liveModules[disc]().catch(err => console.error(`Erreur Live ${disc} :`, err));
+            } else {
+                container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
+            }
+        } 
+        else if (subTab === 'tv') {
+            const tvViewEl = document.getElementById('viewTV');
+            if (tvViewEl) {
+                tvViewEl.style.display = 'block';
+                tvViewEl.style.height = '100vh';
+                setTimeout(() => {
+                    const tvModules = {
+                        'badminton': () => import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV()),
+                        'escalade': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
+                        'orientshow': () => import('../../modules/orientshow/orientshow-tv.js').then(m => m.renderOrientShowTV()),
+                        'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
+                        'bloccontest': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
+                    };
+                    if (tvModules[disc]) {
+                        tvModules[disc]().catch(err => console.error(`Erreur TV ${disc} :`, err));
+                    } else {
+                        document.getElementById('tvGlobe').innerHTML = '<p class="text-slate-500 text-center">Mode TV non disponible pour cette discipline.</p>';
+                    }
+                }, 100);
+            }
         }
-    }
-};
+    };
 
     // ============================================================
-// TRANSMISSION FIREBASE (CORRIGÉE)
-// ============================================================
-window.transmettreConfig = async function() {
-    const activeClasse = document.getElementById('selectClasse').value;
-    if (!activeClasse) return alert("Sélectionnez une classe.");
+    // TRANSMISSION FIREBASE
+    // ============================================================
+    window.transmettreConfig = async function() {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (!activeClasse) return alert("Sélectionnez une classe.");
 
-    const baseProf = getBaseProf();
-    let configData = {};
-    let localMapping = {};
+        const baseProf = getBaseProf();
+        let configData = {};
+        let localMapping = {};
 
-    // ✅ Si la discipline est gérée par le registre (escalade)
-    if (currentDiscipline === 'escalade' || currentDiscipline === 'bloccontest') {
-        const escaladeModule = getModule('escalade');
-        if (escaladeModule && escaladeModule.transmettre) {
-            try {
-                await escaladeModule.transmettre(activeClasse);
-                // La fonction transmettre gère déjà les alertes
-                return;
-            } catch (err) {
-                console.error('Erreur transmission escalade :', err);
-                alert('Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.');
-                return;
+        // ✅ Si on est en escalade ou bloccontest, on utilise le module escalade
+        if (currentDiscipline === 'escalade' || currentDiscipline === 'bloccontest') {
+            const escaladeModule = getModule('escalade');
+            if (escaladeModule && escaladeModule.transmettre) {
+                try {
+                    await escaladeModule.transmettre(activeClasse);
+                    return;
+                } catch (err) {
+                    console.error('Erreur transmission escalade :', err);
+                    alert('Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.');
+                    return;
+                }
+            } else {
+                // Fallback : transmission classique
+                configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
+                configData.activite = 'escalade';
+                Object.keys(configData).forEach(lettre => {
+                    if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
+                        localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
+                        configData[lettre] = configData[lettre].length;
+                    }
+                });
             }
-        } else {
-            alert('❌ Module escalade non disponible.');
+        } 
+        else if (currentDiscipline === 'co') {
+            configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
+            configData.activite = 'co';
+            Object.keys(configData).forEach(lettre => {
+                if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
+                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
+                    configData[lettre] = configData[lettre].length;
+                }
+            });
+        } 
+        else if (currentDiscipline === 'orientshow') {
+            const DEFAULT_OS_MATRIX = {
+                1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
+                2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
+                3: { NOIR: ['C','L'], ROUGE: ['H','U'], BLEU: ['I','B'], VERT: ['O','I'], JAUNE: ['T','E'] },
+                4: { NOIR: ['R','V'], ROUGE: ['E','E'], BLEU: ['C','R'], VERT: ['T','N'], JAUNE: ['O','I'] },
+                5: { NOIR: ['A','B'], ROUGE: ['J','O'], BLEU: ['O','U'], VERT: ['N','E'], JAUNE: ['C','S'] },
+                6: { NOIR: ['F','M'], ROUGE: ['I','E'], BLEU: ['C','R'], VERT: ['U','O'], JAUNE: ['S','U'] },
+                7: { NOIR: ['G','H'], ROUGE: ['U','A'], BLEU: ['E','C'], VERT: ['U','H'], JAUNE: ['X','E'] },
+                8: { NOIR: ['I','J'], ROUGE: ['V','E'], BLEU: ['R','A'], VERT: ['E','N'], JAUNE: ['S','S'] },
+                9: { NOIR: ['K','N'], ROUGE: ['R','Y'], BLEU: ['A','L'], VERT: ['F','O'], JAUNE: ['T','N'] },
+                10: { NOIR: ['O','S'], ROUGE: ['C','E'], BLEU: ['E','I'], VERT: ['A','Z'], JAUNE: ['N','E'] },
+                11: { NOIR: ['P','T'], ROUGE: ['A','U'], BLEU: ['L','Y'], VERT: ['U','A'], JAUNE: ['D','U'] },
+                12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
+            };
+
+            const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
+            const codeCounts = {};
+            Object.keys(orientShowMapping).forEach(key => {
+                if (key.startsWith(activeClasse + '_')) {
+                    const code = key.replace(activeClasse + '_', '');
+                    const match = code.match(/^([A-Z]+)_(\d+)$/);
+                    if (match) {
+                        const couleur = match[1];
+                        codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
+                    }
+                }
+            });
+            configData = { activite: 'orientshow' };
+            Object.keys(codeCounts).forEach(couleur => {
+                configData[couleur] = codeCounts[couleur];
+            });
+            configData.matrix = DEFAULT_OS_MATRIX;
+            
+            const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
+            const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
+            const parseTime = (value) => {
+                if (!value || value === 'null' || value === 'undefined') return null;
+                const parsed = parseInt(value);
+                if (isNaN(parsed)) return null;
+                return parsed;
+            };
+            const startTime = parseTime(startTimeStr);
+            const endTime = parseTime(endTimeStr);
+            if (startTime !== null) configData.startTime = startTime;
+            if (endTime !== null) configData.endTime = endTime;
+        } 
+        else if (currentDiscipline === 'badminton') {
+            const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
+            const lettres = ['A','B','C','D','E','F','G','H','I','J'];
+            
+            const mode = window.badmintonMode || 'terrain';
+            const terrainType = document.getElementById('badmintonMode')?.value || 'frontback';
+            const bonusManiere = parseInt(document.getElementById('badmintonBonusManiere')?.value) || 5;
+            
+            configData = {
+                activite: 'badminton',
+                mode: mode,
+                terrainType: terrainType,
+                bonusManiere: Math.max(3, Math.min(8, bonusManiere))
+            };
+            
+            for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
+                const idsTerrain = assignments[t] || [];
+                idsTerrain.forEach((eleveId, index) => {
+                    const lettre = lettres[index] || '?';
+                    localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
+                });
+                configData[t] = idsTerrain.length;
+            }
+        } 
+        else if (currentDiscipline === 'arcathlon') {
+            await transmettreArcathlonConfig();
             return;
         }
-    }
-
-    // --- Autres disciplines (non migrées) ---
-    if (currentDiscipline === 'co') {
-        configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
-        configData.activite = 'co';
-        Object.keys(configData).forEach(lettre => {
-            if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
-                localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
-                configData[lettre] = configData[lettre].length;
-            }
-        });
-    } 
-    else if (currentDiscipline === 'orientshow') {
-        const DEFAULT_OS_MATRIX = {
-            1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
-            2: { NOIR: ['E','X'], ROUGE: ['X','Y'], BLEU: ['T','L'], VERT: ['R','O'], JAUNE: ['A','L'] },
-            3: { NOIR: ['C','L'], ROUGE: ['H','U'], BLEU: ['I','B'], VERT: ['O','I'], JAUNE: ['T','E'] },
-            4: { NOIR: ['R','V'], ROUGE: ['E','E'], BLEU: ['C','R'], VERT: ['T','N'], JAUNE: ['O','I'] },
-            5: { NOIR: ['A','B'], ROUGE: ['J','O'], BLEU: ['O','U'], VERT: ['N','E'], JAUNE: ['C','S'] },
-            6: { NOIR: ['F','M'], ROUGE: ['I','E'], BLEU: ['C','R'], VERT: ['U','O'], JAUNE: ['S','U'] },
-            7: { NOIR: ['G','H'], ROUGE: ['U','A'], BLEU: ['E','C'], VERT: ['U','H'], JAUNE: ['X','E'] },
-            8: { NOIR: ['I','J'], ROUGE: ['V','E'], BLEU: ['R','A'], VERT: ['E','N'], JAUNE: ['S','S'] },
-            9: { NOIR: ['K','N'], ROUGE: ['R','Y'], BLEU: ['A','L'], VERT: ['F','O'], JAUNE: ['T','N'] },
-            10: { NOIR: ['O','S'], ROUGE: ['C','E'], BLEU: ['E','I'], VERT: ['A','Z'], JAUNE: ['N','E'] },
-            11: { NOIR: ['P','T'], ROUGE: ['A','U'], BLEU: ['L','Y'], VERT: ['U','A'], JAUNE: ['D','U'] },
-            12: { NOIR: ['U','W'], ROUGE: ['L','I'], BLEU: ['T','N'], VERT: ['R','C'], JAUNE: ['A','H'] }
-        };
-
-        const orientShowMapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
-        const codeCounts = {};
-        Object.keys(orientShowMapping).forEach(key => {
-            if (key.startsWith(activeClasse + '_')) {
-                const code = key.replace(activeClasse + '_', '');
-                const match = code.match(/^([A-Z]+)_(\d+)$/);
-                if (match) {
-                    const couleur = match[1];
-                    codeCounts[couleur] = Math.max(codeCounts[couleur] || 0, parseInt(match[2], 10));
-                }
-            }
-        });
-        configData = { activite: 'orientshow' };
-        Object.keys(codeCounts).forEach(couleur => {
-            configData[couleur] = codeCounts[couleur];
-        });
-        configData.matrix = DEFAULT_OS_MATRIX;
-        
-        const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
-        const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
-        const parseTime = (value) => {
-            if (!value || value === 'null' || value === 'undefined') return null;
-            const parsed = parseInt(value);
-            if (isNaN(parsed)) return null;
-            return parsed;
-        };
-        const startTime = parseTime(startTimeStr);
-        const endTime = parseTime(endTimeStr);
-        if (startTime !== null) configData.startTime = startTime;
-        if (endTime !== null) configData.endTime = endTime;
-    } 
-    else if (currentDiscipline === 'badminton') {
-        const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
-        const lettres = ['A','B','C','D','E','F','G','H','I','J'];
-        
-        const mode = window.badmintonMode || 'terrain';
-        const terrainType = document.getElementById('badmintonMode')?.value || 'frontback';
-        const bonusManiere = parseInt(document.getElementById('badmintonBonusManiere')?.value) || 5;
-        
-        configData = {
-            activite: 'badminton',
-            mode: mode,
-            terrainType: terrainType,
-            bonusManiere: Math.max(3, Math.min(8, bonusManiere))
-        };
-        
-        for (let t = 1; t <= (assignments.nbTerrains || 6); t++) {
-            const idsTerrain = assignments[t] || [];
-            idsTerrain.forEach((eleveId, index) => {
-                const lettre = lettres[index] || '?';
-                localMapping[`${activeClasse}_${t}_${lettre}`] = eleveId;
-            });
-            configData[t] = idsTerrain.length;
+        else if (currentDiscipline === 'tournoi') {
+            const configData = {
+                activite: 'tournoi',
+                mode: window.tournoiMode || 'elimination'
+            };
+            await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+            await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+            alert("✅ Module Tournoi activé pour les iPads !");
+            return;
         }
-    } 
-    else if (currentDiscipline === 'arcathlon') {
-        transmettreArcathlonConfig();
-        return;
-    }
-    else if (currentDiscipline === 'tournoi') {
-        const configData = {
-            activite: 'tournoi',
-            mode: window.tournoiMode || 'elimination'
-        };
-        await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
-        await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
-        alert("✅ Module Tournoi activé pour les iPads !");
-        return;
-    }
-    else {
-        configData.activite = 'multi';
-        if (window.lastTeams) {
-            window.lastTeams.forEach((team) => {
-                const key = team.label;
-                localMapping[`${activeClasse}_${key}`] = team.members.map(m => m.id);
-                configData[key] = team.members.length;
-            });
-        } else {
-            return alert("Veuillez d'abord générer les équipes.");
+        else {
+            configData.activite = 'multi';
+            if (window.lastTeams) {
+                window.lastTeams.forEach((team) => {
+                    const key = team.label;
+                    localMapping[`${activeClasse}_${key}`] = team.members.map(m => m.id);
+                    configData[key] = team.members.length;
+                });
+            } else {
+                return alert("Veuillez d'abord générer les équipes.");
+            }
         }
-    }
 
-    localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
+        localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
 
-    try {
-        console.log("📡 Configuration envoyée :", configData);
-        await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
-        await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
-        alert("✅ Configuration transmise aux iPads !");
-    } catch (e) {
-        console.error("Erreur transmission :", e);
-        alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
-    }
-};
+        try {
+            console.log("📡 Configuration envoyée :", configData);
+            await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+            await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+            alert("✅ Configuration transmise aux iPads !");
+        } catch (e) {
+            console.error("Erreur transmission :", e);
+            alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
+        }
+    };
 
     // ============================================================
     // PURGE
@@ -947,9 +967,6 @@ window.transmettreConfig = async function() {
         alert("✅ Terrains générés par niveau de force !");
     };
 
-    // ✅ EXPOSER setBadmintonMode SUR window
-    window.setBadmintonMode = setBadmintonMode;
-
     // ============================================================
     // EXPORTS / IMPORTS
     // ============================================================
@@ -971,35 +988,6 @@ window.transmettreConfig = async function() {
     // ============================================================
     try { initSortableCO(); } catch (e) {}
     try { initSortableEscalade(); } catch (e) {}
-}
-
-// ============================================================
-// UTILITAIRES (Mise à jour des boutons)
-// ============================================================
-function updateDisciplineButtons(disc) {
-    const btnMulti = document.getElementById('btnDisc-multi');
-    const btnCo = document.getElementById('btnDisc-co');
-    const btnOs = document.getElementById('btnDisc-orientshow');
-    const btnEsc = document.getElementById('btnDisc-escalade');
-    const btnBmt = document.getElementById('btnDisc-badminton');
-    const btnArc = document.getElementById('btnDisc-arcathlon');
-    const btnEval = document.getElementById('btnDisc-evaluation');
-    const btnTournoi = document.getElementById('btnDisc-tournoi');
-
-    const resetBtn = (btn) => { if (btn) { btn.classList.remove('border-blue-500'); btn.classList.add('border-slate-600'); } };
-    const setActive = (btn) => { if (btn) { btn.classList.remove('border-slate-600'); btn.classList.add('border-blue-500'); } };
-
-    resetBtn(btnMulti); resetBtn(btnCo); resetBtn(btnOs); resetBtn(btnEsc);
-    resetBtn(btnBmt); resetBtn(btnArc); resetBtn(btnEval); resetBtn(btnTournoi);
-
-    if (disc === 'multi') setActive(btnMulti);
-    else if (disc === 'co') setActive(btnCo);
-    else if (disc === 'orientshow') setActive(btnOs);
-    else if (disc === 'escalade' || disc === 'bloccontest') setActive(btnEsc);
-    else if (disc === 'badminton') setActive(btnBmt);
-    else if (disc === 'arcathlon') setActive(btnArc);
-    else if (disc === 'evaluation') setActive(btnEval);
-    else if (disc === 'tournoi') setActive(btnTournoi);
 }
 
 // ============================================================
