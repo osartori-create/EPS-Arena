@@ -18,13 +18,17 @@ let currentClasse = '';
 // FONCTIONS D’INITIALISATION
 // ============================================================
 
-export function initProf(classe) {
+export function initProf(classe, container) {
     currentClasse = classe || document.getElementById('selectClasse')?.value || '';
-    const container = document.getElementById('co-orientshow-container');
-    if (container) {
-        initOrientShowInterface(container);
+    // ✅ Si un conteneur est fourni, on l’utilise
+    const targetContainer = container || document.getElementById('co-orientshow-container');
+    if (targetContainer) {
+        // ✅ Vider le conteneur avant d’initialiser
+        targetContainer.innerHTML = '';
+        initOrientShowInterface(targetContainer);
         loadOrientShowAssignments();
     } else {
+        // Fallback
         initOrientShowInterface();
         loadOrientShowAssignments();
     }
@@ -46,7 +50,7 @@ export async function generateTeams(classe) {
 }
 
 // ============================================================
-// TRANSMISSION FIREBASE (CORRIGÉE)
+// TRANSMISSION FIREBASE
 // ============================================================
 
 export async function transmettre(classe) {
@@ -60,7 +64,6 @@ export async function transmettre(classe) {
     const startTimeStr = localStorage.getItem('eps_arena_os_startTime');
     const endTimeStr = localStorage.getItem('eps_arena_os_endTime');
 
-    // ✅ Conversion sécurisée
     const startTime = (startTimeStr && startTimeStr !== 'null' && startTimeStr !== 'undefined') ? parseInt(startTimeStr) : null;
     const endTime = (endTimeStr && endTimeStr !== 'null' && endTimeStr !== 'undefined') ? parseInt(endTimeStr) : null;
 
@@ -71,27 +74,33 @@ export async function transmettre(classe) {
         nbCouleurs: 5
     };
 
-    // ✅ Ajouter les comptes de couleurs pour l'affichage des codes élèves
+    if (startTime !== null && !isNaN(startTime)) configData.startTime = startTime;
+    if (endTime !== null && !isNaN(endTime)) configData.endTime = endTime;
+
+    // ✅ Récupérer les codes (couleurs) pour que l’élève voie les bons codes
     const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${activeClasse}`) || '{}');
     const couleurs = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
-    couleurs.forEach(couleur => {
-        let count = 0;
-        for (const key of Object.keys(mapping)) {
-            if (key.startsWith(`${activeClasse}_${couleur}_`)) {
-                const ids = mapping[key];
-                if (Array.isArray(ids)) {
-                    count += ids.length;
-                } else {
-                    count++;
+    const codeCounts = {};
+    couleurs.forEach(c => codeCounts[c] = 0);
+    Object.keys(mapping).forEach(key => {
+        if (key.startsWith(activeClasse + '_')) {
+            const code = key.replace(activeClasse + '_', '');
+            const match = code.match(/^([A-Z]+)_(\d+)$/);
+            if (match) {
+                const couleur = match[1];
+                const num = parseInt(match[2], 10);
+                if (codeCounts[couleur] !== undefined && num > codeCounts[couleur]) {
+                    codeCounts[couleur] = num;
                 }
             }
         }
-        if (count > 0) configData[couleur] = count;
     });
-
-    // ✅ Ajouter uniquement si valide
-    if (startTime !== null && !isNaN(startTime)) configData.startTime = startTime;
-    if (endTime !== null && !isNaN(endTime)) configData.endTime = endTime;
+    // Ajouter les couleurs avec leur nombre max à la config
+    Object.keys(codeCounts).forEach(couleur => {
+        if (codeCounts[couleur] > 0) {
+            configData[couleur] = codeCounts[couleur];
+        }
+    });
 
     try {
         console.log("📡 Configuration OrientShow envoyée :", configData);
@@ -112,9 +121,6 @@ window.importOrientShowConfig = importOrientShowConfig;
 window.startOrientShow = startOrientShow;
 window.stopOrientShow = stopOrientShow;
 
-// ============================================================
-// EXPORT PAR DÉFAUT
-// ============================================================
 export default {
     initProf,
     initKiosk,

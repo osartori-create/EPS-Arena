@@ -36,7 +36,8 @@ export function initCOModeSelector() {
         const container = document.createElement('div');
         container.id = 'co-classique-container';
         container.className = 'space-y-4';
-        coView.appendChild(container);
+        // Insérer après le sélecteur
+        selector.after(container);
     }
     if (!document.getElementById('co-orientshow-container')) {
         const container = document.createElement('div');
@@ -64,25 +65,28 @@ function setCOMode(mode) {
         const btnOrient = document.getElementById('co-mode-orientshow');
         if (btnClassique) btnClassique.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
         if (btnOrient) btnOrient.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-        // Initialiser CO classique
+        // Initialiser CO classique dans le conteneur
         initCOInterface();
         initSortableCO();
         loadCOAssignments();
-        // Charger le contenu classique dans le conteneur
-        import('./classique/classique-prof.js').then(module => {
-            if (module.initProf) module.initProf(currentClasse);
-        });
     } else {
         if (containerClassique) containerClassique.style.display = 'none';
-        if (containerOrientShow) containerOrientShow.style.display = '';
+        if (containerOrientShow) {
+            containerOrientShow.style.display = '';
+            // ✅ Vider le conteneur avant de le remplir
+            containerOrientShow.innerHTML = '';
+            // ✅ Appeler l’initialisation OrientShow avec le conteneur
+            import('./orientshow/orientshow-prof.js').then(module => {
+                if (module.initProf) {
+                    // On passe le conteneur
+                    module.initProf(currentClasse, containerOrientShow);
+                }
+            });
+        }
         const btnClassique = document.getElementById('co-mode-classique');
         const btnOrient = document.getElementById('co-mode-orientshow');
         if (btnOrient) btnOrient.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
         if (btnClassique) btnClassique.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-        // Initialiser OrientShow
-        import('./orientshow/orientshow-prof.js').then(module => {
-            if (module.initProf) module.initProf(currentClasse);
-        });
     }
 }
 
@@ -95,7 +99,6 @@ export function initProf(classe) {
 }
 
 export function initKiosk(classe, code) {
-    // Le kiosk dépend du mode ; on délègue à la bonne variante
     if (currentMode === 'classique') {
         import('./classique/classique-kiosk.js').then(module => {
             if (module.initKiosk) module.initKiosk(classe, code);
@@ -176,9 +179,6 @@ registerModule({
     }
 });
 
-// ============================================================
-// EXPORT PAR DÉFAUT
-// ============================================================
 export default {
     id: 'co',
     label: '🧭 Course d\'orientation',
