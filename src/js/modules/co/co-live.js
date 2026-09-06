@@ -115,7 +115,7 @@ export function renderCOLive() {
                 const pct = totalMax > 0 ? Math.round((totalPts / totalMax) * 100) : 0;
                 const couleurPct = pct >= 80 ? 'text-emerald-400' : (pct >= 50 ? 'text-yellow-400' : 'text-red-400');
 
-                // Construire la map des passages pour ce code
+                // Construire la map des passages pour ce code (sans sérialisation dans l'attribut)
                 const passagesMap = {};
                 sessions.forEach(s => {
                     for (const [key, val] of Object.entries(currentPassagesData)) {
@@ -126,12 +126,15 @@ export function renderCOLive() {
                     }
                 });
 
-                // Échapper les guillemets pour le JSON dans le onclick
-                const passagesJson = JSON.stringify(passagesMap).replace(/"/g, '&quot;');
+                // ✅ Stocker les données dans des attributs data-* pour éviter les problèmes de sérialisation
+                const passagesJson = JSON.stringify(passagesMap);
 
                 html += `
                     <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 cursor-pointer hover:border-blue-500 transition-colors" 
-                         onclick="openCoDetail('${currentClasse}', '${code}', '${passagesJson}')">
+                         data-code="${code}"
+                         data-classe="${currentClasse}"
+                         data-passages="${encodeURIComponent(passagesJson)}"
+                         onclick="handleCoCardClick(this)">
                         <div class="flex items-center gap-3 mb-2">
                             ${photoHtml}
                             <div>
@@ -163,6 +166,20 @@ export function renderCOLive() {
         container.innerHTML = html;
     });
 }
+
+// ✅ Gestionnaire de clic sur les cartes
+window.handleCoCardClick = function(element) {
+    const code = element.dataset.code;
+    const classe = element.dataset.classe;
+    const passagesEncoded = element.dataset.passages;
+    try {
+        const passages = JSON.parse(decodeURIComponent(passagesEncoded));
+        openCoDetail(classe, code, passages);
+    } catch (e) {
+        console.error('Erreur lors de l\'ouverture de la modale :', e);
+        alert('Erreur : impossible d\'ouvrir les détails.');
+    }
+};
 
 export function cleanupCOLive() {
     if (currentUnsub) {

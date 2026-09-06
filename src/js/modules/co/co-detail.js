@@ -14,7 +14,18 @@ let currentPassages = {}; // { circuitId: passageData }
 export function openCoDetail(classe, code, passages) {
     currentClasse = classe;
     currentCode = code;
-    currentPassages = passages || {};
+    
+    // ✅ CORRECTION : parser si passages est une chaîne JSON
+    if (typeof passages === 'string') {
+        try {
+            currentPassages = JSON.parse(passages);
+        } catch (e) {
+            console.warn('[CO-Detail] Erreur parsing JSON :', e);
+            currentPassages = {};
+        }
+    } else {
+        currentPassages = passages || {};
+    }
 
     // Récupérer les élèves pour le nom
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
@@ -79,6 +90,10 @@ function renderDetailContent() {
     let html = '';
     circuitKeys.forEach((circuitId, idx) => {
         const data = currentPassages[circuitId];
+        if (!data || !data.details) {
+            // Ignorer les entrées mal formées
+            return;
+        }
         totalPts += data.pts || 0;
         totalMax += data.total || 0;
 
@@ -170,7 +185,6 @@ window.forcerCorrection = function(circuitId, posteIdx) {
     const updateRef = ref(db, updatePath);
     update(updateRef, 'correct')
         .then(() => {
-            // Mettre à jour localement
             if (currentPassages[passageKey] && currentPassages[passageKey].details) {
                 currentPassages[passageKey].details[posteIdx].status = 'correct';
                 const pts = currentPassages[passageKey].details.filter(d => d.status === 'correct').length;
