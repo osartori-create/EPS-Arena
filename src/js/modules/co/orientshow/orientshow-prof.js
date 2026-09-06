@@ -23,12 +23,14 @@ export function initProf(classe, container) {
     // ✅ Si un conteneur est fourni, on l’utilise
     const targetContainer = container || document.getElementById('co-orientshow-container');
     if (targetContainer) {
+        console.log('[OrientShow] Initialisation dans le conteneur', targetContainer.id);
         // ✅ Vider le conteneur avant d’initialiser
         targetContainer.innerHTML = '';
+        // ✅ Appeler l'initialisation
         initOrientShowInterface(targetContainer);
         loadOrientShowAssignments();
     } else {
-        // Fallback
+        console.warn('[OrientShow] Aucun conteneur trouvé, fallback');
         initOrientShowInterface();
         loadOrientShowAssignments();
     }

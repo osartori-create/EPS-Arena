@@ -36,7 +36,6 @@ export function initCOModeSelector() {
         const container = document.createElement('div');
         container.id = 'co-classique-container';
         container.className = 'space-y-4';
-        // Insérer après le sélecteur
         selector.after(container);
     }
     if (!document.getElementById('co-orientshow-container')) {
@@ -66,6 +65,8 @@ function setCOMode(mode) {
         if (btnClassique) btnClassique.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
         if (btnOrient) btnOrient.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
         // Initialiser CO classique dans le conteneur
+        // Vider le conteneur classique avant de le remplir
+        if (containerClassique) containerClassique.innerHTML = '';
         initCOInterface();
         initSortableCO();
         loadCOAssignments();

@@ -539,3 +539,7 @@ export function getSelectedCode() { return selectedCode; }
 export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
 export function resetToLogin() { showLogin(); }
+export function resetToLogin() { 
+    // Réinitialiser l'interface pour revenir à l'écran de sélection
+    showLogin(); 
+}
