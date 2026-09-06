@@ -10,7 +10,7 @@ import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignment
 import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
 import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
 import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
-import { initBlocProf, cleanupBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
+import { initEscaladeProf, generateEscaladeTeams, transmettreEscalade } from '../../modules/escalade/escalade-prof.js';
 
 // ✅ NOUVEAUX IMPORTS POUR LE SÉLECTEUR DE MODE BADMINTON
 import { getModesList } from '../../modules/badminton/badminton-registry.js';
@@ -248,7 +248,7 @@ export function initActivities() {
     console.log("🚀 initActivities appelée !");
     
     try { console.log("→ Initialisation CO..."); initCOInterface(); console.log("✅ CO OK"); } catch (e) { console.error("❌ Erreur CO :", e); }
-    try { console.log("→ Initialisation Escalade..."); initEscaladeInterface(6); console.log("✅ Escalade OK"); } catch (e) { console.error("❌ Erreur Escalade :", e); }
+    try { console.log("→ Initialisation Escalade..."); initEscaladeProf(); console.log("✅ Escalade OK"); } catch (e) { console.error("❌ Erreur Escalade :", e); }
     try { console.log("→ Initialisation Badminton..."); initBadmintonInterface(6); console.log("✅ Badminton OK"); } catch (e) { console.error("❌ Erreur Badminton :", e); }
     try { console.log("→ Initialisation OrientShow..."); initOrientShowInterface(); console.log("✅ OrientShow OK"); } catch (e) { console.error("❌ Erreur OrientShow :", e); }
     try { console.log("→ Initialisation Arcathlon..."); initArcathlonInterface(); console.log("✅ Arcathlon OK"); } catch (e) { console.error("❌ Erreur Arcathlon :", e); }
@@ -359,8 +359,15 @@ export function initActivities() {
             try { initSortableCO(); loadCOAssignments(); renderCircuits('circuitList', ""); } catch (e) {}
         }
         if (disc === 'escalade') {
-            try { initEscaladeInterface(); initSortableEscalade(); loadEscaladeAssignments(); } catch (e) {}
+    try {
+        const activeClasse = document.getElementById('selectClasse').value;
+        if (activeClasse) {
+            initEscaladeProf(activeClasse);
+        } else {
+            initEscaladeProf();
         }
+    } catch (e) { console.error("Erreur init Escalade :", e); }
+}
         if (disc === 'orientshow') {
             try { setTimeout(() => { initOrientShowInterface(); loadOrientShowAssignments(); }, 100); } catch (e) {}
         }
@@ -413,12 +420,10 @@ export function initActivities() {
             return;
         }
         if (currentDiscipline === 'escalade') {
-            const nbGroupes = Math.ceil(eleves.length / 3);
-            initEscaladeInterface(nbGroupes, true);
-            await populateReserveEscalade(eleves);
-            alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
-            return;
-        }
+    const nbGroupes = await generateEscaladeTeams(activeClasse, eleves);
+    alert(`Tous les élèves sont dans la réserve Escalade (${nbGroupes} groupes). Glissez-les !`);
+    return;
+}
         if (currentDiscipline === 'orientshow') {
             alert("Pour OrientShow, glissez les élèves depuis la réserve vers les codes.");
             return;
@@ -779,16 +784,10 @@ export function initActivities() {
                 }
             });
         } 
-        else if (currentDiscipline === 'escalade') {
-            configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
-            configData.activite = 'escalade';
-            Object.keys(configData).forEach(lettre => {
-                if (lettre !== 'activite' && Array.isArray(configData[lettre])) {
-                    localMapping[`${activeClasse}_${lettre}`] = configData[lettre];
-                    configData[lettre] = configData[lettre].length;
-                }
-            });
-        } 
+        if (currentDiscipline === 'escalade') {
+    await transmettreEscalade(activeClasse);
+    return;
+} 
         else if (currentDiscipline === 'orientshow') {
             const DEFAULT_OS_MATRIX = {
                 1: { NOIR: ['D','Q'], ROUGE: ['O','U'], BLEU: ['Y','A'], VERT: ['E','R'], JAUNE: ['N','K'] },
