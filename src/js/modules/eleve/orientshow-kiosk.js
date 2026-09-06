@@ -1,6 +1,6 @@
 // src/js/modules/eleve/orientshow-kiosk.js
 // Kiosk OrientShow – version élève (inspirée de vos fichiers originaux)
-// Architecture Firebase EPS‑Arena : orientshow/config + orientshow/passages
+// Utilisation de la création DOM pour éviter les erreurs de parsing HTML
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
@@ -26,18 +26,17 @@ export function initOrientShowKiosk(classe, code, config) {
     currentClasse = classe;
     currentCode = code;
 
-    // Récupérer le conteneur (orientshow-module dans eleve.html)
     const container = document.getElementById('orientshow-module');
     if (!container) {
         console.error('Conteneur orientshow-module introuvable');
         return;
     }
-    // Vider le conteneur avant de le remplir
+    // Vider le conteneur
     container.innerHTML = '';
 
     // 1. Écouter la configuration (matrix, startTime, endTime)
     if (configListener) {
-        configListener(); // se désabonner
+        configListener();
         configListener = null;
     }
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -47,7 +46,6 @@ export function initOrientShowKiosk(classe, code, config) {
         matrix = data.matrix || {};
         startTime = data.startTime || null;
         endTime = data.endTime || null;
-        // Si la config est chargée, on charge les sessions
         if (Object.keys(matrix).length > 0) {
             chargerSessions();
         } else {
@@ -55,7 +53,7 @@ export function initOrientShowKiosk(classe, code, config) {
         }
     });
 
-    // 2. Si une config est passée en paramètre (fallback), on l'utilise directement
+    // 2. Si une config est passée en paramètre
     if (config && config.matrix) {
         matrix = config.matrix || {};
         startTime = config.startTime || null;
@@ -65,7 +63,7 @@ export function initOrientShowKiosk(classe, code, config) {
         }
     }
 
-    // 3. Initialiser l'audio (au premier clic)
+    // 3. Audio
     document.addEventListener('click', initAudio, { once: true });
 }
 
@@ -88,16 +86,15 @@ function playTone(freq, duration, type = 'sine') {
         gain.connect(audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + duration);
-    } catch (e) { /* ignorer les erreurs audio */ }
+    } catch (e) {}
 }
 
 // ============================================================
-// CHARGEMENT DES SESSIONS (validations de l'élève)
+// CHARGEMENT DES SESSIONS
 // ============================================================
 function chargerSessions() {
-    // Se désabonner de l'ancien listener
     if (sessionsListener) {
-        sessionsListener(); // appel direct de la fonction de désabonnement
+        sessionsListener();
         sessionsListener = null;
     }
 
@@ -106,7 +103,6 @@ function chargerSessions() {
     const sessionsRef = ref(db, path);
     sessionsListener = onValue(sessionsRef, (snap) => {
         const data = snap.val() || {};
-        // Filtrer les validations de cet élève
         sessions = {};
         Object.keys(data).forEach(key => {
             const passage = data[key];
@@ -119,23 +115,20 @@ function chargerSessions() {
 }
 
 // ============================================================
-// AFFICHAGE DE L'INTERFACE
+// AFFICHAGE DE L'INTERFACE (via création DOM)
 // ============================================================
 function afficherInterface() {
     const container = document.getElementById('orientshow-module');
-    if (!container) {
-        console.warn('Conteneur orientshow-module introuvable');
-        return;
-    }
+    if (!container) return;
+    container.innerHTML = ''; // Reset
 
-    // Vérifier si la course est active (startTime présent et endTime absent)
+    // Vérifier la course
     const isActive = startTime && !endTime;
 
-    // Calculer le total des points
+    // Calcul des points
     let totalPoints = 0;
     const validations = {};
     for (let i = 1; i <= 12; i++) {
-        const circuit = `C${i}`;
         const found = Object.values(sessions).find(s => s.circuit === i);
         if (found) {
             totalPoints += found.score || 0;
@@ -145,7 +138,7 @@ function afficherInterface() {
         }
     }
 
-    // Récupérer la couleur et le numéro
+    // Couleur et numéro
     const [color, num] = currentCode.split('_');
     const colorClasses = {
         NOIR: 'bg-black text-white border-slate-600',
@@ -156,104 +149,100 @@ function afficherInterface() {
     };
     const bgColor = colorClasses[color] || 'bg-slate-700 text-white border-slate-600';
 
-    // État de la course
-    let statusHtml = '';
-    if (!startTime) {
-        statusHtml = '<div class="text-center text-slate-400 text-sm mb-4">⏳ En attente du départ du professeur...</div>';
-    } else if (endTime) {
-        statusHtml = '<div class="text-center text-red-400 text-sm mb-4">⏱️ La course est terminée.</div>';
-    } else {
-        statusHtml = '<div class="text-center text-emerald-400 text-sm mb-4">🏃 Course en cours !</div>';
-    }
+    // --- Création des éléments ---
 
-    // Construction du HTML
-    let html = `
-        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-14 h-14 rounded-full border-2 flex items-center justify-center text-3xl font-black ${bgColor}">
-                        ${num}
-                    </div>
-                    <div>
-                        <div class="text-xs font-bold text-slate-400 uppercase">${color}</div>
-                        <div class="text-xl font-black text-white">${currentCode}</div>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <div class="text-xs text-slate-400 uppercase font-bold">Score</div>
-                    <div class="text-3xl font-black text-yellow-400">${totalPoints}</div>
+    // En‑tête (info élève + score)
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4';
+    headerDiv.innerHTML = `
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-14 h-14 rounded-full border-2 flex items-center justify-center text-3xl font-black ${bgColor}">${num}</div>
+                <div>
+                    <div class="text-xs font-bold text-slate-400 uppercase">${color}</div>
+                    <div class="text-xl font-black text-white">${currentCode}</div>
                 </div>
             </div>
+            <div class="text-right">
+                <div class="text-xs text-slate-400 uppercase font-bold">Score</div>
+                <div class="text-3xl font-black text-yellow-400">${totalPoints}</div>
+            </div>
         </div>
-
-        ${statusHtml}
-
-        <div class="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-4">
     `;
+    container.appendChild(headerDiv);
+
+    // Statut de la course
+    const statusDiv = document.createElement('div');
+    statusDiv.className = 'text-center text-sm mb-4';
+    if (!startTime) {
+        statusDiv.className += ' text-slate-400';
+        statusDiv.textContent = '⏳ En attente du départ du professeur...';
+    } else if (endTime) {
+        statusDiv.className += ' text-red-400';
+        statusDiv.textContent = '⏱️ La course est terminée.';
+    } else {
+        statusDiv.className += ' text-emerald-400';
+        statusDiv.textContent = '🏃 Course en cours !';
+    }
+    container.appendChild(statusDiv);
+
+    // Grille des circuits
+    const gridDiv = document.createElement('div');
+    gridDiv.className = 'grid grid-cols-3 sm:grid-cols-4 gap-3 mb-4';
+    container.appendChild(gridDiv);
 
     for (let i = 1; i <= 12; i++) {
-        const val = validations[i];
-        let statusClass = 'bg-slate-700 hover:bg-slate-600';
-        let statusText = `C${i}`;
-        let disabled = '';
-        let onclick = `onclick="window.selectCircuit(${i})"`;
+        const btn = document.createElement('button');
+        btn.className = 'circuit-btn rounded-xl p-4 font-black text-white text-lg border-2 transition-all active:scale-95';
+        btn.dataset.circuit = i;
 
+        const val = validations[i];
         if (val) {
             const pts = val.score || 0;
             if (pts >= 5) {
-                statusClass = 'bg-emerald-600 border-emerald-400';
-                statusText = `C${i} ✅`;
-                disabled = 'opacity-60 cursor-default';
-                onclick = '';
+                btn.className += ' bg-emerald-600 border-emerald-400';
+                btn.textContent = `C${i} ✅`;
+                btn.disabled = true;
             } else if (pts >= 2) {
-                statusClass = 'bg-orange-500 border-orange-400';
-                statusText = `C${i} 🆗`;
-                disabled = 'opacity-60 cursor-default';
-                onclick = '';
+                btn.className += ' bg-orange-500 border-orange-400';
+                btn.textContent = `C${i} 🆗`;
+                btn.disabled = true;
             } else {
-                statusClass = 'bg-red-600 border-red-400';
-                statusText = `C${i} ❌`;
-                disabled = 'opacity-60 cursor-default';
-                onclick = '';
+                btn.className += ' bg-red-600 border-red-400';
+                btn.textContent = `C${i} ❌`;
+                btn.disabled = true;
             }
+        } else {
+            btn.className += ' bg-slate-700 border-slate-600 hover:border-blue-500';
+            btn.textContent = `C${i}`;
+            btn.addEventListener('click', () => selectCircuit(i));
         }
-
-        html += `
-            <button id="btnCircuit${i}" 
-                    class="circuit-btn ${statusClass} rounded-xl p-4 font-black text-white text-lg border-2 ${!disabled ? 'border-slate-600 hover:scale-105' : 'border-slate-500'} transition-all active:scale-95 ${disabled}"
-                    data-circuit="${i}"
-                    ${onclick ? `onclick="${onclick}"` : 'disabled'}>
-                ${statusText}
-            </button>
-        `;
+        gridDiv.appendChild(btn);
     }
 
-    html += `
+    // Zone de saisie (cachée par défaut)
+    const saisieDiv = document.createElement('div');
+    saisieDiv.id = 'saisieZone';
+    saisieDiv.className = 'hidden bg-slate-800 p-4 rounded-2xl border border-slate-700';
+    saisieDiv.innerHTML = `
+        <div class="text-center mb-3">
+            <span class="text-sm text-slate-400">Circuit sélectionné :</span>
+            <span id="selectedCircuitLabel" class="text-2xl font-black text-white ml-2"></span>
         </div>
-
-        <!-- Zone de saisie -->
-        <div id="saisieZone" class="hidden bg-slate-800 p-4 rounded-2xl border border-slate-700">
-            <div class="text-center mb-3">
-                <span class="text-sm text-slate-400">Circuit sélectionné :</span>
-                <span id="selectedCircuitLabel" class="text-2xl font-black text-white ml-2"></span>
-            </div>
-            <div class="flex justify-center items-center gap-6 mb-4">
-                <input type="text" id="l1" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500 text-white" maxlength="1" oninput="this.value=this.value.toUpperCase(); if(this.value) document.getElementById('l2').focus()">
-                <input type="text" id="l2" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500 text-white" maxlength="1" oninput="this.value=this.value.toUpperCase()">
-            </div>
-            <div class="flex gap-4">
-                <button onclick="window.annulerSaisie()" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white active:scale-95">Annuler</button>
-                <button onclick="window.validerCircuit()" class="flex-1 bg-blue-600 py-3 rounded-xl font-black text-white active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.4)]">Valider</button>
-            </div>
+        <div class="flex justify-center items-center gap-6 mb-4">
+            <input type="text" id="l1" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500 text-white" maxlength="1" oninput="this.value=this.value.toUpperCase(); if(this.value) document.getElementById('l2').focus()">
+            <input type="text" id="l2" class="input-box w-16 h-16 text-center text-4xl font-black uppercase bg-slate-900 border-2 border-slate-600 rounded-xl outline-none focus:border-blue-500 text-white" maxlength="1" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div class="flex gap-4">
+            <button id="btnAnnulerSaisie" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white active:scale-95">Annuler</button>
+            <button id="btnValiderCircuit" class="flex-1 bg-blue-600 py-3 rounded-xl font-black text-white active:scale-95 shadow-[0_0_15px_rgba(37,99,235,0.4)]">Valider</button>
         </div>
     `;
+    container.appendChild(saisieDiv);
 
-    container.innerHTML = html;
-
-    // Exposer les fonctions globalement
-    window.selectCircuit = selectCircuit;
-    window.annulerSaisie = annulerSaisie;
-    window.validerCircuit = validerCircuit;
+    // Attacher les événements aux boutons de saisie
+    document.getElementById('btnAnnulerSaisie').addEventListener('click', annulerSaisie);
+    document.getElementById('btnValiderCircuit').addEventListener('click', validerCircuit);
 }
 
 // ============================================================
@@ -267,15 +256,16 @@ function selectCircuit(circuitId) {
         return;
     }
 
-    // Vérifier que la course est active
+    // Vérifier la course
     if (!startTime || endTime) {
         alert('La course n\'est pas active.');
         return;
     }
 
     selectedCircuit = circuitId;
-    document.getElementById('selectedCircuitLabel').innerText = `C${circuitId}`;
-    document.getElementById('saisieZone').classList.remove('hidden');
+    const saisieZone = document.getElementById('saisieZone');
+    document.getElementById('selectedCircuitLabel').textContent = `C${circuitId}`;
+    saisieZone.classList.remove('hidden');
     document.getElementById('l1').value = '';
     document.getElementById('l2').value = '';
     setTimeout(() => document.getElementById('l1').focus(), 100);
@@ -319,7 +309,7 @@ function validerCircuit() {
         return;
     }
 
-    // Anti‑triche : cooldown
+    // Anti‑triche
     const now = Date.now();
     if (now - lastSend < COOLDOWN) {
         const wait = Math.ceil((COOLDOWN - (now - lastSend)) / 1000);
@@ -327,10 +317,8 @@ function validerCircuit() {
         return;
     }
 
-    // Récupérer la couleur
+    // Calcul du score
     const [color] = currentCode.split('_');
-
-    // Calcul du score avec la matrice
     const codeVerite = matrix[selectedCircuit]?.[color] || [];
     let pts = 0;
     let truth = [...codeVerite];
@@ -345,7 +333,7 @@ function validerCircuit() {
     }
     pts = Math.floor(pts === 5 ? 5 : (pts > 0 ? 2 : 0));
 
-    // Son de feedback
+    // Son
     if (pts === 5) playTone(880, 0.3, 'sine');
     else if (pts === 2) playTone(440, 0.2, 'sine');
     else playTone(150, 0.4, 'sawtooth');
@@ -378,7 +366,6 @@ function validerCircuit() {
 // FEEDBACK
 // ============================================================
 function afficherFeedback(pts) {
-    // Récupérer le score total actuel
     let total = 0;
     Object.values(sessions).forEach(s => { total += s.score || 0; });
     total += pts;
@@ -393,11 +380,15 @@ function afficherFeedback(pts) {
         <div class="text-8xl mb-4">${icon}</div>
         <div class="text-5xl font-black text-white mb-2">+${pts} PTS</div>
         <div class="text-xl font-bold text-yellow-400 mb-8">TOTAL : ${total} PTS</div>
-        <button onclick="this.parentElement.remove()" class="px-12 py-4 bg-white/10 border-2 border-white rounded-2xl text-white font-black text-xl active:scale-95 transition-transform">
+        <button class="btn-fermer-feedback px-12 py-4 bg-white/10 border-2 border-white rounded-2xl text-white font-black text-xl active:scale-95 transition-transform">
             SUIVANT ➔
         </button>
     `;
     document.body.appendChild(overlay);
+
+    overlay.querySelector('.btn-fermer-feedback').addEventListener('click', () => {
+        overlay.remove();
+    });
 }
 
 // ============================================================
