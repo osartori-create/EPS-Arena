@@ -42,8 +42,9 @@ export function initCoKiosk(classe, code) {
     container.innerHTML = '';
     container.style.display = 'block';
 
-    // 1. Écouter la configuration
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+
+    // 1. Écouter la configuration
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/config`);
     configListener = onValue(configRef, (snap) => {
         const data = snap.val() || {};
@@ -51,9 +52,7 @@ export function initCoKiosk(classe, code) {
         valMode = data.valMode || 'step';
         activeCategory = data.activeCategory || '';
         config = data;
-        // Une fois la config chargée, on écoute les sessions
         chargerSessions();
-        // Mettre à jour l'affichage
         afficherInterface();
     });
 
@@ -69,10 +68,11 @@ export function initCoKiosk(classe, code) {
         afficherInterface();
     });
 
-    // 3. Écouter les catégories actives (si changé en cours de route)
-    const catRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/activeCategory`);
+    // 3. ✅ Écouter la catégorie active sur le bon chemin
+    const catRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/co/config/activeCategory`);
     activeCategoryListener = onValue(catRef, (snap) => {
         activeCategory = snap.val() || '';
+        // Mettre à jour l'affichage
         afficherInterface();
     });
 }
