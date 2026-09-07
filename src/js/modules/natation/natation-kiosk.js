@@ -1,6 +1,36 @@
 // src/js/modules/natation/natation-kiosk.js
 import { db, ref, onValue, set } from '../../core/firebase-service.js';
 
+// ============================================================
+// DÉBOGAGE VISUEL
+// ============================================================
+function debugLog(message, isError = false) {
+    const container = document.getElementById('debug-console');
+    const logsDiv = document.getElementById('debug-logs');
+    if (!container || !logsDiv) return;
+    
+    // Afficher la console si elle est cachée
+    container.style.display = 'block';
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const color = isError ? '#f44' : '#0f0';
+    const entry = document.createElement('div');
+    entry.style.color = color;
+    entry.textContent = `[${timestamp}] ${message}`;
+    logsDiv.appendChild(entry);
+    
+    // Limiter le nombre de lignes
+    while (logsDiv.children.length > 50) {
+        logsDiv.removeChild(logsDiv.firstChild);
+    }
+    
+    // Auto-scroll vers le bas
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
+// Remplacer les console.log importants par debugLog
+// On garde console.log pour le débogage sur PC, mais on ajoute aussi debugLog
+
 let currentClasse = '';
 let currentNumero = null;
 let config = null;
@@ -595,44 +625,41 @@ function chargerHistoriqueEleve(eleveId, callback) {
 // FONCTIONS UTILITAIRES
 // ============================================================
 function getEleveIdFromNumero(num) {
-    // 0. Vérifier que la classe est définie
+    debugLog(`🔍 Recherche du numéro ${num} dans la classe ${currentClasse}`);
     if (!currentClasse) {
-        console.warn('Classe non définie.');
+        debugLog('❌ Classe non définie.', true);
         return null;
     }
 
-    // 1. Essayer de récupérer le mapping existant
     let mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
     let eleveId = mapping[`${currentClasse}_${num}`];
-    
-    // 2. Si le mapping est vide ou l'élève introuvable, le reconstruire
+    debugLog(`📋 Mapping actuel : ${Object.keys(mapping).length} entrées`);
+
     if (!eleveId || Object.keys(mapping).length === 0) {
-        console.warn('⚠️ Mapping local manquant, reconstruction automatique...');
+        debugLog('⚠️ Mapping manquant ou incomplet, reconstruction...', true);
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        debugLog(`👥 Nombre d'élèves dans localStorage : ${eleves.length}`);
         if (eleves.length === 0) {
-            console.warn('❌ Aucun élève trouvé dans le localStorage pour la classe', currentClasse);
+            debugLog('❌ Aucun élève trouvé dans le localStorage.', true);
             return null;
         }
         
-        // Trier par nom (identique au professeur)
         eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-        
-        // Construire le nouveau mapping
         const newMapping = {};
         eleves.forEach((e, idx) => {
             const numero = idx + 1;
             newMapping[`${currentClasse}_${numero}`] = e.id;
         });
-        
-        // Sauvegarder
         localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
         mapping = newMapping;
         eleveId = mapping[`${currentClasse}_${num}`];
-        console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves.`);
+        debugLog(`✅ Mapping reconstruit avec ${eleves.length} élèves.`);
     }
     
     if (!eleveId) {
-        console.warn(`❌ Numéro ${num} non trouvé dans le mapping.`);
+        debugLog(`❌ Numéro ${num} non trouvé.`, true);
+    } else {
+        debugLog(`✅ Élève trouvé : ${eleveId}`);
     }
     return eleveId || null;
 }
