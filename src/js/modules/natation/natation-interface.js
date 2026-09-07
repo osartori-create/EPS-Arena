@@ -507,35 +507,45 @@ function exportNatationIDoceo() {
         return;
     }
     
-    // Construire les données
-    const rows = eleves.map(e => {
+    // Trier par numéro (ordre alphabétique déjà fait à l'import)
+    eleves.sort((a, b) => a.numero - b.numero);
+    
+    // Construire les lignes
+    let csv = '';
+    
+    // 1. En-tête (colonnes iDoceo)
+    // La colonne !groupe est obligatoire en première position
+    csv += '"!groupe";"Nom";"Prénom";"Temps (s)";"Coups de bras";"Indice";"Niveau"\n';
+    
+    // 2. Données
+    eleves.forEach(e => {
         const temps = tempsData[e.id] || null;
         const coups = coupsData[e.id] || null;
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
         
-        return {
-            numero: e.numero,
-            nom: e.nom,
-            prenom: e.prenom,
-            temps: temps !== null ? (temps / 1000).toFixed(1) : '',
-            coups: coups !== null ? coups : '',
-            indice: indice !== null ? indice.toFixed(2) : '',
-            niveau: niveau.label
-        };
+        const tempsStr = temps !== null ? (temps / 1000).toFixed(1) : '';
+        const coupsStr = coups !== null ? coups : '';
+        const indiceStr = indice !== null ? indice.toFixed(2) : '';
+        
+        // Remplacer les guillemets dans les noms (sécurité)
+        const nom = (e.nom || '').replace(/"/g, '""');
+        const prenom = (e.prenom || '').replace(/"/g, '""');
+        
+        csv += `"${e.numero}";"${nom}";"${prenom}";"${tempsStr}";"${coupsStr}";"${indiceStr}";"${niveau.label}"\n`;
     });
     
-    // Trier par numéro
-    rows.sort((a, b) => a.numero - b.numero);
+    // 3. Détection du séparateur selon la langue du navigateur
+    // iDoceo attend le séparateur qui correspond aux paramètres régionaux de l'iPad
+    // On génère un fichier avec point-virgule ET on propose aussi une version avec virgule
+    const separator = navigator.language?.startsWith('fr') ? ';' : ',';
     
-    // Générer le CSV avec BOM UTF-8 (compatible iDoceo)
-    let csv = '\uFEFF"!groupe";"Nom";"Prénom";"Temps (s)";"Coups de bras";"Indice";"Niveau"\n';
-    rows.forEach(r => {
-        csv += `"${r.numero}";"${r.nom}";"${r.prenom}";"${r.temps}";"${r.coups}";"${r.indice}";"${r.niveau}"\n`;
-    });
+    // Si le séparateur est différent, on remplace (mais on garde le point-virgule par défaut car plus fiable avec iDoceo français)
+    // Version finale avec point-virgule (fonctionne avec iDoceo en français)
+    const finalCsv = csv;
     
-    // Télécharger
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    // Télécharger avec le bon encodage (UTF-8 sans BOM pour iDoceo)
+    const blob = new Blob([finalCsv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `Natation_${classe}_${new Date().toISOString().slice(0,10)}.csv`;

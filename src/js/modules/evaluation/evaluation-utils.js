@@ -123,59 +123,49 @@ export const UNITES_TESTS = {
 // EXPORT CSV
 // ============================================================
 export function genererCSV(data, classe) {
-    const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom));
+    const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
-    // En-tête avec les colonnes (attention à l'ordre !)
-    const entete = [
-        '"!groupe"', '"Nom"', '"Prénom"', '"Sexe"', '"Statut"',
-        '"Endurance (palier)"', '"Endurance (groupe)"', '"VMA (km/h)"',
-        '"Force (cm)"', '"Force (groupe)"',
-        '"Vitesse (s)"', '"Vitesse (groupe)"',
-        '"Équilibre (s)"', '"Équilibre (groupe)"',
-        '"Coordination (nb)"', '"Coordination (groupe)"',
-        '"Souplesse (cm)"', '"Souplesse (groupe)"',
-        '"Endurance musculaire (s)"', '"Endurance musculaire (groupe)"'
-    ].join(';');
+    // En-tête avec préfixes ! pour les colonnes d'identité
+    let csv = '';
+    csv += '"!groupe";"!Nom";"!Prénom";"Sexe";"Statut";"Endurance (palier)";"Endurance (groupe)";"VMA (km/h)";"Force (cm)";"Force (groupe)";"Vitesse (s)";"Vitesse (groupe)";"Équilibre (s)";"Équilibre (groupe)";"Coordination (nb)";"Coordination (groupe)";"Souplesse (cm)";"Souplesse (groupe)";"Endurance musculaire (s)";"Endurance musculaire (groupe)"\n';
 
-    let lignes = [entete];
-
-    eleves.forEach(e => {
+    eleves.forEach((e, index) => {
         const r = e.resultats || {};
+        const numero = index + 1;
 
-        // VMA à partir du palier d'endurance
         let vmaValue = '';
         if (r.endurance && r.endurance.palier !== undefined && r.endurance.palier !== null) {
             const vma = getVMAFromPalier(r.endurance.palier);
             if (vma !== null) vmaValue = vma.toFixed(1);
         }
 
-        const ligne = [
-            `"${e.id}"`,
-            `"${e.nom}"`,
-            `"${e.prenom}"`,
-            `"${e.sexe || ''}"`,
-            `"${e.statut || 'present'}"`,
-            r.endurance ? `"${r.endurance.palier ?? ''}"` : '""',
-            r.endurance ? `"${LIBELLES_GROUPES[r.endurance.groupe] || ''}"` : '""',
-            `"${vmaValue}"`,
-            r.force ? `"${r.force.meilleur ?? ''}"` : '""',
-            r.force ? `"${LIBELLES_GROUPES[r.force.groupe] || ''}"` : '""',
-            r.vitesse ? `"${r.vitesse.meilleur ?? ''}"` : '""',
-            r.vitesse ? `"${LIBELLES_GROUPES[r.vitesse.groupe] || ''}"` : '""',
-            r.equilibre ? `"${r.equilibre.temps ?? ''}"` : '""',
-            r.equilibre ? `"${LIBELLES_GROUPES[r.equilibre.groupe] || ''}"` : '""',
-            r.coordination ? `"${r.coordination.nb_lancers ?? ''}"` : '""',
-            r.coordination ? `"${LIBELLES_GROUPES[r.coordination.groupe] || ''}"` : '""',
-            r.souplesse ? `"${r.souplesse.meilleur ?? ''}"` : '""',
-            r.souplesse ? `"${LIBELLES_GROUPES[r.souplesse.groupe] || ''}"` : '""',
-            r.endurance_musculaire ? `"${r.endurance_musculaire.temps ?? ''}"` : '""',
-            r.endurance_musculaire ? `"${LIBELLES_GROUPES[r.endurance_musculaire.groupe] || ''}"` : '""'
-        ].join(';');
-        lignes.push(ligne);
+        const nom = (e.nom || '').replace(/"/g, '""');
+        const prenom = (e.prenom || '').replace(/"/g, '""');
+        const sexe = (e.sexe || '').replace(/"/g, '""');
+        const statut = (e.statut || 'present').replace(/"/g, '""');
+
+        csv += `"${numero}";"${nom}";"${prenom}";"${sexe}";"${statut}"`;
+        csv += `;"${r.endurance ? r.endurance.palier ?? '' : ''}"`;
+        csv += `;"${r.endurance ? LIBELLES_GROUPES[r.endurance.groupe] || '' : ''}"`;
+        csv += `;"${vmaValue}"`;
+        csv += `;"${r.force ? r.force.meilleur ?? '' : ''}"`;
+        csv += `;"${r.force ? LIBELLES_GROUPES[r.force.groupe] || '' : ''}"`;
+        csv += `;"${r.vitesse ? r.vitesse.meilleur ?? '' : ''}"`;
+        csv += `;"${r.vitesse ? LIBELLES_GROUPES[r.vitesse.groupe] || '' : ''}"`;
+        csv += `;"${r.equilibre ? r.equilibre.temps ?? '' : ''}"`;
+        csv += `;"${r.equilibre ? LIBELLES_GROUPES[r.equilibre.groupe] || '' : ''}"`;
+        csv += `;"${r.coordination ? r.coordination.nb_lancers ?? '' : ''}"`;
+        csv += `;"${r.coordination ? LIBELLES_GROUPES[r.coordination.groupe] || '' : ''}"`;
+        csv += `;"${r.souplesse ? r.souplesse.meilleur ?? '' : ''}"`;
+        csv += `;"${r.souplesse ? LIBELLES_GROUPES[r.souplesse.groupe] || '' : ''}"`;
+        csv += `;"${r.endurance_musculaire ? r.endurance_musculaire.temps ?? '' : ''}"`;
+        csv += `;"${r.endurance_musculaire ? LIBELLES_GROUPES[r.endurance_musculaire.groupe] || '' : ''}"`;
+        csv += '\n';
     });
 
-    return '\uFEFF' + lignes.join('\n');
+    return csv;
 }
+
 
 export function telechargerCSV(csv, nomFichier) {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
