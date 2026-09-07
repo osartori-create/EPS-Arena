@@ -11,37 +11,54 @@ let tempsUnsubscribe = null;
 let coupsUnsubscribe = null;
 
 // ============================================================
-// BARÈME PAR DÉFAUT (modifiable par le professeur)
+// BARÈME (tableau ordonné du plus élevé au plus bas)
 // ============================================================
-const DEFAULT_BAREME = {
-    tres_insuffisant: { min: 0, max: 1.3, label: 'Très insuffisant' },
-    fragile: { min: 1.31, max: 1.99, label: 'Fragile' },
-    satisfaisant: { min: 2.0, max: 2.99, label: 'Satisfaisant' },
-    tres_satisfaisant: { min: 3.0, max: 3.99, label: 'Très satisfaisant' },
-    excellent: { min: 4.0, max: 6, label: 'Excellent' }
-};
+const DEFAULT_BAREME = [
+    { min: 4.0, label: 'Excellent', couleur: 'bg-emerald-500' },
+    { min: 3.0, label: 'Très satisfaisant', couleur: 'bg-blue-500' },
+    { min: 2.0, label: 'Satisfaisant', couleur: 'bg-yellow-500' },
+    { min: 1.31, label: 'Fragile', couleur: 'bg-orange-500' },
+    { min: 0, label: 'Très insuffisant', couleur: 'bg-red-500' }
+];
 
 function getBareme() {
+    if (!currentClasse) return DEFAULT_BAREME;
     const saved = localStorage.getItem(`eps_arena_natation_bareme_${currentClasse}`);
-    return saved ? JSON.parse(saved) : DEFAULT_BAREME;
+    if (saved) {
+        try {
+            const parsed = JSON.parse(saved);
+            if (Array.isArray(parsed) && parsed.length > 0 && 'min' in parsed[0]) {
+                return parsed;
+            }
+        } catch (e) {}
+    }
+    return DEFAULT_BAREME;
 }
 
 function saveBareme(bareme) {
-    localStorage.setItem(`eps_arena_natation_bareme_${currentClasse}`, JSON.stringify(bareme));
+    if (currentClasse) {
+        localStorage.setItem(`eps_arena_natation_bareme_${currentClasse}`, JSON.stringify(bareme));
+    }
 }
 
 function getNiveau(indice) {
-    if (indice === null || indice === undefined || isNaN(indice)) {
-        return { couleur: 'bg-slate-600', label: '--', niveau: 'non_evalue' };
+    if (indice === null || isNaN(indice)) {
+        return { couleur: 'bg-slate-600', label: '--' };
     }
     const bareme = getBareme();
-    if (indice >= bareme.excellent.min) return { couleur: 'bg-emerald-500', label: bareme.excellent.label, niveau: 'excellent' };
-    if (indice >= bareme.tres_satisfaisant.min) return { couleur: 'bg-blue-500', label: bareme.tres_satisfaisant.label, niveau: 'tres_satisfaisant' };
-    if (indice >= bareme.satisfaisant.min) return { couleur: 'bg-yellow-500', label: bareme.satisfaisant.label, niveau: 'satisfaisant' };
-    if (indice >= bareme.fragile.min) return { couleur: 'bg-orange-500', label: bareme.fragile.label, niveau: 'fragile' };
-    return { couleur: 'bg-red-500', label: bareme.tres_insuffisant.label, niveau: 'tres_insuffisant' };
+    // Parcourir du plus haut seuil au plus bas
+    for (const niveau of bareme) {
+        if (indice >= niveau.min) {
+            return { couleur: niveau.couleur, label: niveau.label };
+        }
+    }
+    // Fallback (normalement jamais atteint)
+    return { couleur: 'bg-red-500', label: 'Erreur' };
 }
 
+// ============================================================
+// CALCUL DE L'INDICE
+// ============================================================
 function calculIndice(tempsMs, nbCoups) {
     if (tempsMs === null || nbCoups === null || tempsMs <= 0 || nbCoups <= 0) return null;
     const tempsSec = tempsMs / 1000;
@@ -195,36 +212,42 @@ function createHeader() {
 }
 
 // ============================================================
-// MODALE BARÈME
+// MODALE BARÈME (adaptée au tableau)
 // ============================================================
 function ouvrirBaremeModal() {
     const bareme = getBareme();
+    // bareme est un tableau trié par min décroissant
+    // On va construire une modale avec des inputs pour chaque seuil (sauf le dernier qui est 0)
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
-    modal.innerHTML = `
+    let html = `
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
             <h3 class="text-xl font-black text-blue-400 text-center mb-4">⚙️ Barème de l'indice de nage</h3>
             <p class="text-xs text-slate-400 text-center mb-4">Seuils minimums pour chaque niveau</p>
             <div class="space-y-3">
-                <div class="flex items-center gap-3">
-                    <span class="w-20 text-xs font-bold text-slate-400">🟢 Vert</span>
-                    <input type="number" id="bareme-vert" value="${bareme.vert.min}" step="0.1" min="0" max="10" class="flex-1 bg-slate-800 border border-slate-600 rounded p-2 text-white text-center">
-                    <span class="text-xs text-slate-500">et +</span>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-20 text-xs font-bold text-slate-400">🟡 Jaune</span>
-                    <input type="number" id="bareme-jaune" value="${bareme.jaune.min}" step="0.1" min="0" max="10" class="flex-1 bg-slate-800 border border-slate-600 rounded p-2 text-white text-center">
-                    <span class="text-xs text-slate-500">à ${bareme.jaune.max}</span>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-20 text-xs font-bold text-slate-400">🟠 Orange</span>
-                    <input type="number" id="bareme-orange" value="${bareme.orange.min}" step="0.1" min="0" max="10" class="flex-1 bg-slate-800 border border-slate-600 rounded p-2 text-white text-center">
-                    <span class="text-xs text-slate-500">à ${bareme.orange.max}</span>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span class="w-20 text-xs font-bold text-slate-400">🔴 Rouge</span>
-                    <span class="flex-1 text-center text-xs text-slate-500">moins de ${bareme.rouge.max}</span>
-                </div>
+    `;
+    // On affiche tous les niveaux sauf le dernier (Très insuffisant) qui a min=0
+    for (let i = 0; i < bareme.length - 1; i++) {
+        const niveau = bareme[i];
+        const couleur = niveau.couleur.replace('bg-', '');
+        const emoji = couleur === 'emerald-500' ? '🟢' : couleur === 'blue-500' ? '🔵' : couleur === 'yellow-500' ? '🟡' : '🟠';
+        html += `
+            <div class="flex items-center gap-3">
+                <span class="w-24 text-xs font-bold text-slate-400">${emoji} ${niveau.label}</span>
+                <input type="number" id="bareme-${i}" value="${niveau.min}" step="0.1" min="0" max="10" class="flex-1 bg-slate-800 border border-slate-600 rounded p-2 text-white text-center">
+                <span class="text-xs text-slate-500">et +</span>
+            </div>
+        `;
+    }
+    // Dernier niveau (Très insuffisant) affiché en lecture seule
+    const dernier = bareme[bareme.length - 1];
+    html += `
+        <div class="flex items-center gap-3 opacity-70">
+            <span class="w-24 text-xs font-bold text-slate-400">🔴 ${dernier.label}</span>
+            <span class="flex-1 text-center text-xs text-slate-500">moins de ${dernier.min}</span>
+        </div>
+    `;
+    html += `
             </div>
             <div class="flex gap-3 mt-6">
                 <button onclick="window.fermerBaremeModal()" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white text-sm active:scale-95">Annuler</button>
@@ -232,6 +255,7 @@ function ouvrirBaremeModal() {
             </div>
         </div>
     `;
+    modal.innerHTML = html;
     document.body.appendChild(modal);
     window._baremeModal = modal;
 }
@@ -244,29 +268,33 @@ window.fermerBaremeModal = function() {
 };
 
 window.sauvegarderBareme = function() {
-    const vert = parseFloat(document.getElementById('bareme-vert').value);
-    const jaune = parseFloat(document.getElementById('bareme-jaune').value);
-    const orange = parseFloat(document.getElementById('bareme-orange').value);
-    
-    if (isNaN(vert) || isNaN(jaune) || isNaN(orange)) {
-        alert('Veuillez saisir des valeurs numériques valides.');
-        return;
+    const inputs = document.querySelectorAll('#bareme-modal input[type="number"]');
+    const baremeActuel = getBareme();
+    const nouveauBareme = [];
+    for (let i = 0; i < inputs.length; i++) {
+        const val = parseFloat(inputs[i].value);
+        if (isNaN(val) || val < 0) {
+            alert('Veuillez saisir des valeurs numériques valides.');
+            return;
+        }
+        // On garde le label et la couleur du niveau correspondant
+        const niveau = baremeActuel[i];
+        nouveauBareme.push({
+            min: val,
+            label: niveau.label,
+            couleur: niveau.couleur
+        });
     }
-    
-    // Vérifier la cohérence
-    if (orange >= jaune || jaune >= vert) {
-        alert('Les seuils doivent être croissants : Orange < Jaune < Vert');
-        return;
-    }
-    
-    const bareme = {
-        rouge: { min: 0, max: orange - 0.1, label: 'À besoins' },
-        orange: { min: orange, max: jaune - 0.1, label: 'Fragile' },
-        jaune: { min: jaune, max: vert - 0.1, label: 'Satisfaisant' },
-        vert: { min: vert, max: 10, label: 'Excellent' }
-    };
-    
-    saveBareme(bareme);
+    // Ajouter le dernier niveau (Très insuffisant) avec min = 0
+    const dernier = baremeActuel[baremeActuel.length - 1];
+    nouveauBareme.push({
+        min: 0,
+        label: dernier.label,
+        couleur: dernier.couleur
+    });
+    // Trier par min décroissant
+    nouveauBareme.sort((a, b) => b.min - a.min);
+    saveBareme(nouveauBareme);
     window.fermerBaremeModal();
     const grid = document.getElementById('natation-grid');
     if (grid) renderGrid(grid);
@@ -491,7 +519,7 @@ export function importNatationConfig(event) {
                 const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${data.classe}/natation/coups`);
                 await set(coupsRef, data.coups);
             }
-            if (data.bareme) {
+            if (data.bareme && Array.isArray(data.bareme)) {
                 localStorage.setItem(`eps_arena_natation_bareme_${data.classe}`, JSON.stringify(data.bareme));
             }
             if (data.distance) {

@@ -142,7 +142,6 @@ window.retourMenuNatation = function() {
         container.innerHTML = '';
         container.style.display = 'none';
     }
-    // Masquer les éléments CO qui pourraient traîner
     const codeInfo = document.getElementById('code-info');
     if (codeInfo) codeInfo.style.display = 'none';
     if (typeof window.resetToLogin === 'function') {
@@ -171,7 +170,7 @@ export function initNatationKiosk(classe) {
     container.innerHTML = '';
     container.style.display = 'block';
     
-    // Masquer les éléments CO qui pourraient traîner
+    // Masquer les éléments CO
     const codeInfo = document.getElementById('code-info');
     if (codeInfo) codeInfo.style.display = 'none';
     const btnQuit = document.getElementById('btn-quit');
@@ -184,12 +183,18 @@ export function initNatationKiosk(classe) {
         config = snap.val() || {};
         nbEleves = config.nbEleves || 0;
         if (nbEleves === 0) {
-            const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
-            const nums = Object.keys(mapping)
-                .filter(k => k.startsWith(`${classe}_`))
-                .map(k => parseInt(k.split('_')[1]))
-                .filter(n => !isNaN(n));
-            nbEleves = Math.max(...nums, 0);
+            // Fallback : déduire le nombre d'élèves des données locales
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+            if (eleves.length > 0) {
+                nbEleves = eleves.length;
+            } else {
+                const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
+                const nums = Object.keys(mapping)
+                    .filter(k => k.startsWith(`${classe}_`))
+                    .map(k => parseInt(k.split('_')[1]))
+                    .filter(n => !isNaN(n));
+                nbEleves = Math.max(...nums, 0);
+            }
         }
         if (nbEleves === 0) nbEleves = 28;
         afficherInterface();
@@ -233,7 +238,6 @@ function afficherListeNumeros(container) {
         tempsData = snap.val() || {};
     }, { onlyOnce: false });
 
-    // Interface pleine largeur pour iPad
     let html = `
         <div class="w-full min-h-screen bg-slate-900 p-6 flex flex-col">
             <div class="flex justify-between items-center mb-6 px-4">
@@ -546,8 +550,37 @@ function chargerHistoriqueEleve(eleveId, callback) {
 // FONCTIONS UTILITAIRES
 // ============================================================
 function getEleveIdFromNumero(num) {
-    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
-    return mapping[`${currentClasse}_${num}`] || null;
+    // 1. Essayer de récupérer le mapping existant
+    let mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
+    let eleveId = mapping[`${currentClasse}_${num}`];
+    
+    if (!eleveId) {
+        // 2. Fallback : reconstruire le mapping à partir des élèves de la classe
+        console.warn('⚠️ Mapping local manquant, tentative de reconstruction...');
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        if (eleves.length > 0) {
+            // Trier par nom alphabétique pour avoir des numéros stables (identique au professeur)
+            eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+            const newMapping = {};
+            eleves.forEach((e, idx) => {
+                const numero = idx + 1;
+                newMapping[`${currentClasse}_${numero}`] = e.id;
+            });
+            // Sauvegarder le nouveau mapping
+            localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
+            mapping = newMapping;
+            eleveId = mapping[`${currentClasse}_${num}`];
+            console.log('✅ Mapping reconstruit avec', eleves.length, 'élèves.');
+        } else {
+            // Pas d'élèves locaux, on utilise le mapping Firebase (peut-être absent)
+            console.warn('❌ Aucun élève local trouvé pour la classe', currentClasse);
+        }
+    }
+    
+    if (!eleveId) {
+        console.warn('❌ Numéro', num, 'non trouvé dans le mapping.');
+    }
+    return eleveId || null;
 }
 
 function calculIndice(tempsMs, nbCoups) {
@@ -580,15 +613,18 @@ function updateChrono() {
 // ENREGISTREMENT FIREBASE (avec historique partagé)
 // ============================================================
 function enregistrerTempsEtCoups(tempsMs, nbCoups) {
-    if (currentNumero === null) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
-    const eleveId = mapping[`${currentClasse}_${currentNumero}`];
+    if (currentNumero === null) {
+        alert('Erreur : aucun numéro sélectionné.');
+        return;
+    }
+    
+    const eleveId = getEleveIdFromNumero(currentNumero);
     if (!eleveId) {
-        alert('Numéro non reconnu. Contacte le professeur.');
+        alert('Numéro non reconnu. Vérifie que le professeur a bien transmis la configuration.\nSi le problème persiste, contacte-le.');
         return;
     }
 
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const indice = calculIndice(tempsMs, nbCoups);
     const nouvelEssai = {
         tempsMs,
