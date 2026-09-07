@@ -1,6 +1,7 @@
 // src/js/ui/prof/live.js
 import { getStudentsMap, getLocalMapping } from '../../core/live-engine.js';
 import { exportIDoceo } from '../../services/export-idocéo.js';
+import { exporterVersIDoceo } from '../../services/export-service.js';
 
 let currentClasse = "";
 
@@ -81,32 +82,100 @@ export function renderLive(discipline) {
     }
 }
 
+// ============================================================
+// EXPORT iDoceo (CO) - via service centralisé
+// ============================================================
 window.exportCOiDoceo = function() {
     const activeClasse = document.getElementById('selectClasse').value;
-    if (!activeClasse) return alert("Sélectionnez une classe.");
+    if (!activeClasse) {
+        alert("Sélectionnez une classe.");
+        return;
+    }
+
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-    if (eleves.length === 0) return alert("Aucun élève.");
-    const sessionData = window.lastLiveSnap || {}; 
-    const results = {};
-    eleves.forEach(e => {
-        const code = e.code;
-        if (!code || code === 'ABS' || code === 'INAPTE') return;
+    if (eleves.length === 0) {
+        alert("Aucun élève dans cette classe.");
+        return;
+    }
+
+    // Récupérer les données du Live (passages CO)
+    const sessionData = window.lastLiveSnap || {};
+    
+    // 1. Construire les données
+    const donnees = eleves.map(e => {
+        // Ignorer les absents/inaptes
+        if (e.code === 'ABS' || e.code === 'INAPTE') {
+            return {
+                nom: `${e.prenom} ${e.nom}`.trim(),
+                score: '',
+                objectif: '',
+                note: '',
+                temps: '',
+                tempsSec: 999999 // Pour le tri
+            };
+        }
+
+        const code = e.code || e.id;
         let score = 0;
-        let max = 0;
-        let temps = 0;
-        Object.values(sessionData[code] || {}).forEach(circ => {
+        let objectif = 0;
+        let tempsSec = 0;
+
+        // Récupérer les passages de l'élève
+        const passages = sessionData[code] || {};
+        Object.values(passages).forEach(circ => {
             score += circ.pts || 0;
-            max += circ.total || 0;
-            if (circ.time && circ.time > temps) temps = circ.time;
+            objectif += circ.total || 0;
+            if (circ.time && circ.time > tempsSec) tempsSec = circ.time;
         });
-        results[code] = { points: score, objectif: max, time: temps };
+
+        let note = "";
+        if (objectif > 0) {
+            note = ((score / objectif) * 20).toFixed(1).replace('.', ',');
+        }
+
+        let temps = "";
+        if (tempsSec > 0) {
+            const min = Math.floor(tempsSec / 60);
+            const sec = tempsSec % 60;
+            temps = `${min}:${sec < 10 ? '0' : ''}${sec}`;
+        }
+
+        return {
+            nom: `${e.prenom} ${e.nom}`.trim(),
+            score: score,
+            objectif: objectif,
+            note: note,
+            temps: temps,
+            tempsSec: tempsSec
+        };
     });
-    exportIDoceo({
-        students: eleves,
-        results: results,
-        className: activeClasse,
-        activityName: "CO"
+
+    // 2. Trier : Score desc, puis Temps asc (les absents à la fin)
+    donnees.sort((a, b) => {
+        if (a.score === "" && b.score === "") return 0;
+        if (a.score === "") return 1;
+        if (b.score === "") return -1;
+        if (b.score !== a.score) return b.score - a.score;
+        return a.tempsSec - b.tempsSec;
     });
+
+    // 3. Définir les colonnes (avec ! devant toutes les colonnes)
+    const colonnes = [
+        { nom: '!groupe', cle: 'rang' },
+        { nom: '!Nom', cle: 'nom' },
+        { nom: '!Score', cle: 'score' },
+        { nom: '!Objectif', cle: 'objectif' },
+        { nom: '!Note /20', cle: 'note' },
+        { nom: '!Temps', cle: 'temps' }
+    ];
+
+    // 4. Ajouter le rang à chaque ligne
+    donnees.forEach((ligne, index) => {
+        ligne.rang = ligne.score !== "" ? (index + 1) : "";
+    });
+
+    // 5. Exporter via le service centralisé
+    exporterVersIDoceo('CO', activeClasse, colonnes, donnees);
 };
 
 window.exportResultsLive = function() {

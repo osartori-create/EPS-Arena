@@ -383,10 +383,10 @@ function reinitialiser() {
     }
 }
 
-function exporterCSV() {
+window.evalExporterCSV = function() {
     if (!currentData) {
         alert('Aucune donnée à exporter.');
         return;
     }
     exporterVersIDoceo(currentData, currentClasse);
-}
+};

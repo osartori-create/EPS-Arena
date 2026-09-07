@@ -2,6 +2,7 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
+import { exporterVersIDoceo } from '../../services/export-service.js';
 
 let currentClasse = '';
 let elevesData = [];
@@ -507,52 +508,37 @@ function exportNatationIDoceo() {
         return;
     }
     
-    // Trier par numéro (ordre alphabétique déjà fait à l'import)
-    eleves.sort((a, b) => a.numero - b.numero);
-    
-    // Construire les lignes
-    let csv = '';
-    
-    // 1. En-tête (colonnes iDoceo)
-    // La colonne !groupe est obligatoire en première position
-    csv += '"!groupe";"Nom";"Prénom";"Temps (s)";"Coups de bras";"Indice";"Niveau"\n';
-    
-    // 2. Données
-    eleves.forEach(e => {
+    // 1. Construire les données
+    const donnees = eleves.map(e => {
         const temps = tempsData[e.id] || null;
         const coups = coupsData[e.id] || null;
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
         
-        const tempsStr = temps !== null ? (temps / 1000).toFixed(1) : '';
-        const coupsStr = coups !== null ? coups : '';
-        const indiceStr = indice !== null ? indice.toFixed(2) : '';
-        
-        // Remplacer les guillemets dans les noms (sécurité)
-        const nom = (e.nom || '').replace(/"/g, '""');
-        const prenom = (e.prenom || '').replace(/"/g, '""');
-        
-        csv += `"${e.numero}";"${nom}";"${prenom}";"${tempsStr}";"${coupsStr}";"${indiceStr}";"${niveau.label}"\n`;
+        return {
+            numero: e.numero,
+            nom: e.nom || '',
+            prenom: e.prenom || '',
+            temps: temps !== null ? (temps / 1000).toFixed(1) : '',
+            coups: coups !== null ? coups : '',
+            indice: indice !== null ? indice.toFixed(2) : '',
+            niveau: niveau.label
+        };
     });
     
-    // 3. Détection du séparateur selon la langue du navigateur
-    // iDoceo attend le séparateur qui correspond aux paramètres régionaux de l'iPad
-    // On génère un fichier avec point-virgule ET on propose aussi une version avec virgule
-    const separator = navigator.language?.startsWith('fr') ? ';' : ',';
+    // 2. Définir les colonnes (avec ! devant toutes les colonnes)
+    const colonnes = [
+        { nom: '!groupe', cle: 'numero' },
+        { nom: '!Nom', cle: 'nom' },
+        { nom: '!Prénom', cle: 'prenom' },
+        { nom: '!Temps (s)', cle: 'temps' },
+        { nom: '!Coups de bras', cle: 'coups' },
+        { nom: '!Indice', cle: 'indice' },
+        { nom: '!Niveau', cle: 'niveau' }
+    ];
     
-    // Si le séparateur est différent, on remplace (mais on garde le point-virgule par défaut car plus fiable avec iDoceo français)
-    // Version finale avec point-virgule (fonctionne avec iDoceo en français)
-    const finalCsv = csv;
-    
-    // Télécharger avec le bon encodage (UTF-8 sans BOM pour iDoceo)
-    const blob = new Blob([finalCsv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Natation_${classe}_${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
+    // 3. Exporter via le service centralisé
+    exporterVersIDoceo('Natation', classe, colonnes, donnees);
 }
 
 // ============================================================
