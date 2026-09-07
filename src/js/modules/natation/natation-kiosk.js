@@ -41,7 +41,9 @@ window.natationChoisirNumero = function(num) {
             afficherInterface();
         });
     } else {
-        mode = 'chrono';
+        // Si l'ID n'est toujours pas trouvé, on affiche un message et on reste en liste
+        alert('Numéro non reconnu. Le professeur doit transmettre la configuration.');
+        mode = 'liste';
         afficherInterface();
     }
 };
@@ -176,6 +178,14 @@ export function initNatationKiosk(classe) {
     const btnQuit = document.getElementById('btn-quit');
     if (btnQuit) btnQuit.style.display = 'none';
 
+    // Pré-construire le mapping local dès le chargement
+    const mappingReconstruit = reconstruireMappingLocal();
+    if (mappingReconstruit) {
+        console.log('✅ Mapping local pré-construit avec succès.');
+    } else {
+        console.warn('⚠️ Impossible de pré-construire le mapping local.');
+    }
+
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/config`);
     if (configListener) configListener();
@@ -199,6 +209,38 @@ export function initNatationKiosk(classe) {
         if (nbEleves === 0) nbEleves = 28;
         afficherInterface();
     });
+}
+
+// ============================================================
+// RECONSTRUCTION ROBUSTE DU MAPPING LOCAL
+// ============================================================
+function reconstruireMappingLocal() {
+    if (!currentClasse) {
+        console.warn('Impossible de reconstruire : classe non définie.');
+        return false;
+    }
+
+    // 1. Récupérer les élèves depuis le localStorage (importés via CSV/ZIP)
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+    if (eleves.length === 0) {
+        console.warn('Aucun élève trouvé dans le localStorage.');
+        return false;
+    }
+
+    // 2. Trier les élèves par nom/prénom (identique au professeur)
+    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+
+    // 3. Construire le mapping { "classe_numero": "eleveId" }
+    const newMapping = {};
+    eleves.forEach((e, idx) => {
+        const numero = idx + 1;
+        newMapping[`${currentClasse}_${numero}`] = e.id;
+    });
+
+    // 4. Sauvegarder le mapping dans localStorage
+    localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
+    console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves pour la classe ${currentClasse}.`);
+    return true;
 }
 
 // ============================================================
@@ -237,6 +279,9 @@ function afficherListeNumeros(container) {
     onValue(tempsRef, (snap) => {
         tempsData = snap.val() || {};
     }, { onlyOnce: false });
+
+    // Reconstruire le mapping si nécessaire (au cas où)
+    reconstruireMappingLocal();
 
     let html = `
         <div class="w-full min-h-screen bg-slate-900 p-6 flex flex-col">
@@ -550,35 +595,44 @@ function chargerHistoriqueEleve(eleveId, callback) {
 // FONCTIONS UTILITAIRES
 // ============================================================
 function getEleveIdFromNumero(num) {
+    // 0. Vérifier que la classe est définie
+    if (!currentClasse) {
+        console.warn('Classe non définie.');
+        return null;
+    }
+
     // 1. Essayer de récupérer le mapping existant
     let mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
     let eleveId = mapping[`${currentClasse}_${num}`];
     
-    if (!eleveId) {
-        // 2. Fallback : reconstruire le mapping à partir des élèves de la classe
-        console.warn('⚠️ Mapping local manquant, tentative de reconstruction...');
+    // 2. Si le mapping est vide ou l'élève introuvable, le reconstruire
+    if (!eleveId || Object.keys(mapping).length === 0) {
+        console.warn('⚠️ Mapping local manquant, reconstruction automatique...');
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-        if (eleves.length > 0) {
-            // Trier par nom alphabétique pour avoir des numéros stables (identique au professeur)
-            eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-            const newMapping = {};
-            eleves.forEach((e, idx) => {
-                const numero = idx + 1;
-                newMapping[`${currentClasse}_${numero}`] = e.id;
-            });
-            // Sauvegarder le nouveau mapping
-            localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
-            mapping = newMapping;
-            eleveId = mapping[`${currentClasse}_${num}`];
-            console.log('✅ Mapping reconstruit avec', eleves.length, 'élèves.');
-        } else {
-            // Pas d'élèves locaux, on utilise le mapping Firebase (peut-être absent)
-            console.warn('❌ Aucun élève local trouvé pour la classe', currentClasse);
+        if (eleves.length === 0) {
+            console.warn('❌ Aucun élève trouvé dans le localStorage pour la classe', currentClasse);
+            return null;
         }
+        
+        // Trier par nom (identique au professeur)
+        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+        
+        // Construire le nouveau mapping
+        const newMapping = {};
+        eleves.forEach((e, idx) => {
+            const numero = idx + 1;
+            newMapping[`${currentClasse}_${numero}`] = e.id;
+        });
+        
+        // Sauvegarder
+        localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
+        mapping = newMapping;
+        eleveId = mapping[`${currentClasse}_${num}`];
+        console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves.`);
     }
     
     if (!eleveId) {
-        console.warn('❌ Numéro', num, 'non trouvé dans le mapping.');
+        console.warn(`❌ Numéro ${num} non trouvé dans le mapping.`);
     }
     return eleveId || null;
 }
