@@ -1,18 +1,6 @@
 // src/js/modules/evaluation/evaluation-utils.js
-// Utilitaires : calculs des scores, groupes de maîtrise, export
-
 import { PALIER_VMA } from '../../config/constants.js';
-import { exporterVersIDoceo } from '../../services/export-service.js';
-
-// ============================================================
-// FONCTION : Récupère la VMA à partir du palier
-// ============================================================
-export function getVMAFromPalier(palier) {
-    if (palier === undefined || palier === null || !(palier in PALIER_VMA)) {
-        return null;
-    }
-    return PALIER_VMA[palier];
-}
+import { exporterVersIDoceo as exporterVersIDoceoService } from '../../services/export-service.js';
 
 // ============================================================
 // GROUPES DE MAÎTRISE
@@ -36,8 +24,15 @@ export const LIBELLES_GROUPES = {
 };
 
 // ============================================================
-// FONCTIONS DE CALCUL DES GROUPES PAR TEST
+// FONCTIONS DE CALCUL DES GROUPES
 // ============================================================
+export function getVMAFromPalier(palier) {
+    if (palier === undefined || palier === null || !(palier in PALIER_VMA)) {
+        return null;
+    }
+    return PALIER_VMA[palier];
+}
+
 export function groupeEndurance(palier) {
     if (palier === undefined || palier === null) return null;
     if (palier <= 1) return GROUPES.A_BESOINS;
@@ -121,54 +116,6 @@ export const UNITES_TESTS = {
 };
 
 // ============================================================
-// EXPORT CSV
-// ============================================================
-export function genererCSV(data, classe) {
-    const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-
-    // En-tête avec préfixes ! pour les colonnes d'identité
-    let csv = '';
-    csv += '"!groupe";"!Nom";"!Prénom";"Sexe";"Statut";"Endurance (palier)";"Endurance (groupe)";"VMA (km/h)";"Force (cm)";"Force (groupe)";"Vitesse (s)";"Vitesse (groupe)";"Équilibre (s)";"Équilibre (groupe)";"Coordination (nb)";"Coordination (groupe)";"Souplesse (cm)";"Souplesse (groupe)";"Endurance musculaire (s)";"Endurance musculaire (groupe)"\n';
-
-    eleves.forEach((e, index) => {
-        const r = e.resultats || {};
-        const numero = index + 1;
-
-        let vmaValue = '';
-        if (r.endurance && r.endurance.palier !== undefined && r.endurance.palier !== null) {
-            const vma = getVMAFromPalier(r.endurance.palier);
-            if (vma !== null) vmaValue = vma.toFixed(1);
-        }
-
-        const nom = (e.nom || '').replace(/"/g, '""');
-        const prenom = (e.prenom || '').replace(/"/g, '""');
-        const sexe = (e.sexe || '').replace(/"/g, '""');
-        const statut = (e.statut || 'present').replace(/"/g, '""');
-
-        csv += `"${numero}";"${nom}";"${prenom}";"${sexe}";"${statut}"`;
-        csv += `;"${r.endurance ? r.endurance.palier ?? '' : ''}"`;
-        csv += `;"${r.endurance ? LIBELLES_GROUPES[r.endurance.groupe] || '' : ''}"`;
-        csv += `;"${vmaValue}"`;
-        csv += `;"${r.force ? r.force.meilleur ?? '' : ''}"`;
-        csv += `;"${r.force ? LIBELLES_GROUPES[r.force.groupe] || '' : ''}"`;
-        csv += `;"${r.vitesse ? r.vitesse.meilleur ?? '' : ''}"`;
-        csv += `;"${r.vitesse ? LIBELLES_GROUPES[r.vitesse.groupe] || '' : ''}"`;
-        csv += `;"${r.equilibre ? r.equilibre.temps ?? '' : ''}"`;
-        csv += `;"${r.equilibre ? LIBELLES_GROUPES[r.equilibre.groupe] || '' : ''}"`;
-        csv += `;"${r.coordination ? r.coordination.nb_lancers ?? '' : ''}"`;
-        csv += `;"${r.coordination ? LIBELLES_GROUPES[r.coordination.groupe] || '' : ''}"`;
-        csv += `;"${r.souplesse ? r.souplesse.meilleur ?? '' : ''}"`;
-        csv += `;"${r.souplesse ? LIBELLES_GROUPES[r.souplesse.groupe] || '' : ''}"`;
-        csv += `;"${r.endurance_musculaire ? r.endurance_musculaire.temps ?? '' : ''}"`;
-        csv += `;"${r.endurance_musculaire ? LIBELLES_GROUPES[r.endurance_musculaire.groupe] || '' : ''}"`;
-        csv += '\n';
-    });
-
-    return csv;
-}
-
-
-// ============================================================
 // EXPORT iDoceo (via service centralisé)
 // ============================================================
 export function exporterVersIDoceo(data, classe) {
@@ -197,18 +144,12 @@ export function exporterVersIDoceo(data, classe) {
             if (vma !== null) vmaValue = vma.toFixed(1);
         }
 
-        // Nettoyer les noms
-        const nom = e.nom || '';
-        const prenom = e.prenom || '';
-        const sexe = e.sexe || '';
-        const statut = e.statut || 'present';
-
         return {
             numero: numero,
-            nom: nom,
-            prenom: prenom,
-            sexe: sexe,
-            statut: statut,
+            nom: e.nom || '',
+            prenom: e.prenom || '',
+            sexe: e.sexe || '',
+            statut: e.statut || 'present',
             endurancePalier: r.endurance ? r.endurance.palier ?? '' : '',
             enduranceGroupe: r.endurance ? LIBELLES_GROUPES[r.endurance.groupe] || '' : '',
             vma: vmaValue,
@@ -252,5 +193,5 @@ export function exporterVersIDoceo(data, classe) {
     ];
 
     // 4. Exporter via le service centralisé
-    exporterVersIDoceo('Evaluation', classe, colonnes, donnees);
+    exporterVersIDoceoService('Evaluation', classe, colonnes, donnees);
 }
