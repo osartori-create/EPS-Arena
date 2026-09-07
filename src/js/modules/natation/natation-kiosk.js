@@ -1,41 +1,12 @@
 // src/js/modules/natation/natation-kiosk.js
 import { db, ref, onValue, set } from '../../core/firebase-service.js';
 
-// ============================================================
-// DÉBOGAGE VISUEL
-// ============================================================
-function debugLog(message, isError = false) {
-    const container = document.getElementById('debug-console');
-    const logsDiv = document.getElementById('debug-logs');
-    if (!container || !logsDiv) return;
-    
-    // Afficher la console si elle est cachée
-    container.style.display = 'block';
-    
-    const timestamp = new Date().toLocaleTimeString();
-    const color = isError ? '#f44' : '#0f0';
-    const entry = document.createElement('div');
-    entry.style.color = color;
-    entry.textContent = `[${timestamp}] ${message}`;
-    logsDiv.appendChild(entry);
-    
-    // Limiter le nombre de lignes
-    while (logsDiv.children.length > 50) {
-        logsDiv.removeChild(logsDiv.firstChild);
-    }
-    
-    // Auto-scroll vers le bas
-    logsDiv.scrollTop = logsDiv.scrollHeight;
-}
-
-// Remplacer les console.log importants par debugLog
-// On garde console.log pour le débogage sur PC, mais on ajoute aussi debugLog
-
 let currentClasse = '';
 let currentNumero = null;
 let config = null;
 let configListener = null;
 let nbEleves = 0;
+let mappingFirebase = {}; // Mapping chargé depuis Firebase
 
 let chronoRunning = false;
 let chronoStart = 0;
@@ -71,7 +42,6 @@ window.natationChoisirNumero = function(num) {
             afficherInterface();
         });
     } else {
-        // Si l'ID n'est toujours pas trouvé, on affiche un message et on reste en liste
         alert('Numéro non reconnu. Le professeur doit transmettre la configuration.');
         mode = 'liste';
         afficherInterface();
@@ -193,6 +163,7 @@ export function initNatationKiosk(classe) {
     tempsFinal = null;
     mode = 'liste';
     historiqueEssais = [];
+    mappingFirebase = {};
 
     const container = document.getElementById('natation-module');
     if (!container) {
@@ -208,69 +179,32 @@ export function initNatationKiosk(classe) {
     const btnQuit = document.getElementById('btn-quit');
     if (btnQuit) btnQuit.style.display = 'none';
 
-    // Pré-construire le mapping local dès le chargement
-    const mappingReconstruit = reconstruireMappingLocal();
-    if (mappingReconstruit) {
-        console.log('✅ Mapping local pré-construit avec succès.');
-    } else {
-        console.warn('⚠️ Impossible de pré-construire le mapping local.');
-    }
-
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+
+    // 1. Charger le mapping depuis Firebase
+    const mappingRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/mapping`);
+    onValue(mappingRef, (snap) => {
+        mappingFirebase = snap.val() || {};
+        console.log('📋 Mapping Firebase chargé :', Object.keys(mappingFirebase).length, 'entrées');
+    }, { onlyOnce: false });
+
+    // 2. Charger la config
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/config`);
     if (configListener) configListener();
     configListener = onValue(configRef, (snap) => {
         config = snap.val() || {};
         nbEleves = config.nbEleves || 0;
         if (nbEleves === 0) {
-            // Fallback : déduire le nombre d'élèves des données locales
-            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-            if (eleves.length > 0) {
-                nbEleves = eleves.length;
-            } else {
-                const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
-                const nums = Object.keys(mapping)
-                    .filter(k => k.startsWith(`${classe}_`))
-                    .map(k => parseInt(k.split('_')[1]))
-                    .filter(n => !isNaN(n));
-                nbEleves = Math.max(...nums, 0);
-            }
+            // Fallback : déduire du mapping
+            const nums = Object.keys(mappingFirebase)
+                .filter(k => k.startsWith(`${classe}_`))
+                .map(k => parseInt(k.split('_')[1]))
+                .filter(n => !isNaN(n));
+            nbEleves = Math.max(...nums, 0);
         }
         if (nbEleves === 0) nbEleves = 28;
         afficherInterface();
     });
-}
-
-// ============================================================
-// RECONSTRUCTION ROBUSTE DU MAPPING LOCAL
-// ============================================================
-function reconstruireMappingLocal() {
-    if (!currentClasse) {
-        console.warn('Impossible de reconstruire : classe non définie.');
-        return false;
-    }
-
-    // 1. Récupérer les élèves depuis le localStorage (importés via CSV/ZIP)
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    if (eleves.length === 0) {
-        console.warn('Aucun élève trouvé dans le localStorage.');
-        return false;
-    }
-
-    // 2. Trier les élèves par nom/prénom (identique au professeur)
-    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-
-    // 3. Construire le mapping { "classe_numero": "eleveId" }
-    const newMapping = {};
-    eleves.forEach((e, idx) => {
-        const numero = idx + 1;
-        newMapping[`${currentClasse}_${numero}`] = e.id;
-    });
-
-    // 4. Sauvegarder le mapping dans localStorage
-    localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
-    console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves pour la classe ${currentClasse}.`);
-    return true;
 }
 
 // ============================================================
@@ -309,9 +243,6 @@ function afficherListeNumeros(container) {
     onValue(tempsRef, (snap) => {
         tempsData = snap.val() || {};
     }, { onlyOnce: false });
-
-    // Reconstruire le mapping si nécessaire (au cas où)
-    reconstruireMappingLocal();
 
     let html = `
         <div class="w-full min-h-screen bg-slate-900 p-6 flex flex-col">
@@ -625,43 +556,21 @@ function chargerHistoriqueEleve(eleveId, callback) {
 // FONCTIONS UTILITAIRES
 // ============================================================
 function getEleveIdFromNumero(num) {
-    debugLog(`🔍 Recherche du numéro ${num} dans la classe ${currentClasse}`);
     if (!currentClasse) {
-        debugLog('❌ Classe non définie.', true);
+        console.warn('Classe non définie.');
         return null;
     }
-
-    let mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
-    let eleveId = mapping[`${currentClasse}_${num}`];
-    debugLog(`📋 Mapping actuel : ${Object.keys(mapping).length} entrées`);
-
-    if (!eleveId || Object.keys(mapping).length === 0) {
-        debugLog('⚠️ Mapping manquant ou incomplet, reconstruction...', true);
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-        debugLog(`👥 Nombre d'élèves dans localStorage : ${eleves.length}`);
-        if (eleves.length === 0) {
-            debugLog('❌ Aucun élève trouvé dans le localStorage.', true);
-            return null;
-        }
-        
-        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-        const newMapping = {};
-        eleves.forEach((e, idx) => {
-            const numero = idx + 1;
-            newMapping[`${currentClasse}_${numero}`] = e.id;
-        });
-        localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
-        mapping = newMapping;
-        eleveId = mapping[`${currentClasse}_${num}`];
-        debugLog(`✅ Mapping reconstruit avec ${eleves.length} élèves.`);
-    }
+    // Lire depuis le mapping Firebase chargé
+    const key = `${currentClasse}_${num}`;
+    const eleveId = mappingFirebase[key] || null;
     
     if (!eleveId) {
-        debugLog(`❌ Numéro ${num} non trouvé.`, true);
+        console.warn(`❌ Numéro ${num} non trouvé dans le mapping Firebase.`);
+        console.log('🔍 Mapping disponible :', Object.keys(mappingFirebase));
     } else {
-        debugLog(`✅ Élève trouvé : ${eleveId}`);
+        console.log(`✅ Numéro ${num} → ID ${eleveId}`);
     }
-    return eleveId || null;
+    return eleveId;
 }
 
 function calculIndice(tempsMs, nbCoups) {
@@ -701,7 +610,7 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
     
     const eleveId = getEleveIdFromNumero(currentNumero);
     if (!eleveId) {
-        alert('Numéro non reconnu. Vérifie que le professeur a bien transmis la configuration.\nSi le problème persiste, contacte-le.');
+        alert('Numéro non reconnu. Le professeur doit transmettre la configuration.');
         return;
     }
 

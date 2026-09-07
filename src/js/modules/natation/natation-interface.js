@@ -458,6 +458,10 @@ export async function transmettreNatationConfig() {
             localMapping[`${classe}_${e.numero}`] = e.id;
         }
     });
+    
+    // ✅ NOUVEAU : sauvegarder le mapping dans Firebase
+    const mappingRef = ref(db, `${baseProf}/${classe}/natation/mapping`);
+    await set(mappingRef, localMapping);
     setLocalMapping(classe, localMapping);
 
     const configData = {
