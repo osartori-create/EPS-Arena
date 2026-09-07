@@ -10,6 +10,7 @@ import { initBadmintonKiosk } from '../../modules/badminton/badminton-dispatcher
 import { initOrientShowKiosk } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
+import { initNatationKiosk } from '../../modules/natation/natation-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -32,6 +33,12 @@ const coModule = document.getElementById('co-module');
 const multiModule = document.getElementById('multi-module');
 const osModule = document.getElementById('orientshow-module');
 const badmintonModule = document.getElementById('badminton-module');
+const natationModule = document.getElementById('natation-module');
+
+// Éléments CO à masquer pour Natation
+const codeInfo = document.getElementById('code-info');
+const btnQuit = document.getElementById('btn-quit');
+const btnBackTerrain = document.getElementById('btn-back-terrain');
 
 export function initApp() {
     currentConfig = null;
@@ -79,8 +86,15 @@ export function initApp() {
                 if (config.activite === 'arcathlon') {
                     console.log('[eleve] Activité Arcathlon détectée (config principale)');
                     showLoginArcathlon();
-                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest', 'natation'].includes(config.activite)) {
+                } else if (config.activite === 'natation') {
+                    console.log('[eleve] Activité Natation détectée');
+                    // Masquer les éléments CO
+                    masquerElementsCO();
+                    showLoginNatation();
+                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
                     currentConfig = config;
+                    // Réafficher les éléments CO si nécessaire
+                    afficherElementsCO();
                     showLogin();
                 } else {
                     showWaiting();
@@ -107,22 +121,39 @@ export function initApp() {
     showWaiting();
 }
 
+// ============================================================
+// FONCTIONS DE MASQUAGE / AFFICHAGE DES ÉLÉMENTS CO
+// ============================================================
+function masquerElementsCO() {
+    if (codeInfo) codeInfo.style.display = 'none';
+    if (btnQuit) btnQuit.style.display = 'none';
+    if (btnBackTerrain) btnBackTerrain.style.display = 'none';
+}
+
+function afficherElementsCO() {
+    if (codeInfo) codeInfo.style.display = '';
+    if (btnQuit) btnQuit.style.display = '';
+    if (btnBackTerrain) btnBackTerrain.style.display = 'none'; // par défaut caché
+}
+
+// ============================================================
+// AFFICHAGE DES ÉCRANS
+// ============================================================
 function showWaiting() {
     loginScreen.classList.add('hidden');
     activityScreen.classList.add('hidden');
     waitingScreen.classList.remove('hidden');
+    // S'assurer que les éléments CO sont visibles par défaut
+    afficherElementsCO();
 }
 
 function showLogin() {
-    // Réinitialiser les codes actifs
-    const codeInfo = document.getElementById('code-info');
-    if (codeInfo) {
-        document.getElementById('selected-code').innerText = '--';
-    }
+    // Réafficher les éléments CO
+    afficherElementsCO();
     
-    waitingScreen.classList.add('hidden');
-    activityScreen.classList.add('hidden');
     loginScreen.classList.remove('hidden');
+    activityScreen.classList.add('hidden');
+    waitingScreen.classList.add('hidden');
     codeList.innerHTML = '';
     const config = currentConfig;
     activityTitle.innerText = "Choisis ton code";
@@ -140,9 +171,10 @@ function showLogin() {
         coModule.classList.add('hidden');
         multiModule.classList.add('hidden');
         if (osModule) osModule.classList.add('hidden');
-        document.getElementById('code-info').classList.add('hidden');
-        document.getElementById('btn-quit').classList.add('hidden');
-        document.getElementById('btn-back-terrain').classList.remove('hidden');
+        if (natationModule) natationModule.classList.add('hidden');
+        codeInfo.classList.add('hidden');
+        btnQuit.classList.add('hidden');
+        btnBackTerrain.classList.remove('hidden');
         document.getElementById('main-container').classList.remove('max-w-md');
         document.getElementById('main-container').classList.add('max-w-7xl');
         badmintonModule.classList.remove('hidden');
@@ -160,9 +192,10 @@ function showLogin() {
         multiModule.classList.add('hidden');
         if (osModule) osModule.classList.add('hidden');
         badmintonModule.classList.add('hidden');
-        document.getElementById('code-info')?.classList.add('hidden');
-        document.getElementById('btn-quit')?.classList.add('hidden');
-        document.getElementById('btn-back-terrain')?.classList.add('hidden');
+        if (natationModule) natationModule.classList.add('hidden');
+        codeInfo.classList.add('hidden');
+        btnQuit.classList.add('hidden');
+        btnBackTerrain.classList.add('hidden');
         document.getElementById('main-container').classList.remove('max-w-md');
         document.getElementById('main-container').classList.add('max-w-7xl');
 
@@ -210,6 +243,7 @@ function showLogin() {
                             multiModule.classList.add('hidden');
                             if (osModule) osModule.classList.add('hidden');
                             badmintonModule.classList.add('hidden');
+                            if (natationModule) natationModule.classList.add('hidden');
                             let blocContainer = document.getElementById('bloc-kiosk-container');
                             if (!blocContainer) {
                                 blocContainer = document.createElement('div');
@@ -236,28 +270,7 @@ function showLogin() {
         return;
     }
 
-    if (config.activite === 'natation') {
-    loginScreen.classList.add('hidden');
-    activityScreen.classList.remove('hidden');
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    const natationModule = document.getElementById('natation-module');
-    if (natationModule) {
-        natationModule.classList.remove('hidden');
-        natationModule.style.display = 'block';
-        import('../../modules/natation/natation-kiosk.js').then(module => {
-            module.initNatationKiosk(selectedClass);
-        }).catch(err => {
-            console.error('Erreur chargement Natation Kiosk :', err);
-            natationModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
-        });
-    }
-    return;
-}
-    // SPÉCIAL ORIENTSHOW (via CO) – avec pastilles de couleur
+    // SPÉCIAL ORIENTSHOW (via CO)
     if (config.activite === 'orientshow') {
         loginScreen.classList.remove('hidden');
         activityScreen.classList.add('hidden');
@@ -265,9 +278,7 @@ function showLogin() {
         codeList.innerHTML = '';
         activityTitle.innerText = "Choisis ton code";
 
-        // Récupérer les couleurs et leurs nombres
         const couleurs = ['NOIR', 'ROUGE', 'BLEU', 'VERT', 'JAUNE'];
-        // Mapping couleur -> classes Tailwind
         const colorMap = {
             NOIR: 'bg-black text-white border-slate-600',
             ROUGE: 'bg-red-600 text-white border-red-900',
@@ -284,23 +295,21 @@ function showLogin() {
                 for (let i = 1; i <= count; i++) {
                     const code = `${couleur}_${i}`;
                     const btn = document.createElement('button');
-                    // Pastille avec le numéro au centre
                     btn.className = `w-16 h-16 rounded-full border-2 ${colorClass} font-black text-2xl flex items-center justify-center transition-transform active:scale-95 hover:scale-105`;
-                    btn.textContent = i; // Affiche seulement le numéro
-                    btn.dataset.code = code; // Stocke le code complet
+                    btn.textContent = i;
+                    btn.dataset.code = code;
                     btn.onclick = () => {
                         selectedCode = code;
                         document.getElementById('selected-code').innerText = code;
                         loginScreen.classList.add('hidden');
                         activityScreen.classList.remove('hidden');
-                        // Cacher les autres modules
                         escaladeModule.classList.add('hidden');
                         coModule.classList.add('hidden');
                         multiModule.classList.add('hidden');
                         if (osModule) osModule.classList.add('hidden');
                         badmintonModule.classList.add('hidden');
+                        if (natationModule) natationModule.classList.add('hidden');
                         
-                        // Utiliser le conteneur existant orientshow-module
                         if (osModule) {
                             osModule.classList.remove('hidden');
                             osModule.style.display = 'block';
@@ -322,50 +331,52 @@ function showLogin() {
         return;
     }
 
+    // SPÉCIAL CO (classique)
     if (config.activite === 'co') {
-    loginScreen.classList.remove('hidden');
-    activityScreen.classList.add('hidden');
-    waitingScreen.classList.add('hidden');
-    codeList.innerHTML = '';
-    activityTitle.innerText = "Choisis ton code";
+        loginScreen.classList.remove('hidden');
+        activityScreen.classList.add('hidden');
+        waitingScreen.classList.add('hidden');
+        codeList.innerHTML = '';
+        activityTitle.innerText = "Choisis ton code";
 
-    // Générer les codes A1 à F6 (ou utiliser les groupes configurés)
-    const letters = ['A','B','C','D','E','F'];
-    letters.forEach(l => {
-        for (let i = 1; i <= 6; i++) {
-            const code = `${l}${i}`;
-            const btn = document.createElement('button');
-            btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
-            btn.innerText = code;
-            btn.onclick = () => {
-                selectedCode = code;
-                document.getElementById('selected-code').innerText = code;
-                loginScreen.classList.add('hidden');
-                activityScreen.classList.remove('hidden');
-                // Cacher les autres modules
-                escaladeModule.classList.add('hidden');
-                coModule.classList.remove('hidden');
-                coModule.style.display = 'block';
-                multiModule.classList.add('hidden');
-                if (osModule) osModule.classList.add('hidden');
-                badmintonModule.classList.add('hidden');
-                import('../../modules/co/co-kiosk.js').then(module => {
-                    module.initCoKiosk(selectedClass, code);
-                }).catch(err => {
-                    console.error('Erreur CO kiosk :', err);
-                    coModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
-                });
-            };
-            codeList.appendChild(btn);
-        }
-    });
-    return;
-}
-    // Pour les autres activités (escalade, co, multi)
+        const letters = ['A','B','C','D','E','F'];
+        letters.forEach(l => {
+            for (let i = 1; i <= 6; i++) {
+                const code = `${l}${i}`;
+                const btn = document.createElement('button');
+                btn.className = "bg-blue-600 p-4 rounded-xl font-black text-white text-xl active:scale-95 transition-transform";
+                btn.innerText = code;
+                btn.onclick = () => {
+                    selectedCode = code;
+                    document.getElementById('selected-code').innerText = code;
+                    loginScreen.classList.add('hidden');
+                    activityScreen.classList.remove('hidden');
+                    escaladeModule.classList.add('hidden');
+                    coModule.classList.remove('hidden');
+                    coModule.style.display = 'block';
+                    multiModule.classList.add('hidden');
+                    if (osModule) osModule.classList.add('hidden');
+                    badmintonModule.classList.add('hidden');
+                    if (natationModule) natationModule.classList.add('hidden');
+                    import('../../modules/co/co-kiosk.js').then(module => {
+                        module.initCoKiosk(selectedClass, code);
+                    }).catch(err => {
+                        console.error('Erreur CO kiosk :', err);
+                        coModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+                    });
+                };
+                codeList.appendChild(btn);
+            }
+        });
+        return;
+    }
+
+    // Pour les autres activités (escalade, multi)
     badmintonModule.classList.add('hidden');
-    document.getElementById('code-info').classList.remove('hidden');
-    document.getElementById('btn-quit').classList.remove('hidden');
-    document.getElementById('btn-back-terrain').classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
+    codeInfo.classList.remove('hidden');
+    btnQuit.classList.remove('hidden');
+    btnBackTerrain.classList.add('hidden');
 
     const ignoreKeys = ['activite', 'matrice', 'startTime', 'endTime', 'matrix', 'nbCircuits', 'nbCouleurs'];
     Object.keys(config).forEach(key => {
@@ -385,6 +396,34 @@ function showLogin() {
 }
 
 // ============================================================
+// SPÉCIAL NATATION
+// ============================================================
+function showLoginNatation() {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+    
+    // Masquer tous les autres modules
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    
+    // Afficher le module Natation
+    if (natationModule) {
+        natationModule.classList.remove('hidden');
+        natationModule.style.display = 'block';
+        initNatationKiosk(selectedClass);
+    } else {
+        console.warn('Conteneur natation-module introuvable');
+    }
+    
+    // Masquer les éléments CO
+    masquerElementsCO();
+}
+
+// ============================================================
 // SPÉCIAL ARCATHLON
 // ============================================================
 function showLoginArcathlon() {
@@ -397,10 +436,11 @@ function showLoginArcathlon() {
     multiModule.classList.add('hidden');
     if (osModule) osModule.classList.add('hidden');
     badmintonModule.classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
 
-    document.getElementById('code-info').classList.add('hidden');
-    document.getElementById('btn-quit').classList.add('hidden');
-    document.getElementById('btn-back-terrain').classList.remove('hidden');
+    codeInfo.classList.add('hidden');
+    btnQuit.classList.add('hidden');
+    btnBackTerrain.classList.remove('hidden');
 
     let arcModule = document.getElementById('arcathlon-module');
     if (!arcModule) {
@@ -543,6 +583,7 @@ function selectCode(code) {
     multiModule.classList.add('hidden');
     if (osModule) osModule.classList.add('hidden');
     badmintonModule.classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
 
     // Dispatch selon l'activité
     if (currentConfig.activite === 'escalade') {
@@ -608,6 +649,14 @@ function selectCode(code) {
             blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
         });
     } 
+    else if (currentConfig.activite === 'natation') {
+        if (natationModule) {
+            natationModule.classList.remove('hidden');
+            natationModule.style.display = 'block';
+            masquerElementsCO();
+            initNatationKiosk(selectedClass);
+        }
+    }
     else {
         multiModule.classList.remove('hidden');
     }
@@ -639,12 +688,18 @@ export function resetToLogin() {
         osModule.style.display = 'none';
         osModule.innerHTML = '';
     }
+    if (natationModule) {
+        natationModule.style.display = 'none';
+        natationModule.innerHTML = '';
+    }
     // Nettoyer les écouteurs du kiosk
     import('../../modules/eleve/orientshow-kiosk.js').then(module => {
         if (module.cleanupOrientShowKiosk) {
             module.cleanupOrientShowKiosk();
         }
     }).catch(() => {});
+    // Réafficher les éléments CO
+    afficherElementsCO();
     // Revenir à l'écran de connexion
     showLogin();
 }
