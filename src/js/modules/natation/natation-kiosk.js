@@ -13,51 +13,8 @@ let chronoElapsed = 0;
 let rafId = null;
 let tempsFinal = null;
 
-let mode = 'liste'; // 'liste' | 'chrono' | 'saisie'
-let historiqueEssais = []; // pour stocker les essais de l'élève
-
-export function initNatationKiosk(classe) {
-    console.log('🏊 initNatationKiosk appelée pour', classe);
-    currentClasse = classe;
-    currentNumero = null;
-    tempsFinal = null;
-    mode = 'liste';
-    historiqueEssais = [];
-
-    const container = document.getElementById('natation-module');
-    if (!container) {
-        console.warn('Conteneur natation-module introuvable');
-        return;
-    }
-    container.innerHTML = '';
-    container.style.display = 'block';
-
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/config`);
-    if (configListener) configListener();
-    configListener = onValue(configRef, (snap) => {
-        config = snap.val() || {};
-        console.log('📡 Config Natation reçue :', config);
-        nbEleves = config.nbEleves || 0;
-        
-        if (nbEleves === 0) {
-            const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
-            const nums = Object.keys(mapping)
-                .filter(k => k.startsWith(`${classe}_`))
-                .map(k => parseInt(k.split('_')[1]))
-                .filter(n => !isNaN(n));
-            nbEleves = Math.max(...nums, 0);
-            console.log('🔢 nbEleves déduit du mapping :', nbEleves);
-        }
-        
-        if (nbEleves === 0) {
-            nbEleves = 28;
-            console.log('⚠️ nbEleves = 0, utilisation de la valeur par défaut : 28');
-        }
-        
-        afficherInterface();
-    });
-}
+let mode = 'liste'; // 'liste' | 'chrono' | 'saisie' | 'feedback'
+let historiqueEssais = [];
 
 // ============================================================
 // EXPOSITION DES FONCTIONS GLOBALES (pour les onclick)
@@ -68,7 +25,6 @@ window.natationChoisirNumero = function(num) {
         console.warn('Numéro invalide :', num);
         return;
     }
-    // Réinitialiser tout
     if (chronoRunning) {
         chronoRunning = false;
         if (rafId) cancelAnimationFrame(rafId);
@@ -77,7 +33,6 @@ window.natationChoisirNumero = function(num) {
     tempsFinal = null;
     chronoElapsed = 0;
     mode = 'chrono';
-    console.log('🔄 Mode changé en "chrono" pour le numéro', num);
     afficherInterface();
 };
 
@@ -99,7 +54,6 @@ window.natationDemarrer = function() {
         return;
     }
     if (chronoRunning) return;
-    console.log('▶️ Démarrer le chrono pour', currentNumero);
     chronoRunning = true;
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
@@ -112,7 +66,6 @@ window.natationDemarrer = function() {
 
 window.natationArreter = function() {
     if (!chronoRunning) return;
-    console.log('⏹️ Arrêter le chrono pour', currentNumero);
     chronoRunning = false;
     if (rafId) cancelAnimationFrame(rafId);
     tempsFinal = chronoElapsed;
@@ -121,7 +74,6 @@ window.natationArreter = function() {
 };
 
 window.natationValiderTemps = function() {
-    console.log('✅ Validation du temps, passage à la saisie des coups');
     if (mode !== 'saisie') {
         mode = 'saisie';
         afficherInterface();
@@ -129,7 +81,6 @@ window.natationValiderTemps = function() {
 };
 
 window.natationRecommencer = function() {
-    console.log('↺ Recommencer le chrono');
     chronoElapsed = 0;
     tempsFinal = null;
     mode = 'chrono';
@@ -143,7 +94,6 @@ window.natationAdjustCoups = function(delta) {
     val = Math.max(1, val + delta);
     display.textContent = val;
     window._coupsSaisis = val;
-    console.log('✋ Coups ajustés à', val);
 };
 
 window.natationValiderCoups = function() {
@@ -152,20 +102,30 @@ window.natationValiderCoups = function() {
         alert('Veuillez saisir au moins 1 coup de bras.');
         return;
     }
-    console.log('💾 Enregistrement : temps =', tempsFinal, 'ms, coups =', nbCoups);
     enregistrerTempsEtCoups(tempsFinal, nbCoups);
-    // Afficher le feedback (indice, niveau)
-    afficherFeedback(tempsFinal, nbCoups);
 };
 
 window.natationAnnulerCoups = function() {
-    console.log('❌ Annulation de la saisie des coups, retour au chrono');
     mode = 'chrono';
     afficherInterface();
 };
 
+window.natationNouvelEssai = function() {
+    tempsFinal = null;
+    chronoElapsed = 0;
+    mode = 'chrono';
+    afficherInterface();
+};
+
+window.natationChangerEleve = function() {
+    currentNumero = null;
+    tempsFinal = null;
+    chronoElapsed = 0;
+    mode = 'liste';
+    afficherInterface();
+};
+
 window.retourMenuNatation = function() {
-    console.log('⬅️ Retour au menu principal');
     if (configListener) configListener();
     const container = document.getElementById('natation-module');
     if (container) {
@@ -180,21 +140,64 @@ window.retourMenuNatation = function() {
 };
 
 // ============================================================
+// INITIALISATION
+// ============================================================
+export function initNatationKiosk(classe) {
+    console.log('🏊 initNatationKiosk appelée pour', classe);
+    currentClasse = classe;
+    currentNumero = null;
+    tempsFinal = null;
+    mode = 'liste';
+    historiqueEssais = [];
+
+    const container = document.getElementById('natation-module');
+    if (!container) {
+        console.warn('Conteneur natation-module introuvable');
+        return;
+    }
+    container.innerHTML = '';
+    container.style.display = 'block';
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/config`);
+    if (configListener) configListener();
+    configListener = onValue(configRef, (snap) => {
+        config = snap.val() || {};
+        nbEleves = config.nbEleves || 0;
+        if (nbEleves === 0) {
+            const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
+            const nums = Object.keys(mapping)
+                .filter(k => k.startsWith(`${classe}_`))
+                .map(k => parseInt(k.split('_')[1]))
+                .filter(n => !isNaN(n));
+            nbEleves = Math.max(...nums, 0);
+        }
+        if (nbEleves === 0) nbEleves = 28;
+        afficherInterface();
+    });
+}
+
+// ============================================================
 // AFFICHAGE PRINCIPAL
 // ============================================================
 function afficherInterface() {
     const container = document.getElementById('natation-module');
     if (!container) return;
-    console.log('🔄 afficherInterface() appelée, mode =', mode);
+    console.log('🔄 afficherInterface() mode =', mode);
 
-    if (mode === 'liste') {
-        afficherListeNumeros(container);
-    } else if (mode === 'chrono') {
-        afficherChrono(container);
-    } else if (mode === 'saisie') {
-        afficherSaisieCoups(container);
-    } else if (mode === 'feedback') {
-        afficherFeedback(container);
+    if (mode === 'liste') afficherListeNumeros(container);
+    else if (mode === 'chrono') afficherChrono(container);
+    else if (mode === 'saisie') afficherSaisieCoups(container);
+    else if (mode === 'feedback') {
+        // On utilise la même fonction de feedback, mais elle sera appelée après enregistrement
+        // On passe les données via les variables globales
+        if (tempsFinal !== null && window._dernierNbCoups) {
+            afficherFeedback(container, tempsFinal, window._dernierNbCoups);
+        } else {
+            // fallback
+            mode = 'liste';
+            afficherListeNumeros(container);
+        }
     }
 }
 
@@ -205,33 +208,6 @@ function afficherListeNumeros(container) {
     const distance = config?.distance || 25;
     const nums = [];
     for (let i = 1; i <= nbEleves; i++) nums.push(i);
-
-    // Récupérer les temps pour colorer les numéros
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
-    let tempsData = {};
-    onValue(tempsRef, (snap) => {
-        tempsData = snap.val() || {};
-        // On ne réaffiche que si on est encore en mode liste
-        if (mode === 'liste') {
-            // Rafraîchir l'affichage avec les couleurs
-            const buttons = container.querySelectorAll('.num-btn');
-            buttons.forEach(btn => {
-                const num = parseInt(btn.dataset.numero);
-                const eleveId = getEleveIdFromNumero(num);
-                const temps = eleveId ? tempsData[eleveId] : null;
-                if (temps && temps > 0) {
-                    btn.classList.remove('bg-gradient-to-br', 'from-blue-600', 'to-blue-700', 'border-blue-400');
-                    btn.classList.add('bg-gradient-to-br', 'from-emerald-600', 'to-emerald-700', 'border-emerald-400');
-                    btn.innerHTML = `${num} ✅`;
-                } else {
-                    btn.classList.remove('bg-gradient-to-br', 'from-emerald-600', 'to-emerald-700', 'border-emerald-400');
-                    btn.classList.add('bg-gradient-to-br', 'from-blue-600', 'to-blue-700', 'border-blue-400');
-                    btn.innerHTML = `${num}`;
-                }
-            });
-        }
-    }, { onlyOnce: false });
 
     let html = `
         <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 text-center max-w-4xl mx-auto">
@@ -265,7 +241,28 @@ function afficherListeNumeros(container) {
     `;
 
     container.innerHTML = html;
-    console.log('✅ Liste des numéros affichée, nbEleves =', nbEleves);
+
+    // Mettre à jour les couleurs avec les temps existants
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
+    onValue(tempsRef, (snap) => {
+        const tempsData = snap.val() || {};
+        const buttons = container.querySelectorAll('.num-btn');
+        buttons.forEach(btn => {
+            const num = parseInt(btn.dataset.numero);
+            const eleveId = getEleveIdFromNumero(num);
+            const temps = eleveId ? tempsData[eleveId] : null;
+            if (temps && temps > 0) {
+                btn.classList.remove('from-blue-600', 'to-blue-700', 'border-blue-400');
+                btn.classList.add('from-emerald-600', 'to-emerald-700', 'border-emerald-400');
+                btn.innerHTML = `${num} ✅`;
+            } else {
+                btn.classList.remove('from-emerald-600', 'to-emerald-700', 'border-emerald-400');
+                btn.classList.add('from-blue-600', 'to-blue-700', 'border-blue-400');
+                btn.innerHTML = `${num}`;
+            }
+        });
+    }, { onlyOnce: false });
 }
 
 // ============================================================
@@ -273,13 +270,9 @@ function afficherListeNumeros(container) {
 // ============================================================
 function afficherChrono(container) {
     const distance = config?.distance || 25;
-
     let tempsAffiche = '00:00.0';
-    if (tempsFinal !== null) {
-        tempsAffiche = formatTime(tempsFinal);
-    } else if (chronoRunning) {
-        tempsAffiche = formatTime(chronoElapsed);
-    }
+    if (tempsFinal !== null) tempsAffiche = formatTime(tempsFinal);
+    else if (chronoRunning) tempsAffiche = formatTime(chronoElapsed);
 
     container.innerHTML = `
         <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
@@ -326,7 +319,6 @@ function afficherChrono(container) {
             </button>
         </div>
     `;
-    console.log('⏱️ Chrono affiché pour le numéro', currentNumero);
 }
 
 // ============================================================
@@ -334,7 +326,6 @@ function afficherChrono(container) {
 // ============================================================
 function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
-    // Initialiser le compteur à 25
     window._coupsSaisis = 25;
     container.innerHTML = `
         <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
@@ -372,7 +363,6 @@ function afficherSaisieCoups(container) {
             </button>
         </div>
     `;
-    console.log('✋ Saisie des coups pour le numéro', currentNumero);
 }
 
 // ============================================================
@@ -385,10 +375,9 @@ function afficherFeedback(container, tempsMs, nbCoups) {
 
     // Ajouter l'essai à l'historique
     historiqueEssais.push({ tempsMs, nbCoups, indice, timestamp: Date.now() });
-    // Garder seulement les 5 derniers
     if (historiqueEssais.length > 5) historiqueEssais.shift();
 
-    // Générer le graphique de progression (barres verticales)
+    // Graphique de progression
     let graphHtml = '';
     if (historiqueEssais.length > 0) {
         const maxIndice = Math.max(...historiqueEssais.map(e => e.indice), 1);
@@ -450,28 +439,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
             </button>
         </div>
     `;
-    console.log('📊 Feedback affiché pour le numéro', currentNumero);
 }
-
-// ============================================================
-// NOUVELLES ACTIONS POUR LE FEEDBACK
-// ============================================================
-window.natationNouvelEssai = function() {
-    console.log('🔄 Nouvel essai pour le même élève');
-    tempsFinal = null;
-    chronoElapsed = 0;
-    mode = 'chrono';
-    afficherInterface();
-};
-
-window.natationChangerEleve = function() {
-    console.log('👤 Changer d\'élève');
-    currentNumero = null;
-    tempsFinal = null;
-    chronoElapsed = 0;
-    mode = 'liste';
-    afficherInterface();
-};
 
 // ============================================================
 // FONCTIONS UTILITAIRES
@@ -492,15 +460,12 @@ function calculIndice(tempsMs, nbCoups) {
 }
 
 function getNiveau(indice) {
-    if (indice === null || indice === undefined || isNaN(indice)) {
-        return { couleur: '#64748b', label: '--' };
-    }
-    // Seuils personnalisables (on pourrait les récupérer du localStorage)
-    if (indice >= 4.0) return { couleur: '#eab308', label: '🌟 Excellent' }; // Or
-    if (indice >= 3.5) return { couleur: '#3b82f6', label: '💪 Très bon' }; // Bleu
-    if (indice >= 3.0) return { couleur: '#22c55e', label: '✅ Satisfaisant' }; // Vert
-    if (indice >= 2.5) return { couleur: '#eab308', label: '🟡 Fragile' }; // Jaune
-    return { couleur: '#ef4444', label: '🔴 À besoins' }; // Rouge
+    if (indice === null || isNaN(indice)) return { couleur: '#64748b', label: '--' };
+    if (indice >= 4.0) return { couleur: '#eab308', label: '🌟 Excellent' };
+    if (indice >= 3.5) return { couleur: '#3b82f6', label: '💪 Très bon' };
+    if (indice >= 3.0) return { couleur: '#22c55e', label: '✅ Satisfaisant' };
+    if (indice >= 2.5) return { couleur: '#eab308', label: '🟡 Fragile' };
+    return { couleur: '#ef4444', label: '🔴 À besoins' };
 }
 
 function formatTime(ms) {
@@ -515,9 +480,7 @@ function updateChrono() {
     if (!chronoRunning) return;
     chronoElapsed = performance.now() - chronoStart;
     const display = document.getElementById('natation-chrono-display');
-    if (display) {
-        display.textContent = formatTime(chronoElapsed);
-    }
+    if (display) display.textContent = formatTime(chronoElapsed);
     rafId = requestAnimationFrame(updateChrono);
 }
 
@@ -525,10 +488,7 @@ function updateChrono() {
 // ENREGISTREMENT FIREBASE
 // ============================================================
 function enregistrerTempsEtCoups(tempsMs, nbCoups) {
-    if (currentNumero === null) {
-        console.warn('Aucun numéro sélectionné');
-        return;
-    }
+    if (currentNumero === null) return;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
     const eleveId = mapping[`${currentClasse}_${currentNumero}`];
@@ -545,7 +505,7 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         set(coupsRef, nbCoups)
     ]).then(() => {
         console.log('✅ Temps et coups enregistrés pour', eleveId);
-        // Passer en mode feedback
+        window._dernierNbCoups = nbCoups;
         mode = 'feedback';
         const container = document.getElementById('natation-module');
         if (container) afficherFeedback(container, tempsMs, nbCoups);
@@ -553,80 +513,4 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         console.error('Erreur enregistrement :', err);
         alert('Erreur lors de l\'enregistrement. Réessayez.');
     });
-}
-
-// ============================================================
-// FEEDBACK - affichage direct (appelé après enregistrement)
-// ============================================================
-function afficherFeedback(container, tempsMs, nbCoups) {
-    // Cette fonction est appelée après enregistrement, elle utilise les données passées
-    const indice = calculIndice(tempsMs, nbCoups);
-    const niveau = getNiveau(indice);
-    const tempsStr = formatTime(tempsMs);
-
-    // Ajouter l'essai à l'historique
-    historiqueEssais.push({ tempsMs, nbCoups, indice, timestamp: Date.now() });
-    if (historiqueEssais.length > 5) historiqueEssais.shift();
-
-    let graphHtml = '';
-    if (historiqueEssais.length > 0) {
-        const maxIndice = Math.max(...historiqueEssais.map(e => e.indice), 1);
-        graphHtml = `
-            <div class="flex items-end justify-center gap-3 h-32 mt-4">
-                ${historiqueEssais.map((essai, idx) => {
-                    const hauteur = Math.max(10, (essai.indice / maxIndice) * 80);
-                    const couleur = getNiveau(essai.indice).couleur;
-                    return `
-                        <div class="flex flex-col items-center">
-                            <div class="w-8 rounded-t-lg" style="height:${hauteur}px; background-color:${couleur};"></div>
-                            <span class="text-xs text-slate-400 mt-1">${idx+1}</span>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-            <p class="text-xs text-slate-500 mt-2">Évolution de l'indice (essais successifs)</p>
-        `;
-    }
-
-    container.innerHTML = `
-        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
-            <div class="flex items-center justify-center gap-6 mb-4">
-                <span class="text-2xl font-black text-slate-400">N°</span>
-                <span class="text-6xl font-black text-yellow-400">${currentNumero}</span>
-            </div>
-            
-            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-600 mb-4">
-                <p class="text-sm text-slate-400">Temps</p>
-                <p class="text-3xl font-black text-yellow-400">${tempsStr}</p>
-                <p class="text-sm text-slate-400 mt-2">Coups de bras</p>
-                <p class="text-3xl font-black text-blue-400">${nbCoups}</p>
-            </div>
-
-            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-600 mb-4">
-                <p class="text-sm text-slate-400">Indice de nage</p>
-                <p class="text-5xl font-black text-yellow-400">${indice.toFixed(2)}</p>
-                <p class="text-sm font-bold mt-2" style="color: ${niveau.couleur}">
-                    ${niveau.label}
-                </p>
-            </div>
-
-            ${graphHtml}
-
-            <div class="flex gap-4 justify-center mt-6">
-                <button onclick="window.natationNouvelEssai()" 
-                        class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
-                    🔄 Nouvel essai
-                </button>
-                <button onclick="window.natationChangerEleve()" 
-                        class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
-                    👤 Changer d'élève
-                </button>
-            </div>
-
-            <button onclick="window.natationRetourListe()" 
-                    class="mt-4 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
-                ← Retour à la liste
-            </button>
-        </div>
-    `;
 }
