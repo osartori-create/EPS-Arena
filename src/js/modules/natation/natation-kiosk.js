@@ -15,6 +15,7 @@ let tempsFinal = null;
 
 let mode = 'liste'; // 'liste' | 'chrono' | 'saisie' | 'feedback'
 let historiqueEssais = [];
+let eleveIdCourant = null;
 
 // ============================================================
 // EXPOSITION DES FONCTIONS GLOBALES (pour les onclick)
@@ -32,8 +33,21 @@ window.natationChoisirNumero = function(num) {
     currentNumero = num;
     tempsFinal = null;
     chronoElapsed = 0;
-    mode = 'chrono';
-    afficherInterface();
+    
+    // Charger l'historique de l'élève depuis Firebase
+    const eleveId = getEleveIdFromNumero(num);
+    if (eleveId) {
+        eleveIdCourant = eleveId;
+        chargerHistoriqueEleve(eleveId, () => {
+            mode = 'chrono';
+            afficherInterface();
+        });
+    } else {
+        eleveIdCourant = null;
+        historiqueEssais = [];
+        mode = 'chrono';
+        afficherInterface();
+    }
 };
 
 window.natationRetourListe = function() {
@@ -119,6 +133,8 @@ window.natationNouvelEssai = function() {
 
 window.natationChangerEleve = function() {
     currentNumero = null;
+    eleveIdCourant = null;
+    historiqueEssais = [];
     tempsFinal = null;
     chronoElapsed = 0;
     mode = 'liste';
@@ -146,9 +162,10 @@ export function initNatationKiosk(classe) {
     console.log('🏊 initNatationKiosk appelée pour', classe);
     currentClasse = classe;
     currentNumero = null;
+    eleveIdCourant = null;
+    historiqueEssais = [];
     tempsFinal = null;
     mode = 'liste';
-    historiqueEssais = [];
 
     const container = document.getElementById('natation-module');
     if (!container) {
@@ -199,7 +216,7 @@ function afficherInterface() {
 }
 
 // ============================================================
-// 1. LISTE DES NUMÉROS
+// 1. LISTE DES NUMÉROS (version iPad : grands boutons)
 // ============================================================
 function afficherListeNumeros(container) {
     const distance = config?.distance || 25;
@@ -207,20 +224,21 @@ function afficherListeNumeros(container) {
     for (let i = 1; i <= nbEleves; i++) nums.push(i);
 
     let html = `
-        <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 text-center max-w-4xl mx-auto">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-3xl font-black text-white">🏊 Indice de nage</h2>
-                <span class="text-sm text-slate-400">${distance}m</span>
+        <div class="bg-slate-800 p-4 rounded-3xl border border-slate-700 text-center max-w-5xl mx-auto">
+            <div class="flex justify-between items-center mb-4 px-2">
+                <h2 class="text-4xl font-black text-white">🏊 Indice de nage</h2>
+                <span class="text-xl text-slate-400">${distance}m</span>
             </div>
-            <p class="text-sm text-slate-400 mb-6">Choisis ton numéro</p>
-            <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-4 max-w-3xl mx-auto" id="num-grid">
+            <p class="text-lg text-slate-400 mb-6">Choisis ton numéro</p>
+            <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-4 max-w-4xl mx-auto" id="num-grid">
     `;
 
     nums.forEach(num => {
         html += `
             <button class="num-btn bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 
-                           p-6 rounded-2xl font-black text-4xl text-white border-2 border-blue-400 
-                           active:scale-95 transition-all shadow-lg hover:scale-105 hover:shadow-2xl"
+                           rounded-2xl font-black text-white border-2 border-blue-400 
+                           active:scale-95 transition-all shadow-lg hover:scale-105 hover:shadow-2xl
+                           w-full aspect-square text-6xl flex items-center justify-center"
                     data-numero="${num}"
                     onclick="window.natationChoisirNumero(${num})">
                 ${num}
@@ -231,7 +249,7 @@ function afficherListeNumeros(container) {
     html += `
             </div>
             <button onclick="window.retourMenuNatation()" 
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-4 rounded-xl font-black text-xl text-white active:scale-95 transition-all">
                 ← Retour
             </button>
         </div>
@@ -263,7 +281,7 @@ function afficherListeNumeros(container) {
 }
 
 // ============================================================
-// 2. CHRONO
+// 2. CHRONO (adapté iPad)
 // ============================================================
 function afficherChrono(container) {
     const distance = config?.distance || 25;
@@ -272,46 +290,46 @@ function afficherChrono(container) {
     else if (chronoRunning) tempsAffiche = formatTime(chronoElapsed);
 
     container.innerHTML = `
-        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
-            <div class="flex items-center justify-center gap-6 mb-6">
-                <span class="text-2xl font-black text-slate-400">N°</span>
-                <span class="text-7xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-2xl mx-auto">
+            <div class="flex items-center justify-center gap-8 mb-6">
+                <span class="text-3xl font-black text-slate-400">N°</span>
+                <span class="text-8xl font-black text-yellow-400">${currentNumero}</span>
             </div>
-            <p class="text-sm text-slate-400 mb-4">${distance}m - Départ dans l'eau</p>
+            <p class="text-xl text-slate-400 mb-4">${distance}m - Départ dans l'eau</p>
 
-            <div class="text-8xl font-black tabular-nums text-yellow-400 mb-8" id="natation-chrono-display">
+            <div class="text-9xl font-black tabular-nums text-yellow-400 mb-8" id="natation-chrono-display">
                 ${tempsAffiche}
             </div>
 
-            <div class="flex gap-4 justify-center">
+            <div class="flex gap-6 justify-center">
                 <button id="natation-start-btn" 
-                        class="bg-emerald-600 hover:bg-emerald-500 px-10 py-5 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all ${chronoRunning ? 'hidden' : ''}"
+                        class="bg-emerald-600 hover:bg-emerald-500 px-12 py-6 rounded-3xl font-black text-3xl text-white active:scale-95 transition-all ${chronoRunning ? 'hidden' : ''}"
                         onclick="window.natationDemarrer()"
                         ${tempsFinal !== null ? 'disabled' : ''}>
                     ▶ Démarrer
                 </button>
                 <button id="natation-stop-btn" 
-                        class="bg-red-600 hover:bg-red-500 px-10 py-5 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all ${chronoRunning ? '' : 'hidden'}"
+                        class="bg-red-600 hover:bg-red-500 px-12 py-6 rounded-3xl font-black text-3xl text-white active:scale-95 transition-all ${chronoRunning ? '' : 'hidden'}"
                         onclick="window.natationArreter()">
                     ⏹ Arrêter
                 </button>
             </div>
 
             ${tempsFinal !== null ? `
-                <div class="mt-6 flex gap-4 justify-center">
+                <div class="mt-6 flex gap-6 justify-center">
                     <button onclick="window.natationValiderTemps()" 
-                            class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                            class="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
                         ✅ Valider
                     </button>
                     <button onclick="window.natationRecommencer()" 
-                            class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                            class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
                         ↺ Recommencer
                     </button>
                 </div>
             ` : ''}
 
             <button onclick="window.natationRetourListe()" 
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all">
                 ← Retour à la liste
             </button>
         </div>
@@ -319,43 +337,43 @@ function afficherChrono(container) {
 }
 
 // ============================================================
-// 3. SAISIE DES COUPS DE BRAS (démarre à 25)
+// 3. SAISIE DES COUPS DE BRAS (démarre à 25) – adapté iPad
 // ============================================================
 function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
     window._coupsSaisis = 25;
     container.innerHTML = `
-        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
-            <div class="flex items-center justify-center gap-6 mb-6">
-                <span class="text-2xl font-black text-slate-400">N°</span>
-                <span class="text-7xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-2xl mx-auto">
+            <div class="flex items-center justify-center gap-8 mb-6">
+                <span class="text-3xl font-black text-slate-400">N°</span>
+                <span class="text-8xl font-black text-yellow-400">${currentNumero}</span>
             </div>
-            <p class="text-sm text-slate-400 mb-2">Temps enregistré</p>
-            <div class="text-5xl font-black text-yellow-400 mb-6">${tempsStr}</div>
+            <p class="text-xl text-slate-400 mb-2">Temps enregistré</p>
+            <div class="text-6xl font-black text-yellow-400 mb-6">${tempsStr}</div>
             
-            <p class="text-lg font-bold text-white mb-4">Combien de coups de bras ?</p>
-            <div class="flex justify-center items-center gap-6 mb-6">
+            <p class="text-2xl font-bold text-white mb-4">Combien de coups de bras ?</p>
+            <div class="flex justify-center items-center gap-8 mb-6">
                 <button onclick="window.natationAdjustCoups(-1)" 
-                        class="bg-slate-700 hover:bg-slate-600 w-20 h-20 rounded-2xl text-4xl font-black text-white active:scale-95 transition-all">−</button>
-                <span id="natation-coups-display" class="text-7xl font-black text-white w-32 text-center">25</span>
+                        class="bg-slate-700 hover:bg-slate-600 w-24 h-24 rounded-3xl text-5xl font-black text-white active:scale-95 transition-all">−</button>
+                <span id="natation-coups-display" class="text-8xl font-black text-white w-40 text-center">25</span>
                 <button onclick="window.natationAdjustCoups(1)" 
-                        class="bg-slate-700 hover:bg-slate-600 w-20 h-20 rounded-2xl text-4xl font-black text-white active:scale-95 transition-all">+</button>
+                        class="bg-slate-700 hover:bg-slate-600 w-24 h-24 rounded-3xl text-5xl font-black text-white active:scale-95 transition-all">+</button>
             </div>
-            <p class="text-xs text-slate-500 mb-6">(1 cycle = 2 coups de bras)</p>
+            <p class="text-base text-slate-500 mb-6">(1 cycle = 2 coups de bras)</p>
 
-            <div class="flex gap-4 justify-center">
+            <div class="flex gap-6 justify-center">
                 <button onclick="window.natationValiderCoups()" 
-                        class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                        class="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
                     ✅ Enregistrer
                 </button>
                 <button onclick="window.natationAnnulerCoups()" 
-                        class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                        class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
                     Annuler
                 </button>
             </div>
 
             <button onclick="window.natationRetourListe()" 
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all">
                 ← Retour à la liste
             </button>
         </div>
@@ -363,13 +381,12 @@ function afficherSaisieCoups(container) {
 }
 
 // ============================================================
-// 4. FONCTIONS DE BARÈME (CORRIGÉES AVEC ARRONDI)
+// 4. FONCTIONS DE BARÈME (avec arrondi)
 // ============================================================
 function getNiveau(indice) {
     if (indice === null || isNaN(indice)) {
         return { couleur: '#64748b', label: '--' };
     }
-    // Arrondir à 2 décimales pour éviter les problèmes de précision
     const rounded = Math.round(indice * 100) / 100;
     
     if (rounded >= 4.0) return { couleur: '#22c55e', label: '🌟 Excellent' };
@@ -381,7 +398,6 @@ function getNiveau(indice) {
 
 function getMessageEncouragement(indice) {
     if (indice === null || isNaN(indice)) return null;
-    // Arrondir à 2 décimales
     const rounded = Math.round(indice * 100) / 100;
     
     if (rounded >= 4.0) return '🏆 Excellent ! Tu maîtrises parfaitement ta nage !';
@@ -404,91 +420,91 @@ function getMessageEncouragement(indice) {
 }
 
 // ============================================================
-// 5. FEEDBACK (avec barème corrigé)
+// 5. FEEDBACK (avec historique partagé et design iPad)
 // ============================================================
 function afficherFeedback(container, tempsMs, nbCoups) {
     const indice = calculIndice(tempsMs, nbCoups);
     const niveau = getNiveau(indice);
     const tempsStr = formatTime(tempsMs);
 
-    // Ajouter l'essai à l'historique
-    historiqueEssais.push({ tempsMs, nbCoups, indice, timestamp: Date.now() });
-    if (historiqueEssais.length > 5) historiqueEssais.shift();
+    // Ajouter l'essai à l'historique (déjà fait dans enregistrerTempsEtCoups, on recharge)
+    // On utilise historiqueEssais qui a été rechargé depuis Firebase
 
-    // Meilleur indice
-    const meilleurIndice = Math.max(...historiqueEssais.map(e => e.indice), 0);
-
-    // Message d'encouragement
+    const meilleurIndice = historiqueEssais.length > 0 ? Math.max(...historiqueEssais.map(e => e.indice)) : 0;
     const messageEncouragement = getMessageEncouragement(indice);
 
-    // Graphique de progression
+    // Graphique
     let graphHtml = '';
     if (historiqueEssais.length > 0) {
         const maxIndice = Math.max(...historiqueEssais.map(e => e.indice), 1);
         graphHtml = `
-            <div class="flex items-end justify-center gap-3 h-32 mt-4">
+            <div class="flex items-end justify-center gap-3 h-40 mt-4">
                 ${historiqueEssais.map((essai, idx) => {
                     const hauteur = Math.max(10, (essai.indice / maxIndice) * 80);
                     const couleur = getNiveau(essai.indice).couleur;
                     return `
                         <div class="flex flex-col items-center">
-                            <div class="w-8 rounded-t-lg" style="height:${hauteur}px; background-color:${couleur};"></div>
-                            <span class="text-xs text-slate-400 mt-1">${idx+1}</span>
+                            <div class="w-10 rounded-t-lg" style="height:${hauteur}px; background-color:${couleur};"></div>
+                            <span class="text-base text-slate-400 mt-1">${idx+1}</span>
                         </div>
                     `;
                 }).join('')}
             </div>
-            <p class="text-xs text-slate-500 mt-2">Évolution de l'indice (essais successifs)</p>
+            <p class="text-base text-slate-500 mt-2">Évolution de l'indice (essais successifs)</p>
         `;
     }
 
     let html = `
-        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
-            <div class="flex items-center justify-center gap-6 mb-4">
-                <span class="text-2xl font-black text-slate-400">N°</span>
-                <span class="text-6xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-2xl mx-auto">
+            <div class="flex items-center justify-center gap-8 mb-4">
+                <span class="text-3xl font-black text-slate-400">N°</span>
+                <span class="text-8xl font-black text-yellow-400">${currentNumero}</span>
             </div>
             
-            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-600 mb-4">
-                <p class="text-sm text-slate-400">Temps</p>
-                <p class="text-3xl font-black text-yellow-400">${tempsStr}</p>
-                <p class="text-sm text-slate-400 mt-2">Coups de bras</p>
-                <p class="text-3xl font-black text-blue-400">${nbCoups}</p>
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-600 mb-4 grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-lg text-slate-400">Temps</p>
+                    <p class="text-5xl font-black text-yellow-400">${tempsStr}</p>
+                </div>
+                <div>
+                    <p class="text-lg text-slate-400">Coups de bras</p>
+                    <p class="text-5xl font-black text-blue-400">${nbCoups}</p>
+                </div>
             </div>
 
-            <div class="bg-slate-900 p-4 rounded-2xl border border-slate-600 mb-4">
-                <p class="text-sm text-slate-400">Indice de nage</p>
-                <p class="text-5xl font-black text-yellow-400">${indice.toFixed(2)}</p>
-                <p class="text-sm font-bold mt-2" style="color: ${niveau.couleur}">
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-600 mb-4">
+                <p class="text-lg text-slate-400">Indice de nage</p>
+                <p class="text-7xl font-black text-yellow-400">${indice.toFixed(2)}</p>
+                <p class="text-2xl font-bold mt-2" style="color: ${niveau.couleur}">
                     ${niveau.label}
                 </p>
                 ${historiqueEssais.length > 1 ? `
-                    <div class="mt-1 text-sm text-slate-400">
+                    <div class="mt-2 text-lg text-slate-400">
                         🏅 Meilleur : <span class="text-yellow-400 font-bold">${meilleurIndice.toFixed(2)}</span>
                     </div>
                 ` : ''}
                 ${messageEncouragement ? `
-                    <div class="mt-3 p-2 bg-slate-700/50 rounded-xl border border-slate-600">
-                        <p class="text-sm text-yellow-400 font-bold">${messageEncouragement}</p>
+                    <div class="mt-4 p-3 bg-slate-700/50 rounded-xl border border-slate-600">
+                        <p class="text-lg text-yellow-400 font-bold">${messageEncouragement}</p>
                     </div>
                 ` : ''}
             </div>
 
             ${graphHtml}
 
-            <div class="flex gap-4 justify-center mt-6">
+            <div class="flex gap-6 justify-center mt-6">
                 <button onclick="window.natationNouvelEssai()" 
-                        class="bg-blue-600 hover:bg-blue-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                        class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
                     🔄 Nouvel essai
                 </button>
                 <button onclick="window.natationChangerEleve()" 
-                        class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                        class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
                     👤 Changer d'élève
                 </button>
             </div>
 
             <button onclick="window.natationRetourListe()" 
-                    class="mt-4 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all">
                 ← Retour à la liste
             </button>
         </div>
@@ -498,7 +514,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
 }
 
 // ============================================================
-// FONCTIONS UTILITAIRES
+// FONCTIONS UTILITAIRES & HISTORIQUE
 // ============================================================
 function getEleveIdFromNumero(num) {
     const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
@@ -532,7 +548,28 @@ function updateChrono() {
 }
 
 // ============================================================
-// ENREGISTREMENT FIREBASE
+// CHARGEMENT DE L'HISTORIQUE DEPUIS FIREBASE
+// ============================================================
+function chargerHistoriqueEleve(eleveId, callback) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${eleveId}`);
+    
+    onValue(historiqueRef, (snap) => {
+        const data = snap.val() || [];
+        historiqueEssais = data.map(e => ({
+            tempsMs: e.tempsMs,
+            nbCoups: e.nbCoups,
+            indice: e.indice,
+            timestamp: e.timestamp
+        }));
+        // Trier par timestamp croissant pour le graphique
+        historiqueEssais.sort((a, b) => a.timestamp - b.timestamp);
+        if (callback) callback();
+    }, { onlyOnce: true });
+}
+
+// ============================================================
+// ENREGISTREMENT FIREBASE (temps + coups + historique)
 // ============================================================
 function enregistrerTempsEtCoups(tempsMs, nbCoups) {
     if (currentNumero === null) return;
@@ -544,20 +581,45 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         return;
     }
 
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
+    const indice = calculIndice(tempsMs, nbCoups);
+    const nouvelEssai = {
+        tempsMs,
+        nbCoups,
+        indice,
+        timestamp: Date.now()
+    };
 
-    Promise.all([
-        set(tempsRef, tempsMs),
-        set(coupsRef, nbCoups)
-    ]).then(() => {
-        console.log('✅ Temps et coups enregistrés pour', eleveId);
-        window._dernierNbCoups = nbCoups;
-        mode = 'feedback';
-        const container = document.getElementById('natation-module');
-        if (container) afficherFeedback(container, tempsMs, nbCoups);
-    }).catch(err => {
-        console.error('Erreur enregistrement :', err);
-        alert('Erreur lors de l\'enregistrement. Réessayez.');
-    });
+    // Récupérer l'historique existant, ajouter le nouvel essai, et réenregistrer
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${eleveId}`);
+    
+    onValue(historiqueRef, (snap) => {
+        const historique = snap.val() || [];
+        historique.push(nouvelEssai);
+        // Garder les 10 derniers essais
+        if (historique.length > 10) historique.shift();
+        
+        // Enregistrer l'historique
+        set(historiqueRef, historique);
+        
+        // Enregistrer le dernier temps et coups (pour l'affichage principal)
+        const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
+        const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
+        
+        Promise.all([
+            set(tempsRef, tempsMs),
+            set(coupsRef, nbCoups)
+        ]).then(() => {
+            console.log('✅ Temps, coups et historique enregistrés pour', eleveId);
+            window._dernierNbCoups = nbCoups;
+            // Recharger l'historique depuis Firebase pour l'affichage
+            chargerHistoriqueEleve(eleveId, () => {
+                mode = 'feedback';
+                const container = document.getElementById('natation-module');
+                if (container) afficherFeedback(container, tempsMs, nbCoups);
+            });
+        }).catch(err => {
+            console.error('Erreur enregistrement :', err);
+            alert('Erreur lors de l\'enregistrement. Réessayez.');
+        });
+    }, { onlyOnce: true });
 }
