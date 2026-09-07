@@ -484,26 +484,61 @@ export async function transmettreNatationConfig() {
 // ============================================================
 // EXPORT / IMPORT JSON
 // ============================================================
-export function exportNatationConfig() {
+function exportNatationIDoceo() {
     const classe = currentClasse || getCurrentClasse();
-    if (!classe) return alert('Sélectionnez une classe.');
-    const distance = document.getElementById('natation-distance')?.value || '25';
-    const data = {
-        version: 2,
-        classe,
-        activite: 'natation',
-        distance: parseInt(distance, 10),
-        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
-        temps: tempsData,
-        coups: coupsData,
-        bareme: getBareme()
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${classe}_natation_${data.date}.json`;
-    a.click();
+    if (!classe) {
+        alert('Sélectionnez une classe.');
+        return;
+    }
+    
+    const eleves = elevesData.filter(e => e.numero !== undefined);
+    if (eleves.length === 0) {
+        alert('Aucun élève dans cette classe.');
+        return;
+    }
+    
+    // Construire les données
+    const rows = eleves.map(e => {
+        const temps = tempsData[e.id] || null;
+        const coups = coupsData[e.id] || null;
+        const indice = calculIndice(temps, coups);
+        const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
+        
+        return {
+            numero: e.numero,
+            nom: e.nom,
+            prenom: e.prenom,
+            temps: temps !== null ? (temps / 1000).toFixed(1) : '',
+            coups: coups !== null ? coups : '',
+            indice: indice !== null ? indice.toFixed(2) : '',
+            niveau: niveau.label
+        };
+    });
+    
+    // Trier par numéro
+    rows.sort((a, b) => a.numero - b.numero);
+    
+    // Générer le CSV avec BOM UTF-8 (compatible iDoceo)
+    let csv = '\uFEFF"!groupe";"Nom";"Prénom";"Temps (s)";"Coups de bras";"Indice";"Niveau"\n';
+    rows.forEach(r => {
+        csv += `"${r.numero}";"${r.nom}";"${r.prenom}";"${r.temps}";"${r.coups}";"${r.indice}";"${r.niveau}"\n`;
+    });
+    
+    // Télécharger
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Natation_${classe}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
 }
+
+// ============================================================
+// EXPOSITION GLOBALE (pour les appels depuis activities.js)
+// ============================================================
+window.exportNatationIDoceo = exportNatationIDoceo;
 
 export function importNatationConfig(event) {
     const file = event.target.files[0];
