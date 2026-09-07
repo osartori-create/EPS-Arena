@@ -5,7 +5,6 @@ let currentClasse = '';
 let currentNumero = null;
 let config = null;
 let configListener = null;
-let tempsListener = null;
 
 let chronoRunning = false;
 let chronoStart = 0;
@@ -143,7 +142,6 @@ window.natationSetCode = function(value) {
     } else {
         currentNumero = num;
     }
-    // Réinitialiser le chrono
     window.natationReset();
     afficherKiosk();
 };
@@ -168,10 +166,99 @@ window.natationArreter = function() {
     chronoRunning = false;
     if (rafId) cancelAnimationFrame(rafId);
     tempsFinal = chronoElapsed;
-    enregistrerTemps(tempsFinal);
-    updateButtons();
-    afficherKiosk();
+    
+    // Demander le nombre de coups de bras
+    demanderCoupsBras(tempsFinal);
 };
+
+function demanderCoupsBras(tempsMs) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
+    overlay.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
+            <h3 class="text-xl font-black text-white text-center mb-2">🏊 Temps enregistré</h3>
+            <p class="text-4xl font-black text-yellow-400 text-center mb-4">${formatTime(tempsMs)}</p>
+            <p class="text-sm text-slate-400 text-center mb-4">Combien de coups de bras as-tu effectués ?</p>
+            <div class="flex justify-center mb-4">
+                <input type="number" id="natation-coups-input" 
+                       inputmode="numeric" 
+                       class="w-32 bg-slate-800 border-2 border-slate-600 rounded-xl p-4 text-center text-3xl font-black text-white"
+                       placeholder="Nb" 
+                       min="1" max="99" 
+                       autofocus>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="window.annulerSaisieCoups()" 
+                        class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                    Annuler
+                </button>
+                <button onclick="window.validerSaisieCoups(${tempsMs})" 
+                        class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                    ✅ Valider
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    
+    setTimeout(() => {
+        const input = document.getElementById('natation-coups-input');
+        if (input) input.focus();
+    }, 300);
+
+    window._coupsOverlay = overlay;
+}
+
+window.annulerSaisieCoups = function() {
+    if (window._coupsOverlay) {
+        window._coupsOverlay.remove();
+        window._coupsOverlay = null;
+    }
+    window.natationReset();
+};
+
+window.validerSaisieCoups = function(tempsMs) {
+    const input = document.getElementById('natation-coups-input');
+    const nbCoups = parseInt(input?.value || '0');
+    if (isNaN(nbCoups) || nbCoups < 1) {
+        alert('Veuillez saisir un nombre de coups valide (≥ 1).');
+        return;
+    }
+    
+    if (window._coupsOverlay) {
+        window._coupsOverlay.remove();
+        window._coupsOverlay = null;
+    }
+    
+    enregistrerTempsEtCoups(tempsMs, nbCoups);
+};
+
+function enregistrerTempsEtCoups(tempsMs, nbCoups) {
+    if (currentNumero === null) return;
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
+    const eleveId = mapping[`${currentClasse}_${currentNumero}`];
+    if (!eleveId) {
+        alert('Numéro non reconnu. Contacte le professeur.');
+        return;
+    }
+
+    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
+    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
+
+    Promise.all([
+        set(tempsRef, tempsMs),
+        set(coupsRef, nbCoups)
+    ]).then(() => {
+        console.log('✅ Temps et coups enregistrés pour', eleveId);
+        tempsFinal = tempsMs;
+        updateButtons();
+        afficherKiosk();
+    }).catch(err => {
+        console.error('Erreur enregistrement :', err);
+        alert('Erreur lors de l\'enregistrement. Réessayez.');
+    });
+}
 
 window.natationReset = function() {
     chronoRunning = false;
@@ -190,33 +277,6 @@ function updateChrono() {
         display.textContent = formatTime(chronoElapsed);
     }
     rafId = requestAnimationFrame(updateChrono);
-}
-
-// ============================================================
-// ENREGISTREMENT FIREBASE
-// ============================================================
-function enregistrerTemps(tempsMs) {
-    if (currentNumero === null) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    // On sauvegarde le temps dans la table /natation/temps/{eleveId}
-    // Mais on ne connaît pas l'eleveId ici, on a juste le numéro.
-    // On va chercher le mapping local pour obtenir l'eleveId.
-    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
-    const eleveId = mapping[`${currentClasse}_${currentNumero}`];
-    if (!eleveId) {
-        alert('Numéro non reconnu. Contacte le professeur.');
-        return;
-    }
-
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
-    set(tempsRef, tempsMs)
-        .then(() => {
-            console.log('✅ Temps enregistré pour', eleveId);
-        })
-        .catch(err => {
-            console.error('Erreur enregistrement :', err);
-            alert('Erreur lors de l\'enregistrement. Réessayez.');
-        });
 }
 
 // ============================================================
