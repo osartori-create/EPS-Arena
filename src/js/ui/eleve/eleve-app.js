@@ -148,6 +148,9 @@ function showWaiting() {
 }
 
 function showLogin() {
+    // 🔽 Revenir en mode normal pour les autres activités
+    setContainerWidth(false);
+    
     // Réafficher les éléments CO
     afficherElementsCO();
     
@@ -165,6 +168,7 @@ function showLogin() {
 
     // SPÉCIAL BADMINTON
     if (config.activite === 'badminton') {
+        setContainerWidth(true);
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
         escaladeModule.classList.add('hidden');
@@ -185,6 +189,7 @@ function showLogin() {
 
     // SPÉCIAL TOURNOI
     if (config.activite === 'tournoi') {
+        setContainerWidth(true);
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
         escaladeModule.classList.add('hidden');
@@ -402,6 +407,9 @@ function showLoginNatation() {
     loginScreen.classList.add('hidden');
     activityScreen.classList.remove('hidden');
     waitingScreen.classList.add('hidden');
+    
+    // 🔽 Passer en mode large pour Natation
+    setContainerWidth(true);
     
     // Masquer tous les autres modules
     escaladeModule.classList.add('hidden');
@@ -680,6 +688,9 @@ export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
 
 export function resetToLogin() {
+    // 🔽 Revenir en mode normal
+    setContainerWidth(false);
+    
     // Réinitialiser la sélection
     selectedCode = '';
     document.getElementById('selected-code').innerText = '--';
@@ -702,4 +713,21 @@ export function resetToLogin() {
     afficherElementsCO();
     // Revenir à l'écran de connexion
     showLogin();
+}
+// ============================================================
+// GESTION DE LA LARGEUR DU CONTENEUR
+// ============================================================
+const mainContainer = document.getElementById('main-container');
+
+function setContainerWidth(wide) {
+    if (!mainContainer) return;
+    if (wide) {
+        mainContainer.classList.remove('max-w-md');
+        mainContainer.classList.add('max-w-7xl');
+        mainContainer.classList.add('w-full');
+        mainContainer.classList.add('px-4');
+    } else {
+        mainContainer.classList.remove('max-w-7xl', 'w-full', 'px-4');
+        mainContainer.classList.add('max-w-md');
+    }
 }
