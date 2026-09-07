@@ -79,7 +79,7 @@ export function initApp() {
                 if (config.activite === 'arcathlon') {
                     console.log('[eleve] Activité Arcathlon détectée (config principale)');
                     showLoginArcathlon();
-                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
+                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest', 'natation'].includes(config.activite)) {
                     currentConfig = config;
                     showLogin();
                 } else {
@@ -236,6 +236,27 @@ function showLogin() {
         return;
     }
 
+    if (config.activite === 'natation') {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    const natationModule = document.getElementById('natation-module');
+    if (natationModule) {
+        natationModule.classList.remove('hidden');
+        natationModule.style.display = 'block';
+        import('../../modules/natation/natation-kiosk.js').then(module => {
+            module.initNatationKiosk(selectedClass);
+        }).catch(err => {
+            console.error('Erreur chargement Natation Kiosk :', err);
+            natationModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
+        });
+    }
+    return;
+}
     // SPÉCIAL ORIENTSHOW (via CO) – avec pastilles de couleur
     if (config.activite === 'orientshow') {
         loginScreen.classList.remove('hidden');
