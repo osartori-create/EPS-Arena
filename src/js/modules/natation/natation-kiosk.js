@@ -363,31 +363,41 @@ function afficherSaisieCoups(container) {
 }
 
 // ============================================================
-// 4. FONCTIONS DE BARÈME (CORRIGÉES)
+// 4. FONCTIONS DE BARÈME (CORRIGÉES AVEC ARRONDI)
 // ============================================================
 function getNiveau(indice) {
     if (indice === null || isNaN(indice)) {
         return { couleur: '#64748b', label: '--' };
     }
-    if (indice >= 4.0) return { couleur: '#22c55e', label: '🌟 Excellent' };
-    if (indice >= 3.0) return { couleur: '#3b82f6', label: '💪 Très satisfaisant' };
-    if (indice >= 2.0) return { couleur: '#eab308', label: '✅ Satisfaisant' };
-    if (indice >= 1.31) return { couleur: '#f97316', label: '🟡 Fragile' };
+    // Arrondir à 2 décimales pour éviter les problèmes de précision
+    const rounded = Math.round(indice * 100) / 100;
+    
+    if (rounded >= 4.0) return { couleur: '#22c55e', label: '🌟 Excellent' };
+    if (rounded >= 3.0) return { couleur: '#3b82f6', label: '💪 Très satisfaisant' };
+    if (rounded >= 2.0) return { couleur: '#eab308', label: '✅ Satisfaisant' };
+    if (rounded >= 1.31) return { couleur: '#f97316', label: '🟡 Fragile' };
     return { couleur: '#ef4444', label: '🔴 Très insuffisant' };
 }
 
 function getMessageEncouragement(indice) {
-    if (indice >= 4.0) return '🏆 Excellent ! Tu maîtrises parfaitement ta nage !';
-    if (indice >= 3.0) {
-        const ecart = (4.0 - indice).toFixed(2);
-        return `💪 Tu es à ${ecart} pt${ecart > 1 ? 's' : ''} de passer dans le groupe "Excellent" ! Continue comme ça !`;
+    if (indice === null || isNaN(indice)) return null;
+    // Arrondir à 2 décimales
+    const rounded = Math.round(indice * 100) / 100;
+    
+    if (rounded >= 4.0) return '🏆 Excellent ! Tu maîtrises parfaitement ta nage !';
+    if (rounded >= 3.0) {
+        const ecart = (4.0 - rounded).toFixed(2);
+        if (ecart == 0) return '🎯 Tu es à la limite de l\'Excellent !';
+        return `💪 Tu es à ${ecart} pt${ecart > 1 ? 's' : ''} de passer dans le groupe "Excellent" !`;
     }
-    if (indice >= 2.0) {
-        const ecart = (3.0 - indice).toFixed(2);
+    if (rounded >= 2.0) {
+        const ecart = (3.0 - rounded).toFixed(2);
+        if (ecart == 0) return '🎯 Tu es à la limite du "Très satisfaisant" !';
         return `💪 Tu es à ${ecart} pt${ecart > 1 ? 's' : ''} de passer dans le groupe "Très satisfaisant" !`;
     }
-    if (indice >= 1.31) {
-        const ecart = (2.0 - indice).toFixed(2);
+    if (rounded >= 1.31) {
+        const ecart = (2.0 - rounded).toFixed(2);
+        if (ecart == 0) return '🎯 Tu es à la limite du "Satisfaisant" !';
         return `💪 Tu es à ${ecart} pt${ecart > 1 ? 's' : ''} de passer dans le groupe "Satisfaisant" !`;
     }
     return null;
