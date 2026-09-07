@@ -1,11 +1,12 @@
 // src/js/modules/natation/natation-kiosk.js
-import { db, ref, onValue, set } from '../../core/firebase-service.js';
+import { db, ref, onValue, set, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
 let currentNumero = null;
 let config = null;
 let configListener = null;
 let nbEleves = 0;
+let historiqueEssais = {}; // { eleveId: [ { temps, coups, indice, date }, ... ] }
 
 let chronoRunning = false;
 let chronoStart = 0;
@@ -13,8 +14,7 @@ let chronoElapsed = 0;
 let rafId = null;
 let tempsFinal = null;
 
-// État de l'interface
-let mode = 'liste'; // 'liste' | 'chrono' | 'saisie'
+let mode = 'liste'; // 'liste' | 'chrono' | 'saisie' | 'feedback'
 
 export function initNatationKiosk(classe) {
     console.log('🏊 initNatationKiosk appelée pour', classe);
@@ -22,6 +22,7 @@ export function initNatationKiosk(classe) {
     currentNumero = null;
     tempsFinal = null;
     mode = 'liste';
+    historiqueEssais = {};
 
     const container = document.getElementById('natation-module');
     if (!container) {
@@ -39,7 +40,6 @@ export function initNatationKiosk(classe) {
         console.log('📡 Config Natation reçue :', config);
         nbEleves = config.nbEleves || 0;
         
-        // Fallback : déduire le nombre d'élèves du mapping local
         if (nbEleves === 0) {
             const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
             const nums = Object.keys(mapping)
@@ -49,14 +49,31 @@ export function initNatationKiosk(classe) {
             nbEleves = Math.max(...nums, 0);
             console.log('🔢 nbEleves déduit du mapping :', nbEleves);
         }
-        
-        // Si toujours 0, on met une valeur par défaut pour tester
         if (nbEleves === 0) {
-            nbEleves = 28; // valeur par défaut
+            nbEleves = 28;
             console.log('⚠️ nbEleves = 0, utilisation de la valeur par défaut : 28');
         }
         
+        // Charger l'historique des essais pour cette classe
+        chargerHistoriqueEssais();
         afficherInterface();
+    });
+}
+
+// ============================================================
+// CHARGEMENT DE L'HISTORIQUE DES ESSAIS (Firebase)
+// ============================================================
+function chargerHistoriqueEssais() {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique`);
+    onValue(historiqueRef, (snap) => {
+        const data = snap.val() || {};
+        // data = { eleveId: [ { temps, coups, indice, date }, ... ] }
+        historiqueEssais = data;
+        // Si on est en mode feedback, on rafraîchit l'affichage
+        if (mode === 'feedback') {
+            afficherInterface();
+        }
     });
 }
 
@@ -74,16 +91,30 @@ function afficherInterface() {
         afficherChrono(container);
     } else if (mode === 'saisie') {
         afficherSaisieCoups(container);
+    } else if (mode === 'feedback') {
+        afficherFeedback(container);
     }
 }
 
 // ============================================================
-// 1. LISTE DES NUMÉROS (version améliorée)
+// 1. LISTE DES NUMÉROS (colorés selon statut)
 // ============================================================
 function afficherListeNumeros(container) {
     const distance = config?.distance || 25;
     const nums = [];
     for (let i = 1; i <= nbEleves; i++) nums.push(i);
+
+    // Récupérer les temps pour colorer les boutons
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
+    let tempsData = {};
+    onValue(tempsRef, (snap) => {
+        tempsData = snap.val() || {};
+        // On réaffiche si on est encore en mode liste
+        if (mode === 'liste') {
+            afficherListeNumeros(container);
+        }
+    }, { onlyOnce: true });
 
     let html = `
         <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 text-center max-w-4xl mx-auto">
@@ -96,12 +127,18 @@ function afficherListeNumeros(container) {
     `;
 
     nums.forEach(num => {
+        const eleveId = getEleveIdFromNumero(num);
+        const aTemps = eleveId && tempsData[eleveId] && tempsData[eleveId] > 0;
+        const bgClass = aTemps 
+            ? 'bg-emerald-600 hover:bg-emerald-500 border-emerald-400' 
+            : 'bg-blue-600 hover:bg-blue-500 border-blue-400';
+        const label = aTemps ? `${num} ✅` : `${num}`;
         html += `
             <button onclick="window.natationChoisirNumero(${num})" 
-                    class="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 
-                           p-6 rounded-2xl font-black text-4xl text-white border-2 border-blue-400 
-                           active:scale-95 transition-all shadow-lg hover:scale-105 hover:shadow-2xl">
-                ${num}
+                    class="${bgClass} p-6 rounded-2xl font-black text-4xl text-white border-4 
+                           active:scale-95 transition-all shadow-lg hover:scale-105 hover:shadow-2xl
+                           min-h-[100px] min-w-[80px] touch-manipulation">
+                ${label}
             </button>
         `;
     });
@@ -109,18 +146,22 @@ function afficherListeNumeros(container) {
     html += `
             </div>
             <button onclick="window.retourMenuNatation()" 
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-4 rounded-xl font-black text-lg text-white active:scale-95 transition-all touch-manipulation">
                 ← Retour
             </button>
         </div>
     `;
 
     container.innerHTML = html;
-    console.log('✅ Liste des numéros affichée, nbEleves =', nbEleves);
+}
+
+function getEleveIdFromNumero(num) {
+    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
+    return mapping[`${currentClasse}_${num}`] || null;
 }
 
 // ============================================================
-// 2. CHRONO
+// 2. CHRONO (grands boutons tactiles)
 // ============================================================
 function afficherChrono(container) {
     const distance = config?.distance || 25;
@@ -146,13 +187,13 @@ function afficherChrono(container) {
 
             <div class="flex gap-4 justify-center">
                 <button id="natation-start-btn" 
-                        class="bg-emerald-600 hover:bg-emerald-500 px-10 py-5 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all ${chronoRunning ? 'hidden' : ''}"
+                        class="bg-emerald-600 hover:bg-emerald-500 px-12 py-6 rounded-3xl font-black text-3xl text-white active:scale-95 transition-all touch-manipulation ${chronoRunning ? 'hidden' : ''}"
                         onclick="window.natationDemarrer()"
                         ${tempsFinal !== null ? 'disabled' : ''}>
                     ▶ Démarrer
                 </button>
                 <button id="natation-stop-btn" 
-                        class="bg-red-600 hover:bg-red-500 px-10 py-5 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all ${chronoRunning ? '' : 'hidden'}"
+                        class="bg-red-600 hover:bg-red-500 px-12 py-6 rounded-3xl font-black text-3xl text-white active:scale-95 transition-all touch-manipulation ${chronoRunning ? '' : 'hidden'}"
                         onclick="window.natationArreter()">
                     ⏹ Arrêter
                 </button>
@@ -161,30 +202,33 @@ function afficherChrono(container) {
             ${tempsFinal !== null ? `
                 <div class="mt-6 flex gap-4 justify-center">
                     <button onclick="window.natationValiderTemps()" 
-                            class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                            class="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all touch-manipulation">
                         ✅ Valider
                     </button>
                     <button onclick="window.natationRecommencer()" 
-                            class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                            class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all touch-manipulation">
                         ↺ Recommencer
                     </button>
                 </div>
             ` : ''}
 
             <button onclick="window.natationRetourListe()" 
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
-                ← Retour à la liste
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-4 rounded-xl font-black text-lg text-white active:scale-95 transition-all touch-manipulation">
+                ← Sélectionner un autre élève
             </button>
         </div>
     `;
-    console.log('⏱️ Chrono affiché pour le numéro', currentNumero);
 }
 
 // ============================================================
-// 3. SAISIE DES COUPS DE BRAS
+// 3. SAISIE DES COUPS (démarre à 25)
 // ============================================================
 function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
+    // Initialiser à 25 si c'est le premier essai, sinon on peut partir de la dernière valeur
+    const initialCoups = 25;
+    window._coupsSaisis = initialCoups;
+
     container.innerHTML = `
         <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
             <div class="flex items-center justify-center gap-6 mb-6">
@@ -197,43 +241,180 @@ function afficherSaisieCoups(container) {
             <p class="text-lg font-bold text-white mb-4">Combien de coups de bras ?</p>
             <div class="flex justify-center items-center gap-6 mb-6">
                 <button onclick="window.natationAdjustCoups(-1)" 
-                        class="bg-slate-700 hover:bg-slate-600 w-20 h-20 rounded-2xl text-4xl font-black text-white active:scale-95 transition-all">−</button>
-                <span id="natation-coups-display" class="text-7xl font-black text-white w-32 text-center">1</span>
+                        class="bg-slate-700 hover:bg-slate-600 w-24 h-24 rounded-3xl text-5xl font-black text-white active:scale-95 transition-all touch-manipulation">−</button>
+                <span id="natation-coups-display" class="text-7xl font-black text-white w-32 text-center">${initialCoups}</span>
                 <button onclick="window.natationAdjustCoups(1)" 
-                        class="bg-slate-700 hover:bg-slate-600 w-20 h-20 rounded-2xl text-4xl font-black text-white active:scale-95 transition-all">+</button>
+                        class="bg-slate-700 hover:bg-slate-600 w-24 h-24 rounded-3xl text-5xl font-black text-white active:scale-95 transition-all touch-manipulation">+</button>
             </div>
             <p class="text-xs text-slate-500 mb-6">(1 cycle = 2 coups de bras)</p>
 
             <div class="flex gap-4 justify-center">
                 <button onclick="window.natationValiderCoups()" 
-                        class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                        class="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all touch-manipulation">
                     ✅ Enregistrer
                 </button>
                 <button onclick="window.natationAnnulerCoups()" 
-                        class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
+                        class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all touch-manipulation">
                     Annuler
                 </button>
             </div>
 
             <button onclick="window.natationRetourListe()" 
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
-                ← Retour à la liste
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-4 rounded-xl font-black text-lg text-white active:scale-95 transition-all touch-manipulation">
+                ← Sélectionner un autre élève
             </button>
         </div>
     `;
-    // Initialiser le compteur à 1
-    window._coupsSaisis = 1;
+    // Mettre à jour l'affichage
     const display = document.getElementById('natation-coups-display');
-    if (display) display.textContent = '1';
-    console.log('✋ Saisie des coups pour le numéro', currentNumero);
+    if (display) display.textContent = initialCoups;
 }
 
 // ============================================================
-// ACTIONS GLOBALES (exposées sur window)
+// 4. FEEDBACK INDIVIDUEL (graphique d'évolution)
+// ============================================================
+function afficherFeedback(container) {
+    const eleveId = getEleveIdFromNumero(currentNumero);
+    const essais = historiqueEssais[eleveId] || [];
+    // Trier par date
+    essais.sort((a, b) => a.date - b.date);
+
+    // Calcul du dernier indice et niveau
+    let dernierIndice = null;
+    let dernierNiveau = null;
+    if (essais.length > 0) {
+        const dernier = essais[essais.length - 1];
+        dernierIndice = dernier.indice;
+        dernierNiveau = getNiveau(dernierIndice);
+    }
+
+    // Générer les points pour le graphique
+    let pointsHtml = '';
+    if (essais.length > 0) {
+        // Déterminer l'échelle : indice min et max
+        const indices = essais.map(e => e.indice).filter(i => i !== null);
+        const minIndice = Math.max(0, Math.min(...indices) - 0.5);
+        const maxIndice = Math.max(5, Math.max(...indices) + 0.5);
+        const range = maxIndice - minIndice;
+
+        // Zones de couleurs (5 zones)
+        const zones = [
+            { min: 0, max: 2.0, color: 'red' },
+            { min: 2.0, max: 2.5, color: 'orange' },
+            { min: 2.5, max: 3.0, color: 'yellow' },
+            { min: 3.0, max: 3.5, color: 'blue' },
+            { min: 3.5, max: 5.0, color: 'gold' }
+        ];
+
+        // Construire les points
+        let points = [];
+        essais.forEach((e, idx) => {
+            if (e.indice !== null) {
+                const x = (idx / (essais.length - 1)) * 100; // 0 à 100%
+                const y = 100 - ((e.indice - minIndice) / range) * 100; // inversion pour que le haut soit le meilleur
+                points.push({ x, y, label: `#${idx+1}`, indice: e.indice });
+            }
+        });
+
+        pointsHtml = `
+            <div class="relative w-full h-64 bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden">
+                <!-- Zones de couleur -->
+                ${zones.map(zone => {
+                    const yMin = 100 - ((zone.max - minIndice) / range) * 100;
+                    const yMax = 100 - ((zone.min - minIndice) / range) * 100;
+                    const height = yMax - yMin;
+                    return `
+                        <div class="absolute left-0 right-0 opacity-20" 
+                             style="top: ${yMin}%; height: ${height}%; background-color: ${zone.color};">
+                        </div>
+                    `;
+                }).join('')}
+                
+                <!-- Points -->
+                <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <!-- Ligne reliant les points -->
+                    <polyline points="${points.map(p => `${p.x},${p.y}`).join(' ')}" 
+                              fill="none" stroke="#facc15" stroke-width="2" />
+                    <!-- Points -->
+                    ${points.map(p => `
+                        <circle cx="${p.x}" cy="${p.y}" r="4" fill="#facc15" stroke="#fff" stroke-width="1.5" />
+                        <text x="${p.x}" y="${p.y - 8}" font-size="4" fill="#fff" text-anchor="middle">${p.label}</text>
+                    `).join('')}
+                </svg>
+                
+                <!-- Légende des zones -->
+                <div class="absolute bottom-2 left-2 right-2 flex justify-between text-[8px] text-slate-400">
+                    <span>🔴</span>
+                    <span>🟠</span>
+                    <span>🟡</span>
+                    <span>🔵</span>
+                    <span>🟡</span>
+                </div>
+            </div>
+        `;
+    }
+
+    container.innerHTML = `
+        <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 text-center max-w-lg mx-auto">
+            <div class="flex items-center justify-center gap-6 mb-4">
+                <span class="text-2xl font-black text-slate-400">N°</span>
+                <span class="text-6xl font-black text-yellow-400">${currentNumero}</span>
+            </div>
+            
+            ${dernierIndice !== null ? `
+                <div class="mb-4">
+                    <p class="text-sm text-slate-400">Dernier indice</p>
+                    <p class="text-5xl font-black text-yellow-400">${dernierIndice.toFixed(2)}</p>
+                    <span class="inline-block px-4 py-1 rounded-full text-sm font-bold text-white" 
+                          style="background-color: ${dernierNiveau.couleur};">${dernierNiveau.label}</span>
+                </div>
+            ` : `
+                <p class="text-slate-400 mb-4">Aucun essai enregistré.</p>
+            `}
+
+            ${essais.length > 1 ? `
+                <div class="mb-4">
+                    <p class="text-sm text-slate-400">Évolution des essais</p>
+                    ${pointsHtml}
+                </div>
+            ` : `
+                ${essais.length === 1 ? '<p class="text-sm text-slate-400">Un premier essai ! Continue comme ça ! 💪</p>' : ''}
+            `}
+
+            <div class="flex gap-4 justify-center mt-6">
+                <button onclick="window.natationNouvelEssai()" 
+                        class="bg-blue-600 hover:bg-blue-500 px-8 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all touch-manipulation">
+                    🔄 Nouvel essai
+                </button>
+                <button onclick="window.natationRetourListe()" 
+                        class="bg-slate-700 hover:bg-slate-600 px-8 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all touch-manipulation">
+                    ← Changer d'élève
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================================
+// BARÈME (couleurs et niveaux)
+// ============================================================
+function getNiveau(indice) {
+    if (indice === null || indice === undefined || isNaN(indice)) {
+        return { couleur: '#64748b', label: '--' };
+    }
+    // Seuils adaptés à la pratique
+    if (indice >= 3.8) return { couleur: '#fbbf24', label: 'Excellent' }; // or
+    if (indice >= 3.2) return { couleur: '#3b82f6', label: 'Très bien' }; // bleu
+    if (indice >= 2.8) return { couleur: '#22c55e', label: 'Bien' }; // vert
+    if (indice >= 2.4) return { couleur: '#f59e0b', label: 'Fragile' }; // orange
+    return { couleur: '#ef4444', label: 'À besoins' }; // rouge
+}
+
+// ============================================================
+// ACTIONS GLOBALES
 // ============================================================
 window.natationChoisirNumero = function(num) {
     console.log('🖱️ Clic sur le numéro', num);
-    // Vérifier que le numéro est valide
     if (!num || num < 1 || num > nbEleves) {
         console.warn('Numéro invalide :', num);
         return;
@@ -244,12 +425,11 @@ window.natationChoisirNumero = function(num) {
     chronoRunning = false;
     if (rafId) cancelAnimationFrame(rafId);
     mode = 'chrono';
-    console.log('🔄 Mode changé en "chrono" pour le numéro', num);
     afficherInterface();
 };
 
 window.natationRetourListe = function() {
-    console.log('⬅️ Retour à la liste');
+    console.log('⬅️ Retour à la liste des numéros');
     if (chronoRunning) {
         chronoRunning = false;
         if (rafId) cancelAnimationFrame(rafId);
@@ -260,17 +440,20 @@ window.natationRetourListe = function() {
     afficherInterface();
 };
 
+window.natationNouvelEssai = function() {
+    console.log('🔄 Nouvel essai pour', currentNumero);
+    mode = 'chrono';
+    tempsFinal = null;
+    chronoElapsed = 0;
+    afficherInterface();
+};
+
 window.natationDemarrer = function() {
-    if (currentNumero === null) {
-        alert('Erreur : aucun numéro sélectionné.');
-        return;
-    }
+    if (currentNumero === null) return;
     if (chronoRunning) return;
-    console.log('▶️ Démarrer le chrono pour', currentNumero);
     chronoRunning = true;
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
-    
     const startBtn = document.getElementById('natation-start-btn');
     const stopBtn = document.getElementById('natation-stop-btn');
     if (startBtn) startBtn.classList.add('hidden');
@@ -279,17 +462,14 @@ window.natationDemarrer = function() {
 
 window.natationArreter = function() {
     if (!chronoRunning) return;
-    console.log('⏹️ Arrêter le chrono pour', currentNumero);
     chronoRunning = false;
     if (rafId) cancelAnimationFrame(rafId);
     tempsFinal = chronoElapsed;
-    // Passer en mode saisie des coups
     mode = 'saisie';
     afficherInterface();
 };
 
 window.natationValiderTemps = function() {
-    console.log('✅ Validation du temps, passage à la saisie des coups');
     if (mode !== 'saisie') {
         mode = 'saisie';
         afficherInterface();
@@ -297,7 +477,6 @@ window.natationValiderTemps = function() {
 };
 
 window.natationRecommencer = function() {
-    console.log('↺ Recommencer le chrono');
     chronoElapsed = 0;
     tempsFinal = null;
     mode = 'chrono';
@@ -307,39 +486,34 @@ window.natationRecommencer = function() {
 window.natationAdjustCoups = function(delta) {
     const display = document.getElementById('natation-coups-display');
     if (!display) return;
-    let val = parseInt(display.textContent) || 1;
+    let val = parseInt(display.textContent) || 25;
     val = Math.max(1, val + delta);
     display.textContent = val;
     window._coupsSaisis = val;
-    console.log('✋ Coups ajustés à', val);
 };
 
 window.natationValiderCoups = function() {
-    const nbCoups = window._coupsSaisis || 1;
+    const nbCoups = window._coupsSaisis || 25;
     if (nbCoups < 1) {
         alert('Veuillez saisir au moins 1 coup de bras.');
         return;
     }
-    console.log('💾 Enregistrement : temps =', tempsFinal, 'ms, coups =', nbCoups);
     enregistrerTempsEtCoups(tempsFinal, nbCoups);
-    // Retour à la liste après enregistrement
-    mode = 'liste';
-    tempsFinal = null;
-    chronoElapsed = 0;
+    // Passer en mode feedback
+    mode = 'feedback';
     afficherInterface();
 };
 
 window.natationAnnulerCoups = function() {
-    console.log('❌ Annulation de la saisie des coups, retour au chrono');
     mode = 'chrono';
     afficherInterface();
 };
 
+// ============================================================
+// ENREGISTREMENT FIREBASE (temps + coups + historique)
+// ============================================================
 function enregistrerTempsEtCoups(tempsMs, nbCoups) {
-    if (currentNumero === null) {
-        console.warn('Aucun numéro sélectionné');
-        return;
-    }
+    if (currentNumero === null) return;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
     const eleveId = mapping[`${currentClasse}_${currentNumero}`];
@@ -348,20 +522,52 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         return;
     }
 
+    // Calculer l'indice
+    const indice = calculIndice(tempsMs, nbCoups);
+
+    // Mettre à jour les temps et coups actuels
     const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
     const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
 
+    // Ajouter à l'historique
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${eleveId}`);
+    const newEntry = {
+        temps: tempsMs,
+        coups: nbCoups,
+        indice: indice,
+        date: Date.now()
+    };
+
+    // Récupérer l'historique existant
+    let historiqueExistant = historiqueEssais[eleveId] || [];
+    historiqueExistant.push(newEntry);
+    // Conserver les 10 derniers essais max
+    if (historiqueExistant.length > 10) historiqueExistant = historiqueExistant.slice(-10);
+
     Promise.all([
         set(tempsRef, tempsMs),
-        set(coupsRef, nbCoups)
+        set(coupsRef, nbCoups),
+        set(historiqueRef, historiqueExistant)
     ]).then(() => {
         console.log('✅ Temps et coups enregistrés pour', eleveId);
-        // Petit feedback visuel
-        alert('✅ Temps et coups enregistrés !');
+        // Mettre à jour la cache locale
+        historiqueEssais[eleveId] = historiqueExistant;
+        // Feedback visuel
+        alert(`✅ Enregistré ! Indice = ${indice.toFixed(2)}`);
     }).catch(err => {
         console.error('Erreur enregistrement :', err);
         alert('Erreur lors de l\'enregistrement. Réessayez.');
     });
+}
+
+function calculIndice(tempsMs, nbCoups) {
+    if (!tempsMs || tempsMs <= 0 || !nbCoups || nbCoups <= 0) return null;
+    const tempsSec = tempsMs / 1000;
+    const cycles = nbCoups / 2;
+    if (cycles <= 0) return null;
+    const vitesse = 25 / tempsSec;
+    const distanceParCycle = 25 / cycles;
+    return vitesse * distanceParCycle;
 }
 
 // ============================================================
@@ -389,7 +595,6 @@ function formatTime(ms) {
 // RETOUR
 // ============================================================
 window.retourMenuNatation = function() {
-    console.log('⬅️ Retour au menu principal');
     if (configListener) configListener();
     const container = document.getElementById('natation-module');
     if (container) {
