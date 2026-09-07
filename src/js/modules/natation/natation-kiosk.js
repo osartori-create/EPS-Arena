@@ -17,6 +17,7 @@ let tempsFinal = null;
 let mode = 'liste'; // 'liste' | 'chrono' | 'saisie'
 
 export function initNatationKiosk(classe) {
+    console.log('🏊 initNatationKiosk appelée pour', classe);
     currentClasse = classe;
     currentNumero = null;
     tempsFinal = null;
@@ -35,13 +36,26 @@ export function initNatationKiosk(classe) {
     if (configListener) configListener();
     configListener = onValue(configRef, (snap) => {
         config = snap.val() || {};
+        console.log('📡 Config Natation reçue :', config);
         nbEleves = config.nbEleves || 0;
-        // Si pas de nbEleves, on essaie de le déduire du mapping local
+        
+        // Fallback : déduire le nombre d'élèves du mapping local
         if (nbEleves === 0) {
             const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
-            const nums = Object.keys(mapping).filter(k => k.startsWith(`${classe}_`)).map(k => parseInt(k.split('_')[1])).filter(n => !isNaN(n));
+            const nums = Object.keys(mapping)
+                .filter(k => k.startsWith(`${classe}_`))
+                .map(k => parseInt(k.split('_')[1]))
+                .filter(n => !isNaN(n));
             nbEleves = Math.max(...nums, 0);
+            console.log('🔢 nbEleves déduit du mapping :', nbEleves);
         }
+        
+        // Si toujours 0, on met une valeur par défaut pour tester
+        if (nbEleves === 0) {
+            nbEleves = 28; // valeur par défaut
+            console.log('⚠️ nbEleves = 0, utilisation de la valeur par défaut : 28');
+        }
+        
         afficherInterface();
     });
 }
@@ -52,6 +66,7 @@ export function initNatationKiosk(classe) {
 function afficherInterface() {
     const container = document.getElementById('natation-module');
     if (!container) return;
+    console.log('🔄 afficherInterface() appelée, mode =', mode);
 
     if (mode === 'liste') {
         afficherListeNumeros(container);
@@ -63,43 +78,30 @@ function afficherInterface() {
 }
 
 // ============================================================
-// 1. LISTE DES NUMÉROS
+// 1. LISTE DES NUMÉROS (version améliorée)
 // ============================================================
 function afficherListeNumeros(container) {
     const distance = config?.distance || 25;
     const nums = [];
     for (let i = 1; i <= nbEleves; i++) nums.push(i);
 
-    // Vérifier si des résultats existent déjà pour colorer les numéros
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
-    let tempsData = {};
-    onValue(tempsRef, (snap) => {
-        tempsData = snap.val() || {};
-        // On ne réaffiche que si on est encore en mode liste
-        if (mode === 'liste') {
-            afficherListeNumeros(container);
-        }
-    }, { onlyOnce: true });
-
     let html = `
-        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 text-center">
-            <h2 class="text-2xl font-black text-white mb-2">🏊 Indice de nage</h2>
-            <p class="text-sm text-slate-400 mb-4">${distance}m - Départ dans l'eau</p>
-            <p class="text-xs text-slate-500 mb-4">Choisis ton numéro</p>
-            <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4 max-w-2xl mx-auto">
+        <div class="bg-slate-800 p-6 rounded-3xl border border-slate-700 text-center max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-3xl font-black text-white">🏊 Indice de nage</h2>
+                <span class="text-sm text-slate-400">${distance}m</span>
+            </div>
+            <p class="text-sm text-slate-400 mb-6">Choisis ton numéro</p>
+            <div class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-4 max-w-3xl mx-auto">
     `;
 
     nums.forEach(num => {
-        const eleveId = getEleveIdFromNumero(num);
-        const temps = eleveId ? tempsData[eleveId] : null;
-        const aTemps = temps !== null && temps > 0;
-        const bgClass = aTemps ? 'bg-emerald-600 border-emerald-400' : 'bg-blue-600 border-blue-400';
-        const label = aTemps ? `${num} ✅` : `${num}`;
         html += `
             <button onclick="window.natationChoisirNumero(${num})" 
-                    class="${bgClass} p-6 rounded-2xl font-black text-4xl text-white border-4 active:scale-95 transition-transform shadow-lg hover:scale-105">
-                ${label}
+                    class="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 
+                           p-6 rounded-2xl font-black text-4xl text-white border-2 border-blue-400 
+                           active:scale-95 transition-all shadow-lg hover:scale-105 hover:shadow-2xl">
+                ${num}
             </button>
         `;
     });
@@ -107,18 +109,14 @@ function afficherListeNumeros(container) {
     html += `
             </div>
             <button onclick="window.retourMenuNatation()" 
-                    class="mt-6 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
                 ← Retour
             </button>
         </div>
     `;
 
     container.innerHTML = html;
-}
-
-function getEleveIdFromNumero(num) {
-    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
-    return mapping[`${currentClasse}_${num}`] || null;
+    console.log('✅ Liste des numéros affichée, nbEleves =', nbEleves);
 }
 
 // ============================================================
@@ -135,50 +133,51 @@ function afficherChrono(container) {
     }
 
     container.innerHTML = `
-        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center max-w-md mx-auto">
-            <div class="flex items-center justify-center gap-4 mb-4">
-                <span class="text-3xl font-black text-white">N°</span>
-                <span class="text-6xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
+            <div class="flex items-center justify-center gap-6 mb-6">
+                <span class="text-2xl font-black text-slate-400">N°</span>
+                <span class="text-7xl font-black text-yellow-400">${currentNumero}</span>
             </div>
             <p class="text-sm text-slate-400 mb-4">${distance}m - Départ dans l'eau</p>
 
-            <div class="text-7xl font-black tabular-nums text-yellow-400 mb-6" id="natation-chrono-display">
+            <div class="text-8xl font-black tabular-nums text-yellow-400 mb-8" id="natation-chrono-display">
                 ${tempsAffiche}
             </div>
 
-            <div class="flex gap-3 justify-center">
+            <div class="flex gap-4 justify-center">
                 <button id="natation-start-btn" 
-                        class="bg-emerald-600 px-8 py-4 rounded-2xl font-black text-white text-xl active:scale-95 ${chronoRunning ? 'hidden' : ''}"
+                        class="bg-emerald-600 hover:bg-emerald-500 px-10 py-5 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all ${chronoRunning ? 'hidden' : ''}"
                         onclick="window.natationDemarrer()"
                         ${tempsFinal !== null ? 'disabled' : ''}>
                     ▶ Démarrer
                 </button>
                 <button id="natation-stop-btn" 
-                        class="bg-red-600 px-8 py-4 rounded-2xl font-black text-white text-xl active:scale-95 ${chronoRunning ? '' : 'hidden'}"
+                        class="bg-red-600 hover:bg-red-500 px-10 py-5 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all ${chronoRunning ? '' : 'hidden'}"
                         onclick="window.natationArreter()">
                     ⏹ Arrêter
                 </button>
             </div>
 
             ${tempsFinal !== null ? `
-                <div class="mt-4 flex gap-3 justify-center">
+                <div class="mt-6 flex gap-4 justify-center">
                     <button onclick="window.natationValiderTemps()" 
-                            class="bg-emerald-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                            class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
                         ✅ Valider
                     </button>
                     <button onclick="window.natationRecommencer()" 
-                            class="bg-slate-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                            class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
                         ↺ Recommencer
                     </button>
                 </div>
             ` : ''}
 
             <button onclick="window.natationRetourListe()" 
-                    class="mt-6 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
                 ← Retour à la liste
             </button>
         </div>
     `;
+    console.log('⏱️ Chrono affiché pour le numéro', currentNumero);
 }
 
 // ============================================================
@@ -187,68 +186,70 @@ function afficherChrono(container) {
 function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
     container.innerHTML = `
-        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center max-w-md mx-auto">
-            <div class="flex items-center justify-center gap-4 mb-4">
-                <span class="text-3xl font-black text-white">N°</span>
-                <span class="text-6xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
+            <div class="flex items-center justify-center gap-6 mb-6">
+                <span class="text-2xl font-black text-slate-400">N°</span>
+                <span class="text-7xl font-black text-yellow-400">${currentNumero}</span>
             </div>
             <p class="text-sm text-slate-400 mb-2">Temps enregistré</p>
-            <div class="text-5xl font-black text-yellow-400 mb-4">${tempsStr}</div>
+            <div class="text-5xl font-black text-yellow-400 mb-6">${tempsStr}</div>
             
-            <p class="text-sm text-slate-400 mb-2">Combien de coups de bras ?</p>
-            <div class="flex justify-center items-center gap-4 mb-4">
+            <p class="text-lg font-bold text-white mb-4">Combien de coups de bras ?</p>
+            <div class="flex justify-center items-center gap-6 mb-6">
                 <button onclick="window.natationAdjustCoups(-1)" 
-                        class="bg-slate-700 w-16 h-16 rounded-2xl text-3xl font-black text-white active:scale-95">−</button>
-                <span id="natation-coups-display" class="text-6xl font-black text-white w-24 text-center">0</span>
+                        class="bg-slate-700 hover:bg-slate-600 w-20 h-20 rounded-2xl text-4xl font-black text-white active:scale-95 transition-all">−</button>
+                <span id="natation-coups-display" class="text-7xl font-black text-white w-32 text-center">1</span>
                 <button onclick="window.natationAdjustCoups(1)" 
-                        class="bg-slate-700 w-16 h-16 rounded-2xl text-3xl font-black text-white active:scale-95">+</button>
+                        class="bg-slate-700 hover:bg-slate-600 w-20 h-20 rounded-2xl text-4xl font-black text-white active:scale-95 transition-all">+</button>
             </div>
-            <p class="text-xs text-slate-500 mb-4">(1 cycle = 2 coups de bras)</p>
+            <p class="text-xs text-slate-500 mb-6">(1 cycle = 2 coups de bras)</p>
 
-            <div class="flex gap-3 justify-center">
+            <div class="flex gap-4 justify-center">
                 <button onclick="window.natationValiderCoups()" 
-                        class="bg-emerald-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                        class="bg-emerald-600 hover:bg-emerald-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
                     ✅ Enregistrer
                 </button>
                 <button onclick="window.natationAnnulerCoups()" 
-                        class="bg-slate-600 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                        class="bg-slate-600 hover:bg-slate-500 px-8 py-3 rounded-xl font-black text-lg text-white active:scale-95 transition-all">
                     Annuler
                 </button>
             </div>
 
             <button onclick="window.natationRetourListe()" 
-                    class="mt-6 bg-slate-700 px-6 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-all">
                 ← Retour à la liste
             </button>
         </div>
     `;
-    // Initialiser le compteur à 1 (minimum)
+    // Initialiser le compteur à 1
     window._coupsSaisis = 1;
-    document.getElementById('natation-coups-display').textContent = '1';
+    const display = document.getElementById('natation-coups-display');
+    if (display) display.textContent = '1';
+    console.log('✋ Saisie des coups pour le numéro', currentNumero);
 }
 
 // ============================================================
-// ACTIONS GLOBALES
+// ACTIONS GLOBALES (exposées sur window)
 // ============================================================
 window.natationChoisirNumero = function(num) {
-    // Vérifier si l'élève a déjà un temps
-    const eleveId = getEleveIdFromNumero(num);
-    if (eleveId) {
-        const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
-        // On pourrait vérifier si un temps existe déjà, mais on laisse l'élève refaire un essai
-        // On réinitialise tout
-        window.natationReset();
+    console.log('🖱️ Clic sur le numéro', num);
+    // Vérifier que le numéro est valide
+    if (!num || num < 1 || num > nbEleves) {
+        console.warn('Numéro invalide :', num);
+        return;
     }
     currentNumero = num;
     tempsFinal = null;
     chronoElapsed = 0;
+    chronoRunning = false;
+    if (rafId) cancelAnimationFrame(rafId);
     mode = 'chrono';
+    console.log('🔄 Mode changé en "chrono" pour le numéro', num);
     afficherInterface();
 };
 
 window.natationRetourListe = function() {
-    // Annuler tout chrono en cours
+    console.log('⬅️ Retour à la liste');
     if (chronoRunning) {
         chronoRunning = false;
         if (rafId) cancelAnimationFrame(rafId);
@@ -260,12 +261,16 @@ window.natationRetourListe = function() {
 };
 
 window.natationDemarrer = function() {
-    if (currentNumero === null) return;
+    if (currentNumero === null) {
+        alert('Erreur : aucun numéro sélectionné.');
+        return;
+    }
     if (chronoRunning) return;
+    console.log('▶️ Démarrer le chrono pour', currentNumero);
     chronoRunning = true;
     chronoStart = performance.now() - chronoElapsed;
     rafId = requestAnimationFrame(updateChrono);
-    // Mettre à jour le bouton
+    
     const startBtn = document.getElementById('natation-start-btn');
     const stopBtn = document.getElementById('natation-stop-btn');
     if (startBtn) startBtn.classList.add('hidden');
@@ -274,6 +279,7 @@ window.natationDemarrer = function() {
 
 window.natationArreter = function() {
     if (!chronoRunning) return;
+    console.log('⏹️ Arrêter le chrono pour', currentNumero);
     chronoRunning = false;
     if (rafId) cancelAnimationFrame(rafId);
     tempsFinal = chronoElapsed;
@@ -283,7 +289,7 @@ window.natationArreter = function() {
 };
 
 window.natationValiderTemps = function() {
-    // Passer à la saisie des coups (si on n'y est pas déjà)
+    console.log('✅ Validation du temps, passage à la saisie des coups');
     if (mode !== 'saisie') {
         mode = 'saisie';
         afficherInterface();
@@ -291,25 +297,21 @@ window.natationValiderTemps = function() {
 };
 
 window.natationRecommencer = function() {
+    console.log('↺ Recommencer le chrono');
     chronoElapsed = 0;
     tempsFinal = null;
     mode = 'chrono';
     afficherInterface();
 };
 
-window.natationReset = function() {
-    chronoRunning = false;
-    if (rafId) cancelAnimationFrame(rafId);
-    chronoElapsed = 0;
-    tempsFinal = null;
-};
-
 window.natationAdjustCoups = function(delta) {
     const display = document.getElementById('natation-coups-display');
-    let val = parseInt(display.textContent) || 0;
+    if (!display) return;
+    let val = parseInt(display.textContent) || 1;
     val = Math.max(1, val + delta);
     display.textContent = val;
     window._coupsSaisis = val;
+    console.log('✋ Coups ajustés à', val);
 };
 
 window.natationValiderCoups = function() {
@@ -318,6 +320,7 @@ window.natationValiderCoups = function() {
         alert('Veuillez saisir au moins 1 coup de bras.');
         return;
     }
+    console.log('💾 Enregistrement : temps =', tempsFinal, 'ms, coups =', nbCoups);
     enregistrerTempsEtCoups(tempsFinal, nbCoups);
     // Retour à la liste après enregistrement
     mode = 'liste';
@@ -327,13 +330,16 @@ window.natationValiderCoups = function() {
 };
 
 window.natationAnnulerCoups = function() {
-    // Retour au chrono sans enregistrer
+    console.log('❌ Annulation de la saisie des coups, retour au chrono');
     mode = 'chrono';
     afficherInterface();
 };
 
 function enregistrerTempsEtCoups(tempsMs, nbCoups) {
-    if (currentNumero === null) return;
+    if (currentNumero === null) {
+        console.warn('Aucun numéro sélectionné');
+        return;
+    }
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
     const eleveId = mapping[`${currentClasse}_${currentNumero}`];
@@ -350,7 +356,8 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         set(coupsRef, nbCoups)
     ]).then(() => {
         console.log('✅ Temps et coups enregistrés pour', eleveId);
-        // On pourrait afficher une confirmation rapide
+        // Petit feedback visuel
+        alert('✅ Temps et coups enregistrés !');
     }).catch(err => {
         console.error('Erreur enregistrement :', err);
         alert('Erreur lors de l\'enregistrement. Réessayez.');
@@ -382,6 +389,7 @@ function formatTime(ms) {
 // RETOUR
 // ============================================================
 window.retourMenuNatation = function() {
+    console.log('⬅️ Retour au menu principal');
     if (configListener) configListener();
     const container = document.getElementById('natation-module');
     if (container) {
