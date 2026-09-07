@@ -14,10 +14,11 @@ let coupsUnsubscribe = null;
 // BARÈME PAR DÉFAUT (modifiable par le professeur)
 // ============================================================
 const DEFAULT_BAREME = {
-    rouge: { min: 0, max: 2.9, label: 'À besoins' },
-    orange: { min: 3.0, max: 3.4, label: 'Fragile' },
-    jaune: { min: 3.5, max: 3.9, label: 'Satisfaisant' },
-    vert: { min: 4.0, max: 10, label: 'Excellent' }
+    tres_insuffisant: { min: 0, max: 1.3, label: 'Très insuffisant' },
+    fragile: { min: 1.31, max: 1.99, label: 'Fragile' },
+    satisfaisant: { min: 2.0, max: 2.99, label: 'Satisfaisant' },
+    tres_satisfaisant: { min: 3.0, max: 3.99, label: 'Très satisfaisant' },
+    excellent: { min: 4.0, max: 6, label: 'Excellent' }
 };
 
 function getBareme() {
@@ -34,10 +35,11 @@ function getNiveau(indice) {
         return { couleur: 'bg-slate-600', label: '--', niveau: 'non_evalue' };
     }
     const bareme = getBareme();
-    if (indice >= bareme.vert.min) return { couleur: 'bg-emerald-500', label: bareme.vert.label, niveau: 'vert' };
-    if (indice >= bareme.jaune.min) return { couleur: 'bg-yellow-500', label: bareme.jaune.label, niveau: 'jaune' };
-    if (indice >= bareme.orange.min) return { couleur: 'bg-orange-500', label: bareme.orange.label, niveau: 'orange' };
-    return { couleur: 'bg-red-500', label: bareme.rouge.label, niveau: 'rouge' };
+    if (indice >= bareme.excellent.min) return { couleur: 'bg-emerald-500', label: bareme.excellent.label, niveau: 'excellent' };
+    if (indice >= bareme.tres_satisfaisant.min) return { couleur: 'bg-blue-500', label: bareme.tres_satisfaisant.label, niveau: 'tres_satisfaisant' };
+    if (indice >= bareme.satisfaisant.min) return { couleur: 'bg-yellow-500', label: bareme.satisfaisant.label, niveau: 'satisfaisant' };
+    if (indice >= bareme.fragile.min) return { couleur: 'bg-orange-500', label: bareme.fragile.label, niveau: 'fragile' };
+    return { couleur: 'bg-red-500', label: bareme.tres_insuffisant.label, niveau: 'tres_insuffisant' };
 }
 
 function calculIndice(tempsMs, nbCoups) {

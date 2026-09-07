@@ -189,12 +189,9 @@ function afficherInterface() {
     else if (mode === 'chrono') afficherChrono(container);
     else if (mode === 'saisie') afficherSaisieCoups(container);
     else if (mode === 'feedback') {
-        // On utilise la même fonction de feedback, mais elle sera appelée après enregistrement
-        // On passe les données via les variables globales
         if (tempsFinal !== null && window._dernierNbCoups) {
             afficherFeedback(container, tempsFinal, window._dernierNbCoups);
         } else {
-            // fallback
             mode = 'liste';
             afficherListeNumeros(container);
         }
@@ -366,7 +363,38 @@ function afficherSaisieCoups(container) {
 }
 
 // ============================================================
-// 4. FEEDBACK (avec graphique de progression)
+// 4. FONCTIONS DE BARÈME (CORRIGÉES)
+// ============================================================
+function getNiveau(indice) {
+    if (indice === null || isNaN(indice)) {
+        return { couleur: '#64748b', label: '--' };
+    }
+    if (indice >= 4.0) return { couleur: '#22c55e', label: '🌟 Excellent' };
+    if (indice >= 3.0) return { couleur: '#3b82f6', label: '💪 Très satisfaisant' };
+    if (indice >= 2.0) return { couleur: '#eab308', label: '✅ Satisfaisant' };
+    if (indice >= 1.31) return { couleur: '#f97316', label: '🟡 Fragile' };
+    return { couleur: '#ef4444', label: '🔴 Très insuffisant' };
+}
+
+function getMessageEncouragement(indice) {
+    if (indice >= 4.0) return '🏆 Excellent ! Tu maîtrises parfaitement ta nage !';
+    if (indice >= 3.0) {
+        const ecart = (4.0 - indice).toFixed(2);
+        return `💪 Tu es à ${ecart} pt${ecart > 1 ? 's' : ''} de passer dans le groupe "Excellent" ! Continue comme ça !`;
+    }
+    if (indice >= 2.0) {
+        const ecart = (3.0 - indice).toFixed(2);
+        return `💪 Tu es à ${ecart} pt${ecart > 1 ? 's' : ''} de passer dans le groupe "Très satisfaisant" !`;
+    }
+    if (indice >= 1.31) {
+        const ecart = (2.0 - indice).toFixed(2);
+        return `💪 Tu es à ${ecart} pt${ecart > 1 ? 's' : ''} de passer dans le groupe "Satisfaisant" !`;
+    }
+    return null;
+}
+
+// ============================================================
+// 5. FEEDBACK (avec barème corrigé)
 // ============================================================
 function afficherFeedback(container, tempsMs, nbCoups) {
     const indice = calculIndice(tempsMs, nbCoups);
@@ -376,6 +404,12 @@ function afficherFeedback(container, tempsMs, nbCoups) {
     // Ajouter l'essai à l'historique
     historiqueEssais.push({ tempsMs, nbCoups, indice, timestamp: Date.now() });
     if (historiqueEssais.length > 5) historiqueEssais.shift();
+
+    // Meilleur indice
+    const meilleurIndice = Math.max(...historiqueEssais.map(e => e.indice), 0);
+
+    // Message d'encouragement
+    const messageEncouragement = getMessageEncouragement(indice);
 
     // Graphique de progression
     let graphHtml = '';
@@ -398,7 +432,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
         `;
     }
 
-    container.innerHTML = `
+    let html = `
         <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 text-center max-w-md mx-auto">
             <div class="flex items-center justify-center gap-6 mb-4">
                 <span class="text-2xl font-black text-slate-400">N°</span>
@@ -418,6 +452,16 @@ function afficherFeedback(container, tempsMs, nbCoups) {
                 <p class="text-sm font-bold mt-2" style="color: ${niveau.couleur}">
                     ${niveau.label}
                 </p>
+                ${historiqueEssais.length > 1 ? `
+                    <div class="mt-1 text-sm text-slate-400">
+                        🏅 Meilleur : <span class="text-yellow-400 font-bold">${meilleurIndice.toFixed(2)}</span>
+                    </div>
+                ` : ''}
+                ${messageEncouragement ? `
+                    <div class="mt-3 p-2 bg-slate-700/50 rounded-xl border border-slate-600">
+                        <p class="text-sm text-yellow-400 font-bold">${messageEncouragement}</p>
+                    </div>
+                ` : ''}
             </div>
 
             ${graphHtml}
@@ -439,6 +483,8 @@ function afficherFeedback(container, tempsMs, nbCoups) {
             </button>
         </div>
     `;
+
+    container.innerHTML = html;
 }
 
 // ============================================================
@@ -457,15 +503,6 @@ function calculIndice(tempsMs, nbCoups) {
     const vitesse = 25 / tempsSec;
     const distanceParCycle = 25 / cycles;
     return vitesse * distanceParCycle;
-}
-
-function getNiveau(indice) {
-    if (indice === null || isNaN(indice)) return { couleur: '#64748b', label: '--' };
-    if (indice >= 4.0) return { couleur: '#eab308', label: '🌟 Excellent' };
-    if (indice >= 3.5) return { couleur: '#3b82f6', label: '💪 Très bon' };
-    if (indice >= 3.0) return { couleur: '#22c55e', label: '✅ Satisfaisant' };
-    if (indice >= 2.5) return { couleur: '#eab308', label: '🟡 Fragile' };
-    return { couleur: '#ef4444', label: '🔴 À besoins' };
 }
 
 function formatTime(ms) {
