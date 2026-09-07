@@ -11,7 +11,7 @@ let tempsUnsubscribe = null;
 let coupsUnsubscribe = null;
 
 // ============================================================
-// BARÈME (tableau ordonné du plus élevé au plus bas)
+// BARÈME (tableau ordonné)
 // ============================================================
 const DEFAULT_BAREME = [
     { min: 4.0, label: 'Excellent', couleur: 'bg-emerald-500' },
@@ -46,19 +46,14 @@ function getNiveau(indice) {
         return { couleur: 'bg-slate-600', label: '--' };
     }
     const bareme = getBareme();
-    // Parcourir du plus haut seuil au plus bas
     for (const niveau of bareme) {
         if (indice >= niveau.min) {
             return { couleur: niveau.couleur, label: niveau.label };
         }
     }
-    // Fallback (normalement jamais atteint)
     return { couleur: 'bg-red-500', label: 'Erreur' };
 }
 
-// ============================================================
-// CALCUL DE L'INDICE
-// ============================================================
 function calculIndice(tempsMs, nbCoups) {
     if (tempsMs === null || nbCoups === null || tempsMs <= 0 || nbCoups <= 0) return null;
     const tempsSec = tempsMs / 1000;
@@ -105,7 +100,6 @@ export function initNatationInterface() {
     const grid = createGrid();
     container.appendChild(grid);
 
-    // Écouter le changement de classe
     const select = document.getElementById('selectClasse');
     if (select) {
         select.removeEventListener('change', onClassChange);
@@ -212,12 +206,10 @@ function createHeader() {
 }
 
 // ============================================================
-// MODALE BARÈME (adaptée au tableau)
+// MODALE BARÈME
 // ============================================================
 function ouvrirBaremeModal() {
     const bareme = getBareme();
-    // bareme est un tableau trié par min décroissant
-    // On va construire une modale avec des inputs pour chaque seuil (sauf le dernier qui est 0)
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
     let html = `
@@ -226,11 +218,9 @@ function ouvrirBaremeModal() {
             <p class="text-xs text-slate-400 text-center mb-4">Seuils minimums pour chaque niveau</p>
             <div class="space-y-3">
     `;
-    // On affiche tous les niveaux sauf le dernier (Très insuffisant) qui a min=0
     for (let i = 0; i < bareme.length - 1; i++) {
         const niveau = bareme[i];
-        const couleur = niveau.couleur.replace('bg-', '');
-        const emoji = couleur === 'emerald-500' ? '🟢' : couleur === 'blue-500' ? '🔵' : couleur === 'yellow-500' ? '🟡' : '🟠';
+        const emoji = niveau.couleur === 'bg-emerald-500' ? '🟢' : niveau.couleur === 'bg-blue-500' ? '🔵' : niveau.couleur === 'bg-yellow-500' ? '🟡' : '🟠';
         html += `
             <div class="flex items-center gap-3">
                 <span class="w-24 text-xs font-bold text-slate-400">${emoji} ${niveau.label}</span>
@@ -239,7 +229,6 @@ function ouvrirBaremeModal() {
             </div>
         `;
     }
-    // Dernier niveau (Très insuffisant) affiché en lecture seule
     const dernier = bareme[bareme.length - 1];
     html += `
         <div class="flex items-center gap-3 opacity-70">
@@ -277,7 +266,6 @@ window.sauvegarderBareme = function() {
             alert('Veuillez saisir des valeurs numériques valides.');
             return;
         }
-        // On garde le label et la couleur du niveau correspondant
         const niveau = baremeActuel[i];
         nouveauBareme.push({
             min: val,
@@ -285,14 +273,12 @@ window.sauvegarderBareme = function() {
             couleur: niveau.couleur
         });
     }
-    // Ajouter le dernier niveau (Très insuffisant) avec min = 0
     const dernier = baremeActuel[baremeActuel.length - 1];
     nouveauBareme.push({
         min: 0,
         label: dernier.label,
         couleur: dernier.couleur
     });
-    // Trier par min décroissant
     nouveauBareme.sort((a, b) => b.min - a.min);
     saveBareme(nouveauBareme);
     window.fermerBaremeModal();
@@ -458,11 +444,11 @@ export async function transmettreNatationConfig() {
             localMapping[`${classe}_${e.numero}`] = e.id;
         }
     });
+    setLocalMapping(classe, localMapping);
     
-    // ✅ NOUVEAU : sauvegarder le mapping dans Firebase
+    // Sauvegarde du mapping dans Firebase pour les iPads
     const mappingRef = ref(db, `${baseProf}/${classe}/natation/mapping`);
     await set(mappingRef, localMapping);
-    setLocalMapping(classe, localMapping);
 
     const configData = {
         activite: 'natation',
@@ -482,7 +468,31 @@ export async function transmettreNatationConfig() {
 }
 
 // ============================================================
-// EXPORT / IMPORT JSON
+// EXPORT JSON
+// ============================================================
+export function exportNatationConfig() {
+    const classe = currentClasse || getCurrentClasse();
+    if (!classe) return alert('Sélectionnez une classe.');
+    const distance = document.getElementById('natation-distance')?.value || '25';
+    const data = {
+        version: 2,
+        classe,
+        activite: 'natation',
+        distance: parseInt(distance, 10),
+        date: new Date().toISOString().slice(0,10).replace(/-/g,''),
+        temps: tempsData,
+        coups: coupsData,
+        bareme: getBareme()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${classe}_natation_${data.date}.json`;
+    a.click();
+}
+
+// ============================================================
+// EXPORT iDoceo (CSV compatible)
 // ============================================================
 function exportNatationIDoceo() {
     const classe = currentClasse || getCurrentClasse();
@@ -536,10 +546,8 @@ function exportNatationIDoceo() {
 }
 
 // ============================================================
-// EXPOSITION GLOBALE (pour les appels depuis activities.js)
+// IMPORT JSON
 // ============================================================
-window.exportNatationIDoceo = exportNatationIDoceo;
-
 export function importNatationConfig(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -582,3 +590,8 @@ export function importNatationConfig(event) {
     reader.readAsText(file);
     event.target.value = '';
 }
+
+// ============================================================
+// EXPOSITION GLOBALE (pour les appels depuis activities.js)
+// ============================================================
+window.exportNatationIDoceo = exportNatationIDoceo;
