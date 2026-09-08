@@ -6,7 +6,12 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 let currentUnsub = null;
 let currentMode = 'classic';
 
-export async function renderEscaladeTV() {
+export async function renderEscaladeTV(mode) {
+    if (mode) {
+        currentMode = mode;
+    } else {
+        currentMode = localStorage.getItem('escalade_mode') || 'classic';
+    }
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 

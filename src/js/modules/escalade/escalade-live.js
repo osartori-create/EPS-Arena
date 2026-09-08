@@ -7,7 +7,9 @@ import { BAREME, coeffToCotation } from './escalade-calculations.js';
 let currentUnsub = null;
 let currentMode = 'classic';
 
-export function renderEscaladeLive() {
+export function renderEscaladeLive(mode) {
+    // Si mode est fourni, on l'utilise, sinon on lit localStorage
+    currentMode = mode || localStorage.getItem('escalade_mode') || 'classic';
     const container = document.getElementById('live-content');
     if (!container) return;
 

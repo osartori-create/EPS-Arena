@@ -331,61 +331,67 @@ export function initActivities() {
                 }
             }
         } else if (subTab === 'live') {
-            if (viewLive) viewLive.classList.remove('hidden');
-            const container = document.getElementById('live-content');
-            container.innerHTML = '<p>Chargement du Live...</p>';
+    if (viewLive) viewLive.classList.remove('hidden');
+    const container = document.getElementById('live-content');
+    container.innerHTML = '<p>Chargement du Live...</p>';
 
-            // --- GESTION DES BOUTONS D'EXPORT ---
-            const exportCSVBtn = document.querySelector('#viewLive .bg-indigo-600');
-            const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
-            
-            if (disc === 'natation') {
-                if (exportCSVBtn) exportCSVBtn.style.display = 'none';
-                if (exportIDoceoBtn) {
-                    exportIDoceoBtn.textContent = '📥 Export iDoceo';
-                    exportIDoceoBtn.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400';
-                    exportIDoceoBtn.onclick = function() {
-                        if (typeof window.exportNatationIDoceo === 'function') {
-                            window.exportNatationIDoceo();
-                        } else {
-                            alert('Export Natation non disponible. Transmettez d\'abord la configuration.');
-                        }
-                    };
-                }
-            } else {
-                if (exportCSVBtn) exportCSVBtn.style.display = '';
-                if (exportIDoceoBtn) {
-                    exportIDoceoBtn.textContent = '📥 Export iDoceo (CO)';
-                    exportIDoceoBtn.className = 'bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400';
-                    exportIDoceoBtn.onclick = function() {
-                        if (typeof exportCOiDoceo === 'function') exportCOiDoceo();
-                        else alert('Export CO non disponible.');
-                    };
-                }
-            }
-
-            // --- Chargement du Live selon la discipline ---
-            const liveModules = {
-                'badminton': () => import('../../modules/badminton/badminton-live.js').then(m => m.renderBadmintonLive()),
-                'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
-                'co': () => {
-                    const coModule = getModule('co');
-                    return coModule?.renderLive ? coModule.renderLive() : import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {}));
-                },
-                'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
-                'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
-                'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
-                'tournoi': () => {
-                    container.innerHTML = '<p class="text-slate-500">Live non disponible pour le tournoi.</p>';
-                    return Promise.resolve();
+    // --- GESTION DES BOUTONS D'EXPORT ---
+    const exportCSVBtn = document.querySelector('#viewLive .bg-indigo-600');
+    const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
+    
+    // Cacher les boutons pour l'escalade (classique et bloccontest)
+    if (disc === 'escalade' || disc === 'bloccontest') {
+        if (exportCSVBtn) exportCSVBtn.style.display = 'none';
+        if (exportIDoceoBtn) exportIDoceoBtn.style.display = 'none';
+    } else if (disc === 'natation') {
+        if (exportCSVBtn) exportCSVBtn.style.display = 'none';
+        if (exportIDoceoBtn) {
+            exportIDoceoBtn.textContent = '📥 Export iDoceo';
+            exportIDoceoBtn.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400';
+            exportIDoceoBtn.onclick = function() {
+                if (typeof window.exportNatationIDoceo === 'function') {
+                    window.exportNatationIDoceo();
+                } else {
+                    alert('Export Natation non disponible. Transmettez d\'abord la configuration.');
                 }
             };
-            if (liveModules[disc]) {
-                const result = liveModules[disc]();
-                if (result?.catch) result.catch(err => console.error(`Erreur Live ${disc} :`, err));
-            } else {
-                container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
-            }
+        }
+    } else {
+        // Autres disciplines (CO, Multi, etc.)
+        if (exportCSVBtn) exportCSVBtn.style.display = '';
+        if (exportIDoceoBtn) {
+            exportIDoceoBtn.textContent = '📥 Export iDoceo (CO)';
+            exportIDoceoBtn.className = 'bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400';
+            exportIDoceoBtn.onclick = function() {
+                if (typeof exportCOiDoceo === 'function') exportCOiDoceo();
+                else alert('Export CO non disponible.');
+            };
+        }
+    }
+
+    // --- Chargement du Live selon la discipline ---
+    const liveModules = {
+        'badminton': () => import('../../modules/badminton/badminton-live.js').then(m => m.renderBadmintonLive()),
+        'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive('classic')),
+'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive('bloc')),
+        'co': () => {
+            const coModule = getModule('co');
+            return coModule?.renderLive ? coModule.renderLive() : import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {}));
+        },
+        'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
+        'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
+        'tournoi': () => {
+            container.innerHTML = '<p class="text-slate-500">Live non disponible pour le tournoi.</p>';
+            return Promise.resolve();
+        }
+    };
+    if (liveModules[disc]) {
+        const result = liveModules[disc]();
+        if (result?.catch) result.catch(err => console.error(`Erreur Live ${disc} :`, err));
+    } else {
+        container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
+    }
+
         } else if (subTab === 'tv') {
             const tvViewEl = document.getElementById('viewTV');
             if (tvViewEl) {
@@ -394,13 +400,13 @@ export function initActivities() {
                 setTimeout(() => {
                     const tvModules = {
                         'badminton': () => import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV()),
-                        'escalade': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
+                        'escalade': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV('classic')),
+    'bloccontest': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV('bloc')),
                         'co': () => {
                             const coModule = getModule('co');
                             return coModule?.renderTV ? coModule.renderTV() : Promise.resolve();
                         },
                         'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
-                        'bloccontest': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
                         'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
                         'tournoi': () => {
                             document.getElementById('tvGlobe').innerHTML = '<p class="text-slate-500 text-center">Mode TV non disponible pour le tournoi.</p>';
