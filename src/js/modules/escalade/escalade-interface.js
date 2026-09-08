@@ -1,4 +1,8 @@
+// src/js/modules/escalade/escalade-interface.js
 import { getPhotoUrl } from '../../services/admin-service.js';
+import { exporterVersIDoceo } from '../../services/export-service.js';
+import { db, ref, onValue } from '../../core/firebase-service.js';
+import { BAREME, coeffToCotation } from './escalade-calculations.js';
 
 // 1. Génération de la grille (avec lecture de la sauvegarde pour le bon nombre de groupes)
 export function initEscaladeInterface(nbGroupes = 6, force = false) {
@@ -80,7 +84,7 @@ export function initSortableEscalade() {
             animation: 150,
             onEnd: () => {
                 saveEscaladeAssignments();
-                updateRanks(); // <--- AJOUT
+                updateRanks();
             }
         });
     }
@@ -91,7 +95,7 @@ export function initSortableEscalade() {
             animation: 150,
             onEnd: () => {
                 saveEscaladeAssignments();
-                updateRanks(); // <--- AJOUT
+                updateRanks();
             }
         });
     }
@@ -102,7 +106,7 @@ export function initSortableEscalade() {
             animation: 150,
             onEnd: () => {
                 saveEscaladeAssignments();
-                updateRanks(); // <--- AJOUT
+                updateRanks();
             }
         });
     });
@@ -318,3 +322,112 @@ export function importEscaladeConfig(event) {
     reader.readAsText(file);
     event.target.value = '';
 }
+
+// ============================================================
+// EXPORT iDoceo (Escalade) - avec "Meilleure voie"
+// ============================================================
+function exportEscaladeIDoceo() {
+    const activeClasse = document.getElementById('selectClasse').value;
+    if (!activeClasse) {
+        alert('Sélectionnez une classe.');
+        return;
+    }
+
+    // 1. Récupérer les élèves
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+    if (eleves.length === 0) {
+        alert('Aucun élève dans cette classe.');
+        return;
+    }
+
+    // 2. Récupérer les montées depuis Firebase
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const monteesPath = `etablissements/0680013V/profs/${profCode}/${activeClasse}/escalade/montees`;
+    const monteesRef = ref(db, monteesPath);
+
+    onValue(monteesRef, (snap) => {
+        const montees = snap.val() || {};
+        const monteesList = Object.values(montees);
+
+        // 3. Construire les données pour chaque élève
+        const donnees = eleves.map((eleve, index) => {
+            // Récupérer les montées de l'élève
+            const mesMontees = monteesList.filter(m => {
+                return m.eleveId === eleve.id ||
+                       `${m.groupe}${m.role}` === eleve.code ||
+                       m.groupe === eleve.code;
+            });
+
+            const nbMontees = mesMontees.length;
+            const distanceTotale = mesMontees.reduce((sum, m) => sum + (m.hauteur || m.points || 0), 0);
+
+            // Difficulté moyenne (cotation)
+            let coeffTotal = 0;
+            let hauteurTotal = 0;
+            mesMontees.forEach(m => {
+                const coeff = BAREME[m.cotation] || 1;
+                coeffTotal += coeff * (m.hauteur || 0);
+                hauteurTotal += m.hauteur || 0;
+            });
+            const coeffMoyen = hauteurTotal > 0 ? (coeffTotal / hauteurTotal) : 0;
+            const difficultMoyenne = coeffToCotation(coeffMoyen);
+
+            // Meilleure cotation (validée sur au moins 2 voies)
+            const validations = {};
+            mesMontees.forEach(m => {
+                if (!validations[m.cotation]) validations[m.cotation] = new Set();
+                validations[m.cotation].add(m.voie_num);
+            });
+            const meilleureCotation = Object.keys(validations)
+                .filter(cot => validations[cot].size >= 2)
+                .sort((a, b) => (BAREME[b] || 1) - (BAREME[a] || 1))[0] || 'Aucune';
+
+            // Meilleure voie (celle qui a rapporté le plus de points)
+            let meilleureVoie = '';
+            let meilleurScore = 0;
+            mesMontees.forEach(m => {
+                const score = m.points || 0;
+                if (score > meilleurScore) {
+                    meilleurScore = score;
+                    meilleureVoie = m.voie_num || '';
+                }
+            });
+            if (meilleureVoie === '') meilleureVoie = 'Aucune';
+
+            return {
+                numero: index + 1,
+                nom: eleve.nom || '',
+                prenom: eleve.prenom || '',
+                nbMontees: nbMontees,
+                distanceTotale: distanceTotale.toFixed(1),
+                difficulteMoyenne: difficultMoyenne,
+                meilleureCotation: meilleureCotation,
+                meilleureVoie: meilleureVoie
+            };
+        });
+
+        // 4. Trier par numéro (ordre alphabétique déjà respecté)
+        donnees.sort((a, b) => a.numero - b.numero);
+
+        // 5. Définir les colonnes (avec ! devant toutes les colonnes)
+        const colonnes = [
+            { nom: '!groupe', cle: 'numero' },
+            { nom: '!Nom', cle: 'nom' },
+            { nom: '!Prénom', cle: 'prenom' },
+            { nom: '!Nb montées', cle: 'nbMontees' },
+            { nom: '!Distance totale (m)', cle: 'distanceTotale' },
+            { nom: '!Difficulté moyenne', cle: 'difficulteMoyenne' },
+            { nom: '!Meilleure cotation', cle: 'meilleureCotation' },
+            { nom: '!Meilleure voie', cle: 'meilleureVoie' }
+        ];
+
+        // 6. Exporter via le service centralisé
+        exporterVersIDoceo('Escalade', activeClasse, colonnes, donnees);
+
+    }, { onlyOnce: true });
+}
+
+// ============================================================
+// EXPOSITION GLOBALE
+// ============================================================
+window.exportEscaladeIDoceo = exportEscaladeIDoceo;
