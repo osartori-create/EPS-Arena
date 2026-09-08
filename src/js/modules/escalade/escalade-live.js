@@ -5,11 +5,17 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 import { BAREME, coeffToCotation } from './escalade-calculations.js';
 
 let currentUnsub = null;
-let currentMode = 'classic';
+let currentEscaladeMode = 'classic';
+let currentEscaladeClasse = '';
 
-export function renderEscaladeLive(mode) {
-    // Si mode est fourni, on l'utilise, sinon on lit localStorage
-    currentMode = mode || localStorage.getItem('escalade_mode') || 'classic';
+export function setEscaladeMode(mode) {
+    currentEscaladeMode = mode;
+    if (currentEscaladeClasse) {
+        renderEscaladeLive();
+    }
+}
+
+export function renderEscaladeLive() {
     const container = document.getElementById('live-content');
     if (!container) return;
 
@@ -19,8 +25,7 @@ export function renderEscaladeLive(mode) {
         return;
     }
 
-    const savedMode = localStorage.getItem('escalade_mode') || 'classic';
-    currentMode = savedMode;
+    currentEscaladeClasse = classe;
 
     if (currentUnsub) {
         currentUnsub();
@@ -34,13 +39,14 @@ export function renderEscaladeLive(mode) {
 
     container.innerHTML = '<p class="text-slate-500 text-center">Chargement...</p>';
 
-    if (currentMode === 'classic') {
+    if (currentEscaladeMode === 'classic') {
         const monteesRef = ref(db, monteesPath);
         currentUnsub = onValue(monteesRef, (snap) => {
             const data = snap.val() || {};
             renderClassicLive(container, data, classe);
         });
     } else {
+        // Bloc Contest
         const validationsRef = ref(db, validationsPath);
         const configRef = ref(db, configPath);
         
@@ -78,7 +84,6 @@ function renderClassicLive(container, data, classe) {
 
     let html = `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade (Cliquez pour le bilan)</h3><div class="space-y-2">`;
     
-    // On utilise Promise.all car getPhotoHtml est async
     const promises = entries.slice(0, 20).map(async m => {
         const code = `${m.groupe}${m.role}`;
         const nom = getNomFromCode(code, classe);
@@ -99,7 +104,6 @@ function renderClassicLive(container, data, classe) {
         container.innerHTML = html;
     });
 
-    // openBilan (inchangé)
     window.openBilan = async function(code) {
         const allData = data;
         const mesMontees = Object.values(allData).filter(m => `${m.groupe}${m.role}` === code);
@@ -181,7 +185,6 @@ function renderBlocLive(container, validations, config, classe) {
         .sort((a, b) => b[1] - a[1])
         .slice(0, 20);
 
-    // Ici on utilise async/await dans une IIFE car on est dans une fonction synchrone
     (async () => {
         let items = [];
         for (const [eleveId, score] of sorted) {

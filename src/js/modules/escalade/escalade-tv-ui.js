@@ -4,14 +4,17 @@ import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 
 let currentUnsub = null;
-let currentMode = 'classic';
+let currentEscaladeMode = 'classic';
+let currentEscaladeClasse = '';
 
-export async function renderEscaladeTV(mode) {
-    if (mode) {
-        currentMode = mode;
-    } else {
-        currentMode = localStorage.getItem('escalade_mode') || 'classic';
+export function setEscaladeMode(mode) {
+    currentEscaladeMode = mode;
+    if (currentEscaladeClasse) {
+        renderEscaladeTV();
     }
+}
+
+export async function renderEscaladeTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
 
@@ -37,8 +40,7 @@ export async function renderEscaladeTV(mode) {
         return;
     }
 
-    const savedMode = localStorage.getItem('escalade_mode') || 'classic';
-    currentMode = savedMode;
+    currentEscaladeClasse = classe;
 
     if (currentUnsub) {
         currentUnsub();
@@ -52,13 +54,14 @@ export async function renderEscaladeTV(mode) {
 
     container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente des performances...</p>';
 
-    if (currentMode === 'classic') {
+    if (currentEscaladeMode === 'classic') {
         const monteesRef = ref(db, monteesPath);
         currentUnsub = onValue(monteesRef, async (snap) => {
             const montees = snap.val() || {};
             await renderClassicTV(container, montees, classe);
         });
     } else {
+        // Bloc Contest
         const validationsRef = ref(db, validationsPath);
         const configRef = ref(db, configPath);
         

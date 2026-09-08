@@ -125,17 +125,27 @@ export function initActivities() {
                 const classe = document.getElementById('selectClasse').value;
                 multiModule.initProf(classe);
             }
-        } else if (disc === 'escalade') {
-            const escaladeModule = getModule('escalade');
-            if (escaladeModule?.initProf) {
-                const classe = document.getElementById('selectClasse').value;
-                escaladeModule.initProf(classe);
-            } else {
-                // Fallback
-                initEscaladeInterface();
-                initSortableEscalade();
-                loadEscaladeAssignments();
-            }
+        } else if (disc === 'escalade' || disc === 'bloccontest') {
+    const escaladeModule = getModule('escalade');
+    if (escaladeModule?.initProf) {
+        const classe = document.getElementById('selectClasse').value;
+        escaladeModule.initProf(classe);
+    } else {
+        // Fallback
+        initEscaladeInterface();
+        initSortableEscalade();
+        loadEscaladeAssignments();
+    }
+    // Définir le mode pour le Live et la TV
+    const mode = disc === 'bloccontest' ? 'bloc' : 'classic';
+    // On importe dynamiquement les modules pour appeler setEscaladeMode
+    import('../../modules/escalade/escalade-live.js').then(module => {
+        if (module.setEscaladeMode) module.setEscaladeMode(mode);
+    });
+    import('../../modules/escalade/escalade-tv-ui.js').then(module => {
+        if (module.setEscaladeMode) module.setEscaladeMode(mode);
+    });
+
         } else if (disc === 'badminton') {
             try {
                 initBadmintonInterface();
@@ -185,10 +195,17 @@ export function initActivities() {
     // ÉCOUTE DU CHANGEMENT DE MODE ESCALADE
     // ============================================================
     window.addEventListener('escalade-mode-changed', (e) => {
-        const mode = e.detail.mode;
-        currentDiscipline = (mode === 'bloc') ? 'bloccontest' : 'escalade';
-        console.log('[activities] currentDiscipline mis à jour :', currentDiscipline);
+    const mode = e.detail.mode;
+    currentDiscipline = (mode === 'bloc') ? 'bloccontest' : 'escalade';
+    // Mettre à jour les modules Live et TV
+    import('../../modules/escalade/escalade-live.js').then(module => {
+        if (module.setEscaladeMode) module.setEscaladeMode(mode);
     });
+    import('../../modules/escalade/escalade-tv-ui.js').then(module => {
+        if (module.setEscaladeMode) module.setEscaladeMode(mode);
+    });
+    console.log('[activities] currentDiscipline mis à jour :', currentDiscipline);
+});
 
     // ============================================================
     // GÉNÉRATION DES ÉQUIPES / GROUPES
@@ -337,37 +354,32 @@ export function initActivities() {
 
     // --- GESTION DES BOUTONS D'EXPORT ---
     const exportCSVBtn = document.querySelector('#viewLive .bg-indigo-600');
-    const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
-    
-    // Cacher les boutons pour l'escalade (classique et bloccontest)
-    if (disc === 'escalade' || disc === 'bloccontest') {
-        if (exportCSVBtn) exportCSVBtn.style.display = 'none';
-        if (exportIDoceoBtn) exportIDoceoBtn.style.display = 'none';
-    } else if (disc === 'natation') {
-        if (exportCSVBtn) exportCSVBtn.style.display = 'none';
-        if (exportIDoceoBtn) {
-            exportIDoceoBtn.textContent = '📥 Export iDoceo';
-            exportIDoceoBtn.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400';
-            exportIDoceoBtn.onclick = function() {
-                if (typeof window.exportNatationIDoceo === 'function') {
-                    window.exportNatationIDoceo();
-                } else {
-                    alert('Export Natation non disponible. Transmettez d\'abord la configuration.');
-                }
-            };
-        }
-    } else {
-        // Autres disciplines (CO, Multi, etc.)
-        if (exportCSVBtn) exportCSVBtn.style.display = '';
-        if (exportIDoceoBtn) {
+const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
+
+// Par défaut, on les masque pour les disciplines où ils ne sont pas utiles
+if (disc === 'escalade' || disc === 'bloccontest' || disc === 'natation') {
+    if (exportCSVBtn) exportCSVBtn.style.display = 'none';
+    if (exportIDoceoBtn) exportIDoceoBtn.style.display = 'none';
+} else {
+    // Pour les autres disciplines, on les restaure
+    if (exportCSVBtn) exportCSVBtn.style.display = '';
+    // Pour CO, on restaure le bouton iDoceo
+    if (exportIDoceoBtn) {
+        if (disc === 'co') {
             exportIDoceoBtn.textContent = '📥 Export iDoceo (CO)';
             exportIDoceoBtn.className = 'bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400';
             exportIDoceoBtn.onclick = function() {
                 if (typeof exportCOiDoceo === 'function') exportCOiDoceo();
                 else alert('Export CO non disponible.');
             };
+            exportIDoceoBtn.style.display = '';
+        } else {
+            // Pour les autres, on le masque ou on le laisse selon besoin
+            // On peut le laisser affiché pour Multi par exemple, mais on le désactive
+            exportIDoceoBtn.style.display = 'none';
         }
     }
+}
 
     // --- Chargement du Live selon la discipline ---
     const liveModules = {
