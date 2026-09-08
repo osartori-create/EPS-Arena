@@ -18,7 +18,6 @@ export function initEscaladeInterface(nbGroupes = 6, force = false) {
     // Calculer le nombre de groupes à afficher
     if (force && nbGroupes) {
         savedGroupes = nbGroupes; // On impose le nombre demandé
-        // On ne supprime PAS la sauvegarde pour éviter de vider les groupes
     } else if (savedData.nbGroupes) {
         savedGroupes = savedData.nbGroupes; // On utilise le nombre sauvegardé
     } else {

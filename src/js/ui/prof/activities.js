@@ -81,7 +81,7 @@ export function initActivities() {
         const coOrientShow = document.getElementById('co-orientshow-container');
         if (coClassique) {
             coClassique.style.display = 'none';
-            coClassique.innerHTML = ''; // Vide pour être sûr
+            coClassique.innerHTML = '';
         }
         if (coOrientShow) {
             coOrientShow.style.display = 'none';
@@ -105,7 +105,7 @@ export function initActivities() {
             const targetView = document.getElementById(targetId);
             if (targetView) {
                 targetView.classList.remove('hidden');
-                targetView.style.display = ''; // Restaure l'affichage normal (CSS)
+                targetView.style.display = '';
             }
         }
 
@@ -167,7 +167,6 @@ export function initActivities() {
                 console.error("Erreur init Tournoi :", e);
             }
         } else if (disc === 'natation') {
-            // La vue est déjà affichée, on initialise le module
             initNatationInterface();
         }
 
@@ -202,7 +201,7 @@ export function initActivities() {
 
         const dispatch = {
             'natation': () => {
-                initNatationInterface(); // recharge la liste des élèves
+                initNatationInterface();
                 alert('Liste des élèves mise à jour.');
             },
             'co': async () => {
@@ -331,63 +330,62 @@ export function initActivities() {
                     import('../../modules/co/co-live.js').then(m => m.renderCOLive()).catch(console.error);
                 }
             }
-        else if (subTab === 'live') {
-    if (viewLive) viewLive.classList.remove('hidden');
-    const container = document.getElementById('live-content');
-    container.innerHTML = '<p>Chargement du Live...</p>';
+        } else if (subTab === 'live') {
+            if (viewLive) viewLive.classList.remove('hidden');
+            const container = document.getElementById('live-content');
+            container.innerHTML = '<p>Chargement du Live...</p>';
 
-    // --- GESTION DES BOUTONS D'EXPORT ---
-    const exportCSVBtn = document.querySelector('#viewLive .bg-indigo-600');
-    const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
-    
-    if (disc === 'natation') {
-        if (exportCSVBtn) exportCSVBtn.style.display = 'none';
-        if (exportIDoceoBtn) {
-            exportIDoceoBtn.textContent = '📥 Export iDoceo';
-            exportIDoceoBtn.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400';
-            exportIDoceoBtn.onclick = function() {
-                if (typeof window.exportNatationIDoceo === 'function') {
-                    window.exportNatationIDoceo();
-                } else {
-                    alert('Export Natation non disponible. Transmettez d\'abord la configuration.');
+            // --- GESTION DES BOUTONS D'EXPORT ---
+            const exportCSVBtn = document.querySelector('#viewLive .bg-indigo-600');
+            const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
+            
+            if (disc === 'natation') {
+                if (exportCSVBtn) exportCSVBtn.style.display = 'none';
+                if (exportIDoceoBtn) {
+                    exportIDoceoBtn.textContent = '📥 Export iDoceo';
+                    exportIDoceoBtn.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400';
+                    exportIDoceoBtn.onclick = function() {
+                        if (typeof window.exportNatationIDoceo === 'function') {
+                            window.exportNatationIDoceo();
+                        } else {
+                            alert('Export Natation non disponible. Transmettez d\'abord la configuration.');
+                        }
+                    };
+                }
+            } else {
+                if (exportCSVBtn) exportCSVBtn.style.display = '';
+                if (exportIDoceoBtn) {
+                    exportIDoceoBtn.textContent = '📥 Export iDoceo (CO)';
+                    exportIDoceoBtn.className = 'bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400';
+                    exportIDoceoBtn.onclick = function() {
+                        if (typeof exportCOiDoceo === 'function') exportCOiDoceo();
+                        else alert('Export CO non disponible.');
+                    };
+                }
+            }
+
+            // --- Chargement du Live selon la discipline ---
+            const liveModules = {
+                'badminton': () => import('../../modules/badminton/badminton-live.js').then(m => m.renderBadmintonLive()),
+                'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
+                'co': () => {
+                    const coModule = getModule('co');
+                    return coModule?.renderLive ? coModule.renderLive() : import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {}));
+                },
+                'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
+                'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
+                'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
+                'tournoi': () => {
+                    container.innerHTML = '<p class="text-slate-500">Live non disponible pour le tournoi.</p>';
+                    return Promise.resolve();
                 }
             };
-        }
-    } else {
-        if (exportCSVBtn) exportCSVBtn.style.display = '';
-        if (exportIDoceoBtn) {
-            exportIDoceoBtn.textContent = '📥 Export iDoceo (CO)';
-            exportIDoceoBtn.className = 'bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400';
-            exportIDoceoBtn.onclick = function() {
-                if (typeof exportCOiDoceo === 'function') exportCOiDoceo();
-                else alert('Export CO non disponible.');
-            };
-        }
-    }
-
-    // --- Chargement du Live selon la discipline ---
-    const liveModules = {
-        'badminton': () => import('../../modules/badminton/badminton-live.js').then(m => m.renderBadmintonLive()),
-        'escalade': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
-        'co': () => {
-            const coModule = getModule('co');
-            return coModule?.renderLive ? coModule.renderLive() : import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {}));
-        },
-        'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
-        'bloccontest': () => import('../../modules/escalade/escalade-live.js').then(m => m.renderEscaladeLive(window.lastLiveData || {})),
-        'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
-        'tournoi': () => {
-            container.innerHTML = '<p class="text-slate-500">Live non disponible pour le tournoi.</p>';
-            return Promise.resolve();
-        }
-    };
-    if (liveModules[disc]) {
-        const result = liveModules[disc]();
-        if (result?.catch) result.catch(err => console.error(`Erreur Live ${disc} :`, err));
-    } else {
-        container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
-    }
-}
+            if (liveModules[disc]) {
+                const result = liveModules[disc]();
+                if (result?.catch) result.catch(err => console.error(`Erreur Live ${disc} :`, err));
+            } else {
+                container.innerHTML = `<p class="text-red-400">Aucun module Live pour cette discipline.</p>`;
+            }
         } else if (subTab === 'tv') {
             const tvViewEl = document.getElementById('viewTV');
             if (tvViewEl) {
@@ -405,7 +403,6 @@ export function initActivities() {
                         'bloccontest': () => import('../../modules/escalade/escalade-tv-ui.js').then(m => m.renderEscaladeTV()),
                         'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
                         'tournoi': () => {
-                            // TV non disponible pour le tournoi
                             document.getElementById('tvGlobe').innerHTML = '<p class="text-slate-500 text-center">Mode TV non disponible pour le tournoi.</p>';
                             return Promise.resolve();
                         }
@@ -432,8 +429,15 @@ export function initActivities() {
             'escalade': async () => {
                 const escaladeModule = getModule('escalade');
                 if (escaladeModule?.transmettre) {
-                    await escaladeModule.transmettre(activeClasse);
-                    return;
+                    try {
+                        await escaladeModule.transmettre(activeClasse);
+                        alert("✅ Configuration Escalade transmise aux iPads !");
+                        return;
+                    } catch (err) {
+                        console.error('Erreur transmission escalade :', err);
+                        alert('❌ Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.');
+                        return;
+                    }
                 }
                 // Fallback
                 const configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
@@ -446,25 +450,48 @@ export function initActivities() {
                     }
                 });
                 localStorage.setItem(`eps_arena_local_mapping_${activeClasse}`, JSON.stringify(localMapping));
-                await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
-                await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
-                alert("✅ Configuration Escalade transmise aux iPads !");
+                try {
+                    await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+                    await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+                    alert("✅ Configuration Escalade transmise aux iPads !");
+                } catch (e) {
+                    console.error("Erreur transmission :", e);
+                    alert("❌ Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
+                }
             },
             'bloccontest': async () => {
                 const escaladeModule = getModule('escalade');
-                if (escaladeModule?.transmettre) await escaladeModule.transmettre(activeClasse);
+                if (escaladeModule?.transmettre) {
+                    await escaladeModule.transmettre(activeClasse);
+                    alert("✅ Configuration Bloc Contest transmise aux iPads !");
+                }
             },
             'multi': async () => {
                 const multiModule = getModule('multi');
-                if (multiModule?.transmettre) await multiModule.transmettre(activeClasse);
+                if (multiModule?.transmettre) {
+                    await multiModule.transmettre(activeClasse);
+                    alert("✅ Configuration Multi transmise aux iPads !");
+                }
             },
             'co': async () => {
                 const coModule = getModule('co');
-                if (coModule?.transmettre) await coModule.transmettre(activeClasse);
+                if (coModule?.transmettre) {
+                    await coModule.transmettre(activeClasse);
+                    alert("✅ Configuration CO transmise aux iPads !");
+                }
             },
-            'badminton': async () => { await transmettreBadmintonConfig(); },
-            'arcathlon': async () => { await transmettreArcathlonConfig(); },
-            'natation': async () => { await transmettreNatationConfig(); },
+            'badminton': async () => {
+                await transmettreBadmintonConfig();
+                // transmettreBadmintonConfig gère déjà son propre alert
+            },
+            'arcathlon': async () => {
+                await transmettreArcathlonConfig();
+                // transmettreArcathlonConfig gère déjà son propre alert
+            },
+            'natation': async () => {
+                await transmettreNatationConfig();
+                // transmettreNatationConfig gère déjà son propre alert
+            },
             'tournoi': async () => {
                 const configData = { activite: 'tournoi', mode: window.tournoiMode || 'elimination' };
                 await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
@@ -478,7 +505,7 @@ export function initActivities() {
                 await handlers[currentDiscipline]();
             } catch (e) {
                 console.error("Erreur transmission :", e);
-                alert("Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
+                alert("❌ Erreur lors de la transmission.\nVérifie la console (F12) pour plus de détails.");
             }
         } else {
             alert("❌ Aucune transmission définie pour cette discipline.");
