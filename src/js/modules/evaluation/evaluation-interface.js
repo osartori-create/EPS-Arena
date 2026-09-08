@@ -67,6 +67,28 @@ export function initEvaluationInterface() {
 
     chargerDonneesClasse();
 }
+// ============================================================
+// EXPORT CSV (iDoceo)
+// ============================================================
+function exporterCSV() {
+    if (!currentData) {
+        alert('Aucune donnée à exporter.');
+        return;
+    }
+    if (!currentClasse) {
+        alert('Aucune classe sélectionnée.');
+        return;
+    }
+    // Appel direct à la fonction d'export du module
+    // Comme nous avons déjà importé exporterVersIDoceo dans evaluation-utils.js,
+    // on va l'importer dynamiquement pour éviter les problèmes de dépendances circulaires
+    import('./evaluation-utils.js').then(module => {
+        module.exporterVersIDoceo(currentData, currentClasse);
+    }).catch(err => {
+        console.error('Erreur export :', err);
+        alert('Erreur lors de l\'export. Vérifie la console.');
+    });
+}
 
 function afficherMenu() {
     const container = document.getElementById('viewEvaluationSettings');
