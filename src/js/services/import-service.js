@@ -27,7 +27,7 @@ function detectSeparator(csvString) {
 }
 
 /**
- * Nettoie les noms : 
+ * Nettoie les noms :
  * - Prénom : première lettre majuscule, reste minuscule
  * - Nom : tout en majuscule
  */
@@ -188,6 +188,8 @@ export function importerIDoceo(file, classeName, onProgress, onComplete) {
         
         if (nouveauxEleves.length > 0 || updatedEleves.length > 0) {
             saveEleves(classeName, elevesExistants);
+            // Déclencher un événement pour rafraîchir la grille
+            window.dispatchEvent(new CustomEvent('eleves-imported'));
         }
         
         if (onComplete) {
@@ -435,6 +437,10 @@ export function openImportModal(classeName) {
                             <p class="text-sm text-slate-300">${result.nouveaux} élève(s) créé(s), ${result.updated} mis à jour.</p>
                         </div>
                     `;
+                    // Fermer la modale automatiquement après 2 secondes
+                    setTimeout(() => {
+                        window.closeImportModal();
+                    }, 2000);
                 } else {
                     alert('Erreur : ' + result.error);
                     confirmBtn.disabled = false;
@@ -491,6 +497,8 @@ export function openImportModal(classeName) {
         
         if (nouveauxEleves.length > 0 || updatedEleves.length > 0) {
             saveEleves(classeName, elevesExistants);
+            // Déclencher un événement pour rafraîchir la grille
+            window.dispatchEvent(new CustomEvent('eleves-imported'));
         }
         
         return {
@@ -506,5 +514,3 @@ window.closeImportModal = function() {
     const modal = document.getElementById('import-idoceo-modal');
     if (modal) modal.remove();
 };
-
-// La fonction openImportModal est déjà exportée

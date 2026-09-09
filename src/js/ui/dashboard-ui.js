@@ -64,6 +64,10 @@ export function initAdminUI() {
 
     activeClasse = select ? select.value : "";
     if (activeClasse) loadLocalEleves();
+
+    window.addEventListener('eleves-imported', () => {
+    loadLocalEleves();
+});
 }
 
 // --- Fonctions de rendu et actions (inchangées) ---
