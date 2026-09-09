@@ -593,25 +593,21 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
     if (isSaving) return;
     if (currentNumero === null) return;
     
-    const eleveId = getEleveIdFromNumero(currentNumero);
-    if (!eleveId) {
-        alert('Numéro non reconnu.');
-        return;
-    }
+    const numero = currentNumero; // ✅ on utilise le numéro directement
 
     isSaving = true;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const indice = calculIndice(tempsMs, nbCoups);
     
     const nouvelEssai = {
-        eleveId: eleveId,  // ✅ UNIQUEMENT l'ID
+        numero: numero,  // On stocke le numéro dans l'historique
         tempsMs: tempsMs,
         nbCoups: nbCoups,
         indice: indice,
         timestamp: Date.now()
     };
 
-    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${eleveId}`);
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
     
     onValue(historiqueRef, (snap) => {
         let historique = snap.val() || [];
@@ -625,17 +621,17 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         if (historique.length > 10) historique.shift();
         
         set(historiqueRef, historique).then(() => {
-            const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
-            const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
+            const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
+            const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
             
             return Promise.all([
                 set(tempsRef, tempsMs),
                 set(coupsRef, nbCoups)
             ]);
         }).then(() => {
-            console.log('✅ Enregistré pour', eleveId);
+            console.log('✅ Enregistré pour le numéro', numero);
             window._dernierNbCoups = nbCoups;
-            chargerHistoriqueEleve(eleveId, () => {
+            chargerHistoriqueEleve(numero, () => {
                 isSaving = false;
                 mode = 'feedback';
                 const container = document.getElementById('natation-module');
@@ -646,5 +642,22 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
             alert('Erreur lors de l\'enregistrement.');
             isSaving = false;
         });
+    }, { onlyOnce: true });
+}
+
+// chargerHistoriqueEleve utilise aussi le numéro
+function chargerHistoriqueEleve(numero, callback) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
+    
+    onValue(historiqueRef, (snap) => {
+        const data = snap.val() || [];
+        historiqueEssais = data.map(e => ({
+            tempsMs: e.tempsMs,
+            nbCoups: e.nbCoups,
+            indice: e.indice,
+            timestamp: e.timestamp
+        }));
+        if (callback) callback();
     }, { onlyOnce: true });
 }

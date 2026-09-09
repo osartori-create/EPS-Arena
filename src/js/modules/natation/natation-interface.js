@@ -486,6 +486,7 @@ window.exportNatationIDoceo = exportNatationIDoceo;
 // ============================================================
 // TRANSMISSION FIREBASE
 // ============================================================
+// Dans transmettreNatationConfig
 export async function transmettreNatationConfig() {
     const classe = currentClasse || getCurrentClasse();
     if (!classe) return alert('Sélectionnez une classe.');
@@ -494,18 +495,8 @@ export async function transmettreNatationConfig() {
     const baseProf = `etablissements/0680013V/profs/${profCode}`;
     const distance = parseInt(document.getElementById('natation-distance')?.value) || 25;
 
-    const localMapping = {};
-    elevesData.forEach(e => {
-        if (e.numero) {
-            localMapping[`${classe}_${e.numero}`] = e.id;
-        }
-    });
-    setLocalMapping(classe, localMapping);
-    
-    // Sauvegarde du mapping dans Firebase pour les iPads
-    const mappingRef = ref(db, `${baseProf}/${classe}/natation/mapping`);
-    await set(mappingRef, localMapping);
-
+    // ✅ Plus de mapping envoyé à Firebase
+    // On conserve seulement la config (distance + nombre d'élèves)
     const configData = {
         activite: 'natation',
         distance: distance,
