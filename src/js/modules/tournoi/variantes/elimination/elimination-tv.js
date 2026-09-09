@@ -5,6 +5,8 @@ import { getCurrentClasse } from '../../../../core/live-engine.js';
 
 let currentUnsub = null;
 let currentClasse = '';
+let animationId = null;
+let scrollOffset = 0;
 
 // ============================================================
 // RENDU PRINCIPAL
@@ -26,7 +28,7 @@ export function renderEliminationTV() {
     container.style.backgroundColor = '#0f172a';
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
-    container.style.padding = '20px';
+    container.style.padding = '0';
 
     const classe = getCurrentClasse();
     if (!classe) {
@@ -40,16 +42,22 @@ export function renderEliminationTV() {
         currentUnsub();
         currentUnsub = null;
     }
+    if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const joueursRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/joueurs`);
 
     container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40vh;">En attente des données...</p>';
 
-    // Configuration (comme natation-tv.js)
-    const PHOTO_SIZE = 65;
+    // Configuration (identique à natation-tv.js)
+    const NB_VISIBLES = 10;
+    const PHOTO_SIZE = 80;
+    const SCROLL_SPEED = 1.2;
     const TOP_MARGIN = 80;   // pour le titre
-    const BOTTOM_MARGIN = 40;
+    const BOTTOM_MARGIN = 30;
 
     let eleveData = [];
 
@@ -99,25 +107,32 @@ export function renderEliminationTV() {
                     overflow: hidden;
                 }
                 .tv-scroll-inner {
-                    position: relative;
-                    width: 100%;
+                    position: absolute;
+                    bottom: 0;
+                    left: 0;
                     height: 100%;
+                    will-change: transform;
+                    display: flex;
+                    align-items: stretch;
+                    gap: 12px;
+                    padding: 0 20px;
                 }
                 .tv-eleve {
+                    position: relative;
+                    height: 100%;
+                    flex-shrink: 0;
+                    width: ${PHOTO_SIZE + 20}px;
+                }
+                .tv-eleve .marker {
                     position: absolute;
                     left: 50%;
                     transform: translateX(-50%);
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    transition: bottom 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    transition: bottom 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
                     will-change: bottom;
-                    padding: 4px 12px;
-                    border-radius: 16px;
-                    background: rgba(30, 41, 59, 0.5);
-                    backdrop-filter: blur(4px);
-                    border: 1px solid rgba(71, 85, 105, 0.3);
-                    min-width: 80px;
+                    width: 100%;
                 }
                 .tv-eleve .photo {
                     width: ${PHOTO_SIZE}px;
@@ -127,7 +142,6 @@ export function renderEliminationTV() {
                     border: 3px solid rgba(255,255,255,0.2);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
                     flex-shrink: 0;
-                    margin-bottom: 2px;
                 }
                 .tv-eleve .photo img {
                     width: 100%;
@@ -141,77 +155,70 @@ export function renderEliminationTV() {
                     align-items: center;
                     justify-content: center;
                     background: #334155;
-                    font-size: 28px;
+                    font-size: 32px;
                     color: #94a3b8;
                 }
+                .tv-eleve .rank-badge {
+                    position: absolute;
+                    top: -12px;
+                    right: -12px;
+                    font-size: 1.2rem;
+                    background: #0f172a;
+                    border-radius: 50%;
+                    padding: 2px;
+                    border: 2px solid rgba(255,255,255,0.3);
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 5;
+                }
                 .tv-eleve .nom {
-                    font-size: 0.8rem;
+                    margin-top: 4px;
+                    font-size: 0.9rem;
                     font-weight: 700;
                     color: white;
-                    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+                    text-shadow: 0 0 10px rgba(0,0,0,0.9);
+                    background: rgba(0,0,0,0.5);
+                    padding: 0 8px;
+                    border-radius: 8px;
                     white-space: nowrap;
-                    max-width: 100px;
+                    max-width: 80px;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
                 .tv-eleve .score {
-                    font-size: 1.8rem;
+                    font-size: 1.6rem;
                     font-weight: 900;
                     line-height: 1.2;
+                    margin-top: -2px;
                 }
                 .tv-eleve .score-label {
                     font-size: 0.5rem;
                     color: #94a3b8;
                     text-transform: uppercase;
                     letter-spacing: 1px;
+                    margin-top: -4px;
                 }
-                .tv-eleve .rank-badge {
-                    position: absolute;
-                    top: -8px;
-                    right: -8px;
-                    font-size: 1rem;
-                    background: #0f172a;
-                    border-radius: 50%;
-                    padding: 2px;
-                    border: 2px solid rgba(255,255,255,0.2);
-                    width: 28px;
-                    height: 28px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .tv-eleve.top1 {
-                    border-color: #facc15;
-                    background: rgba(250, 204, 21, 0.2);
-                }
-                .tv-eleve.top1 .rank-badge {
-                    border-color: #facc15;
-                }
-                .tv-eleve.top2 {
-                    border-color: #94a3b8;
-                    background: rgba(148, 163, 184, 0.2);
-                }
-                .tv-eleve.top2 .rank-badge {
-                    border-color: #94a3b8;
-                }
-                .tv-eleve.top3 {
-                    border-color: #d97706;
-                    background: rgba(217, 119, 6, 0.2);
-                }
-                .tv-eleve.top3 .rank-badge {
-                    border-color: #d97706;
-                }
+                .tv-eleve.top1 .photo { border-color: #facc15; }
+                .tv-eleve.top1 .rank-badge { border-color: #facc15; }
+                .tv-eleve.top2 .photo { border-color: #94a3b8; }
+                .tv-eleve.top2 .rank-badge { border-color: #94a3b8; }
+                .tv-eleve.top3 .photo { border-color: #d97706; }
+                .tv-eleve.top3 .rank-badge { border-color: #d97706; }
                 @media (max-width: 768px) {
-                    .tv-eleve { min-width: 60px; padding: 2px 8px; }
-                    .tv-eleve .photo { width: 50px; height: 50px; }
-                    .tv-eleve .nom { font-size: 0.7rem; max-width: 70px; }
-                    .tv-eleve .score { font-size: 1.3rem; }
-                    .tv-eleve .rank-badge { width: 22px; height: 22px; font-size: 0.7rem; top: -6px; right: -6px; }
+                    .tv-eleve { width: ${PHOTO_SIZE - 20 + 20}px; }
+                    .tv-eleve .photo { width: ${PHOTO_SIZE - 20}px; height: ${PHOTO_SIZE - 20}px; }
+                    .tv-eleve .nom { font-size: 0.7rem; max-width: 60px; }
+                    .tv-eleve .score { font-size: 1.2rem; }
+                    .tv-eleve .rank-badge { width: 24px; height: 24px; font-size: 0.9rem; top: -8px; right: -8px; }
                     .tv-title { font-size: 1.3rem; top: 10px; }
                     .tv-subtitle { top: 45px; font-size: 0.8rem; }
                 }
                 @media (max-width: 480px) {
-                    .tv-eleve .photo { width: 40px; height: 40px; }
+                    .tv-eleve { width: ${PHOTO_SIZE - 40 + 20}px; }
+                    .tv-eleve .photo { width: ${PHOTO_SIZE - 40}px; height: ${PHOTO_SIZE - 40}px; }
                     .tv-eleve .nom { font-size: 0.6rem; max-width: 50px; }
                     .tv-eleve .score { font-size: 1rem; }
                 }
@@ -234,65 +241,113 @@ export function renderEliminationTV() {
         const inner = document.getElementById('tv-scroll-inner');
         if (!inner) return;
 
+        const containerWidth = window.innerWidth;
+        const eleveWidth = PHOTO_SIZE + 20 + 12; // largeur + gap
+        const totalWidth = eleves.length * eleveWidth;
+        const shouldScroll = eleves.length > NB_VISIBLES;
+
         const maxElim = Math.max(...eleves.map(e => e.eliminations), 1);
 
         let html = '';
-        for (const item of eleves) {
-            // bottom en % : 0 élimination = 100% (tout en haut)
-            // max éliminations = 0% (tout en bas)
-            const ratio = maxElim > 0 ? item.eliminations / maxElim : 0;
-            const bottomPct = (1 - ratio) * 100;
+        const nbCopies = shouldScroll ? 2 : 1;
+        for (let copy = 0; copy < nbCopies; copy++) {
+            for (const item of eleves) {
+                // Position verticale : 0 élimination = 100% (haut), max = 0% (bas)
+                const ratio = maxElim > 0 ? item.eliminations / maxElim : 0;
+                const bottomPct = (1 - ratio) * 100;
 
-            const rankClass = item.rank === 1 ? 'top1' : (item.rank === 2 ? 'top2' : (item.rank === 3 ? 'top3' : ''));
-            const medal = item.rank === 1 ? '🥇' : (item.rank === 2 ? '🥈' : (item.rank === 3 ? '🥉' : `#${item.rank}`));
+                const rankClass = item.rank === 1 ? 'top1' : (item.rank === 2 ? 'top2' : (item.rank === 3 ? 'top3' : ''));
+                const medal = item.rank === 1 ? '🥇' : (item.rank === 2 ? '🥈' : (item.rank === 3 ? '🥉' : ''));
 
-            let color = '#3b82f6';
-            if (item.eliminations >= 10) color = '#ef4444';
-            else if (item.eliminations >= 5) color = '#facc15';
+                let color = '#3b82f6';
+                if (item.eliminations >= 10) color = '#ef4444';
+                else if (item.eliminations >= 5) color = '#facc15';
 
-            const photoId = `tv-photo-${item.code}`;
+                const photoId = `tv-photo-${item.code}-${copy}`;
 
-            html += `
-                <div class="tv-eleve ${rankClass}" style="bottom: ${bottomPct}%;">
-                    <span class="rank-badge">${medal}</span>
-                    <div class="photo" id="${photoId}">
-                        <div class="fallback">👤</div>
+                html += `
+                    <div class="tv-eleve">
+                        <div class="marker" style="bottom: ${bottomPct}%;">
+                            ${medal ? `<span class="rank-badge">${medal}</span>` : ''}
+                            <div class="photo ${rankClass}" id="${photoId}">
+                                <div class="fallback">👤</div>
+                            </div>
+                            <div class="nom">${item.nom}</div>
+                            <div class="score" style="color: ${color};">${item.eliminations}</div>
+                            <div class="score-label">élim.</div>
+                        </div>
                     </div>
-                    <div class="nom">${item.nom}</div>
-                    <div class="score" style="color: ${color};">${item.eliminations}</div>
-                    <div class="score-label">élim.</div>
-                </div>
-            `;
+                `;
+            }
         }
 
         inner.innerHTML = html;
+        inner.style.width = shouldScroll ? (totalWidth * 2) + 'px' : totalWidth + 'px';
 
         // Charger les photos après le rendu
         for (const item of eleves) {
-            const photoDiv = document.getElementById(`tv-photo-${item.code}`);
-            if (!photoDiv) continue;
-            try {
-                const url = getPhotoUrl(item.code);
-                url.then(u => {
-                    if (u) {
-                        photoDiv.innerHTML = `<img src="${u}" alt="${item.nom}">`;
-                    }
-                });
-            } catch (e) {
-                // Garder le fallback
+            for (let copy = 0; copy < nbCopies; copy++) {
+                const photoDiv = document.getElementById(`tv-photo-${item.code}-${copy}`);
+                if (!photoDiv) continue;
+                try {
+                    const url = getPhotoUrl(item.code);
+                    url.then(u => {
+                        if (u) {
+                            photoDiv.innerHTML = `<img src="${u}" alt="${item.nom}">`;
+                        }
+                    });
+                } catch (e) {
+                    // Garder le fallback
+                }
+            }
+        }
+
+        // Positionner le défilement
+        if (shouldScroll) {
+            const windowWidth = Math.min(containerWidth, NB_VISIBLES * eleveWidth);
+            const initialOffset = (containerWidth - windowWidth) / 2;
+            scrollOffset = initialOffset;
+            inner.style.transform = `translateX(${scrollOffset}px)`;
+
+            if (!animationId) {
+                animateScroll(inner, totalWidth);
+            }
+        } else {
+            const totalContentWidth = eleves.length * eleveWidth;
+            const offset = (containerWidth - totalContentWidth) / 2;
+            inner.style.transform = `translateX(${offset}px)`;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
             }
         }
     }
 
+    function animateScroll(inner, totalWidth) {
+        if (!inner) return;
+
+        scrollOffset -= SCROLL_SPEED;
+
+        if (scrollOffset <= -totalWidth) {
+            scrollOffset += totalWidth;
+        }
+
+        inner.style.transform = `translateX(${scrollOffset}px)`;
+
+        animationId = requestAnimationFrame(() => {
+            animateScroll(inner, totalWidth);
+        });
+    }
+
     // ============================================================
-    // CALCUL DES POSITIONS
+    // CALCUL DES POSITIONS ET CLASSEMENT
     // ============================================================
-    function computeElevePositions(joueurs) {
+    function computeEleveData(joueurs) {
         const entries = Object.entries(joueurs);
         if (entries.length === 0) return [];
 
-        // Trier par nombre d'éliminations décroissant pour le classement
-        const sorted = entries.sort((a, b) => (b[1].eliminations || 0) - (a[1].eliminations || 0));
+        // Classement : les meilleurs sont ceux qui ont le MOINS d'éliminations
+        const sorted = entries.sort((a, b) => (a[1].eliminations || 0) - (b[1].eliminations || 0));
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
 
         return sorted.map(([code, data], index) => {
@@ -335,7 +390,7 @@ export function renderEliminationTV() {
     // ============================================================
     currentUnsub = onValue(joueursRef, (snap) => {
         const joueurs = snap.val() || {};
-        eleveData = computeElevePositions(joueurs);
+        eleveData = computeEleveData(joueurs);
         render();
     });
 
@@ -354,6 +409,10 @@ export function renderEliminationTV() {
         if (currentUnsub) {
             currentUnsub();
             currentUnsub = null;
+        }
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
         }
         window.removeEventListener('resize', resizeHandler);
     };
