@@ -1,6 +1,6 @@
 // src/js/ui/dashboard-ui.js
 import { importCSV, importZIP, getPhotoUrl, getExistingEleves, saveEleves, updateStudentForce, updateStudentName } from '../services/admin-service.js';
-import { openImportModal } from '../services/import-service.js'; // Import du service iDoceo
+import { openImportModal } from '../services/import-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
@@ -11,7 +11,6 @@ function getStorageKey() {
 
 function loadLocalEleves() {
     currentEleves = getExistingEleves(activeClasse);
-    // Tri alphabétique par nom
     currentEleves.sort((a, b) => a.nom.localeCompare(b.nom));
     renderEleves();
 }
@@ -62,15 +61,29 @@ export function initAdminUI() {
         });
     }
 
+    window.addEventListener('eleves-imported', () => {
+        loadLocalEleves();
+    });
+
     activeClasse = select ? select.value : "";
     if (activeClasse) loadLocalEleves();
-
-    window.addEventListener('eleves-imported', () => {
-    loadLocalEleves();
-});
 }
 
-// --- Fonctions de rendu et actions (inchangées) ---
+// ============================================================
+// NORMALISATION POUR LA DÉTECTION DES DOUBLONS
+// ============================================================
+function normaliserNom(str) {
+    if (!str) return '';
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .trim();
+}
+
+// ============================================================
+// AFFICHAGE DES ÉLÈVES
+// ============================================================
 async function renderEleves() {
     const container = document.getElementById('eleveList');
     if (!container) return;
@@ -80,6 +93,19 @@ async function renderEleves() {
         container.innerHTML = '<p class="text-slate-500 text-sm col-span-full">Aucun élève importé pour cette classe.<br>📸 Utilisez "Import ZIP Photos" pour créer la classe.</p>';
         return;
     }
+
+    // Détection des doublons (basée sur nom + prénom normalisés)
+    const ids = {};
+    const doublons = new Set();
+    currentEleves.forEach(e => {
+        const cle = normaliserNom(e.nom) + '_' + normaliserNom(e.prenom);
+        if (ids[cle]) {
+            doublons.add(e.id);
+            doublons.add(ids[cle]);
+        } else {
+            ids[cle] = e.id;
+        }
+    });
 
     currentEleves.sort((a, b) => a.nom.localeCompare(b.nom));
 
@@ -99,8 +125,15 @@ async function renderEleves() {
             starsHtml += `<span onclick="event.stopPropagation(); setForce('${e.id}', ${i})" class="cursor-pointer text-lg ${filled}">★</span>`;
         }
 
+        const isDoublon = doublons.has(e.id);
+
         container.innerHTML += `
-            <div class="bg-slate-800 rounded-2xl p-4 flex flex-col items-center border border-slate-700 text-center relative cursor-pointer hover:border-blue-500 transition-all" onclick="openEditModal('${e.id}')">
+            <div class="bg-slate-800 rounded-2xl p-4 flex flex-col items-center border border-slate-700 text-center relative cursor-pointer hover:border-blue-500 transition-all ${isDoublon ? 'border-yellow-500 border-2' : ''}" onclick="openEditModal('${e.id}')">
+                ${isDoublon ? '<span class="absolute top-0 left-0 bg-yellow-500 text-black text-[10px] font-black px-2 py-0.5 rounded-br-lg z-10">⚠️ Doublon</span>' : ''}
+                <button onclick="event.stopPropagation(); supprimerEleve('${e.id}')" 
+                        class="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white text-xs w-6 h-6 rounded-full font-black opacity-60 hover:opacity-100 transition-opacity z-10">
+                    ✕
+                </button>
                 <div class="mb-2">${photoHtml}</div>
                 <p class="font-black text-white leading-tight">${e.prenom}</p>
                 <p class="text-xs text-slate-400 uppercase font-bold mb-2">${e.nom}</p>
@@ -117,7 +150,19 @@ async function renderEleves() {
     }
 }
 
-// Fonctions globales
+// ============================================================
+// SUPPRESSION D'UN ÉLÈVE
+// ============================================================
+window.supprimerEleve = function(eleveId) {
+    if (!confirm(`Supprimer définitivement cet élève ?`)) return;
+    currentEleves = currentEleves.filter(e => e.id !== eleveId);
+    saveEleves(activeClasse, currentEleves);
+    loadLocalEleves();
+};
+
+// ============================================================
+// ACTIONS (inchangées)
+// ============================================================
 window.setForce = function(studentId, force) {
     updateStudentForce(studentId, force, activeClasse);
     loadLocalEleves();
@@ -213,9 +258,6 @@ window.purgeEleves = function() {
     loadLocalEleves();
 };
 
-// ============================================================
-// EXPOSITION DE LA FONCTION D'IMPORT iDoceo
-// ============================================================
 window.openImportModal = function() {
     const classe = document.getElementById('selectClasse').value;
     if (!classe) {
