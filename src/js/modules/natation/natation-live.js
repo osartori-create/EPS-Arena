@@ -1,5 +1,5 @@
 // src/js/modules/natation/natation-live.js
-import { db, ref, onValue } from '../../core/firebase-service.js';
+import { db, ref, onValue, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 import { getExistingEleves } from '../../services/admin-service.js';
@@ -51,8 +51,6 @@ window.exportNatationLiveCSV = function() {
         alert('Sélectionnez une classe.');
         return;
     }
-    // Cette fonction sera appelée depuis le bouton "Export CSV" du Live
-    // On utilise les données déjà chargées
     const container = document.getElementById('live-content');
     const rows = container.querySelectorAll('.natation-live-row');
     let csv = '\uFEFF"!groupe";"Nom";"Prénom";"Temps (s)";"Coups";"Indice";"Niveau"\n';
@@ -102,7 +100,7 @@ export function renderNatationLive() {
     let mapping = getLocalMapping(classe) || {};
     let eleves = getExistingEleves(classe);
 
-    function render() {
+    async function render() {
         if (Object.keys(tempsData).length === 0 && Object.keys(coupsData).length === 0) {
             container.innerHTML = '<p class="text-slate-500 text-center">Aucun résultat pour l\'instant.</p>';
             return;
@@ -141,7 +139,6 @@ export function renderNatationLive() {
                 coups,
                 indice,
                 niveau,
-                // Historique
                 historique: Object.values(historiqueData)
                     .filter(h => h.eleveId === eleveId || h.code === eleve.code)
                     .sort((a, b) => a.timestamp - b.timestamp)
@@ -167,14 +164,15 @@ export function renderNatationLive() {
             <div class="space-y-2 max-h-[70vh] overflow-y-auto pr-2">
         `;
 
-        for (const r of results) {
+        // Utiliser Promise.all pour charger les photos en parallèle
+        const rowsPromises = results.map(async (r) => {
             const photo = await getPhotoUrl(r.eleveId);
             const photoHtml = photo ? `<img src="${photo}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">` : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
             const tempsStr = r.tempsMs !== null ? `${(r.tempsMs/1000).toFixed(1)}s` : '--';
             const coupsStr = r.coups !== null ? `${r.coups}` : '--';
             const indiceStr = r.indice !== null ? r.indice.toFixed(2) : '--';
             
-            html += `
+            return `
                 <div class="natation-live-row bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 cursor-pointer hover:border-blue-500 transition-all"
                      data-eleveid="${r.eleveId}"
                      data-numero="${r.numero || ''}"
@@ -197,8 +195,10 @@ export function renderNatationLive() {
                     </div>
                 </div>
             `;
-        }
+        });
 
+        const rowsHtml = await Promise.all(rowsPromises);
+        html += rowsHtml.join('');
         html += `</div>`;
         container.innerHTML = html;
     }
@@ -345,7 +345,7 @@ export function renderNatationLive() {
             ]).then(() => {
                 alert('✅ Données mises à jour !');
                 modal.remove();
-                render(); // Recharger le Live
+                // Recharger le Live (render sera appelé par les écouteurs)
             }).catch(err => {
                 console.error('Erreur sauvegarde :', err);
                 alert('❌ Erreur lors de la sauvegarde.');
