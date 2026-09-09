@@ -47,7 +47,6 @@ async function renderProf() {
         return;
     }
 
-    // ✅ Grille à 4 colonnes pour iPad
     let html = `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
             <div class="flex justify-between items-center flex-wrap gap-2">
@@ -99,13 +98,14 @@ async function renderProf() {
 
         html += `
             <div class="bg-slate-900 p-3 rounded-2xl border-2 ${statusColor} ${statusBg}">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-3">
                     <div class="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 ${sexeBg} flex items-center justify-center text-2xl">
                         ${photoHtml}
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-black text-white text-sm truncate">${nom}</div>
-                        <div class="text-xs text-slate-400">#${code}</div>
+                        <!-- ✅ NUMÉRO BEAUCOUP PLUS GROS ET LISIBLE -->
+                        <div class="text-3xl font-black text-yellow-400">#${code}</div>
                         <div class="flex items-center gap-2 mt-0.5">
                             <span class="${statusText} font-bold">${info.eliminations}</span>
                             <span class="text-[10px] text-slate-500">élim.</span>
@@ -135,7 +135,7 @@ async function getPhotoHtml(id) {
     return `<span class="text-2xl">👤</span>`;
 }
 
-// Fonctions globales
+// Fonctions globales (inchangées)
 window.tournoiAjouterElim = function(code) {
     if (confirm(`Ajouter une élimination pour le joueur ${code} ?`)) {
         ajouterElimination(code);
