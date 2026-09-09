@@ -1,6 +1,8 @@
 // src/js/services/import-service.js
 import { getExistingEleves, saveEleves } from './admin-service.js';
-import Papa from 'papaparse';
+
+// PapaParse est chargé globalement via le script dans maitre.html
+const Papa = window.Papa;
 
 /**
  * Détecte automatiquement le séparateur d'un fichier CSV
@@ -57,7 +59,6 @@ function detectColumns(headers) {
         sexe: ['sexe', 'gender', 'sex', '@sexe']
     };
     
-    // Nettoyer les en-têtes (enlever les guillemets, espaces)
     const cleanHeaders = headers.map(h => h.replace(/^["']|["']$/g, '').trim());
     
     for (const [key, words] of Object.entries(keywords)) {
@@ -80,7 +81,6 @@ function parseDate(dateStr) {
     if (!dateStr) return '';
     dateStr = dateStr.trim();
     
-    // Formats possibles : JJ/MM/AAAA, JJ-MM-AAAA, AAAA-MM-JJ, AAAA/MM/JJ
     const patterns = [
         /^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/, // JJ/MM/AAAA
         /^(\d{4})[\/\-](\d{2})[\/\-](\d{2})$/, // AAAA-MM-JJ
@@ -90,16 +90,14 @@ function parseDate(dateStr) {
         const match = dateStr.match(pattern);
         if (match) {
             if (match[1].length === 4) {
-                // AAAA-MM-JJ
                 return `${match[2]}/${match[3]}/${match[1]}`;
             } else {
-                // JJ/MM/AAAA
                 return `${match[1]}/${match[2]}/${match[3]}`;
             }
         }
     }
     
-    return dateStr; // retour tel quel si non reconnu
+    return dateStr;
 }
 
 /**
@@ -111,7 +109,6 @@ export function importerIDoceo(file, classeName, onProgress, onComplete) {
         const csvString = e.target.result;
         const separator = detectSeparator(csvString);
         
-        // Parser avec Papa Parse
         const result = Papa.parse(csvString, {
             delimiter: separator,
             header: true,
@@ -131,13 +128,10 @@ export function importerIDoceo(file, classeName, onProgress, onComplete) {
             return;
         }
         
-        // Détecter les colonnes
         const headers = result.meta.fields || [];
         const mapping = detectColumns(headers);
         
-        // Vérifier qu'on a au moins prénom et nom
         if (mapping.prenom === null || mapping.nom === null) {
-            // Si la détection automatique échoue, on propose un mapping manuel
             if (onComplete) onComplete({ 
                 success: false, 
                 error: 'Détection automatique impossible',
@@ -148,7 +142,6 @@ export function importerIDoceo(file, classeName, onProgress, onComplete) {
             return;
         }
         
-        // Construire les données des élèves
         const elevesExistants = getExistingEleves(classeName);
         const nouveauxEleves = [];
         const updatedEleves = [];
@@ -163,15 +156,12 @@ export function importerIDoceo(file, classeName, onProgress, onComplete) {
             const date = mapping.date !== null ? parseDate(rowValues[mapping.date] || '') : '';
             const sexe = mapping.sexe !== null ? (rowValues[mapping.sexe] || '').toUpperCase() : '';
             
-            // Générer un ID unique
             const normalizedNom = nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
             const normalizedPrenom = prenom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
             const id = `${normalizedNom}_${normalizedPrenom.charAt(0)}`;
             
-            // Vérifier si l'élève existe déjà
             const existing = elevesExistants.find(e => e.id === id);
             if (existing) {
-                // Mettre à jour les infos
                 let modifie = false;
                 if (existing.prenom !== prenom) { existing.prenom = prenom; modifie = true; }
                 if (existing.nom !== nom) { existing.nom = nom; modifie = true; }
@@ -179,7 +169,6 @@ export function importerIDoceo(file, classeName, onProgress, onComplete) {
                 if (sexe && existing.sexe !== sexe) { existing.sexe = sexe; modifie = true; }
                 if (modifie) updatedEleves.push(existing);
             } else {
-                // Créer un nouvel élève
                 const newEleve = {
                     id: id,
                     prenom: prenom,
@@ -197,7 +186,6 @@ export function importerIDoceo(file, classeName, onProgress, onComplete) {
             }
         }
         
-        // Sauvegarder
         if (nouveauxEleves.length > 0 || updatedEleves.length > 0) {
             saveEleves(classeName, elevesExistants);
         }
@@ -269,7 +257,6 @@ export function openImportModal(classeName) {
     const step1 = document.getElementById('import-step-1');
     const step2 = document.getElementById('import-step-2');
     const preview = document.getElementById('import-preview');
-    const mappingDiv = document.getElementById('import-mapping');
     const confirmBtn = document.getElementById('import-confirm-btn');
     
     let parsedData = null;
@@ -303,7 +290,6 @@ export function openImportModal(classeName) {
             return;
         }
         
-        // Lire et analyser
         const reader = new FileReader();
         reader.onload = function(e) {
             const csvString = e.target.result;
@@ -332,7 +318,6 @@ export function openImportModal(classeName) {
             detectedMapping = detectColumns(headers);
             parsedData = data;
             
-            // Afficher l'aperçu
             showPreview(data, headers, detectedMapping);
             
             step1.classList.add('hidden');
@@ -343,7 +328,6 @@ export function openImportModal(classeName) {
     }
     
     function showPreview(data, headers, mapping) {
-        // Aperçu des 5 premières lignes
         let html = `
             <div class="mt-4">
                 <p class="text-xs font-bold text-slate-400 uppercase mb-2">Aperçu des données (5 premières lignes)</p>
@@ -367,7 +351,6 @@ export function openImportModal(classeName) {
             </div>
         `;
         
-        // Mapping des colonnes
         html += `
             <div class="mt-4">
                 <p class="text-xs font-bold text-slate-400 uppercase mb-2">Mapping des colonnes</p>
@@ -401,25 +384,20 @@ export function openImportModal(classeName) {
         preview.innerHTML = html;
         preview.classList.remove('hidden');
         
-        // Mettre à jour le mapping lors du changement
         document.querySelectorAll('.mapping-select').forEach(select => {
             select.addEventListener('change', () => {
-                // Mettre à jour detectedMapping
                 const field = select.dataset.field;
                 const value = select.value !== '' ? parseInt(select.value) : null;
                 detectedMapping[field] = value;
             });
         });
         
-        // Confirmer l'import
         confirmBtn.onclick = function() {
-            // Vérifier que prénom et nom sont mappés
             if (detectedMapping.prenom === null || detectedMapping.nom === null) {
                 alert('Les colonnes "Prénom" et "Nom" sont obligatoires.');
                 return;
             }
             
-            // Lancer l'import
             const progressBar = document.getElementById('import-progress-bar');
             const progressText = document.getElementById('import-progress-text');
             const progressDiv = document.getElementById('import-progress');
@@ -427,7 +405,6 @@ export function openImportModal(classeName) {
             confirmBtn.disabled = true;
             confirmBtn.textContent = '⏳ Import en cours...';
             
-            // Simuler une progression
             let progress = 0;
             const interval = setInterval(() => {
                 progress += 10;
@@ -435,7 +412,6 @@ export function openImportModal(classeName) {
                 progressText.textContent = `Import en cours... ${Math.min(progress, 90)}%`;
             }, 200);
             
-            // Importer les données
             const result = importerDonnees(parsedData, headers, detectedMapping, classeName);
             
             clearInterval(interval);
@@ -451,7 +427,6 @@ export function openImportModal(classeName) {
                             ✅ Fermer
                         </button>
                     `;
-                    // Afficher le résultat
                     const resultDiv = document.getElementById('import-result');
                     resultDiv.classList.remove('hidden');
                     resultDiv.innerHTML = `
@@ -484,12 +459,10 @@ export function openImportModal(classeName) {
             const date = mapping.date !== null ? parseDate(rowValues[mapping.date] || '') : '';
             const sexe = mapping.sexe !== null ? (rowValues[mapping.sexe] || '').toUpperCase() : '';
             
-            // Générer un ID unique
             const normalizedNom = nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
             const normalizedPrenom = prenom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
             const id = `${normalizedNom}_${normalizedPrenom.charAt(0)}`;
             
-            // Vérifier si l'élève existe déjà
             const existing = elevesExistants.find(e => e.id === id);
             if (existing) {
                 let modifie = false;
@@ -529,16 +502,9 @@ export function openImportModal(classeName) {
 }
 
 // Exposition globale pour les appels HTML
-window.openImportModal = function() {
-    const classe = document.getElementById('selectClasse').value;
-    if (!classe) {
-        alert('Sélectionnez une classe d\'abord.');
-        return;
-    }
-    openImportModal(classe);
-};
-
 window.closeImportModal = function() {
     const modal = document.getElementById('import-idoceo-modal');
     if (modal) modal.remove();
 };
+
+// La fonction openImportModal est déjà exportée
