@@ -15,9 +15,10 @@ let tempsFinal = null;
 
 let mode = 'liste'; // 'liste' | 'chrono' | 'saisie' | 'feedback'
 let historiqueEssais = [];
+let isSaving = false; // ✅ Verrou pour éviter les doubles enregistrements
 
 // ============================================================
-// EXPOSITION DES FONCTIONS GLOBALES (inchangée)
+// EXPOSITION DES FONCTIONS GLOBALES
 // ============================================================
 window.natationChoisirNumero = function(num) {
     console.log('🖱️ Clic sur le numéro', num);
@@ -106,6 +107,10 @@ window.natationAdjustCoups = function(delta) {
 };
 
 window.natationValiderCoups = function() {
+    if (isSaving) {
+        console.warn('⚠️ Enregistrement déjà en cours, ignore.');
+        return;
+    }
     const nbCoups = window._coupsSaisis || 25;
     if (nbCoups < 1) {
         alert('Veuillez saisir au moins 1 coup de bras.');
@@ -151,7 +156,7 @@ window.retourMenuNatation = function() {
 };
 
 // ============================================================
-// INITIALISATION (inchangée)
+// INITIALISATION
 // ============================================================
 export function initNatationKiosk(classe) {
     console.log('🏊 initNatationKiosk appelée pour', classe);
@@ -160,6 +165,7 @@ export function initNatationKiosk(classe) {
     tempsFinal = null;
     mode = 'liste';
     historiqueEssais = [];
+    isSaving = false;
 
     const container = document.getElementById('natation-module');
     if (!container) {
@@ -173,13 +179,6 @@ export function initNatationKiosk(classe) {
     if (codeInfo) codeInfo.style.display = 'none';
     const btnQuit = document.getElementById('btn-quit');
     if (btnQuit) btnQuit.style.display = 'none';
-
-    const mappingReconstruit = reconstruireMappingLocal();
-    if (mappingReconstruit) {
-        console.log('✅ Mapping local pré-construit avec succès.');
-    } else {
-        console.warn('⚠️ Impossible de pré-construire le mapping local.');
-    }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/config`);
@@ -205,33 +204,24 @@ export function initNatationKiosk(classe) {
     });
 }
 
+// ============================================================
+// RECONSTRUCTION DU MAPPING (inchangée)
+// ============================================================
 function reconstruireMappingLocal() {
-    if (!currentClasse) {
-        console.warn('Impossible de reconstruire : classe non définie.');
-        return false;
-    }
-
+    if (!currentClasse) return false;
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    if (eleves.length === 0) {
-        console.warn('Aucun élève trouvé dans le localStorage.');
-        return false;
-    }
-
+    if (eleves.length === 0) return false;
     eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-
     const newMapping = {};
     eleves.forEach((e, idx) => {
-        const numero = idx + 1;
-        newMapping[`${currentClasse}_${numero}`] = e.id;
+        newMapping[`${currentClasse}_${idx + 1}`] = e.id;
     });
-
     localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
-    console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves pour la classe ${currentClasse}.`);
     return true;
 }
 
 // ============================================================
-// AFFICHAGE PRINCIPAL (inchangé)
+// AFFICHAGE PRINCIPAL
 // ============================================================
 function afficherInterface() {
     const container = document.getElementById('natation-module');
@@ -372,7 +362,7 @@ function afficherChrono(container) {
 }
 
 // ============================================================
-// 3. SAISIE DES COUPS DE BRAS (inchangé)
+// 3. SAISIE DES COUPS DE BRAS (inchangée)
 // ============================================================
 function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
@@ -459,19 +449,29 @@ function getMessageEncouragement(indice) {
 }
 
 // ============================================================
-// 5. FEEDBACK (inchangé)
+// 5. FEEDBACK - avec dédoublonnage de l'historique
 // ============================================================
 function afficherFeedback(container, tempsMs, nbCoups) {
     const indice = calculIndice(tempsMs, nbCoups);
     const niveau = getNiveau(indice);
     const tempsStr = formatTime(tempsMs);
 
-    historiqueEssais.push({ tempsMs, nbCoups, indice, timestamp: Date.now() });
-    if (historiqueEssais.length > 5) historiqueEssais.shift();
+    // ✅ Dédoublonner l'historique avant de l'afficher
+    const uniqueEssais = [];
+    const seen = new Set();
+    for (const essai of historiqueEssais) {
+        const key = `${essai.tempsMs}-${essai.nbCoups}-${Math.round(essai.indice * 100)}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            uniqueEssais.push(essai);
+        }
+    }
+    historiqueEssais = uniqueEssais;
 
     const meilleurIndice = Math.max(...historiqueEssais.map(e => e.indice), 0);
     const messageEncouragement = getMessageEncouragement(indice);
 
+    // Graphique de progression
     let graphHtml = '';
     if (historiqueEssais.length > 0) {
         const maxIndice = Math.max(...historiqueEssais.map(e => e.indice), 1);
@@ -554,7 +554,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
 }
 
 // ============================================================
-// HISTORIQUE FIREBASE (inchangé)
+// HISTORIQUE FIREBASE (partagé entre tablettes)
 // ============================================================
 function chargerHistoriqueEleve(eleveId, callback) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -573,39 +573,23 @@ function chargerHistoriqueEleve(eleveId, callback) {
 }
 
 // ============================================================
-// FONCTIONS UTILITAIRES (inchangé)
+// FONCTIONS UTILITAIRES
 // ============================================================
 function getEleveIdFromNumero(num) {
-    if (!currentClasse) {
-        console.warn('Classe non définie.');
-        return null;
-    }
-
+    if (!currentClasse) return null;
     let mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
     let eleveId = mapping[`${currentClasse}_${num}`];
-    
     if (!eleveId || Object.keys(mapping).length === 0) {
-        console.warn('⚠️ Mapping local manquant, reconstruction automatique...');
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-        if (eleves.length === 0) {
-            console.warn('❌ Aucun élève trouvé dans le localStorage pour la classe', currentClasse);
-            return null;
-        }
-        
+        if (eleves.length === 0) return null;
         eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
         const newMapping = {};
         eleves.forEach((e, idx) => {
-            const numero = idx + 1;
-            newMapping[`${currentClasse}_${numero}`] = e.id;
+            newMapping[`${currentClasse}_${idx + 1}`] = e.id;
         });
         localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
         mapping = newMapping;
         eleveId = mapping[`${currentClasse}_${num}`];
-        console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves.`);
-    }
-    
-    if (!eleveId) {
-        console.warn(`❌ Numéro ${num} non trouvé dans le mapping.`);
     }
     return eleveId || null;
 }
@@ -637,9 +621,13 @@ function updateChrono() {
 }
 
 // ============================================================
-// ENREGISTREMENT FIREBASE - ✅ CORRECTION
+// ENREGISTREMENT FIREBASE (avec verrou et dédoublonnage)
 // ============================================================
 function enregistrerTempsEtCoups(tempsMs, nbCoups) {
+    if (isSaving) {
+        console.warn('⚠️ Enregistrement déjà en cours, ignore.');
+        return;
+    }
     if (currentNumero === null) {
         alert('Erreur : aucun numéro sélectionné.');
         return;
@@ -647,10 +635,11 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
     
     const eleveId = getEleveIdFromNumero(currentNumero);
     if (!eleveId) {
-        alert('Numéro non reconnu. Vérifie que le professeur a bien transmis la configuration.\nSi le problème persiste, contacte-le.');
+        alert('Numéro non reconnu. Vérifie que le professeur a bien transmis la configuration.');
         return;
     }
 
+    isSaving = true;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const indice = calculIndice(tempsMs, nbCoups);
     const nouvelEssai = {
@@ -661,35 +650,41 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
     };
 
     const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${eleveId}`);
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
-
-    // ✅ CORRECTION : Utiliser une promesse pour lire l'historique de manière fiable
-    new Promise((resolve) => {
-        onValue(historiqueRef, (snap) => {
-            resolve(snap.val() || []);
-        }, { onlyOnce: true });
-    }).then((historique) => {
-        // S'assurer que c'est un tableau
+    
+    onValue(historiqueRef, (snap) => {
+        let historique = snap.val() || [];
         if (!Array.isArray(historique)) historique = [];
+        
+        // ✅ Dédoublonner : on retire les essais identiques au nouvel essai (même temps et même nombre de coups)
+        historique = historique.filter(h => 
+            !(Math.abs(h.tempsMs - tempsMs) < 1 && h.nbCoups === nbCoups)
+        );
+        
+        // Ajouter le nouvel essai
         historique.push(nouvelEssai);
         if (historique.length > 10) historique.shift();
-        return set(historiqueRef, historique);
-    }).then(() => {
-        return Promise.all([
-            set(tempsRef, tempsMs),
-            set(coupsRef, nbCoups)
-        ]);
-    }).then(() => {
-        console.log('✅ Temps, coups et historique enregistrés pour', eleveId);
-        window._dernierNbCoups = nbCoups;
-        chargerHistoriqueEleve(eleveId, () => {
-            mode = 'feedback';
-            const container = document.getElementById('natation-module');
-            if (container) afficherFeedback(container, tempsMs, nbCoups);
+        
+        set(historiqueRef, historique).then(() => {
+            const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
+            const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
+            
+            return Promise.all([
+                set(tempsRef, tempsMs),
+                set(coupsRef, nbCoups)
+            ]);
+        }).then(() => {
+            console.log('✅ Temps, coups et historique enregistrés pour', eleveId);
+            window._dernierNbCoups = nbCoups;
+            chargerHistoriqueEleve(eleveId, () => {
+                isSaving = false;
+                mode = 'feedback';
+                const container = document.getElementById('natation-module');
+                if (container) afficherFeedback(container, tempsMs, nbCoups);
+            });
+        }).catch(err => {
+            console.error('Erreur enregistrement :', err);
+            alert('Erreur lors de l\'enregistrement. Réessayez.');
+            isSaving = false;
         });
-    }).catch(err => {
-        console.error('Erreur enregistrement :', err);
-        alert('Erreur lors de l\'enregistrement. Réessayez.');
-    });
+    }, { onlyOnce: true });
 }
