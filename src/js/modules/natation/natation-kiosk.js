@@ -6,7 +6,6 @@ let currentNumero = null;
 let config = null;
 let configListener = null;
 let nbEleves = 0;
-let mappingFirebase = {}; // Mapping chargé depuis Firebase
 
 let chronoRunning = false;
 let chronoStart = 0;
@@ -42,8 +41,7 @@ window.natationChoisirNumero = function(num) {
             afficherInterface();
         });
     } else {
-        alert('Numéro non reconnu. Le professeur doit transmettre la configuration.');
-        mode = 'liste';
+        mode = 'chrono';
         afficherInterface();
     }
 };
@@ -163,7 +161,6 @@ export function initNatationKiosk(classe) {
     tempsFinal = null;
     mode = 'liste';
     historiqueEssais = [];
-    mappingFirebase = {};
 
     const container = document.getElementById('natation-module');
     if (!container) {
@@ -179,32 +176,69 @@ export function initNatationKiosk(classe) {
     const btnQuit = document.getElementById('btn-quit');
     if (btnQuit) btnQuit.style.display = 'none';
 
+    // Pré-construire le mapping local dès le chargement
+    const mappingReconstruit = reconstruireMappingLocal();
+    if (mappingReconstruit) {
+        console.log('✅ Mapping local pré-construit avec succès.');
+    } else {
+        console.warn('⚠️ Impossible de pré-construire le mapping local.');
+    }
+
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-
-    // 1. Charger le mapping depuis Firebase
-    const mappingRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/mapping`);
-    onValue(mappingRef, (snap) => {
-        mappingFirebase = snap.val() || {};
-        console.log('📋 Mapping Firebase chargé :', Object.keys(mappingFirebase).length, 'entrées');
-    }, { onlyOnce: false });
-
-    // 2. Charger la config
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/config`);
     if (configListener) configListener();
     configListener = onValue(configRef, (snap) => {
         config = snap.val() || {};
         nbEleves = config.nbEleves || 0;
         if (nbEleves === 0) {
-            // Fallback : déduire du mapping
-            const nums = Object.keys(mappingFirebase)
-                .filter(k => k.startsWith(`${classe}_`))
-                .map(k => parseInt(k.split('_')[1]))
-                .filter(n => !isNaN(n));
-            nbEleves = Math.max(...nums, 0);
+            // Fallback : déduire le nombre d'élèves des données locales
+            const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+            if (eleves.length > 0) {
+                nbEleves = eleves.length;
+            } else {
+                const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
+                const nums = Object.keys(mapping)
+                    .filter(k => k.startsWith(`${classe}_`))
+                    .map(k => parseInt(k.split('_')[1]))
+                    .filter(n => !isNaN(n));
+                nbEleves = Math.max(...nums, 0);
+            }
         }
         if (nbEleves === 0) nbEleves = 28;
         afficherInterface();
     });
+}
+
+// ============================================================
+// RECONSTRUCTION ROBUSTE DU MAPPING LOCAL
+// ============================================================
+function reconstruireMappingLocal() {
+    if (!currentClasse) {
+        console.warn('Impossible de reconstruire : classe non définie.');
+        return false;
+    }
+
+    // 1. Récupérer les élèves depuis le localStorage (importés via CSV/ZIP)
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+    if (eleves.length === 0) {
+        console.warn('Aucun élève trouvé dans le localStorage.');
+        return false;
+    }
+
+    // 2. Trier les élèves par nom/prénom (identique au professeur)
+    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+
+    // 3. Construire le mapping { "classe_numero": "eleveId" }
+    const newMapping = {};
+    eleves.forEach((e, idx) => {
+        const numero = idx + 1;
+        newMapping[`${currentClasse}_${numero}`] = e.id;
+    });
+
+    // 4. Sauvegarder le mapping dans localStorage
+    localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
+    console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves pour la classe ${currentClasse}.`);
+    return true;
 }
 
 // ============================================================
@@ -350,7 +384,7 @@ function afficherChrono(container) {
 }
 
 // ============================================================
-// 3. SAISIE DES COUPS DE BRAS - VERSION iPAD
+// 3. SAISIE DES COUPS DE BRAS - VERSION iPAD (démarre à 25)
 // ============================================================
 function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
@@ -437,7 +471,7 @@ function getMessageEncouragement(indice) {
 }
 
 // ============================================================
-// 5. FEEDBACK - VERSION iPAD
+// 5. FEEDBACK - VERSION iPAD avec historique
 // ============================================================
 function afficherFeedback(container, tempsMs, nbCoups) {
     const indice = calculIndice(tempsMs, nbCoups);
@@ -556,21 +590,46 @@ function chargerHistoriqueEleve(eleveId, callback) {
 // FONCTIONS UTILITAIRES
 // ============================================================
 function getEleveIdFromNumero(num) {
+    // 0. Vérifier que la classe est définie
     if (!currentClasse) {
         console.warn('Classe non définie.');
         return null;
     }
-    // Lire depuis le mapping Firebase chargé
-    const key = `${currentClasse}_${num}`;
-    const eleveId = mappingFirebase[key] || null;
+
+    // 1. Essayer de récupérer le mapping existant
+    let mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
+    let eleveId = mapping[`${currentClasse}_${num}`];
+    
+    // 2. Si le mapping est vide ou l'élève introuvable, le reconstruire
+    if (!eleveId || Object.keys(mapping).length === 0) {
+        console.warn('⚠️ Mapping local manquant, reconstruction automatique...');
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        if (eleves.length === 0) {
+            console.warn('❌ Aucun élève trouvé dans le localStorage pour la classe', currentClasse);
+            return null;
+        }
+        
+        // Trier par nom (identique au professeur)
+        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+        
+        // Construire le nouveau mapping
+        const newMapping = {};
+        eleves.forEach((e, idx) => {
+            const numero = idx + 1;
+            newMapping[`${currentClasse}_${numero}`] = e.id;
+        });
+        
+        // Sauvegarder
+        localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
+        mapping = newMapping;
+        eleveId = mapping[`${currentClasse}_${num}`];
+        console.log(`✅ Mapping reconstruit avec ${eleves.length} élèves.`);
+    }
     
     if (!eleveId) {
-        console.warn(`❌ Numéro ${num} non trouvé dans le mapping Firebase.`);
-        console.log('🔍 Mapping disponible :', Object.keys(mappingFirebase));
-    } else {
-        console.log(`✅ Numéro ${num} → ID ${eleveId}`);
+        console.warn(`❌ Numéro ${num} non trouvé dans le mapping.`);
     }
-    return eleveId;
+    return eleveId || null;
 }
 
 function calculIndice(tempsMs, nbCoups) {
@@ -610,23 +669,25 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
     
     const eleveId = getEleveIdFromNumero(currentNumero);
     if (!eleveId) {
-        alert('Numéro non reconnu. Le professeur doit transmettre la configuration.');
+        alert('Numéro non reconnu. Vérifie que le professeur a bien transmis la configuration.\nSi le problème persiste, contacte-le.');
         return;
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const indice = calculIndice(tempsMs, nbCoups);
     const nouvelEssai = {
-        tempsMs,
-        nbCoups,
-        indice,
+        tempsMs: tempsMs,
+        nbCoups: nbCoups,
+        indice: indice,
         timestamp: Date.now()
     };
 
     const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${eleveId}`);
     
     onValue(historiqueRef, (snap) => {
-        const historique = snap.val() || [];
+        let historique = snap.val() || [];
+        // S'assurer que c'est un tableau
+        if (!Array.isArray(historique)) historique = [];
         historique.push(nouvelEssai);
         if (historique.length > 10) historique.shift();
         

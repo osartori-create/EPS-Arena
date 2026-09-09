@@ -93,7 +93,6 @@ export function renderNatationLive() {
     let mapping = getLocalMapping(classe) || {};
     let eleves = getExistingEleves(classe);
 
-    // Fonction render asynchrone
     async function render() {
         if (Object.keys(tempsData).length === 0 && Object.keys(coupsData).length === 0) {
             container.innerHTML = '<p class="text-slate-500 text-center">Aucun résultat pour l\'instant.</p>';
@@ -123,18 +122,39 @@ export function renderNatationLive() {
                 }
             }
             
-            // Récupérer l'historique pour cet élève
+            // --- RÉCUPÉRATION ROBUSTE DE L'HISTORIQUE ---
             const historique = [];
+            let lastTimestamp = 0;
+            
             for (const [key, h] of Object.entries(historiqueData)) {
+                // Vérifier si l'entrée correspond à l'élève
                 if (h.eleveId === eleveId || h.code === eleve.code || h.code === eleve.id) {
+                    // Fallback sur les données actuelles si l'historique est mal formaté
+                    const hTempsMs = h.tempsMs || h.temps || tempsMs || 0;
+                    const hNbCoups = h.nbCoups || h.coups || coups || 0;
+                    const hTimestamp = h.timestamp || Date.now();
+                    
                     historique.push({
-                        tempsMs: h.tempsMs || h.temps || 0,
-                        nbCoups: h.nbCoups || h.coups || 0,
-                        indice: h.indice || 0,
-                        timestamp: h.timestamp || Date.now()
+                        tempsMs: hTempsMs,
+                        nbCoups: hNbCoups,
+                        indice: h.indice || (hTempsMs > 0 && hNbCoups > 0 ? calculIndice(hTempsMs, hNbCoups) : 0),
+                        timestamp: hTimestamp
                     });
+                    if (hTimestamp > lastTimestamp) lastTimestamp = hTimestamp;
                 }
             }
+            
+            // Si l'historique est vide mais qu'on a des données actuelles, les ajouter
+            if (historique.length === 0 && tempsMs && coups) {
+                historique.push({
+                    tempsMs: tempsMs,
+                    nbCoups: coups,
+                    indice: calculIndice(tempsMs, coups),
+                    timestamp: Date.now()
+                });
+            }
+            
+            // Trier par timestamp
             historique.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
             
             results.push({
@@ -232,17 +252,29 @@ export function renderNatationLive() {
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
         
-        // Récupérer l'historique
+        // Récupérer l'historique avec fallback
         const historique = [];
         for (const [key, h] of Object.entries(historiqueData)) {
             if (h.eleveId === eleveId || h.code === eleve.code || h.code === eleve.id) {
+                const hTempsMs = h.tempsMs || h.temps || temps || 0;
+                const hNbCoups = h.nbCoups || h.coups || coups || 0;
+                const hTimestamp = h.timestamp || Date.now();
                 historique.push({
-                    tempsMs: h.tempsMs || h.temps || 0,
-                    nbCoups: h.nbCoups || h.coups || 0,
-                    indice: h.indice || 0,
-                    timestamp: h.timestamp || Date.now()
+                    tempsMs: hTempsMs,
+                    nbCoups: hNbCoups,
+                    indice: h.indice || (hTempsMs > 0 && hNbCoups > 0 ? calculIndice(hTempsMs, hNbCoups) : 0),
+                    timestamp: hTimestamp
                 });
             }
+        }
+        
+        if (historique.length === 0 && temps && coups) {
+            historique.push({
+                tempsMs: temps,
+                nbCoups: coups,
+                indice: calculIndice(temps, coups),
+                timestamp: Date.now()
+            });
         }
         historique.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
@@ -255,7 +287,6 @@ export function renderNatationLive() {
             }
         }
 
-        // Générer le HTML de l'historique
         let historiqueHtml = '';
         if (historique.length > 0) {
             historiqueHtml = `
@@ -264,7 +295,7 @@ export function renderNatationLive() {
                     <div class="space-y-1 max-h-40 overflow-y-auto">
                         ${historique.map((h, idx) => {
                             const hTemps = formatTime(h.tempsMs);
-                            const hIndice = calculIndice(h.tempsMs, h.nbCoups);
+                            const hIndice = h.indice || calculIndice(h.tempsMs, h.nbCoups);
                             const hNiveau = hIndice !== null ? getNiveau(hIndice) : { label: '--' };
                             const date = h.timestamp ? new Date(h.timestamp).toLocaleTimeString() : '--';
                             return `
