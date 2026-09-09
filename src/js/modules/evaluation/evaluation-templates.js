@@ -472,6 +472,8 @@ export function templateTableauBord(data, classe) {
 // FICHE ÉLÈVE (MODIFICATION : affichage VMA)
 // ============================================================
 
+// src/js/modules/evaluation/evaluation-templates.js
+
 export function templateFicheEleve(eleve, data, modeEdition = false) {
     const tests = ['endurance', 'force', 'vitesse', 'equilibre', 'coordination', 'souplesse', 'endurance_musculaire'];
     const libellesAffiches = {
@@ -547,6 +549,58 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                             const libelle = libellesAffiches[testId];
                             const unite = unites[testId];
                             
+                            // --- CORRECTION : En mode édition, on affiche toujours un champ ---
+                            if (modeEdition) {
+                                // Récupérer la valeur actuelle si elle existe
+                                let valeurActuelle = '';
+                                if (r) {
+                                    switch (testId) {
+                                        case 'endurance': valeurActuelle = r.palier ?? ''; break;
+                                        case 'force':
+                                        case 'souplesse': valeurActuelle = r.meilleur ?? ''; break;
+                                        case 'vitesse': valeurActuelle = r.meilleur ?? ''; break;
+                                        case 'equilibre':
+                                        case 'endurance_musculaire': valeurActuelle = r.temps ?? ''; break;
+                                        case 'coordination': valeurActuelle = r.nb_lancers ?? ''; break;
+                                        default: valeurActuelle = '';
+                                    }
+                                }
+                                
+                                let inputHtml = '';
+                                const step = testId === 'vitesse' ? '0.1' : (testId === 'souplesse' ? '0.5' : '1');
+                                
+                                if (testId === 'endurance') {
+                                    inputHtml = `
+                                        <input type="number" id="edit-${testId}" value="${valeurActuelle}" min="-1" max="20" step="1"
+                                               class="w-20 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                        <span class="text-xs text-slate-500 ml-1">palier</span>
+                                    `;
+                                } else {
+                                    inputHtml = `
+                                        <input type="number" id="edit-${testId}" value="${valeurActuelle}" step="${step}"
+                                               class="w-24 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
+                                        <span class="text-xs text-slate-500 ml-1">${unite}</span>
+                                    `;
+                                }
+                                
+                                return `
+                                    <div class="bg-slate-900 p-3 rounded-xl border-l-4 border-slate-600 flex justify-between items-center">
+                                        <div>
+                                            <span class="text-sm font-bold text-white">${libelle}</span>
+                                            <span class="ml-2">${inputHtml}</span>
+                                        </div>
+                                        ${r && r.groupe ? `
+                                            <span class="text-xs font-black px-2 py-1 rounded-full text-white" style="background-color: ${COULEURS_GROUPES[r.groupe]}">
+                                                ${LIBELLES_GROUPES[r.groupe]}
+                                            </span>
+                                        ` : `
+                                            <span class="text-xs font-black px-2 py-1 rounded-full bg-slate-600 text-white">Non évalué</span>
+                                        `}
+                                    </div>
+                                `;
+                            }
+                            
+                            // --- Mode lecture (inchangé) ---
                             if (!r || r.groupe === null) {
                                 return `
                                     <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex justify-between items-center">
@@ -556,68 +610,34 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                                 `;
                             }
 
+                            // ... (le reste du code lecture inchangé)
                             const couleur = COULEURS_GROUPES[r.groupe] || '#64748b';
                             const libelleGroupe = LIBELLES_GROUPES[r.groupe] || '';
                             
                             let affichageValeur = '';
                             let essaisHtml = '';
-                            let inputHtml = '';
-
+                            
                             switch (testId) {
                                 case 'endurance':
                                     const vma = getVMAFromPalier(r.palier);
                                     const vmaStr = vma !== null ? vma.toFixed(1) : '--';
                                     affichageValeur = `Palier ${r.palier} → VMA : ${vmaStr} km/h`;
-                                    if (modeEdition) {
-                                        inputHtml = `
-                                            <input type="number" id="edit-${testId}" value="${r.palier}" min="-1" max="20" 
-                                                   class="w-20 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
-                                            <span class="text-xs text-slate-500 ml-1">palier</span>
-                                        `;
-                                    }
                                     break;
                                 case 'force':
                                 case 'souplesse':
                                     affichageValeur = `${r.meilleur} ${unite}`;
                                     essaisHtml = r.essais ? `Essais : ${r.essais.join(', ')} ${unite}` : '';
-                                    if (modeEdition) {
-                                        inputHtml = `
-                                            <input type="number" id="edit-${testId}" value="${r.meilleur}" step="1" 
-                                                   class="w-24 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
-                                            <span class="text-xs text-slate-500">${unite}</span>
-                                        `;
-                                    }
                                     break;
                                 case 'vitesse':
                                     affichageValeur = `${r.meilleur.toFixed(1)} ${unite}`;
                                     essaisHtml = r.essais ? `Essais : ${r.essais.map(e => e.toFixed(1)).join(', ')} ${unite}` : '';
-                                    if (modeEdition) {
-                                        inputHtml = `
-                                            <input type="number" id="edit-${testId}" value="${r.meilleur}" step="0.1" 
-                                                   class="w-24 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
-                                            <span class="text-xs text-slate-500">${unite}</span>
-                                        `;
-                                    }
                                     break;
                                 case 'equilibre':
                                 case 'endurance_musculaire':
                                     affichageValeur = `${r.temps} ${unite}`;
-                                    if (modeEdition) {
-                                        inputHtml = `
-                                            <input type="number" id="edit-${testId}" value="${r.temps}" step="1" 
-                                                   class="w-24 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
-                                            <span class="text-xs text-slate-500">${unite}</span>
-                                        `;
-                                    }
                                     break;
                                 case 'coordination':
                                     affichageValeur = `${r.nb_lancers} ${unite}`;
-                                    if (modeEdition) {
-                                        inputHtml = `
-                                            <input type="number" id="edit-${testId}" value="${r.nb_lancers}" step="1" 
-                                                   class="w-20 bg-slate-900 border-2 border-slate-600 rounded-lg p-2 text-center text-white font-black">
-                                        `;
-                                    }
                                     break;
                                 default:
                                     affichageValeur = '--';
@@ -627,7 +647,7 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                                 <div class="bg-slate-900 p-3 rounded-xl border-l-4 flex justify-between items-center" style="border-color:${couleur}">
                                     <div>
                                         <span class="text-sm font-bold text-white">${libelle}</span>
-                                        ${modeEdition ? inputHtml : `<span class="text-sm text-slate-300 ml-2">${affichageValeur}</span>`}
+                                        <span class="text-sm text-slate-300 ml-2">${affichageValeur}</span>
                                         ${essaisHtml ? `<span class="text-xs text-slate-500 ml-2">${essaisHtml}</span>` : ''}
                                     </div>
                                     <span class="text-xs font-black px-2 py-1 rounded-full text-white" style="background-color:${couleur}">
