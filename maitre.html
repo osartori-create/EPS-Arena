@@ -60,6 +60,7 @@
                 <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
                 <p class="text-xs text-slate-400 w-full">Les noms et photos restent sur cet appareil (IndexedDB).</p>
                 <div class="flex gap-2">
+                    <button onclick="window.openImportModal()" class="btn btn-primary text-xs uppercase">📥 Import iDoceo</button>
                     <button onclick="document.getElementById('csvFile').click()" class="btn btn-primary text-xs uppercase">📄 Import CSV</button>
                     <input type="file" id="csvFile" accept=".csv" class="hidden">
                     <button onclick="document.getElementById('zipFile').click()" class="btn btn-primary text-xs uppercase">📸 Import ZIP Photos</button>
