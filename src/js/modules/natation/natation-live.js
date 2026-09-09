@@ -122,40 +122,32 @@ export function renderNatationLive() {
                 }
             }
             
-            // --- RÉCUPÉRATION ROBUSTE DE L'HISTORIQUE ---
+            // Récupérer l'historique pour cet élève
             const historique = [];
-            let lastTimestamp = 0;
-            
             for (const [key, h] of Object.entries(historiqueData)) {
-                // Vérifier si l'entrée correspond à l'élève
                 if (h.eleveId === eleveId || h.code === eleve.code || h.code === eleve.id) {
-                    // Fallback sur les données actuelles si l'historique est mal formaté
-                    const hTempsMs = h.tempsMs || h.temps || tempsMs || 0;
-                    const hNbCoups = h.nbCoups || h.coups || coups || 0;
+                    const hTempsMs = h.tempsMs || h.temps || 0;
+                    const hNbCoups = h.nbCoups || h.coups || 0;
                     const hTimestamp = h.timestamp || Date.now();
-                    
                     historique.push({
                         tempsMs: hTempsMs,
                         nbCoups: hNbCoups,
                         indice: h.indice || (hTempsMs > 0 && hNbCoups > 0 ? calculIndice(hTempsMs, hNbCoups) : 0),
                         timestamp: hTimestamp
                     });
-                    if (hTimestamp > lastTimestamp) lastTimestamp = hTimestamp;
                 }
             }
             
-            // Si l'historique est vide mais qu'on a des données actuelles, les ajouter
-            if (historique.length === 0 && tempsMs && coups) {
-                historique.push({
-                    tempsMs: tempsMs,
-                    nbCoups: coups,
-                    indice: calculIndice(tempsMs, coups),
-                    timestamp: Date.now()
-                });
+            // Dédoublonner l'historique : garder une seule entrée par (tempsMs, nbCoups)
+            const uniqueMap = new Map();
+            for (const item of historique) {
+                const key = `${item.tempsMs}-${item.nbCoups}`;
+                // Garder la plus récente pour chaque combinaison
+                if (!uniqueMap.has(key) || uniqueMap.get(key).timestamp < item.timestamp) {
+                    uniqueMap.set(key, item);
+                }
             }
-            
-            // Trier par timestamp
-            historique.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+            const historiqueUnique = Array.from(uniqueMap.values()).sort((a, b) => a.timestamp - b.timestamp);
             
             results.push({
                 eleveId,
@@ -165,7 +157,7 @@ export function renderNatationLive() {
                 coups,
                 indice,
                 niveau,
-                historique
+                historique: historiqueUnique
             });
         }
 
@@ -252,12 +244,12 @@ export function renderNatationLive() {
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
         
-        // Récupérer l'historique avec fallback
+        // Récupérer l'historique dédoublonné
         const historique = [];
         for (const [key, h] of Object.entries(historiqueData)) {
             if (h.eleveId === eleveId || h.code === eleve.code || h.code === eleve.id) {
-                const hTempsMs = h.tempsMs || h.temps || temps || 0;
-                const hNbCoups = h.nbCoups || h.coups || coups || 0;
+                const hTempsMs = h.tempsMs || h.temps || 0;
+                const hNbCoups = h.nbCoups || h.coups || 0;
                 const hTimestamp = h.timestamp || Date.now();
                 historique.push({
                     tempsMs: hTempsMs,
@@ -268,15 +260,15 @@ export function renderNatationLive() {
             }
         }
         
-        if (historique.length === 0 && temps && coups) {
-            historique.push({
-                tempsMs: temps,
-                nbCoups: coups,
-                indice: calculIndice(temps, coups),
-                timestamp: Date.now()
-            });
+        // Dédoublonner
+        const uniqueMap = new Map();
+        for (const item of historique) {
+            const key = `${item.tempsMs}-${item.nbCoups}`;
+            if (!uniqueMap.has(key) || uniqueMap.get(key).timestamp < item.timestamp) {
+                uniqueMap.set(key, item);
+            }
         }
-        historique.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        const historiqueUnique = Array.from(uniqueMap.values()).sort((a, b) => a.timestamp - b.timestamp);
 
         let numero = null;
         for (const [key, id] of Object.entries(mapping)) {
@@ -288,12 +280,12 @@ export function renderNatationLive() {
         }
 
         let historiqueHtml = '';
-        if (historique.length > 0) {
+        if (historiqueUnique.length > 0) {
             historiqueHtml = `
                 <div class="mt-4">
                     <p class="text-xs font-bold text-slate-400 uppercase mb-2">📊 Historique des essais</p>
                     <div class="space-y-1 max-h-40 overflow-y-auto">
-                        ${historique.map((h, idx) => {
+                        ${historiqueUnique.map((h, idx) => {
                             const hTemps = formatTime(h.tempsMs);
                             const hIndice = h.indice || calculIndice(h.tempsMs, h.nbCoups);
                             const hNiveau = hIndice !== null ? getNiveau(hIndice) : { label: '--' };
