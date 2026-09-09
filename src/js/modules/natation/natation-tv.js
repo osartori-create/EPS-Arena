@@ -2,9 +2,21 @@
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
+import { getExistingEleves } from '../../services/admin-service.js';
 
 let currentUnsubTemps = null;
 let currentUnsubCoups = null;
+let currentClasse = '';
+
+function getNiveau(indice) {
+    if (indice === null || isNaN(indice)) return { couleur: '#64748b', label: '--' };
+    const rounded = Math.round(indice * 100) / 100;
+    if (rounded >= 4.0) return { couleur: '#22c55e', label: '🌟 Excellent' };
+    if (rounded >= 3.0) return { couleur: '#3b82f6', label: '💪 Très satisfaisant' };
+    if (rounded >= 2.0) return { couleur: '#eab308', label: '✅ Satisfaisant' };
+    if (rounded >= 1.31) return { couleur: '#f97316', label: '🟡 Fragile' };
+    return { couleur: '#ef4444', label: '🔴 Très insuffisant' };
+}
 
 function calculIndice(tempsMs, nbCoups) {
     if (tempsMs === null || nbCoups === null || tempsMs <= 0 || nbCoups <= 0) return null;
@@ -16,14 +28,13 @@ function calculIndice(tempsMs, nbCoups) {
     return vitesse * distanceParCycle;
 }
 
-function getNiveau(indice) {
-    if (indice === null || indice === undefined || isNaN(indice)) {
-        return { couleur: '#64748b', label: '--' };
-    }
-    if (indice >= 4.0) return { couleur: '#22c55e', label: 'Excellent' };
-    if (indice >= 3.5) return { couleur: '#eab308', label: 'Satisfaisant' };
-    if (indice >= 3.0) return { couleur: '#f97316', label: 'Fragile' };
-    return { couleur: '#ef4444', label: 'À besoins' };
+function formatTime(ms) {
+    if (!ms || ms <= 0) return '--:--.-';
+    const totalSec = Math.floor(ms / 1000);
+    const min = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const sec = String(totalSec % 60).padStart(2, '0');
+    const dec = Math.floor((ms % 1000) / 100);
+    return `${min}:${sec}.${dec}`;
 }
 
 export function renderNatationTV() {
@@ -34,18 +45,23 @@ export function renderNatationTV() {
     if (tvView) {
         tvView.style.display = 'block';
         tvView.style.height = '100vh';
-        tvView.style.padding = '10px';
+        tvView.style.padding = '0';
+        tvView.style.overflow = 'hidden';
     }
 
-    container.style.height = '90vh';
+    container.style.height = '100vh';
     container.style.width = '100%';
     container.style.backgroundColor = '#0f172a';
-    container.style.overflowY = 'auto';
+    container.style.overflow = 'hidden';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
+    container.style.justifyContent = 'center';
     container.style.padding = '20px';
 
-    const classe = getCurrentClasse();
-    if (!classe) {
-        container.innerHTML = '<p style="text-align:center; color:#64748b;">Choisissez une classe.</p>';
+    currentClasse = getCurrentClasse();
+    if (!currentClasse) {
+        container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem;">Sélectionnez une classe.</p>';
         return;
     }
 
@@ -53,40 +69,38 @@ export function renderNatationTV() {
     if (currentUnsubCoups) currentUnsubCoups();
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/temps`);
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/coups`);
-    const mapping = getLocalMapping(classe) || {};
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
+    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups`);
 
     let tempsData = {};
     let coupsData = {};
+    const mapping = getLocalMapping(currentClasse) || {};
+    const eleves = getExistingEleves(currentClasse);
 
     async function render() {
+        if (Object.keys(tempsData).length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem;">En attente des résultats...</p>';
+            return;
+        }
+
         const results = [];
-        for (const [eleveId, tempsMs] of Object.entries(tempsData)) {
+        for (const [numero, tempsMs] of Object.entries(tempsData)) {
+            const eleveId = mapping[`${currentClasse}_${numero}`];
             const eleve = eleves.find(e => e.id === eleveId);
             if (!eleve) continue;
-            const coups = coupsData[eleveId] || null;
+            const coups = coupsData[numero] || null;
             const indice = calculIndice(tempsMs, coups);
             const niveau = indice !== null ? getNiveau(indice) : { couleur: '#64748b', label: '--' };
-            
-            let numero = null;
-            for (const [key, id] of Object.entries(mapping)) {
-                if (id === eleveId) {
-                    const match = key.match(/_(\d+)$/);
-                    if (match) numero = parseInt(match[1]);
-                    break;
-                }
-            }
             results.push({
-                eleve,
                 numero,
+                eleve,
                 tempsMs,
                 coups,
                 indice,
                 niveau
             });
         }
+
         results.sort((a, b) => {
             if (a.indice === null && b.indice === null) return 0;
             if (a.indice === null) return 1;
@@ -95,86 +109,148 @@ export function renderNatationTV() {
         });
 
         if (results.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#64748b; margin-top:50px;">Aucun résultat pour l\'instant.</p>';
+            container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem;">Aucun résultat.</p>';
             return;
         }
 
-        const top3 = results.slice(0, 3);
-        const autres = results.slice(3);
+        const maxIndice = Math.max(...results.map(r => r.indice || 0), 1);
 
         let html = `
             <style>
-                .tv-podium { display: flex; justify-content: center; align-items: flex-end; gap: 30px; margin-bottom: 40px; }
-                .tv-podium-item { text-align: center; }
-                .tv-podium-item .photo { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 10px; overflow: hidden; border: 3px solid #facc15; }
-                .tv-podium-item .photo img { width: 100%; height: 100%; object-fit: cover; }
-                .tv-podium-item .name { font-size: 1.5rem; font-weight: 700; color: white; }
-                .tv-podium-item .time { font-size: 1.2rem; color: #94a3b8; }
-                .tv-podium-item .indice { font-size: 2.5rem; font-weight: 900; color: #facc15; }
-                .tv-podium-item .rank { font-size: 3rem; }
-                .tv-podium-item .badge { display: inline-block; padding: 2px 12px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; color: white; margin-top: 4px; }
-                .tv-table { background: #1e293b; border-radius: 12px; overflow: hidden; border: 1px solid #334155; margin-top: 20px; }
-                .tv-table table { width: 100%; border-collapse: collapse; color: white; }
-                .tv-table th { background: #0f172a; padding: 12px; text-align: left; border-bottom: 2px solid #334155; }
-                .tv-table td { padding: 10px; border-bottom: 1px solid #1e293b; }
-                .tv-table .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.7rem; font-weight: 700; color: white; }
+                .tv-header {
+                    font-size: 2.5rem;
+                    font-weight: 900;
+                    color: #3b82f6;
+                    text-align: center;
+                    margin-bottom: 20px;
+                    letter-spacing: 4px;
+                }
+                .tv-container {
+                    width: 100%;
+                    max-width: 1400px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                    padding: 0 20px;
+                    height: calc(100vh - 120px);
+                    justify-content: flex-end;
+                }
+                .tv-bar {
+                    display: flex;
+                    align-items: center;
+                    border-radius: 8px;
+                    transition: height 0.5s ease;
+                    min-height: 40px;
+                    padding: 4px 12px;
+                    position: relative;
+                    border: 1px solid rgba(255,255,255,0.1);
+                }
+                .tv-bar .photo {
+                    width: 50px;
+                    height: 50px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    flex-shrink: 0;
+                    border: 2px solid rgba(255,255,255,0.3);
+                    margin-right: 12px;
+                }
+                .tv-bar .photo img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+                .tv-bar .photo .fallback {
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: #334155;
+                    font-size: 24px;
+                }
+                .tv-bar .info {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                    flex-wrap: wrap;
+                }
+                .tv-bar .numero {
+                    font-size: 1.8rem;
+                    font-weight: 900;
+                    color: #facc15;
+                    min-width: 60px;
+                }
+                .tv-bar .nom {
+                    font-size: 1.4rem;
+                    font-weight: 700;
+                    color: white;
+                }
+                .tv-bar .temps {
+                    font-size: 1.2rem;
+                    font-weight: 700;
+                    color: #94a3b8;
+                }
+                .tv-bar .indice {
+                    font-size: 1.6rem;
+                    font-weight: 900;
+                    color: #facc15;
+                    margin-left: auto;
+                    padding-left: 16px;
+                }
+                .tv-bar .badge {
+                    padding: 2px 12px;
+                    border-radius: 9999px;
+                    font-size: 0.9rem;
+                    font-weight: 700;
+                    color: white;
+                }
+                @media (max-width: 768px) {
+                    .tv-bar .nom { font-size: 1rem; }
+                    .tv-bar .numero { font-size: 1.2rem; min-width: 40px; }
+                    .tv-bar .indice { font-size: 1.2rem; }
+                    .tv-bar .photo { width: 36px; height: 36px; }
+                    .tv-header { font-size: 1.8rem; }
+                }
             </style>
-            <div style="text-align:center; margin-bottom:20px;">
-                <h2 style="color:#3b82f6; font-weight:900; font-size:2.5rem;">🏊 Indice de nage</h2>
-                <p style="color:#64748b;">Classe : ${classe}</p>
-            </div>
+            <div class="tv-header">🏊 Classement Indice de nage</div>
+            <div class="tv-container">
         `;
 
-        // Podium
-        if (top3.length > 0) {
-            html += `<div class="tv-podium">`;
-            const podiumColors = ['#facc15', '#94a3b8', '#d97706'];
-            for (let i = 0; i < top3.length; i++) {
-                const r = top3[i];
-                const photo = await getPhotoUrl(r.eleve.id);
-                const photoHtml = photo ? `<img src="${photo}">` : `<span style="font-size:3rem;">👤</span>`;
-                const medaille = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
-                const tempsStr = r.tempsMs !== null ? `${(r.tempsMs/1000).toFixed(1)}s` : '--';
-                const indiceStr = r.indice !== null ? r.indice.toFixed(2) : '--';
-                
-                html += `
-                    <div class="tv-podium-item" style="order: ${i === 0 ? 2 : i === 1 ? 1 : 3};">
-                        <div class="rank">${medaille}</div>
-                        <div class="photo" style="border-color: ${podiumColors[i]};">${photoHtml}</div>
-                        <div class="name">${r.eleve.prenom} ${r.eleve.nom}</div>
-                        <div class="time">${tempsStr} · ${r.coups} bras</div>
-                        <div class="indice">${indiceStr}</div>
-                        <div class="badge" style="background-color: ${r.niveau.couleur};">${r.niveau.label}</div>
+        const maxHeight = 80; // % de la hauteur disponible
+        const minHeight = 8;
+
+        for (const r of results) {
+            const hauteur = r.indice ? Math.max(minHeight, (r.indice / maxIndice) * maxHeight) : minHeight;
+            const tempsStr = r.tempsMs ? formatTime(r.tempsMs) : '--';
+            const indiceStr = r.indice ? r.indice.toFixed(2) : '--';
+
+            let photoHtml = '';
+            try {
+                const photoUrl = await getPhotoUrl(r.eleve.id);
+                if (photoUrl) {
+                    photoHtml = `<img src="${photoUrl}" alt="${r.eleve.prenom}">`;
+                } else {
+                    photoHtml = `<div class="fallback">👤</div>`;
+                }
+            } catch (e) {
+                photoHtml = `<div class="fallback">👤</div>`;
+            }
+
+            html += `
+                <div class="tv-bar" style="height: ${hauteur}%; background-color: ${r.niveau.couleur};">
+                    <div class="photo">${photoHtml}</div>
+                    <div class="info">
+                        <span class="numero">#${r.numero}</span>
+                        <span class="nom">${r.eleve.prenom} ${r.eleve.nom}</span>
+                        <span class="temps">${tempsStr}</span>
+                        <span class="badge" style="background-color: ${r.niveau.couleur};">${r.niveau.label}</span>
                     </div>
-                `;
-            }
-            html += `</div>`;
+                    <span class="indice">${indiceStr}</span>
+                </div>
+            `;
         }
 
-        // Tableau des autres
-        if (autres.length > 0) {
-            html += `<div class="tv-table"><table>
-                <thead><tr><th>#</th><th>Joueur</th><th>Temps</th><th>Bras</th><th>Indice</th><th>Niveau</th></tr></thead>
-                <tbody>`;
-            for (let i = 0; i < autres.length; i++) {
-                const r = autres[i];
-                const num = i + 4;
-                const tempsStr = r.tempsMs !== null ? `${(r.tempsMs/1000).toFixed(1)}s` : '--';
-                const indiceStr = r.indice !== null ? r.indice.toFixed(2) : '--';
-                html += `
-                    <tr>
-                        <td>${num}</td>
-                        <td>${r.eleve.prenom} ${r.eleve.nom}</td>
-                        <td>${tempsStr}</td>
-                        <td>${r.coups || '--'}</td>
-                        <td style="font-weight:700; color:#facc15;">${indiceStr}</td>
-                        <td><span class="badge" style="background-color: ${r.niveau.couleur};">${r.niveau.label}</span></td>
-                    </tr>
-                `;
-            }
-            html += `</tbody></table></div>`;
-        }
-
+        html += `</div>`;
         container.innerHTML = html;
     }
 
