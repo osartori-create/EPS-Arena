@@ -5,8 +5,6 @@ import { getCurrentClasse } from '../../../../core/live-engine.js';
 
 let currentUnsub = null;
 let currentClasse = '';
-let animationId = null;
-let scrollOffset = 0;
 
 // ============================================================
 // RENDU PRINCIPAL
@@ -28,7 +26,7 @@ export function renderEliminationTV() {
     container.style.backgroundColor = '#0f172a';
     container.style.overflow = 'hidden';
     container.style.position = 'relative';
-    container.style.padding = '0';
+    container.style.padding = '20px';
 
     const classe = getCurrentClasse();
     if (!classe) {
@@ -42,10 +40,6 @@ export function renderEliminationTV() {
         currentUnsub();
         currentUnsub = null;
     }
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-        animationId = null;
-    }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const joueursRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/joueurs`);
@@ -53,12 +47,9 @@ export function renderEliminationTV() {
     container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40vh;">En attente des données...</p>';
 
     // Configuration
-    const PHOTO_SIZE = 70;
-    const ELEVE_WIDTH = PHOTO_SIZE + 20;
-    const NB_VISIBLES = 10;
-    const SCROLL_SPEED = 1.2;
-    const TOP_MARGIN = 80;
-    const BOTTOM_MARGIN = 40;
+    const PHOTO_SIZE = 65;
+    const TOP_OFFSET = 80; // pour le titre
+    const BOTTOM_OFFSET = 30;
 
     let eleveData = [];
 
@@ -74,7 +65,7 @@ export function renderEliminationTV() {
                 }
                 .tv-title {
                     position: absolute;
-                    top: 20px;
+                    top: 15px;
                     left: 50%;
                     transform: translateX(-50%);
                     color: rgba(255,255,255,0.7);
@@ -87,7 +78,7 @@ export function renderEliminationTV() {
                 }
                 .tv-subtitle {
                     position: absolute;
-                    top: 70px;
+                    top: 60px;
                     left: 50%;
                     transform: translateX(-50%);
                     color: rgba(255,255,255,0.4);
@@ -95,42 +86,30 @@ export function renderEliminationTV() {
                     z-index: 10;
                     pointer-events: none;
                 }
-                .tv-scroll-container {
+                .tv-eleve-container {
                     position: absolute;
-                    top: 0;
                     left: 0;
-                    width: 100%;
-                    height: 100%;
+                    right: 0;
+                    top: ${TOP_OFFSET}px;
+                    bottom: ${BOTTOM_OFFSET}px;
                     z-index: 2;
-                    overflow: hidden;
-                }
-                .tv-scroll-inner {
-                    position: absolute;
-                    bottom: 0;
-                    left: 0;
-                    height: calc(100% - ${TOP_MARGIN + BOTTOM_MARGIN}px);
-                    top: ${TOP_MARGIN}px;
-                    will-change: transform;
-                    display: flex;
-                    align-items: stretch;
-                    gap: 12px;
-                    padding: 0 20px;
                 }
                 .tv-eleve {
-                    position: relative;
-                    height: 100%;
-                    flex-shrink: 0;
-                    width: ${ELEVE_WIDTH}px;
-                }
-                .tv-eleve .marker {
                     position: absolute;
                     left: 50%;
                     transform: translateX(-50%);
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    transition: bottom 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-                    will-change: bottom;
+                    transition: top 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    will-change: top;
+                    padding: 4px 12px;
+                    border-radius: 16px;
+                    background: rgba(30, 41, 59, 0.5);
+                    backdrop-filter: blur(4px);
+                    border: 1px solid rgba(71, 85, 105, 0.3);
+                    min-width: 80px;
+                    cursor: default;
                 }
                 .tv-eleve .photo {
                     width: ${PHOTO_SIZE}px;
@@ -140,6 +119,7 @@ export function renderEliminationTV() {
                     border: 3px solid rgba(255,255,255,0.2);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
                     flex-shrink: 0;
+                    margin-bottom: 2px;
                 }
                 .tv-eleve .photo img {
                     width: 100%;
@@ -153,32 +133,23 @@ export function renderEliminationTV() {
                     align-items: center;
                     justify-content: center;
                     background: #334155;
-                    font-size: 32px;
+                    font-size: 28px;
                     color: #94a3b8;
                 }
                 .tv-eleve .nom {
-                    margin-top: 4px;
                     font-size: 0.8rem;
                     font-weight: 700;
                     color: white;
                     text-shadow: 0 0 10px rgba(0,0,0,0.8);
                     white-space: nowrap;
-                    background: rgba(0,0,0,0.5);
-                    padding: 0 8px;
-                    border-radius: 8px;
-                }
-                .tv-eleve .code {
-                    font-size: 0.6rem;
-                    color: #94a3b8;
-                    background: rgba(0,0,0,0.5);
-                    padding: 0 6px;
-                    border-radius: 6px;
+                    max-width: 100px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
                 .tv-eleve .score {
                     font-size: 1.8rem;
                     font-weight: 900;
                     line-height: 1.2;
-                    text-shadow: 0 0 20px rgba(0,0,0,0.9);
                 }
                 .tv-eleve .score-label {
                     font-size: 0.5rem;
@@ -190,152 +161,120 @@ export function renderEliminationTV() {
                     position: absolute;
                     top: -8px;
                     right: -8px;
-                    font-size: 1.2rem;
+                    font-size: 1rem;
                     background: #0f172a;
                     border-radius: 50%;
                     padding: 2px;
                     border: 2px solid rgba(255,255,255,0.2);
-                    width: 30px;
-                    height: 30px;
+                    width: 28px;
+                    height: 28px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    z-index: 5;
                 }
-                .tv-eleve.top1 .photo { border-color: #facc15; }
-                .tv-eleve.top2 .photo { border-color: #94a3b8; }
-                .tv-eleve.top3 .photo { border-color: #d97706; }
-                .tv-eleve.top1 .rank-badge { border-color: #facc15; }
-                .tv-eleve.top2 .rank-badge { border-color: #94a3b8; }
-                .tv-eleve.top3 .rank-badge { border-color: #d97706; }
+                .tv-eleve.top1 {
+                    border-color: #facc15;
+                    background: rgba(250, 204, 21, 0.2);
+                }
+                .tv-eleve.top1 .rank-badge {
+                    border-color: #facc15;
+                }
+                .tv-eleve.top2 {
+                    border-color: #94a3b8;
+                    background: rgba(148, 163, 184, 0.2);
+                }
+                .tv-eleve.top2 .rank-badge {
+                    border-color: #94a3b8;
+                }
+                .tv-eleve.top3 {
+                    border-color: #d97706;
+                    background: rgba(217, 119, 6, 0.2);
+                }
+                .tv-eleve.top3 .rank-badge {
+                    border-color: #d97706;
+                }
                 @media (max-width: 768px) {
-                    .tv-eleve { width: ${PHOTO_SIZE * 0.8 + 16}px; }
-                    .tv-eleve .photo { width: ${PHOTO_SIZE * 0.8}px; height: ${PHOTO_SIZE * 0.8}px; }
-                    .tv-eleve .nom { font-size: 0.6rem; }
+                    .tv-eleve { min-width: 60px; padding: 2px 8px; }
+                    .tv-eleve .photo { width: 45px; height: 45px; }
+                    .tv-eleve .nom { font-size: 0.6rem; max-width: 70px; }
                     .tv-eleve .score { font-size: 1.2rem; }
-                    .tv-eleve .rank-badge { width: 22px; height: 22px; font-size: 0.8rem; top: -6px; right: -6px; }
+                    .tv-eleve .rank-badge { width: 22px; height: 22px; font-size: 0.7rem; top: -6px; right: -6px; }
                     .tv-title { font-size: 1.3rem; top: 10px; }
                     .tv-subtitle { top: 45px; font-size: 0.8rem; }
                 }
                 @media (max-width: 480px) {
-                    .tv-eleve { width: ${PHOTO_SIZE * 0.6 + 12}px; }
-                    .tv-eleve .photo { width: ${PHOTO_SIZE * 0.6}px; height: ${PHOTO_SIZE * 0.6}px; }
-                    .tv-eleve .nom { font-size: 0.5rem; }
+                    .tv-eleve .photo { width: 35px; height: 35px; }
+                    .tv-eleve .nom { font-size: 0.5rem; max-width: 50px; }
                     .tv-eleve .score { font-size: 1rem; }
-                    .tv-eleve .rank-badge { width: 18px; height: 18px; font-size: 0.6rem; }
                 }
             </style>
             <div class="tv-container" id="tv-container">
                 <div class="tv-title">🏆 Tournoi Élimination</div>
                 <div class="tv-subtitle">Classe : ${classe}</div>
-                <div class="tv-scroll-container" id="tv-scroll-container">
-                    <div class="tv-scroll-inner" id="tv-scroll-inner"></div>
-                </div>
+                <div class="tv-eleve-container" id="tv-eleve-container"></div>
             </div>
         `;
         return html;
     }
 
     function renderEleves(eleves) {
-        const inner = document.getElementById('tv-scroll-inner');
-        if (!inner) return;
+        const containerEl = document.getElementById('tv-eleve-container');
+        if (!containerEl) return;
 
-        const containerWidth = window.innerWidth;
-        const totalWidth = eleves.length * ELEVE_WIDTH;
-        const shouldScroll = eleves.length > NB_VISIBLES;
-
+        // Hauteur disponible pour les positions
+        const containerHeight = containerEl.clientHeight || window.innerHeight - TOP_OFFSET - BOTTOM_OFFSET;
         const maxElim = Math.max(...eleves.map(e => e.eliminations), 1);
 
+        // Calculer la position en pixels pour chaque élève
+        // 0 élimination = 0 (tout en haut), max = containerHeight (tout en bas)
+        // On ajoute un petit offset pour que le premier ne soit pas collé au bord
+        const padding = 10;
+        const usableHeight = containerHeight - 2 * padding;
+
         let html = '';
-        const nbCopies = shouldScroll ? 2 : 1;
-        for (let copy = 0; copy < nbCopies; copy++) {
-            for (const item of eleves) {
-                // Position en % : 0 élimination = 100% (haut), max = 0% (bas)
-                const ratio = maxElim > 0 ? item.eliminations / maxElim : 0;
-                const bottomPct = ratio * 100;
+        for (const item of eleves) {
+            const ratio = item.eliminations / maxElim;
+            const topPos = padding + ratio * usableHeight;
 
-                const rankClass = item.rank === 1 ? 'top1' : (item.rank === 2 ? 'top2' : (item.rank === 3 ? 'top3' : ''));
-                const medal = item.rank === 1 ? '🥇' : (item.rank === 2 ? '🥈' : (item.rank === 3 ? '🥉' : ''));
+            const rankClass = item.rank === 1 ? 'top1' : (item.rank === 2 ? 'top2' : (item.rank === 3 ? 'top3' : ''));
+            const medal = item.rank === 1 ? '🥇' : (item.rank === 2 ? '🥈' : (item.rank === 3 ? '🥉' : `#${item.rank}`));
 
-                let color = '#3b82f6';
-                if (item.eliminations >= 10) color = '#ef4444';
-                else if (item.eliminations >= 5) color = '#facc15';
+            let color = '#3b82f6';
+            if (item.eliminations >= 10) color = '#ef4444';
+            else if (item.eliminations >= 5) color = '#facc15';
 
-                const photoId = `tv-photo-${item.code}-${copy}`;
+            const photoId = `tv-photo-${item.code}`;
 
-                html += `
-                    <div class="tv-eleve">
-                        <div class="marker" style="bottom: ${bottomPct}%;">
-                            ${medal ? `<span class="rank-badge">${medal}</span>` : ''}
-                            <div class="photo ${rankClass}" id="${photoId}">
-                                <div class="fallback">👤</div>
-                            </div>
-                            <div class="nom">${item.nom}</div>
-                            <div class="code">#${item.code}</div>
-                            <div class="score" style="color: ${color};">${item.eliminations}</div>
-                            <div class="score-label">élim.</div>
-                        </div>
+            html += `
+                <div class="tv-eleve ${rankClass}" style="top: ${topPos}px;">
+                    <span class="rank-badge">${medal}</span>
+                    <div class="photo" id="${photoId}">
+                        <div class="fallback">👤</div>
                     </div>
-                `;
-            }
+                    <div class="nom">${item.nom}</div>
+                    <div class="score" style="color: ${color};">${item.eliminations}</div>
+                    <div class="score-label">élim.</div>
+                </div>
+            `;
         }
 
-        inner.innerHTML = html;
-        inner.style.width = shouldScroll ? (totalWidth * 2) + 'px' : totalWidth + 'px';
+        containerEl.innerHTML = html;
 
         // Charger les photos après le rendu
         for (const item of eleves) {
-            for (let copy = 0; copy < (shouldScroll ? 2 : 1); copy++) {
-                const photoDiv = document.getElementById(`tv-photo-${item.code}-${copy}`);
-                if (!photoDiv) continue;
-                try {
-                    const url = getPhotoUrl(item.code);
-                    url.then(u => {
-                        if (u) {
-                            photoDiv.innerHTML = `<img src="${u}" alt="${item.nom}">`;
-                        }
-                    });
-                } catch (e) {
-                    // Garder le fallback
-                }
+            const photoDiv = document.getElementById(`tv-photo-${item.code}`);
+            if (!photoDiv) continue;
+            try {
+                const url = getPhotoUrl(item.code);
+                url.then(u => {
+                    if (u) {
+                        photoDiv.innerHTML = `<img src="${u}" alt="${item.nom}">`;
+                    }
+                });
+            } catch (e) {
+                // Garder le fallback
             }
         }
-
-        // Positionner le défilement
-        if (shouldScroll) {
-            const windowWidth = Math.min(containerWidth, NB_VISIBLES * ELEVE_WIDTH);
-            const initialOffset = (containerWidth - windowWidth) / 2;
-            scrollOffset = initialOffset;
-            inner.style.transform = `translateX(${scrollOffset}px)`;
-
-            if (!animationId) {
-                animateScroll(inner, totalWidth);
-            }
-        } else {
-            const totalContentWidth = eleves.length * ELEVE_WIDTH;
-            const offset = (containerWidth - totalContentWidth) / 2;
-            inner.style.transform = `translateX(${offset}px)`;
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-        }
-    }
-
-    function animateScroll(inner, totalWidth) {
-        if (!inner) return;
-
-        scrollOffset -= SCROLL_SPEED;
-
-        if (scrollOffset <= -totalWidth) {
-            scrollOffset += totalWidth;
-        }
-
-        inner.style.transform = `translateX(${scrollOffset}px)`;
-
-        animationId = requestAnimationFrame(() => {
-            animateScroll(inner, totalWidth);
-        });
     }
 
     function computeElevePositions(joueurs) {
@@ -360,8 +299,8 @@ export function renderEliminationTV() {
     }
 
     function render() {
-        const inner = document.getElementById('tv-scroll-inner');
-        if (!inner) {
+        const containerEl = document.getElementById('tv-eleve-container');
+        if (!containerEl) {
             // Premier rendu : créer le fond
             const bgHtml = renderBackground();
             container.innerHTML = bgHtml;
@@ -371,7 +310,7 @@ export function renderEliminationTV() {
         }
 
         if (eleveData.length === 0) {
-            inner.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40%;">Aucune élimination enregistrée.</p>';
+            containerEl.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40%;">Aucune élimination enregistrée.</p>';
             return;
         }
 
@@ -400,10 +339,6 @@ export function renderEliminationTV() {
         if (currentUnsub) {
             currentUnsub();
             currentUnsub = null;
-        }
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-            animationId = null;
         }
         window.removeEventListener('resize', resizeHandler);
     };
