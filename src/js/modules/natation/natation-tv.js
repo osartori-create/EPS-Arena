@@ -8,7 +8,7 @@ let currentUnsubTemps = null;
 let currentUnsubCoups = null;
 
 // ============================================================
-// BARÈME (identique au kiosk)
+// BARÈME
 // ============================================================
 function getNiveau(indice) {
     if (indice === null || isNaN(indice)) return { couleur: '#64748b', label: '--' };
@@ -92,7 +92,6 @@ export function renderNatationTV() {
         { valeur: 4.0, label: '4.0' }
     ];
 
-    // ✅ Fonction render déclarée async
     async function render() {
         if (Object.keys(tempsData).length === 0) {
             container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem; margin-top:40vh;">En attente des résultats...</p>';
@@ -122,9 +121,6 @@ export function renderNatationTV() {
             return;
         }
 
-        // Trier par indice décroissant (pour l'affichage, mais on va les grouper)
-        eleveData.sort((a, b) => b.indice - a.indice);
-
         // 2. Regrouper par tranche d'indice (arrondi à 0.1)
         const groupes = {};
         for (const item of eleveData) {
@@ -133,7 +129,15 @@ export function renderNatationTV() {
             groupes[cle].push(item);
         }
 
-        // 3. Construire le HTML avec les zones de fond
+        // 3. Calculer la taille des photos en fonction du nombre max d'élèves dans un groupe
+        const maxElevesParGroupe = Math.max(...Object.values(groupes).map(arr => arr.length));
+        // Taille en pixels, entre 40px et 70px
+        const photoSizePx = Math.max(40, Math.min(70, 500 / maxElevesParGroupe));
+        // Taille en vw pour responsive
+        const photoSizeVw = Math.min(8, Math.max(4, (photoSizePx / window.innerWidth) * 100));
+        const photoSize = `clamp(40px, ${photoSizeVw}vw, 70px)`;
+
+        // 4. Construire le HTML avec les zones de fond
         let html = `
             <style>
                 .tv-container {
@@ -161,8 +165,8 @@ export function renderNatationTV() {
                 }
                 .tv-background .repere {
                     position: absolute;
-                    left: 20px;
-                    right: 20px;
+                    left: 60px;
+                    right: 60px;
                     height: 1px;
                     background: rgba(255,255,255,0.15);
                     z-index: 1;
@@ -172,7 +176,7 @@ export function renderNatationTV() {
                     left: 10px;
                     transform: translateY(-50%);
                     color: rgba(255,255,255,0.4);
-                    font-size: 1rem;
+                    font-size: 1.2rem;
                     font-weight: 700;
                     z-index: 1;
                     text-shadow: 0 0 10px rgba(0,0,0,0.8);
@@ -193,13 +197,14 @@ export function renderNatationTV() {
                     z-index: 3;
                 }
                 .tv-eleve .photo {
-                    width: 70px;
-                    height: 70px;
+                    width: ${photoSize};
+                    height: ${photoSize};
                     border-radius: 50%;
                     overflow: hidden;
                     border: 3px solid rgba(255,255,255,0.3);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
                     transition: border-color 0.3s ease;
+                    flex-shrink: 0;
                 }
                 .tv-eleve .photo img {
                     width: 100%;
@@ -213,27 +218,28 @@ export function renderNatationTV() {
                     align-items: center;
                     justify-content: center;
                     background: #334155;
-                    font-size: 32px;
+                    font-size: calc(${photoSize} * 0.45);
                     color: #94a3b8;
                 }
                 .tv-eleve .numero {
-                    margin-top: 4px;
-                    font-size: 1.2rem;
+                    margin-top: 2px;
+                    font-size: clamp(0.6rem, ${photoSizeVw * 0.25}vw, 1.2rem);
                     font-weight: 900;
                     color: #facc15;
-                    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+                    text-shadow: 0 0 10px rgba(0,0,0,0.9);
                     background: rgba(0,0,0,0.5);
-                    padding: 0 8px;
-                    border-radius: 12px;
+                    padding: 0 6px;
+                    border-radius: 10px;
+                    white-space: nowrap;
+                    line-height: 1.4;
                 }
                 @media (max-width: 768px) {
-                    .tv-eleve .photo { width: 50px; height: 50px; }
-                    .tv-eleve .numero { font-size: 0.9rem; }
-                    .tv-background .repere-label { font-size: 0.7rem; }
+                    .tv-background .repere-label { font-size: 0.8rem; left: 5px; }
+                    .tv-background .repere { left: 30px; right: 30px; }
                 }
                 @media (max-width: 480px) {
-                    .tv-eleve .photo { width: 40px; height: 40px; }
-                    .tv-eleve .numero { font-size: 0.7rem; }
+                    .tv-background .repere-label { font-size: 0.6rem; }
+                    .tv-background .repere { left: 15px; right: 15px; }
                 }
             </style>
             <div class="tv-container" id="tv-container">
@@ -260,14 +266,13 @@ export function renderNatationTV() {
 
         html += `</div>`; // fin background
 
-        // 4. Placer les élèves
+        // 5. Placer les élèves
         html += `<div class="tv-eleves" id="tv-eleves">`;
 
-        const paddingX = 5; // pourcentage
+        const paddingX = 6; // pourcentage
         const largeurDispo = 100 - 2 * paddingX;
         const groupesTries = Object.keys(groupes).sort((a, b) => parseFloat(b) - parseFloat(a));
 
-        // On va stocker les données des élèves pour charger les photos ensuite
         const elevesToRender = [];
 
         for (const cle of groupesTries) {
@@ -275,8 +280,10 @@ export function renderNatationTV() {
             const indice = parseFloat(cle);
             const yPct = 100 - ((Math.min(Math.max(indice, INDICE_MIN), INDICE_MAX) - INDICE_MIN) / (INDICE_MAX - INDICE_MIN)) * 100;
             const nb = items.length;
-            const espacement = largeurDispo / (nb + 1);
-            const debutX = paddingX + espacement;
+            // Calculer l'espacement horizontal pour éviter les chevauchements
+            const espacementMin = (photoSizePx / window.innerWidth) * 100; // en pourcentage
+            const espacement = Math.max(espacementMin * 1.2, largeurDispo / (nb + 1));
+            const debutX = paddingX + espacement / 2;
 
             for (let i = 0; i < nb; i++) {
                 const item = items[i];
@@ -311,7 +318,7 @@ export function renderNatationTV() {
 
         container.innerHTML = html;
 
-        // 5. Charger les photos en asynchrone (après le rendu)
+        // 6. Charger les photos en asynchrone
         for (const item of elevesToRender) {
             const photoDiv = document.getElementById(`photo-${item.numero}`);
             if (!photoDiv) continue;
