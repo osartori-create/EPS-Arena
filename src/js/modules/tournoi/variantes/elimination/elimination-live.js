@@ -18,7 +18,6 @@ export function renderEliminationLive() {
 
     currentClasse = classe;
 
-    // Nettoyer l'ancien écouteur
     if (currentUnsub) {
         currentUnsub();
         currentUnsub = null;
@@ -31,50 +30,63 @@ export function renderEliminationLive() {
 
     currentUnsub = onValue(joueursRef, async (snap) => {
         const joueurs = snap.val() || {};
-        const entries = Object.entries(joueurs);
 
-        if (entries.length === 0) {
-            container.innerHTML = '<p class="text-slate-500 text-center">Aucune élimination enregistrée.</p>';
+        // 1. Récupérer TOUS les élèves de la classe depuis localStorage
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+        if (eleves.length === 0) {
+            container.innerHTML = '<p class="text-slate-500 text-center">Aucun élève dans cette classe.</p>';
             return;
         }
 
-        // Trier par nombre d'éliminations (décroissant)
-        const sorted = entries.sort((a, b) => (b[1].eliminations || 0) - (a[1].eliminations || 0));
+        // 2. Trier les élèves par nom
+        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
-        // Récupérer les élèves de la classe pour les noms
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+        // 3. Construire la liste complète avec les éliminations
+        const data = eleves.map((eleve, index) => {
+            const code = (index + 1).toString();
+            const eliminations = joueurs[code]?.eliminations || 0;
+            return {
+                code: code,                 // Numéro affiché
+                eleveId: eleve.id,          // ID pour la photo
+                nom: `${eleve.prenom} ${eleve.nom}`,
+                eliminations: eliminations
+            };
+        });
 
+        // 4. Trier par éliminations décroissantes (les plus éliminés en premier)
+        data.sort((a, b) => b.eliminations - a.eliminations);
+
+        // 5. Afficher
         let html = `
             <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏆 Classement des éliminations</h3>
             <div class="space-y-2 max-h-[70vh] overflow-y-auto pr-2">
         `;
 
-        for (const [code, data] of sorted) {
-            const eleve = eleves.find(e => e.id === code) || { prenom: code, nom: '' };
-            const nom = eleve ? `${eleve.prenom} ${eleve.nom}` : code;
-            const eliminations = data.eliminations || 0;
-
-            // Récupérer la photo
+        for (const item of data) {
+            // Charger la photo
             let photoHtml = `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
-            try {
-                const url = await getPhotoUrl(code);
-                if (url) photoHtml = `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`;
-            } catch (e) {}
+            if (item.eleveId) {
+                try {
+                    const url = await getPhotoUrl(item.eleveId);
+                    if (url) {
+                        photoHtml = `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">`;
+                    }
+                } catch (e) {}
+            }
 
-            // Déterminer la couleur selon le nombre d'éliminations
             let color = 'text-slate-400';
-            if (eliminations >= 10) color = 'text-red-400 font-black';
-            else if (eliminations >= 5) color = 'text-yellow-400 font-bold';
+            if (item.eliminations >= 10) color = 'text-red-400 font-black';
+            else if (item.eliminations >= 5) color = 'text-yellow-400 font-bold';
 
             html += `
                 <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
                     ${photoHtml}
                     <div class="flex-1">
-                        <span class="font-bold text-white">${nom}</span>
-                        <span class="text-xs text-slate-400 ml-2">#${code}</span>
+                        <span class="font-bold text-white">${item.nom}</span>
+                        <span class="text-xs text-slate-400 ml-2">#${item.code}</span>
                     </div>
                     <div class="text-right">
-                        <span class="${color} text-2xl font-black">${eliminations}</span>
+                        <span class="${color} text-2xl font-black">${item.eliminations}</span>
                         <span class="text-xs text-slate-500 ml-1">élim.</span>
                     </div>
                 </div>
