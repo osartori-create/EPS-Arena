@@ -274,48 +274,47 @@ function afficherChrono(container) {
     else if (chronoRunning) tempsAffiche = formatTime(chronoElapsed);
 
     container.innerHTML = `
-        <div class="w-full min-h-screen bg-slate-900 p-8 flex flex-col items-center justify-center">
-            <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 w-full max-w-2xl">
-                <div class="flex items-center justify-center gap-8 mb-8">
-                    <span class="text-3xl font-black text-slate-400">N°</span>
-                    <span class="text-8xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="w-full min-h-screen bg-slate-900 p-4 md:p-8 flex flex-col items-center justify-center">
+            <div class="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 w-full max-w-2xl">
+                <div class="flex items-center justify-center gap-6 md:gap-8 mb-6 md:mb-8">
+                    <span class="text-2xl md:text-3xl font-black text-slate-400">N°</span>
+                    <span class="text-6xl md:text-8xl font-black text-yellow-400">${currentNumero}</span>
                 </div>
-                <p class="text-xl text-slate-400 text-center mb-6">${distance}m - Départ dans l'eau</p>
+                <p class="text-lg md:text-xl text-slate-400 text-center mb-4 md:mb-6">${distance}m - Départ dans l'eau</p>
 
-                <div class="text-9xl font-black tabular-nums text-yellow-400 text-center mb-10" id="natation-chrono-display">
+                <div class="text-7xl md:text-9xl font-black tabular-nums text-yellow-400 text-center mb-8 md:mb-10" id="natation-chrono-display">
                     ${tempsAffiche}
                 </div>
 
-                <div class="flex gap-6 justify-center">
+                <!-- 🔥 BOUTONS GÉANTS -->
+                <div class="flex flex-col gap-4 md:gap-6">
                     <button id="natation-start-btn" 
-                            class="bg-emerald-600 hover:bg-emerald-500 px-12 py-6 rounded-2xl font-black text-3xl text-white active:scale-95 transition-all ${chronoRunning ? 'hidden' : ''}"
+                            class="w-full bg-emerald-600 hover:bg-emerald-500 py-8 md:py-10 rounded-2xl font-black text-4xl md:text-5xl text-white active:scale-95 transition-all touch-manipulation ${chronoRunning ? 'hidden' : ''}"
                             onclick="window.natationDemarrer()"
                             ${tempsFinal !== null ? 'disabled' : ''}>
-                        ▶ Démarrer
+                        ▶ DÉMARRER
                     </button>
                     <button id="natation-stop-btn" 
-                            class="bg-red-600 hover:bg-red-500 px-12 py-6 rounded-2xl font-black text-3xl text-white active:scale-95 transition-all ${chronoRunning ? '' : 'hidden'}"
+                            class="w-full bg-red-600 hover:bg-red-500 py-8 md:py-10 rounded-2xl font-black text-4xl md:text-5xl text-white active:scale-95 transition-all touch-manipulation ${chronoRunning ? '' : 'hidden'}"
                             onclick="window.natationArreter()">
-                        ⏹ Arrêter
+                        ⏹ ARRÊTER
                     </button>
-                </div>
 
-                ${tempsFinal !== null ? `
-                    <div class="mt-8 flex gap-6 justify-center">
-                        <button onclick="window.natationValiderTemps()" 
-                                class="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
-                            ✅ Valider
-                        </button>
-                        <button onclick="window.natationRecommencer()" 
-                                class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
-                            ↺ Recommencer
-                        </button>
-                    </div>
-                ` : ''}
+                    ${tempsFinal !== null ? `
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <button onclick="window.natationValiderTemps()" 
+                                    class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-6 md:py-8 rounded-2xl font-black text-3xl md:text-4xl text-white active:scale-95 transition-all touch-manipulation">
+                                ✅ VALIDER
+                            </button>
+                            <button onclick="window.natationRecommencer()" 
+                                    class="flex-1 bg-slate-600 hover:bg-slate-500 py-6 md:py-8 rounded-2xl font-black text-3xl md:text-4xl text-white active:scale-95 transition-all touch-manipulation">
+                                ↺ RECOMMENCER
+                            </button>
+                        </div>
+                    ` : ''}
 
-                <div class="mt-8 text-center">
                     <button onclick="window.natationRetourListe()" 
-                            class="bg-slate-700 hover:bg-slate-600 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all">
+                            class="w-full bg-slate-700 hover:bg-slate-600 py-4 md:py-5 rounded-2xl font-black text-xl md:text-2xl text-white active:scale-95 transition-all touch-manipulation">
                         ← Retour à la liste
                     </button>
                 </div>
@@ -331,42 +330,43 @@ function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
     window._coupsSaisis = 25;
     container.innerHTML = `
-        <div class="w-full min-h-screen bg-slate-900 p-8 flex flex-col items-center justify-center">
-            <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 w-full max-w-2xl">
-                <div class="flex items-center justify-center gap-8 mb-6">
-                    <span class="text-3xl font-black text-slate-400">N°</span>
-                    <span class="text-8xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="w-full min-h-screen bg-slate-900 p-4 md:p-8 flex flex-col items-center justify-center">
+            <div class="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 w-full max-w-2xl">
+                <div class="flex items-center justify-center gap-6 md:gap-8 mb-4 md:mb-6">
+                    <span class="text-2xl md:text-3xl font-black text-slate-400">N°</span>
+                    <span class="text-6xl md:text-8xl font-black text-yellow-400">${currentNumero}</span>
                 </div>
-                <p class="text-xl text-slate-400 text-center mb-2">Temps enregistré</p>
-                <div class="text-6xl font-black text-yellow-400 text-center mb-8">${tempsStr}</div>
+                <p class="text-lg md:text-xl text-slate-400 text-center mb-2">Temps enregistré</p>
+                <div class="text-5xl md:text-6xl font-black text-yellow-400 text-center mb-6 md:mb-8">${tempsStr}</div>
                 
-                <p class="text-2xl font-bold text-white text-center mb-6">Combien de coups de bras ?</p>
-                <div class="flex justify-center items-center gap-8 mb-6">
+                <p class="text-xl md:text-2xl font-bold text-white text-center mb-4 md:mb-6">Combien de coups de bras ?</p>
+                
+                <!-- 🔥 COMPTEUR GÉANT -->
+                <div class="flex justify-center items-center gap-4 md:gap-6 mb-6 md:mb-8">
                     <button onclick="window.natationAdjustCoups(-1)" 
-                            class="bg-slate-700 hover:bg-slate-600 w-24 h-24 rounded-2xl text-5xl font-black text-white active:scale-95 transition-all">−</button>
-                    <span id="natation-coups-display" class="text-8xl font-black text-white w-40 text-center">25</span>
+                            class="bg-slate-700 hover:bg-slate-600 w-20 h-20 md:w-28 md:h-28 rounded-2xl text-5xl md:text-6xl font-black text-white active:scale-95 transition-all touch-manipulation">−</button>
+                    <span id="natation-coups-display" class="text-7xl md:text-8xl font-black text-white w-32 md:w-40 text-center">25</span>
                     <button onclick="window.natationAdjustCoups(1)" 
-                            class="bg-slate-700 hover:bg-slate-600 w-24 h-24 rounded-2xl text-5xl font-black text-white active:scale-95 transition-all">+</button>
+                            class="bg-slate-700 hover:bg-slate-600 w-20 h-20 md:w-28 md:h-28 rounded-2xl text-5xl md:text-6xl font-black text-white active:scale-95 transition-all touch-manipulation">+</button>
                 </div>
-                <p class="text-sm text-slate-500 text-center mb-8">(1 cycle = 2 coups de bras)</p>
+                <p class="text-sm text-slate-500 text-center mb-6 md:mb-8">(1 cycle = 2 coups de bras)</p>
 
-                <div class="flex gap-6 justify-center">
+                <!-- 🔥 BOUTONS GÉANTS -->
+                <div class="flex flex-col sm:flex-row gap-4">
                     <button onclick="window.natationValiderCoups()" 
-                            class="bg-emerald-600 hover:bg-emerald-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
-                        ✅ Enregistrer
+                            class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-6 md:py-8 rounded-2xl font-black text-3xl md:text-4xl text-white active:scale-95 transition-all touch-manipulation">
+                        ✅ ENREGISTRER
                     </button>
                     <button onclick="window.natationAnnulerCoups()" 
-                            class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
-                        Annuler
+                            class="flex-1 bg-slate-600 hover:bg-slate-500 py-6 md:py-8 rounded-2xl font-black text-3xl md:text-4xl text-white active:scale-95 transition-all touch-manipulation">
+                        ANNULER
                     </button>
                 </div>
 
-                <div class="mt-8 text-center">
-                    <button onclick="window.natationRetourListe()" 
-                            class="bg-slate-700 hover:bg-slate-600 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all">
-                        ← Retour à la liste
-                    </button>
-                </div>
+                <button onclick="window.natationRetourListe()" 
+                        class="w-full mt-4 md:mt-6 bg-slate-700 hover:bg-slate-600 py-4 md:py-5 rounded-2xl font-black text-xl md:text-2xl text-white active:scale-95 transition-all touch-manipulation">
+                    ← Retour à la liste
+                </button>
             </div>
         </div>
     `;
@@ -419,7 +419,6 @@ function afficherFeedback(container, tempsMs, nbCoups) {
     const niveau = getNiveau(indice);
     const tempsStr = formatTime(tempsMs);
 
-    // Dédoublonner l'historique local
     const uniqueEssais = [];
     const seen = new Set();
     for (const essai of historiqueEssais) {
@@ -438,77 +437,76 @@ function afficherFeedback(container, tempsMs, nbCoups) {
     if (historiqueEssais.length > 0) {
         const maxIndice = Math.max(...historiqueEssais.map(e => e.indice), 1);
         graphHtml = `
-            <div class="flex items-end justify-center gap-4 h-40 mt-6">
+            <div class="flex items-end justify-center gap-3 md:gap-4 h-32 md:h-40 mt-4 md:mt-6">
                 ${historiqueEssais.map((essai, idx) => {
-                    const hauteur = Math.max(10, (essai.indice / maxIndice) * 120);
+                    const hauteur = Math.max(10, (essai.indice / maxIndice) * 100);
                     const couleur = getNiveau(essai.indice).couleur;
                     return `
                         <div class="flex flex-col items-center">
-                            <div class="w-10 rounded-t-lg" style="height:${hauteur}px; background-color:${couleur};"></div>
-                            <span class="text-sm text-slate-400 mt-2">${idx+1}</span>
+                            <div class="w-6 md:w-10 rounded-t-lg" style="height:${hauteur}px; background-color:${couleur};"></div>
+                            <span class="text-xs md:text-sm text-slate-400 mt-1 md:mt-2">${idx+1}</span>
                         </div>
                     `;
                 }).join('')}
             </div>
-            <p class="text-sm text-slate-500 text-center mt-3">Évolution de l'indice (essais successifs)</p>
+            <p class="text-xs md:text-sm text-slate-500 text-center mt-2 md:mt-3">Évolution de l'indice (essais successifs)</p>
         `;
     }
 
     container.innerHTML = `
-        <div class="w-full min-h-screen bg-slate-900 p-8 flex flex-col items-center justify-center">
-            <div class="bg-slate-800 p-8 rounded-3xl border border-slate-700 w-full max-w-2xl">
-                <div class="flex items-center justify-center gap-8 mb-6">
-                    <span class="text-3xl font-black text-slate-400">N°</span>
-                    <span class="text-8xl font-black text-yellow-400">${currentNumero}</span>
+        <div class="w-full min-h-screen bg-slate-900 p-4 md:p-8 flex flex-col items-center justify-center">
+            <div class="bg-slate-800 p-6 md:p-8 rounded-3xl border border-slate-700 w-full max-w-2xl">
+                <div class="flex items-center justify-center gap-6 md:gap-8 mb-4 md:mb-6">
+                    <span class="text-2xl md:text-3xl font-black text-slate-400">N°</span>
+                    <span class="text-6xl md:text-8xl font-black text-yellow-400">${currentNumero}</span>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4 bg-slate-900 p-6 rounded-2xl border border-slate-600 mb-6">
+                <div class="grid grid-cols-2 gap-3 md:gap-4 bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-600 mb-4 md:mb-6">
                     <div class="text-center">
-                        <p class="text-sm text-slate-400">Temps</p>
-                        <p class="text-4xl font-black text-yellow-400">${tempsStr}</p>
+                        <p class="text-xs md:text-sm text-slate-400">Temps</p>
+                        <p class="text-3xl md:text-4xl font-black text-yellow-400">${tempsStr}</p>
                     </div>
                     <div class="text-center">
-                        <p class="text-sm text-slate-400">Coups de bras</p>
-                        <p class="text-4xl font-black text-blue-400">${nbCoups}</p>
+                        <p class="text-xs md:text-sm text-slate-400">Coups de bras</p>
+                        <p class="text-3xl md:text-4xl font-black text-blue-400">${nbCoups}</p>
                     </div>
                 </div>
 
-                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-600 mb-6">
-                    <p class="text-sm text-slate-400 text-center">Indice de nage</p>
-                    <p class="text-7xl font-black text-yellow-400 text-center">${indice.toFixed(2)}</p>
-                    <p class="text-2xl font-bold text-center mt-2" style="color: ${niveau.couleur}">
+                <div class="bg-slate-900 p-4 md:p-6 rounded-2xl border border-slate-600 mb-4 md:mb-6">
+                    <p class="text-xs md:text-sm text-slate-400 text-center">Indice de nage</p>
+                    <p class="text-5xl md:text-7xl font-black text-yellow-400 text-center">${indice.toFixed(2)}</p>
+                    <p class="text-xl md:text-2xl font-bold text-center mt-1 md:mt-2" style="color: ${niveau.couleur}">
                         ${niveau.label}</p>
                     ${historiqueEssais.length > 1 ? `
-                        <div class="text-center mt-2 text-slate-400">
-                            🏅 Meilleur : <span class="text-yellow-400 font-bold text-xl">${meilleurIndice.toFixed(2)}</span>
+                        <div class="text-center mt-1 md:mt-2 text-xs md:text-sm text-slate-400">
+                            🏅 Meilleur : <span class="text-yellow-400 font-bold text-lg md:text-xl">${meilleurIndice.toFixed(2)}</span>
                         </div>
                     ` : ''}
                     ${messageEncouragement ? `
-                        <div class="mt-4 p-4 bg-slate-700/50 rounded-xl border border-slate-600">
-                            <p class="text-lg text-yellow-400 font-bold text-center">${messageEncouragement}</p>
+                        <div class="mt-3 md:mt-4 p-3 md:p-4 bg-slate-700/50 rounded-xl border border-slate-600">
+                            <p class="text-base md:text-lg text-yellow-400 font-bold text-center">${messageEncouragement}</p>
                         </div>
                     ` : ''}
                 </div>
 
                 ${graphHtml}
 
-                <div class="flex gap-6 justify-center mt-8">
+                <!-- 🔥 BOUTONS GÉANTS -->
+                <div class="flex flex-col sm:flex-row gap-4 mt-4 md:mt-8">
                     <button onclick="window.natationNouvelEssai()" 
-                            class="bg-blue-600 hover:bg-blue-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
-                        🔄 Nouvel essai
+                            class="flex-1 bg-blue-600 hover:bg-blue-500 py-6 md:py-8 rounded-2xl font-black text-3xl md:text-4xl text-white active:scale-95 transition-all touch-manipulation">
+                        🔄 NOUVEL ESSAI
                     </button>
                     <button onclick="window.natationChangerEleve()" 
-                            class="bg-slate-600 hover:bg-slate-500 px-10 py-4 rounded-2xl font-black text-2xl text-white active:scale-95 transition-all">
-                        👤 Changer d'élève
+                            class="flex-1 bg-slate-600 hover:bg-slate-500 py-6 md:py-8 rounded-2xl font-black text-3xl md:text-4xl text-white active:scale-95 transition-all touch-manipulation">
+                        👤 CHANGER D'ÉLÈVE
                     </button>
                 </div>
 
-                <div class="mt-6 text-center">
-                    <button onclick="window.natationRetourListe()" 
-                            class="bg-slate-700 hover:bg-slate-600 px-10 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all">
-                        ← Retour à la liste
-                    </button>
-                </div>
+                <button onclick="window.natationRetourListe()" 
+                        class="w-full mt-4 bg-slate-700 hover:bg-slate-600 py-4 md:py-5 rounded-2xl font-black text-xl md:text-2xl text-white active:scale-95 transition-all touch-manipulation">
+                    ← Retour à la liste
+                </button>
             </div>
         </div>
     `;
