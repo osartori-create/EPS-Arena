@@ -44,7 +44,7 @@ function formatTime(ms) {
 }
 
 // ============================================================
-// EXPORT CSV (pour le bouton dans le Live)
+// EXPORT CSV
 // ============================================================
 window.exportNatationLiveCSV = function() {
     const classe = getCurrentClasse();
@@ -90,11 +90,10 @@ export function renderNatationLive() {
     let tempsData = {};
     let coupsData = {};
     let historiqueData = {};
-    const mapping = getLocalMapping(classe) || {}; // mapping local du prof (numéro -> eleveId)
-    const eleves = getExistingEleves(classe); // liste des élèves avec id, nom, prenom
+    const mapping = getLocalMapping(classe) || {};
+    const eleves = getExistingEleves(classe);
 
     async function render() {
-        // Vérifier si on a des données
         if (Object.keys(tempsData).length === 0 && Object.keys(coupsData).length === 0) {
             container.innerHTML = '<p class="text-slate-500 text-center">Aucun résultat pour l\'instant.</p>';
             return;
@@ -103,35 +102,31 @@ export function renderNatationLive() {
         const results = [];
         const seenNumeros = new Set();
 
-        // Parcourir les données par numéro (clés dans tempsData sont des numéros)
         for (const [numero, tempsMs] of Object.entries(tempsData)) {
             if (seenNumeros.has(numero)) continue;
             seenNumeros.add(numero);
 
-            // Récupérer l'eleveId depuis le mapping local
             const eleveId = mapping[`${classe}_${numero}`];
             const eleve = eleves.find(e => e.id === eleveId);
-            if (!eleve) continue; // Si l'élève n'est pas trouvé dans le mapping, on ignore
+            if (!eleve) continue;
 
             const coups = coupsData[numero] || null;
             const indice = calculIndice(tempsMs, coups);
             const niveau = indice !== null ? getNiveau(indice) : { label: '--', couleur: 'bg-slate-600' };
 
-            // Récupérer l'historique pour ce numéro
+            // ✅ LECTURE CORRECTE DE L'HISTORIQUE
             const historique = [];
-            for (const [key, h] of Object.entries(historiqueData)) {
-                // On compare avec le numéro (les clés dans historique sont les numéros)
-                if (key === numero) {
-                    historique.push({
-                        tempsMs: h.tempsMs || 0,
-                        nbCoups: h.nbCoups || 0,
-                        indice: h.indice || 0,
-                        timestamp: h.timestamp || Date.now()
-                    });
-                }
+            const essais = historiqueData[numero] || [];
+            for (const h of essais) {
+                historique.push({
+                    tempsMs: h.tempsMs || 0,
+                    nbCoups: h.nbCoups || 0,
+                    indice: h.indice || 0,
+                    timestamp: h.timestamp || Date.now()
+                });
             }
 
-            // Dédoublonner l'historique
+            // Dédoublonner
             const uniqueMap = new Map();
             for (const item of historique) {
                 const key = `${item.tempsMs}-${item.nbCoups}`;
@@ -152,7 +147,6 @@ export function renderNatationLive() {
             });
         }
 
-        // Trier par indice décroissant
         results.sort((a, b) => {
             if (a.indice === null && b.indice === null) return 0;
             if (a.indice === null) return 1;
@@ -206,7 +200,6 @@ export function renderNatationLive() {
         container.innerHTML = html;
     }
 
-    // Écouter les changements
     currentUnsubTemps = onValue(tempsRef, (snap) => {
         tempsData = snap.val() || {};
         render();
@@ -223,26 +216,24 @@ export function renderNatationLive() {
     });
 
     // ============================================================
-    // FICHE ÉLÈVE DEPUIS LE LIVE (clic sur une ligne)
+    // FICHE ÉLÈVE DEPUIS LE LIVE
     // ============================================================
     window.openNatationLiveFiche = function(numero) {
-        // Récupérer les données du numéro
         const tempsMs = tempsData[numero] || null;
         const coups = coupsData[numero] || null;
         const indice = calculIndice(tempsMs, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
 
-        // Récupérer l'historique pour ce numéro
+        // ✅ LECTURE CORRECTE DE L'HISTORIQUE
         const historique = [];
-        for (const [key, h] of Object.entries(historiqueData)) {
-            if (key === numero) {
-                historique.push({
-                    tempsMs: h.tempsMs || 0,
-                    nbCoups: h.nbCoups || 0,
-                    indice: h.indice || 0,
-                    timestamp: h.timestamp || Date.now()
-                });
-            }
+        const essais = historiqueData[numero] || [];
+        for (const h of essais) {
+            historique.push({
+                tempsMs: h.tempsMs || 0,
+                nbCoups: h.nbCoups || 0,
+                indice: h.indice || 0,
+                timestamp: h.timestamp || Date.now()
+            });
         }
 
         // Dédoublonner
@@ -255,7 +246,6 @@ export function renderNatationLive() {
         }
         const historiqueUnique = Array.from(uniqueMap.values()).sort((a, b) => a.timestamp - b.timestamp);
 
-        // Récupérer l'élève via le mapping local
         const eleveId = (getLocalMapping(classe) || {})[`${classe}_${numero}`];
         const eleve = getExistingEleves(classe).find(e => e.id === eleveId);
         if (!eleve) {
@@ -263,7 +253,6 @@ export function renderNatationLive() {
             return;
         }
 
-        // Générer le HTML de l'historique
         let historiqueHtml = '';
         if (historiqueUnique.length > 0) {
             historiqueHtml = `
@@ -341,7 +330,6 @@ export function renderNatationLive() {
         `;
         document.body.appendChild(modal);
 
-        // Fonction de sauvegarde
         window.sauvegarderLiveNatation = function(numero) {
             const tempsInput = document.getElementById('edit-live-temps');
             const coupsInput = document.getElementById('edit-live-coups');
@@ -369,7 +357,7 @@ export function renderNatationLive() {
             ]).then(() => {
                 alert('✅ Données mises à jour !');
                 modal.remove();
-                render(); // rafraîchir le Live
+                render();
             }).catch(err => {
                 console.error('Erreur sauvegarde :', err);
                 alert('❌ Erreur lors de la sauvegarde.');

@@ -34,16 +34,10 @@ window.natationChoisirNumero = function(num) {
     tempsFinal = null;
     chronoElapsed = 0;
     
-    const eleveId = getEleveIdFromNumero(num);
-    if (eleveId) {
-        chargerHistoriqueEleve(eleveId, () => {
-            mode = 'chrono';
-            afficherInterface();
-        });
-    } else {
+    chargerHistoriqueEleve(num, () => {
         mode = 'chrono';
         afficherInterface();
-    }
+    });
 };
 
 window.natationRetourListe = function() {
@@ -236,8 +230,8 @@ function afficherListeNumeros(container) {
     `;
 
     nums.forEach(num => {
-        const eleveId = getEleveIdFromNumero(num);
-        const temps = eleveId ? tempsData[eleveId] : null;
+        // On vérifie si l'élève a déjà un temps (directement dans tempsData par numéro)
+        const temps = tempsData[num] || null;
         const aTemps = temps && temps > 0;
         const bgClass = aTemps 
             ? 'bg-gradient-to-br from-emerald-600 to-emerald-700 border-emerald-400' 
@@ -425,6 +419,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
     const niveau = getNiveau(indice);
     const tempsStr = formatTime(tempsMs);
 
+    // Dédoublonner l'historique local
     const uniqueEssais = [];
     const seen = new Set();
     for (const essai of historiqueEssais) {
@@ -520,11 +515,11 @@ function afficherFeedback(container, tempsMs, nbCoups) {
 }
 
 // ============================================================
-// HISTORIQUE FIREBASE
+// CHARGEMENT DE L'HISTORIQUE (uniquement ici)
 // ============================================================
-function chargerHistoriqueEleve(eleveId, callback) {
+function chargerHistoriqueEleve(numero, callback) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${eleveId}`);
+    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
     
     onValue(historiqueRef, (snap) => {
         const data = snap.val() || [];
@@ -541,25 +536,6 @@ function chargerHistoriqueEleve(eleveId, callback) {
 // ============================================================
 // FONCTIONS UTILITAIRES
 // ============================================================
-function getEleveIdFromNumero(num) {
-    if (!currentClasse) return null;
-    let mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${currentClasse}`) || '{}');
-    let eleveId = mapping[`${currentClasse}_${num}`];
-    if (!eleveId || Object.keys(mapping).length === 0) {
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-        if (eleves.length === 0) return null;
-        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-        const newMapping = {};
-        eleves.forEach((e, idx) => {
-            newMapping[`${currentClasse}_${idx + 1}`] = e.id;
-        });
-        localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
-        mapping = newMapping;
-        eleveId = mapping[`${currentClasse}_${num}`];
-    }
-    return eleveId || null;
-}
-
 function calculIndice(tempsMs, nbCoups) {
     if (tempsMs === null || nbCoups === null || tempsMs <= 0 || nbCoups <= 0) return null;
     const tempsSec = tempsMs / 1000;
@@ -593,14 +569,14 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
     if (isSaving) return;
     if (currentNumero === null) return;
     
-    const numero = currentNumero; // ✅ on utilise le numéro directement
+    const numero = currentNumero; // clé = numéro
 
     isSaving = true;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const indice = calculIndice(tempsMs, nbCoups);
     
     const nouvelEssai = {
-        numero: numero,  // On stocke le numéro dans l'historique
+        numero: numero,
         tempsMs: tempsMs,
         nbCoups: nbCoups,
         indice: indice,
@@ -613,6 +589,7 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         let historique = snap.val() || [];
         if (!Array.isArray(historique)) historique = [];
         
+        // Dédoublonner (supprimer les essais identiques)
         historique = historique.filter(h => 
             !(Math.abs(h.tempsMs - tempsMs) < 1 && h.nbCoups === nbCoups)
         );
@@ -642,22 +619,5 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
             alert('Erreur lors de l\'enregistrement.');
             isSaving = false;
         });
-    }, { onlyOnce: true });
-}
-
-// chargerHistoriqueEleve utilise aussi le numéro
-function chargerHistoriqueEleve(numero, callback) {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
-    
-    onValue(historiqueRef, (snap) => {
-        const data = snap.val() || [];
-        historiqueEssais = data.map(e => ({
-            tempsMs: e.tempsMs,
-            nbCoups: e.nbCoups,
-            indice: e.indice,
-            timestamp: e.timestamp
-        }));
-        if (callback) callback();
     }, { onlyOnce: true });
 }
