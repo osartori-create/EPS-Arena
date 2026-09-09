@@ -2,7 +2,6 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
-import { exporterVersIDoceo } from '../../services/export-service.js';
 
 let currentClasse = '';
 let elevesData = [];
@@ -12,7 +11,7 @@ let tempsUnsubscribe = null;
 let coupsUnsubscribe = null;
 
 // ============================================================
-// BARÈME (tableau ordonné)
+// BARÈME (tableau ordonné du plus élevé au plus bas)
 // ============================================================
 const DEFAULT_BAREME = [
     { min: 4.0, label: 'Excellent', couleur: 'bg-emerald-500' },
@@ -175,6 +174,13 @@ function createHeader() {
     btnBareme.onclick = ouvrirBaremeModal;
     right.appendChild(btnBareme);
 
+    // Bouton Export iDoceo
+    const btnExportIdoceo = document.createElement('button');
+    btnExportIdoceo.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400 active:scale-95';
+    btnExportIdoceo.textContent = '📥 Export iDoceo';
+    btnExportIdoceo.onclick = exportNatationIDoceo;
+    right.appendChild(btnExportIdoceo);
+
     const btnTransmettre = document.createElement('button');
     btnTransmettre.className = 'bg-blue-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-blue-400 active:scale-95';
     btnTransmettre.textContent = '📡 Transmettre';
@@ -289,7 +295,7 @@ window.sauvegarderBareme = function() {
 };
 
 // ============================================================
-// GRILLE DES ÉLÈVES
+// GRILLE DES ÉLÈVES (avec numéro bien visible)
 // ============================================================
 function createGrid() {
     const div = document.createElement('div');
@@ -334,7 +340,8 @@ async function renderGrid(container) {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-black text-white text-sm truncate">${eleve.prenom} ${eleve.nom}</div>
-                        <div class="text-xs text-slate-400">N° ${eleve.numero}</div>
+                        <!-- ✅ NUMÉRO BEAUCOUP PLUS GROS ET LISIBLE -->
+                        <div class="text-2xl font-black text-yellow-400">N° ${eleve.numero}</div>
                         <div class="flex items-center gap-2 mt-1 flex-wrap">
                             <span class="text-yellow-400 font-bold text-sm">${tempsStr}</span>
                             <span class="text-blue-400 font-bold text-sm">${coupsStr} bras</span>
@@ -429,6 +436,54 @@ function sauvegarderCoups(eleveId, nbCoups) {
 }
 
 // ============================================================
+// EXPORT iDoceo (via service centralisé)
+// ============================================================
+function exportNatationIDoceo() {
+    const classe = currentClasse || getCurrentClasse();
+    if (!classe) {
+        alert('Sélectionnez une classe.');
+        return;
+    }
+    
+    const eleves = elevesData.filter(e => e.numero !== undefined);
+    if (eleves.length === 0) {
+        alert('Aucun élève dans cette classe.');
+        return;
+    }
+    
+    const donnees = eleves.map(e => {
+        const temps = tempsData[e.id] || null;
+        const coups = coupsData[e.id] || null;
+        const indice = calculIndice(temps, coups);
+        const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
+        
+        return {
+            numero: e.numero,
+            nom: e.nom || '',
+            prenom: e.prenom || '',
+            temps: temps !== null ? (temps / 1000).toFixed(1) : '',
+            coups: coups !== null ? coups : '',
+            indice: indice !== null ? indice.toFixed(2) : '',
+            niveau: niveau.label
+        };
+    });
+    
+    const colonnes = [
+        { nom: '!groupe', cle: 'numero' },
+        { nom: '!Nom', cle: 'nom' },
+        { nom: '!Prénom', cle: 'prenom' },
+        { nom: '!Temps (s)', cle: 'temps' },
+        { nom: '!Coups de bras', cle: 'coups' },
+        { nom: '!Indice', cle: 'indice' },
+        { nom: '!Niveau', cle: 'niveau' }
+    ];
+    
+    exporterVersIDoceo('Natation', classe, colonnes, donnees);
+}
+
+window.exportNatationIDoceo = exportNatationIDoceo;
+
+// ============================================================
 // TRANSMISSION FIREBASE
 // ============================================================
 export async function transmettreNatationConfig() {
@@ -490,55 +545,6 @@ export function exportNatationConfig() {
     a.href = URL.createObjectURL(blob);
     a.download = `${classe}_natation_${data.date}.json`;
     a.click();
-}
-
-// ============================================================
-// EXPORT iDoceo (CSV compatible)
-// ============================================================
-function exportNatationIDoceo() {
-    const classe = currentClasse || getCurrentClasse();
-    if (!classe) {
-        alert('Sélectionnez une classe.');
-        return;
-    }
-    
-    const eleves = elevesData.filter(e => e.numero !== undefined);
-    if (eleves.length === 0) {
-        alert('Aucun élève dans cette classe.');
-        return;
-    }
-    
-    // 1. Construire les données
-    const donnees = eleves.map(e => {
-        const temps = tempsData[e.id] || null;
-        const coups = coupsData[e.id] || null;
-        const indice = calculIndice(temps, coups);
-        const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
-        
-        return {
-            numero: e.numero,
-            nom: e.nom || '',
-            prenom: e.prenom || '',
-            temps: temps !== null ? (temps / 1000).toFixed(1) : '',
-            coups: coups !== null ? coups : '',
-            indice: indice !== null ? indice.toFixed(2) : '',
-            niveau: niveau.label
-        };
-    });
-    
-    // 2. Définir les colonnes (avec ! devant toutes les colonnes)
-    const colonnes = [
-        { nom: '!groupe', cle: 'numero' },
-        { nom: '!Nom', cle: 'nom' },
-        { nom: '!Prénom', cle: 'prenom' },
-        { nom: '!Temps (s)', cle: 'temps' },
-        { nom: '!Coups de bras', cle: 'coups' },
-        { nom: '!Indice', cle: 'indice' },
-        { nom: '!Niveau', cle: 'niveau' }
-    ];
-    
-    // 3. Exporter via le service centralisé
-    exporterVersIDoceo('Natation', classe, colonnes, donnees);
 }
 
 // ============================================================
