@@ -159,19 +159,35 @@ export function renderNatationTV() {
                     height: calc(100% - 20px);
                     will-change: transform;
                     display: flex;
-                    align-items: flex-end;
+                    align-items: stretch;
                     gap: 12px;
                     padding: 0 20px;
                 }
+                /*
+                 * FIX : chaque "slot" élève est désormais un conteneur en
+                 * position:relative avec une largeur explicite (pour que le
+                 * flex horizontal / gap continue de fonctionner comme avant),
+                 * et c'est le ".marker" à l'intérieur qui est positionné en
+                 * absolu. On utilise "bottom: X%" (résolu par rapport à la
+                 * HAUTEUR du bloc conteneur) au lieu de "margin-bottom: X%"
+                 * (qui se résout TOUJOURS par rapport à la LARGEUR, quel que
+                 * soit le contexte flex — c'est ce qui causait le bug de
+                 * hauteur incorrecte par rapport à l'indice).
+                 */
                 .tv-eleve {
+                    position: relative;
+                    height: 100%;
+                    flex-shrink: 0;
+                    width: ${PHOTO_SIZE}px;
+                }
+                .tv-eleve .marker {
+                    position: absolute;
+                    left: 50%;
+                    transform: translateX(-50%);
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    flex-shrink: 0;
-                    transition: opacity 0.3s ease;
-                    height: 100%;
-                    justify-content: flex-end;
-                    padding-bottom: 10px;
+                    transition: bottom 0.3s ease;
                 }
                 .tv-eleve .photo {
                     width: ${PHOTO_SIZE}px;
@@ -279,12 +295,19 @@ export function renderNatationTV() {
                 const colorBorder = item.niveau.couleur;
                 const yPosition = item.yPct;
                 const photoId = `photo-${item.numero}-${copy}`;
+                // FIX : "bottom" en % se résout par rapport à la hauteur du
+                // slot (.tv-eleve, position:relative, height:100%), à
+                // l'inverse de l'ancien "margin-bottom: %" qui se résolvait
+                // par rapport à la largeur de l'écran. Le +10px reproduit
+                // le petit espacement bas qu'il y avait avant (padding-bottom).
                 html += `
-                    <div class="tv-eleve" style="height: 100%; justify-content: flex-end; padding-bottom: 10px;">
-                        <div class="photo" style="border-color: ${colorBorder}; margin-bottom: ${yPosition}%;" id="${photoId}">
-                            <div class="fallback">👤</div>
+                    <div class="tv-eleve">
+                        <div class="marker" style="bottom: calc(${yPosition}% + 10px);">
+                            <div class="photo" style="border-color: ${colorBorder};" id="${photoId}">
+                                <div class="fallback">👤</div>
+                            </div>
+                            <div class="numero">#${item.numero}</div>
                         </div>
-                        <div class="numero">#${item.numero}</div>
                     </div>
                 `;
             }
