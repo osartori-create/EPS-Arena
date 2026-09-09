@@ -6,16 +6,18 @@ import { getExistingEleves } from '../../services/admin-service.js';
 
 let currentUnsubTemps = null;
 let currentUnsubCoups = null;
-let currentClasse = '';
 
+// ============================================================
+// BARÈME (identique au kiosk)
+// ============================================================
 function getNiveau(indice) {
     if (indice === null || isNaN(indice)) return { couleur: '#64748b', label: '--' };
     const rounded = Math.round(indice * 100) / 100;
-    if (rounded >= 4.0) return { couleur: '#22c55e', label: '🌟 Excellent' };
-    if (rounded >= 3.0) return { couleur: '#3b82f6', label: '💪 Très satisfaisant' };
-    if (rounded >= 2.0) return { couleur: '#eab308', label: '✅ Satisfaisant' };
-    if (rounded >= 1.31) return { couleur: '#f97316', label: '🟡 Fragile' };
-    return { couleur: '#ef4444', label: '🔴 Très insuffisant' };
+    if (rounded >= 4.0) return { couleur: '#22c55e', label: 'Excellent' };
+    if (rounded >= 3.0) return { couleur: '#3b82f6', label: 'Très satisfaisant' };
+    if (rounded >= 2.0) return { couleur: '#eab308', label: 'Satisfaisant' };
+    if (rounded >= 1.31) return { couleur: '#f97316', label: 'Fragile' };
+    return { couleur: '#ef4444', label: 'Très insuffisant' };
 }
 
 function calculIndice(tempsMs, nbCoups) {
@@ -28,15 +30,9 @@ function calculIndice(tempsMs, nbCoups) {
     return vitesse * distanceParCycle;
 }
 
-function formatTime(ms) {
-    if (!ms || ms <= 0) return '--:--.-';
-    const totalSec = Math.floor(ms / 1000);
-    const min = String(Math.floor(totalSec / 60)).padStart(2, '0');
-    const sec = String(totalSec % 60).padStart(2, '0');
-    const dec = Math.floor((ms % 1000) / 100);
-    return `${min}:${sec}.${dec}`;
-}
-
+// ============================================================
+// RENDU PRINCIPAL
+// ============================================================
 export function renderNatationTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
@@ -53,15 +49,12 @@ export function renderNatationTV() {
     container.style.width = '100%';
     container.style.backgroundColor = '#0f172a';
     container.style.overflow = 'hidden';
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.alignItems = 'center';
-    container.style.justifyContent = 'center';
-    container.style.padding = '20px';
+    container.style.position = 'relative';
+    container.style.padding = '0';
 
-    currentClasse = getCurrentClasse();
-    if (!currentClasse) {
-        container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem;">Sélectionnez une classe.</p>';
+    const classe = getCurrentClasse();
+    if (!classe) {
+        container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem; margin-top:40vh;">Sélectionnez une classe.</p>';
         return;
     }
 
@@ -69,189 +62,268 @@ export function renderNatationTV() {
     if (currentUnsubCoups) currentUnsubCoups();
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups`);
+    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/temps`);
+    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/coups`);
 
     let tempsData = {};
     let coupsData = {};
-    const mapping = getLocalMapping(currentClasse) || {};
-    const eleves = getExistingEleves(currentClasse);
+    const mapping = getLocalMapping(classe) || {};
+    const eleves = getExistingEleves(classe);
 
+    // Configuration de l'échelle
+    const INDICE_MIN = 0.8;
+    const INDICE_MAX = 4.5;
+
+    // Zones de couleur (du bas vers le haut)
+    const ZONES = [
+        { min: 0, max: 1.3, couleur: '#ef4444', label: 'Très insuffisant' },
+        { min: 1.3, max: 2.0, couleur: '#f97316', label: 'Fragile' },
+        { min: 2.0, max: 3.0, couleur: '#eab308', label: 'Satisfaisant' },
+        { min: 3.0, max: 4.0, couleur: '#3b82f6', label: 'Très satisfaisant' },
+        { min: 4.0, max: 6.0, couleur: '#22c55e', label: 'Excellent' }
+    ];
+
+    // Repères de l'axe vertical (seuils)
+    const REPERES = [
+        { valeur: 1.0, label: '1.0' },
+        { valeur: 1.3, label: '1.3' },
+        { valeur: 2.0, label: '2.0' },
+        { valeur: 3.0, label: '3.0' },
+        { valeur: 4.0, label: '4.0' }
+    ];
+
+    // ✅ Fonction render déclarée async
     async function render() {
         if (Object.keys(tempsData).length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem;">En attente des résultats...</p>';
+            container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem; margin-top:40vh;">En attente des résultats...</p>';
             return;
         }
 
-        const results = [];
+        // 1. Collecter les meilleurs indices par élève
+        const eleveData = [];
         for (const [numero, tempsMs] of Object.entries(tempsData)) {
-            const eleveId = mapping[`${currentClasse}_${numero}`];
+            const eleveId = mapping[`${classe}_${numero}`];
             const eleve = eleves.find(e => e.id === eleveId);
             if (!eleve) continue;
             const coups = coupsData[numero] || null;
             const indice = calculIndice(tempsMs, coups);
-            const niveau = indice !== null ? getNiveau(indice) : { couleur: '#64748b', label: '--' };
-            results.push({
-                numero,
+            if (indice === null) continue;
+            eleveData.push({
+                numero: parseInt(numero),
                 eleve,
+                indice: indice,
                 tempsMs,
-                coups,
-                indice,
-                niveau
+                coups
             });
         }
 
-        results.sort((a, b) => {
-            if (a.indice === null && b.indice === null) return 0;
-            if (a.indice === null) return 1;
-            if (b.indice === null) return -1;
-            return b.indice - a.indice;
-        });
-
-        if (results.length === 0) {
-            container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem;">Aucun résultat.</p>';
+        if (eleveData.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem; margin-top:40vh;">Aucune performance enregistrée.</p>';
             return;
         }
 
-        const maxIndice = Math.max(...results.map(r => r.indice || 0), 1);
+        // Trier par indice décroissant (pour l'affichage, mais on va les grouper)
+        eleveData.sort((a, b) => b.indice - a.indice);
 
+        // 2. Regrouper par tranche d'indice (arrondi à 0.1)
+        const groupes = {};
+        for (const item of eleveData) {
+            const cle = Math.round(item.indice * 10) / 10;
+            if (!groupes[cle]) groupes[cle] = [];
+            groupes[cle].push(item);
+        }
+
+        // 3. Construire le HTML avec les zones de fond
         let html = `
             <style>
-                .tv-header {
-                    font-size: 2.5rem;
-                    font-weight: 900;
-                    color: #3b82f6;
-                    text-align: center;
-                    margin-bottom: 20px;
-                    letter-spacing: 4px;
-                }
                 .tv-container {
+                    position: relative;
                     width: 100%;
-                    max-width: 1400px;
+                    height: 100vh;
+                    background: #0f172a;
+                    overflow: hidden;
+                }
+                .tv-background {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    z-index: 0;
+                }
+                .tv-background .zone {
+                    position: absolute;
+                    left: 0;
+                    width: 100%;
+                    opacity: 0.25;
+                    border-bottom: 1px solid rgba(255,255,255,0.1);
+                }
+                .tv-background .repere {
+                    position: absolute;
+                    left: 20px;
+                    right: 20px;
+                    height: 1px;
+                    background: rgba(255,255,255,0.15);
+                    z-index: 1;
+                }
+                .tv-background .repere-label {
+                    position: absolute;
+                    left: 10px;
+                    transform: translateY(-50%);
+                    color: rgba(255,255,255,0.4);
+                    font-size: 1rem;
+                    font-weight: 700;
+                    z-index: 1;
+                    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+                }
+                .tv-eleves {
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
+                    z-index: 2;
+                }
+                .tv-eleve {
+                    position: absolute;
+                    transform: translate(-50%, -50%);
                     display: flex;
                     flex-direction: column;
-                    gap: 6px;
-                    padding: 0 20px;
-                    height: calc(100vh - 120px);
-                    justify-content: flex-end;
-                }
-                .tv-bar {
-                    display: flex;
                     align-items: center;
-                    border-radius: 8px;
-                    transition: height 0.5s ease;
-                    min-height: 40px;
-                    padding: 4px 12px;
-                    position: relative;
-                    border: 1px solid rgba(255,255,255,0.1);
+                    transition: top 0.8s ease, left 0.8s ease;
+                    z-index: 3;
                 }
-                .tv-bar .photo {
-                    width: 50px;
-                    height: 50px;
+                .tv-eleve .photo {
+                    width: 70px;
+                    height: 70px;
                     border-radius: 50%;
                     overflow: hidden;
-                    flex-shrink: 0;
-                    border: 2px solid rgba(255,255,255,0.3);
-                    margin-right: 12px;
+                    border: 3px solid rgba(255,255,255,0.3);
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                    transition: border-color 0.3s ease;
                 }
-                .tv-bar .photo img {
+                .tv-eleve .photo img {
                     width: 100%;
                     height: 100%;
                     object-fit: cover;
                 }
-                .tv-bar .photo .fallback {
+                .tv-eleve .photo .fallback {
                     width: 100%;
                     height: 100%;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     background: #334155;
-                    font-size: 24px;
-                }
-                .tv-bar .info {
-                    display: flex;
-                    align-items: center;
-                    gap: 16px;
-                    flex-wrap: wrap;
-                }
-                .tv-bar .numero {
-                    font-size: 1.8rem;
-                    font-weight: 900;
-                    color: #facc15;
-                    min-width: 60px;
-                }
-                .tv-bar .nom {
-                    font-size: 1.4rem;
-                    font-weight: 700;
-                    color: white;
-                }
-                .tv-bar .temps {
-                    font-size: 1.2rem;
-                    font-weight: 700;
+                    font-size: 32px;
                     color: #94a3b8;
                 }
-                .tv-bar .indice {
-                    font-size: 1.6rem;
+                .tv-eleve .numero {
+                    margin-top: 4px;
+                    font-size: 1.2rem;
                     font-weight: 900;
                     color: #facc15;
-                    margin-left: auto;
-                    padding-left: 16px;
-                }
-                .tv-bar .badge {
-                    padding: 2px 12px;
-                    border-radius: 9999px;
-                    font-size: 0.9rem;
-                    font-weight: 700;
-                    color: white;
+                    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+                    background: rgba(0,0,0,0.5);
+                    padding: 0 8px;
+                    border-radius: 12px;
                 }
                 @media (max-width: 768px) {
-                    .tv-bar .nom { font-size: 1rem; }
-                    .tv-bar .numero { font-size: 1.2rem; min-width: 40px; }
-                    .tv-bar .indice { font-size: 1.2rem; }
-                    .tv-bar .photo { width: 36px; height: 36px; }
-                    .tv-header { font-size: 1.8rem; }
+                    .tv-eleve .photo { width: 50px; height: 50px; }
+                    .tv-eleve .numero { font-size: 0.9rem; }
+                    .tv-background .repere-label { font-size: 0.7rem; }
+                }
+                @media (max-width: 480px) {
+                    .tv-eleve .photo { width: 40px; height: 40px; }
+                    .tv-eleve .numero { font-size: 0.7rem; }
                 }
             </style>
-            <div class="tv-header">🏊 Classement Indice de nage</div>
-            <div class="tv-container">
+            <div class="tv-container" id="tv-container">
+                <!-- FOND -->
+                <div class="tv-background" id="tv-background">
         `;
 
-        const maxHeight = 80; // % de la hauteur disponible
-        const minHeight = 8;
+        // Ajouter les zones de couleur
+        for (const zone of ZONES) {
+            const topPct = 100 - ((zone.min - INDICE_MIN) / (INDICE_MAX - INDICE_MIN)) * 100;
+            const heightPct = ((zone.max - zone.min) / (INDICE_MAX - INDICE_MIN)) * 100;
+            const zoneCss = `top: ${topPct}%; height: ${heightPct}%; background: ${zone.couleur};`;
+            html += `<div class="zone" style="${zoneCss}"></div>`;
+        }
 
-        for (const r of results) {
-            const hauteur = r.indice ? Math.max(minHeight, (r.indice / maxIndice) * maxHeight) : minHeight;
-            const tempsStr = r.tempsMs ? formatTime(r.tempsMs) : '--';
-            const indiceStr = r.indice ? r.indice.toFixed(2) : '--';
-
-            let photoHtml = '';
-            try {
-                const photoUrl = await getPhotoUrl(r.eleve.id);
-                if (photoUrl) {
-                    photoHtml = `<img src="${photoUrl}" alt="${r.eleve.prenom}">`;
-                } else {
-                    photoHtml = `<div class="fallback">👤</div>`;
-                }
-            } catch (e) {
-                photoHtml = `<div class="fallback">👤</div>`;
-            }
-
+        // Ajouter les repères horizontaux
+        for (const repere of REPERES) {
+            const topPct = 100 - ((repere.valeur - INDICE_MIN) / (INDICE_MAX - INDICE_MIN)) * 100;
             html += `
-                <div class="tv-bar" style="height: ${hauteur}%; background-color: ${r.niveau.couleur};">
-                    <div class="photo">${photoHtml}</div>
-                    <div class="info">
-                        <span class="numero">#${r.numero}</span>
-                        <span class="nom">${r.eleve.prenom} ${r.eleve.nom}</span>
-                        <span class="temps">${tempsStr}</span>
-                        <span class="badge" style="background-color: ${r.niveau.couleur};">${r.niveau.label}</span>
+                <div class="repere" style="top: ${topPct}%;"></div>
+                <div class="repere-label" style="top: ${topPct}%;">${repere.label}</div>
+            `;
+        }
+
+        html += `</div>`; // fin background
+
+        // 4. Placer les élèves
+        html += `<div class="tv-eleves" id="tv-eleves">`;
+
+        const paddingX = 5; // pourcentage
+        const largeurDispo = 100 - 2 * paddingX;
+        const groupesTries = Object.keys(groupes).sort((a, b) => parseFloat(b) - parseFloat(a));
+
+        // On va stocker les données des élèves pour charger les photos ensuite
+        const elevesToRender = [];
+
+        for (const cle of groupesTries) {
+            const items = groupes[cle];
+            const indice = parseFloat(cle);
+            const yPct = 100 - ((Math.min(Math.max(indice, INDICE_MIN), INDICE_MAX) - INDICE_MIN) / (INDICE_MAX - INDICE_MIN)) * 100;
+            const nb = items.length;
+            const espacement = largeurDispo / (nb + 1);
+            const debutX = paddingX + espacement;
+
+            for (let i = 0; i < nb; i++) {
+                const item = items[i];
+                const xPct = debutX + i * espacement;
+                const niveau = getNiveau(item.indice);
+                elevesToRender.push({
+                    numero: item.numero,
+                    eleve: item.eleve,
+                    x: xPct,
+                    y: yPct,
+                    niveau: niveau
+                });
+            }
+        }
+
+        // Générer le HTML des élèves (avec fallback photo)
+        let elevesHtmlFinal = '';
+        for (const item of elevesToRender) {
+            const colorBorder = item.niveau.couleur;
+            elevesHtmlFinal += `
+                <div class="tv-eleve" style="top: ${item.y}%; left: ${item.x}%;" data-numero="${item.numero}">
+                    <div class="photo" style="border-color: ${colorBorder};" id="photo-${item.numero}">
+                        <div class="fallback">👤</div>
                     </div>
-                    <span class="indice">${indiceStr}</span>
+                    <div class="numero">#${item.numero}</div>
                 </div>
             `;
         }
 
-        html += `</div>`;
+        html += elevesHtmlFinal;
+        html += `</div></div>`; // fin tv-eleves et tv-container
+
         container.innerHTML = html;
+
+        // 5. Charger les photos en asynchrone (après le rendu)
+        for (const item of elevesToRender) {
+            const photoDiv = document.getElementById(`photo-${item.numero}`);
+            if (!photoDiv) continue;
+            try {
+                const url = await getPhotoUrl(item.eleve.id);
+                if (url) {
+                    photoDiv.innerHTML = `<img src="${url}" alt="${item.eleve.prenom}">`;
+                }
+            } catch (e) {
+                // fallback déjà présent
+            }
+        }
     }
 
     currentUnsubTemps = onValue(tempsRef, (snap) => {
