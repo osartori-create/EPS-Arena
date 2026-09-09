@@ -8,15 +8,9 @@ let currentUnsubTemps = null;
 let currentUnsubCoups = null;
 let currentUnsubHistorique = null;
 
-// ============================================================
-// BARÈME
-// ============================================================
 function getNiveau(indice) {
-    if (indice === null || isNaN(indice)) {
-        return { couleur: 'bg-slate-600', label: '--' };
-    }
+    if (indice === null || isNaN(indice)) return { couleur: 'bg-slate-600', label: '--' };
     const rounded = Math.round(indice * 100) / 100;
-    
     if (rounded >= 4.0) return { couleur: 'bg-emerald-500', label: '🌟 Excellent' };
     if (rounded >= 3.0) return { couleur: 'bg-blue-500', label: '💪 Très satisfaisant' };
     if (rounded >= 2.0) return { couleur: 'bg-yellow-500', label: '✅ Satisfaisant' };
@@ -43,15 +37,9 @@ function formatTime(ms) {
     return `${min}:${sec}.${dec}`;
 }
 
-// ============================================================
-// EXPORT CSV
-// ============================================================
 window.exportNatationLiveCSV = function() {
     const classe = getCurrentClasse();
-    if (!classe) {
-        alert('Sélectionnez une classe.');
-        return;
-    }
+    if (!classe) return alert('Sélectionnez une classe.');
     const container = document.getElementById('live-content');
     const rows = container.querySelectorAll('.natation-live-row');
     let csv = '\uFEFF"!groupe";"Nom";"Prénom";"Temps (s)";"Coups";"Indice";"Niveau"\n';
@@ -65,9 +53,6 @@ window.exportNatationLiveCSV = function() {
     link.click();
 };
 
-// ============================================================
-// RENDU PRINCIPAL
-// ============================================================
 export function renderNatationLive() {
     const container = document.getElementById('live-content');
     if (!container) return;
@@ -94,7 +79,7 @@ export function renderNatationLive() {
     let eleves = getExistingEleves(classe);
 
     async function render() {
-        if (Object.keys(tempsData).length === 0 && Object.keys(coupsData).length === 0) {
+        if (Object.keys(tempsData).length === 0) {
             container.innerHTML = '<p class="text-slate-500 text-center">Aucun résultat pour l\'instant.</p>';
             return;
         }
@@ -122,27 +107,22 @@ export function renderNatationLive() {
                 }
             }
             
-            // Récupérer l'historique pour cet élève
             const historique = [];
             for (const [key, h] of Object.entries(historiqueData)) {
-                if (h.eleveId === eleveId || h.code === eleve.code || h.code === eleve.id) {
-                    const hTempsMs = h.tempsMs || h.temps || 0;
-                    const hNbCoups = h.nbCoups || h.coups || 0;
-                    const hTimestamp = h.timestamp || Date.now();
+                if (h.eleveId === eleveId || h.eleveId === eleve.code || h.eleveId === eleve.id) {
                     historique.push({
-                        tempsMs: hTempsMs,
-                        nbCoups: hNbCoups,
-                        indice: h.indice || (hTempsMs > 0 && hNbCoups > 0 ? calculIndice(hTempsMs, hNbCoups) : 0),
-                        timestamp: hTimestamp
+                        tempsMs: h.tempsMs || 0,
+                        nbCoups: h.nbCoups || 0,
+                        indice: h.indice || 0,
+                        timestamp: h.timestamp || Date.now()
                     });
                 }
             }
             
-            // Dédoublonner l'historique : garder une seule entrée par (tempsMs, nbCoups)
+            // Dédoublonner
             const uniqueMap = new Map();
             for (const item of historique) {
                 const key = `${item.tempsMs}-${item.nbCoups}`;
-                // Garder la plus récente pour chaque combinaison
                 if (!uniqueMap.has(key) || uniqueMap.get(key).timestamp < item.timestamp) {
                     uniqueMap.set(key, item);
                 }
@@ -179,14 +159,14 @@ export function renderNatationLive() {
             <div class="space-y-2 max-h-[70vh] overflow-y-auto pr-2">
         `;
 
-        const renderPromises = results.map(async (r) => {
+        for (const r of results) {
             const photo = await getPhotoUrl(r.eleveId);
             const photoHtml = photo ? `<img src="${photo}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-500">` : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
             const tempsStr = r.tempsMs !== null ? `${(r.tempsMs/1000).toFixed(1)}s` : '--';
             const coupsStr = r.coups !== null ? `${r.coups}` : '--';
             const indiceStr = r.indice !== null ? r.indice.toFixed(2) : '--';
             
-            return `
+            html += `
                 <div class="natation-live-row bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 cursor-pointer hover:border-blue-500 transition-all"
                      data-eleveid="${r.eleveId}"
                      data-numero="${r.numero || ''}"
@@ -209,10 +189,8 @@ export function renderNatationLive() {
                     </div>
                 </div>
             `;
-        });
+        }
 
-        const items = await Promise.all(renderPromises);
-        html += items.join('');
         html += `</div>`;
         container.innerHTML = html;
     }
@@ -233,7 +211,7 @@ export function renderNatationLive() {
     });
 
     // ============================================================
-    // FICHE ÉLÈVE DEPUIS LE LIVE
+    // FICHE ÉLÈVE
     // ============================================================
     window.openNatationLiveFiche = function(eleveId) {
         const eleve = eleves.find(e => e.id === eleveId);
@@ -244,23 +222,18 @@ export function renderNatationLive() {
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
         
-        // Récupérer l'historique dédoublonné
         const historique = [];
         for (const [key, h] of Object.entries(historiqueData)) {
-            if (h.eleveId === eleveId || h.code === eleve.code || h.code === eleve.id) {
-                const hTempsMs = h.tempsMs || h.temps || 0;
-                const hNbCoups = h.nbCoups || h.coups || 0;
-                const hTimestamp = h.timestamp || Date.now();
+            if (h.eleveId === eleveId || h.eleveId === eleve.code || h.eleveId === eleve.id) {
                 historique.push({
-                    tempsMs: hTempsMs,
-                    nbCoups: hNbCoups,
-                    indice: h.indice || (hTempsMs > 0 && hNbCoups > 0 ? calculIndice(hTempsMs, hNbCoups) : 0),
-                    timestamp: hTimestamp
+                    tempsMs: h.tempsMs || 0,
+                    nbCoups: h.nbCoups || 0,
+                    indice: h.indice || 0,
+                    timestamp: h.timestamp || Date.now()
                 });
             }
         }
         
-        // Dédoublonner
         const uniqueMap = new Map();
         for (const item of historique) {
             const key = `${item.tempsMs}-${item.nbCoups}`;
@@ -304,11 +277,7 @@ export function renderNatationLive() {
                 </div>
             `;
         } else {
-            historiqueHtml = `
-                <div class="mt-4 text-center text-slate-500 text-sm">
-                    <p>Aucun essai enregistré</p>
-                </div>
-            `;
+            historiqueHtml = `<div class="mt-4 text-center text-slate-500 text-sm"><p>Aucun essai enregistré</p></div>`;
         }
 
         const modal = document.createElement('div');
@@ -324,13 +293,11 @@ export function renderNatationLive() {
                 <div class="space-y-4">
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Temps (secondes)</label>
-                        <input type="number" id="edit-live-temps" value="${temps !== null ? (temps/1000).toFixed(1) : ''}" 
-                               step="0.1" min="0" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-xl font-black text-center">
+                        <input type="number" id="edit-live-temps" value="${temps !== null ? (temps/1000).toFixed(1) : ''}" step="0.1" min="0" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-xl font-black text-center">
                     </div>
                     <div>
                         <label class="text-xs font-bold text-slate-400 uppercase">Nombre de coups de bras</label>
-                        <input type="number" id="edit-live-coups" value="${coups !== null ? coups : ''}" 
-                               min="1" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-xl font-black text-center">
+                        <input type="number" id="edit-live-coups" value="${coups !== null ? coups : ''}" min="1" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-xl font-black text-center">
                     </div>
                     
                     <div class="bg-slate-800 p-3 rounded-xl text-center">
@@ -342,14 +309,8 @@ export function renderNatationLive() {
                     ${historiqueHtml}
 
                     <div class="flex gap-3 mt-4">
-                        <button onclick="window.sauvegarderLiveNatation('${eleveId}')" 
-                                class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-sm active:scale-95">
-                            💾 Enregistrer
-                        </button>
-                        <button onclick="this.closest('.fixed').remove()" 
-                                class="bg-slate-700 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">
-                            Fermer
-                        </button>
+                        <button onclick="window.sauvegarderLiveNatation('${eleveId}')" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-sm active:scale-95">💾 Enregistrer</button>
+                        <button onclick="this.closest('.fixed').remove()" class="bg-slate-700 px-6 py-3 rounded-xl font-black text-white text-sm active:scale-95">Fermer</button>
                     </div>
                 </div>
             </div>
@@ -362,14 +323,8 @@ export function renderNatationLive() {
             const temps = parseFloat(tempsInput.value.replace(',', '.'));
             const coups = parseInt(coupsInput.value);
             
-            if (isNaN(temps) || temps < 0) {
-                alert('Veuillez saisir un temps valide.');
-                return;
-            }
-            if (isNaN(coups) || coups < 1) {
-                alert('Veuillez saisir un nombre de coups valide (≥ 1).');
-                return;
-            }
+            if (isNaN(temps) || temps < 0) return alert('Veuillez saisir un temps valide.');
+            if (isNaN(coups) || coups < 1) return alert('Veuillez saisir un nombre de coups valide (≥ 1).');
             
             const tempsMs = Math.round(temps * 1000);
             
@@ -377,17 +332,9 @@ export function renderNatationLive() {
             const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/temps/${eleveId}`);
             const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/coups/${eleveId}`);
             
-            Promise.all([
-                set(tempsRef, tempsMs),
-                set(coupsRef, coups)
-            ]).then(() => {
-                alert('✅ Données mises à jour !');
-                modal.remove();
-                render();
-            }).catch(err => {
-                console.error('Erreur sauvegarde :', err);
-                alert('❌ Erreur lors de la sauvegarde.');
-            });
+            Promise.all([set(tempsRef, tempsMs), set(coupsRef, coups)])
+                .then(() => { alert('✅ Données mises à jour !'); modal.remove(); render(); })
+                .catch(err => { console.error(err); alert('❌ Erreur lors de la sauvegarde.'); });
         };
     };
 }

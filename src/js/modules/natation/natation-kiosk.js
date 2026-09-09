@@ -13,9 +13,9 @@ let chronoElapsed = 0;
 let rafId = null;
 let tempsFinal = null;
 
-let mode = 'liste'; // 'liste' | 'chrono' | 'saisie' | 'feedback'
+let mode = 'liste';
 let historiqueEssais = [];
-let isSaving = false; // ✅ Verrou pour éviter les doubles enregistrements
+let isSaving = false;
 
 // ============================================================
 // EXPOSITION DES FONCTIONS GLOBALES
@@ -107,10 +107,7 @@ window.natationAdjustCoups = function(delta) {
 };
 
 window.natationValiderCoups = function() {
-    if (isSaving) {
-        console.warn('⚠️ Enregistrement déjà en cours, ignore.');
-        return;
-    }
+    if (isSaving) return;
     const nbCoups = window._coupsSaisis || 25;
     if (nbCoups < 1) {
         alert('Veuillez saisir au moins 1 coup de bras.');
@@ -146,8 +143,6 @@ window.retourMenuNatation = function() {
         container.innerHTML = '';
         container.style.display = 'none';
     }
-    const codeInfo = document.getElementById('code-info');
-    if (codeInfo) codeInfo.style.display = 'none';
     if (typeof window.resetToLogin === 'function') {
         window.resetToLogin();
     } else {
@@ -188,36 +183,11 @@ export function initNatationKiosk(classe) {
         nbEleves = config.nbEleves || 0;
         if (nbEleves === 0) {
             const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-            if (eleves.length > 0) {
-                nbEleves = eleves.length;
-            } else {
-                const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
-                const nums = Object.keys(mapping)
-                    .filter(k => k.startsWith(`${classe}_`))
-                    .map(k => parseInt(k.split('_')[1]))
-                    .filter(n => !isNaN(n));
-                nbEleves = Math.max(...nums, 0);
-            }
+            if (eleves.length > 0) nbEleves = eleves.length;
+            else nbEleves = 28;
         }
-        if (nbEleves === 0) nbEleves = 28;
         afficherInterface();
     });
-}
-
-// ============================================================
-// RECONSTRUCTION DU MAPPING (inchangée)
-// ============================================================
-function reconstruireMappingLocal() {
-    if (!currentClasse) return false;
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    if (eleves.length === 0) return false;
-    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-    const newMapping = {};
-    eleves.forEach((e, idx) => {
-        newMapping[`${currentClasse}_${idx + 1}`] = e.id;
-    });
-    localStorage.setItem(`eps_arena_local_mapping_${currentClasse}`, JSON.stringify(newMapping));
-    return true;
 }
 
 // ============================================================
@@ -226,7 +196,6 @@ function reconstruireMappingLocal() {
 function afficherInterface() {
     const container = document.getElementById('natation-module');
     if (!container) return;
-    console.log('🔄 afficherInterface() mode =', mode);
 
     if (mode === 'liste') afficherListeNumeros(container);
     else if (mode === 'chrono') afficherChrono(container);
@@ -242,7 +211,7 @@ function afficherInterface() {
 }
 
 // ============================================================
-// 1. LISTE DES NUMÉROS (inchangée)
+// 1. LISTE DES NUMÉROS
 // ============================================================
 function afficherListeNumeros(container) {
     const distance = config?.distance || 25;
@@ -302,7 +271,7 @@ function afficherListeNumeros(container) {
 }
 
 // ============================================================
-// 2. CHRONO (inchangé)
+// 2. CHRONO
 // ============================================================
 function afficherChrono(container) {
     const distance = config?.distance || 25;
@@ -362,7 +331,7 @@ function afficherChrono(container) {
 }
 
 // ============================================================
-// 3. SAISIE DES COUPS DE BRAS (inchangée)
+// 3. SAISIE DES COUPS DE BRAS
 // ============================================================
 function afficherSaisieCoups(container) {
     const tempsStr = formatTime(tempsFinal);
@@ -410,7 +379,7 @@ function afficherSaisieCoups(container) {
 }
 
 // ============================================================
-// 4. BARÈME (inchangé)
+// 4. BARÈME
 // ============================================================
 function getNiveau(indice) {
     if (indice === null || isNaN(indice)) {
@@ -449,14 +418,13 @@ function getMessageEncouragement(indice) {
 }
 
 // ============================================================
-// 5. FEEDBACK - avec dédoublonnage de l'historique
+// 5. FEEDBACK
 // ============================================================
 function afficherFeedback(container, tempsMs, nbCoups) {
     const indice = calculIndice(tempsMs, nbCoups);
     const niveau = getNiveau(indice);
     const tempsStr = formatTime(tempsMs);
 
-    // ✅ Dédoublonner l'historique avant de l'afficher
     const uniqueEssais = [];
     const seen = new Set();
     for (const essai of historiqueEssais) {
@@ -471,7 +439,6 @@ function afficherFeedback(container, tempsMs, nbCoups) {
     const meilleurIndice = Math.max(...historiqueEssais.map(e => e.indice), 0);
     const messageEncouragement = getMessageEncouragement(indice);
 
-    // Graphique de progression
     let graphHtml = '';
     if (historiqueEssais.length > 0) {
         const maxIndice = Math.max(...historiqueEssais.map(e => e.indice), 1);
@@ -515,8 +482,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
                     <p class="text-sm text-slate-400 text-center">Indice de nage</p>
                     <p class="text-7xl font-black text-yellow-400 text-center">${indice.toFixed(2)}</p>
                     <p class="text-2xl font-bold text-center mt-2" style="color: ${niveau.couleur}">
-                        ${niveau.label}
-                    </p>
+                        ${niveau.label}</p>
                     ${historiqueEssais.length > 1 ? `
                         <div class="text-center mt-2 text-slate-400">
                             🏅 Meilleur : <span class="text-yellow-400 font-bold text-xl">${meilleurIndice.toFixed(2)}</span>
@@ -554,7 +520,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
 }
 
 // ============================================================
-// HISTORIQUE FIREBASE (partagé entre tablettes)
+// HISTORIQUE FIREBASE
 // ============================================================
 function chargerHistoriqueEleve(eleveId, callback) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -621,28 +587,24 @@ function updateChrono() {
 }
 
 // ============================================================
-// ENREGISTREMENT FIREBASE (avec verrou et dédoublonnage)
+// ENREGISTREMENT FIREBASE
 // ============================================================
 function enregistrerTempsEtCoups(tempsMs, nbCoups) {
-    if (isSaving) {
-        console.warn('⚠️ Enregistrement déjà en cours, ignore.');
-        return;
-    }
-    if (currentNumero === null) {
-        alert('Erreur : aucun numéro sélectionné.');
-        return;
-    }
+    if (isSaving) return;
+    if (currentNumero === null) return;
     
     const eleveId = getEleveIdFromNumero(currentNumero);
     if (!eleveId) {
-        alert('Numéro non reconnu. Vérifie que le professeur a bien transmis la configuration.');
+        alert('Numéro non reconnu.');
         return;
     }
 
     isSaving = true;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const indice = calculIndice(tempsMs, nbCoups);
+    
     const nouvelEssai = {
+        eleveId: eleveId,  // ✅ UNIQUEMENT l'ID
         tempsMs: tempsMs,
         nbCoups: nbCoups,
         indice: indice,
@@ -655,12 +617,10 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         let historique = snap.val() || [];
         if (!Array.isArray(historique)) historique = [];
         
-        // ✅ Dédoublonner : on retire les essais identiques au nouvel essai (même temps et même nombre de coups)
         historique = historique.filter(h => 
             !(Math.abs(h.tempsMs - tempsMs) < 1 && h.nbCoups === nbCoups)
         );
         
-        // Ajouter le nouvel essai
         historique.push(nouvelEssai);
         if (historique.length > 10) historique.shift();
         
@@ -673,7 +633,7 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
                 set(coupsRef, nbCoups)
             ]);
         }).then(() => {
-            console.log('✅ Temps, coups et historique enregistrés pour', eleveId);
+            console.log('✅ Enregistré pour', eleveId);
             window._dernierNbCoups = nbCoups;
             chargerHistoriqueEleve(eleveId, () => {
                 isSaving = false;
@@ -682,8 +642,8 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
                 if (container) afficherFeedback(container, tempsMs, nbCoups);
             });
         }).catch(err => {
-            console.error('Erreur enregistrement :', err);
-            alert('Erreur lors de l\'enregistrement. Réessayez.');
+            console.error('Erreur :', err);
+            alert('Erreur lors de l\'enregistrement.');
             isSaving = false;
         });
     }, { onlyOnce: true });
