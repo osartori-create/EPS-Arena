@@ -8,7 +8,6 @@ let currentUnsubTemps = null;
 let currentUnsubCoups = null;
 let animationId = null;
 let scrollOffset = 0;
-let lastTimestamp = 0;
 
 // ============================================================
 // BARÈME
@@ -78,10 +77,10 @@ export function renderNatationTV() {
     const INDICE_MIN = 0.8;
     const INDICE_MAX = 4.5;
     const NB_VISIBLES = 10;
-    const PHOTO_SIZE = 80; // pixels (doublé)
-    const SCROLL_SPEED = 1.2; // pixels par frame (60fps → ~72px/s)
+    const PHOTO_SIZE = 80;
+    const SCROLL_SPEED = 1.2;
 
-    // Zones de couleur (du bas vers le haut)
+    // Zones de couleur
     const ZONES = [
         { min: 0, max: 1.3, couleur: '#ef4444', label: 'Très insuffisant' },
         { min: 1.3, max: 2.0, couleur: '#f97316', label: 'Fragile' },
@@ -99,10 +98,8 @@ export function renderNatationTV() {
     ];
 
     let eleveData = [];
-    let photosLoaded = {};
-    let isRendering = false;
 
-    async function renderBackground() {
+    function renderBackground() {
         const html = `
             <style>
                 .tv-container {
@@ -157,9 +154,9 @@ export function renderNatationTV() {
                 }
                 .tv-scroll-inner {
                     position: absolute;
-                    top: 0;
+                    bottom: 0;
                     left: 0;
-                    height: 100%;
+                    height: calc(100% - 20px);
                     will-change: transform;
                     display: flex;
                     align-items: flex-end;
@@ -172,6 +169,9 @@ export function renderNatationTV() {
                     align-items: center;
                     flex-shrink: 0;
                     transition: opacity 0.3s ease;
+                    height: 100%;
+                    justify-content: flex-end;
+                    padding-bottom: 10px;
                 }
                 .tv-eleve .photo {
                     width: ${PHOTO_SIZE}px;
@@ -180,7 +180,6 @@ export function renderNatationTV() {
                     overflow: hidden;
                     border: 3px solid rgba(255,255,255,0.3);
                     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-                    transition: border-color 0.3s ease;
                     flex-shrink: 0;
                 }
                 .tv-eleve .photo img {
@@ -233,7 +232,6 @@ export function renderNatationTV() {
                 @media (max-width: 480px) {
                     .tv-eleve .photo { width: 45px; height: 45px; }
                     .tv-eleve .numero { font-size: 0.7rem; }
-                    .tv-background .repere-label { font-size: 0.6rem; }
                 }
             </style>
             <div class="tv-container" id="tv-container">
@@ -241,7 +239,6 @@ export function renderNatationTV() {
                 <div class="tv-background" id="tv-background">
         `;
 
-        // Ajouter les zones de couleur
         let bgHtml = '';
         for (const zone of ZONES) {
             const topPct = 100 - ((zone.min - INDICE_MIN) / (INDICE_MAX - INDICE_MIN)) * 100;
@@ -249,7 +246,6 @@ export function renderNatationTV() {
             bgHtml += `<div class="zone" style="top: ${topPct}%; height: ${heightPct}%; background: ${zone.couleur};"></div>`;
         }
 
-        // Ajouter les repères
         for (const repere of REPERES) {
             const topPct = 100 - ((repere.valeur - INDICE_MIN) / (INDICE_MAX - INDICE_MIN)) * 100;
             bgHtml += `
@@ -272,13 +268,10 @@ export function renderNatationTV() {
         if (!inner) return;
 
         const containerWidth = window.innerWidth;
-        const eleveWidth = PHOTO_SIZE + 12; // photo + gap
+        const eleveWidth = PHOTO_SIZE + 12;
         const totalWidth = eleves.length * eleveWidth;
-
-        // Si moins de NB_VISIBLES élèves, pas de défilement
         const shouldScroll = eleves.length > NB_VISIBLES;
 
-        // Construire le HTML des élèves (avec duplication pour la boucle)
         let html = '';
         const nbCopies = shouldScroll ? 2 : 1;
         for (let copy = 0; copy < nbCopies; copy++) {
@@ -287,8 +280,8 @@ export function renderNatationTV() {
                 const yPosition = item.yPct;
                 const photoId = `photo-${item.numero}-${copy}`;
                 html += `
-                    <div class="tv-eleve" style="transform: translateY(-${yPosition}%);" data-numero="${item.numero}" data-copy="${copy}">
-                        <div class="photo" style="border-color: ${colorBorder};" id="${photoId}">
+                    <div class="tv-eleve" style="height: 100%; justify-content: flex-end; padding-bottom: 10px;">
+                        <div class="photo" style="border-color: ${colorBorder}; margin-bottom: ${yPosition}%;" id="${photoId}">
                             <div class="fallback">👤</div>
                         </div>
                         <div class="numero">#${item.numero}</div>
@@ -309,7 +302,6 @@ export function renderNatationTV() {
                 url.then(u => {
                     if (u) {
                         photoDiv.innerHTML = `<img src="${u}" alt="${item.eleve.prenom}">`;
-                        // Mettre à jour la copie aussi
                         const photoDiv2 = document.getElementById(`photo-${item.numero}-1`);
                         if (photoDiv2) photoDiv2.innerHTML = `<img src="${u}" alt="${item.eleve.prenom}">`;
                     }
@@ -322,18 +314,14 @@ export function renderNatationTV() {
         // Positionner le défilement
         if (shouldScroll) {
             const windowWidth = Math.min(containerWidth, NB_VISIBLES * eleveWidth);
-            // Centrer la fenêtre sur le premier groupe
             const initialOffset = (containerWidth - windowWidth) / 2;
             scrollOffset = initialOffset;
             inner.style.transform = `translateX(${scrollOffset}px)`;
 
-            // Démarrer l'animation
             if (!animationId) {
-                lastTimestamp = performance.now();
-                animateScroll(inner, totalWidth, windowWidth);
+                animateScroll(inner, totalWidth);
             }
         } else {
-            // Pas de défilement, centrer les élèves
             const totalContentWidth = eleves.length * eleveWidth;
             const offset = (containerWidth - totalContentWidth) / 2;
             inner.style.transform = `translateX(${offset}px)`;
@@ -344,24 +332,19 @@ export function renderNatationTV() {
         }
     }
 
-    function animateScroll(inner, totalWidth, windowWidth) {
+    function animateScroll(inner, totalWidth) {
         if (!inner) return;
 
-        const speed = SCROLL_SPEED;
-        const maxOffset = totalWidth; // Pour la boucle
+        scrollOffset -= SCROLL_SPEED;
 
-        // Défilement vers la gauche (scrollOffset diminue)
-        scrollOffset -= speed;
-
-        // Boucle infinie : quand on a défilé de la largeur totale, on revient au début
-        if (scrollOffset <= -maxOffset) {
-            scrollOffset += maxOffset;
+        if (scrollOffset <= -totalWidth) {
+            scrollOffset += totalWidth;
         }
 
         inner.style.transform = `translateX(${scrollOffset}px)`;
 
         animationId = requestAnimationFrame(() => {
-            animateScroll(inner, totalWidth, windowWidth);
+            animateScroll(inner, totalWidth);
         });
     }
 
@@ -374,6 +357,7 @@ export function renderNatationTV() {
             const coups = coupsData[numero] || null;
             const indice = calculIndice(tempsMs, coups);
             if (indice === null) continue;
+            // yPct = pourcentage de la hauteur totale (0 = bas, 100 = haut)
             const yPct = ((Math.min(Math.max(indice, INDICE_MIN), INDICE_MAX) - INDICE_MIN) / (INDICE_MAX - INDICE_MIN)) * 100;
             result.push({
                 numero: parseInt(numero),
@@ -383,41 +367,29 @@ export function renderNatationTV() {
                 niveau: getNiveau(indice)
             });
         }
-        // Trier par numéro
         result.sort((a, b) => a.numero - b.numero);
         return result;
     }
 
-    async function render() {
-        if (isRendering) return;
-        isRendering = true;
+    function render() {
+        const newEleveData = computeElevePositions();
 
-        try {
-            const newEleveData = computeElevePositions();
-
-            if (newEleveData.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem; margin-top:40vh;">Aucune performance enregistrée.</p>';
-                isRendering = false;
-                return;
-            }
-
-            // Si les données ont changé ou premier rendu
-            const dataChanged = JSON.stringify(newEleveData) !== JSON.stringify(eleveData);
-            if (dataChanged || !container.querySelector('.tv-container')) {
-                eleveData = newEleveData;
-
-                // Rendre le fond (une seule fois)
-                const bgHtml = await renderBackground();
-                container.innerHTML = bgHtml;
-
-                // Rendre les élèves
-                renderEleves(eleveData);
-            }
-        } catch (e) {
-            console.error('Erreur rendu TV :', e);
+        if (newEleveData.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:2rem; margin-top:40vh;">Aucune performance enregistrée.</p>';
+            return;
         }
 
-        isRendering = false;
+        // Mettre à jour les données
+        eleveData = newEleveData;
+
+        // Rendre le fond (une seule fois)
+        if (!container.querySelector('.tv-container')) {
+            const bgHtml = renderBackground();
+            container.innerHTML = bgHtml;
+        }
+
+        // Rendre les élèves
+        renderEleves(eleveData);
     }
 
     // Écouter les changements
@@ -441,7 +413,6 @@ export function renderNatationTV() {
     // Premier rendu
     render();
 
-    // Nettoyer l'animation à la destruction
     return () => {
         if (animationId) {
             cancelAnimationFrame(animationId);
