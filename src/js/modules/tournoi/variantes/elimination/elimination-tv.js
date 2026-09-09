@@ -46,13 +46,16 @@ export function renderEliminationTV() {
 
     container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40vh;">En attente des données...</p>';
 
-    // Configuration
+    // Configuration (comme natation-tv.js)
     const PHOTO_SIZE = 65;
-    const TOP_OFFSET = 80; // pour le titre
-    const BOTTOM_OFFSET = 30;
+    const TOP_MARGIN = 80;   // pour le titre
+    const BOTTOM_MARGIN = 40;
 
     let eleveData = [];
 
+    // ============================================================
+    // RENDU DU FOND (comme natation-tv.js)
+    // ============================================================
     function renderBackground() {
         const html = `
             <style>
@@ -65,7 +68,7 @@ export function renderEliminationTV() {
                 }
                 .tv-title {
                     position: absolute;
-                    top: 15px;
+                    top: 20px;
                     left: 50%;
                     transform: translateX(-50%);
                     color: rgba(255,255,255,0.7);
@@ -78,7 +81,7 @@ export function renderEliminationTV() {
                 }
                 .tv-subtitle {
                     position: absolute;
-                    top: 60px;
+                    top: 70px;
                     left: 50%;
                     transform: translateX(-50%);
                     color: rgba(255,255,255,0.4);
@@ -86,13 +89,19 @@ export function renderEliminationTV() {
                     z-index: 10;
                     pointer-events: none;
                 }
-                .tv-eleve-container {
+                .tv-scroll-container {
                     position: absolute;
+                    top: ${TOP_MARGIN}px;
                     left: 0;
                     right: 0;
-                    top: ${TOP_OFFSET}px;
-                    bottom: ${BOTTOM_OFFSET}px;
+                    bottom: ${BOTTOM_MARGIN}px;
                     z-index: 2;
+                    overflow: hidden;
+                }
+                .tv-scroll-inner {
+                    position: relative;
+                    width: 100%;
+                    height: 100%;
                 }
                 .tv-eleve {
                     position: absolute;
@@ -101,15 +110,14 @@ export function renderEliminationTV() {
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    transition: top 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-                    will-change: top;
+                    transition: bottom 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    will-change: bottom;
                     padding: 4px 12px;
                     border-radius: 16px;
                     background: rgba(30, 41, 59, 0.5);
                     backdrop-filter: blur(4px);
                     border: 1px solid rgba(71, 85, 105, 0.3);
                     min-width: 80px;
-                    cursor: default;
                 }
                 .tv-eleve .photo {
                     width: ${PHOTO_SIZE}px;
@@ -195,46 +203,45 @@ export function renderEliminationTV() {
                 }
                 @media (max-width: 768px) {
                     .tv-eleve { min-width: 60px; padding: 2px 8px; }
-                    .tv-eleve .photo { width: 45px; height: 45px; }
-                    .tv-eleve .nom { font-size: 0.6rem; max-width: 70px; }
-                    .tv-eleve .score { font-size: 1.2rem; }
+                    .tv-eleve .photo { width: 50px; height: 50px; }
+                    .tv-eleve .nom { font-size: 0.7rem; max-width: 70px; }
+                    .tv-eleve .score { font-size: 1.3rem; }
                     .tv-eleve .rank-badge { width: 22px; height: 22px; font-size: 0.7rem; top: -6px; right: -6px; }
                     .tv-title { font-size: 1.3rem; top: 10px; }
                     .tv-subtitle { top: 45px; font-size: 0.8rem; }
                 }
                 @media (max-width: 480px) {
-                    .tv-eleve .photo { width: 35px; height: 35px; }
-                    .tv-eleve .nom { font-size: 0.5rem; max-width: 50px; }
+                    .tv-eleve .photo { width: 40px; height: 40px; }
+                    .tv-eleve .nom { font-size: 0.6rem; max-width: 50px; }
                     .tv-eleve .score { font-size: 1rem; }
                 }
             </style>
             <div class="tv-container" id="tv-container">
                 <div class="tv-title">🏆 Tournoi Élimination</div>
                 <div class="tv-subtitle">Classe : ${classe}</div>
-                <div class="tv-eleve-container" id="tv-eleve-container"></div>
+                <div class="tv-scroll-container" id="tv-scroll-container">
+                    <div class="tv-scroll-inner" id="tv-scroll-inner"></div>
+                </div>
             </div>
         `;
         return html;
     }
 
+    // ============================================================
+    // RENDU DES ÉLÈVES (comme natation-tv.js)
+    // ============================================================
     function renderEleves(eleves) {
-        const containerEl = document.getElementById('tv-eleve-container');
-        if (!containerEl) return;
+        const inner = document.getElementById('tv-scroll-inner');
+        if (!inner) return;
 
-        // Hauteur disponible pour les positions
-        const containerHeight = containerEl.clientHeight || window.innerHeight - TOP_OFFSET - BOTTOM_OFFSET;
         const maxElim = Math.max(...eleves.map(e => e.eliminations), 1);
-
-        // Calculer la position en pixels pour chaque élève
-        // 0 élimination = 0 (tout en haut), max = containerHeight (tout en bas)
-        // On ajoute un petit offset pour que le premier ne soit pas collé au bord
-        const padding = 10;
-        const usableHeight = containerHeight - 2 * padding;
 
         let html = '';
         for (const item of eleves) {
-            const ratio = item.eliminations / maxElim;
-            const topPos = padding + ratio * usableHeight;
+            // bottom en % : 0 élimination = 100% (tout en haut)
+            // max éliminations = 0% (tout en bas)
+            const ratio = maxElim > 0 ? item.eliminations / maxElim : 0;
+            const bottomPct = (1 - ratio) * 100;
 
             const rankClass = item.rank === 1 ? 'top1' : (item.rank === 2 ? 'top2' : (item.rank === 3 ? 'top3' : ''));
             const medal = item.rank === 1 ? '🥇' : (item.rank === 2 ? '🥈' : (item.rank === 3 ? '🥉' : `#${item.rank}`));
@@ -246,7 +253,7 @@ export function renderEliminationTV() {
             const photoId = `tv-photo-${item.code}`;
 
             html += `
-                <div class="tv-eleve ${rankClass}" style="top: ${topPos}px;">
+                <div class="tv-eleve ${rankClass}" style="bottom: ${bottomPct}%;">
                     <span class="rank-badge">${medal}</span>
                     <div class="photo" id="${photoId}">
                         <div class="fallback">👤</div>
@@ -258,7 +265,7 @@ export function renderEliminationTV() {
             `;
         }
 
-        containerEl.innerHTML = html;
+        inner.innerHTML = html;
 
         // Charger les photos après le rendu
         for (const item of eleves) {
@@ -277,6 +284,9 @@ export function renderEliminationTV() {
         }
     }
 
+    // ============================================================
+    // CALCUL DES POSITIONS
+    // ============================================================
     function computeElevePositions(joueurs) {
         const entries = Object.entries(joueurs);
         if (entries.length === 0) return [];
@@ -298,9 +308,12 @@ export function renderEliminationTV() {
         });
     }
 
+    // ============================================================
+    // RENDU PRINCIPAL
+    // ============================================================
     function render() {
-        const containerEl = document.getElementById('tv-eleve-container');
-        if (!containerEl) {
+        const inner = document.getElementById('tv-scroll-inner');
+        if (!inner) {
             // Premier rendu : créer le fond
             const bgHtml = renderBackground();
             container.innerHTML = bgHtml;
@@ -310,14 +323,16 @@ export function renderEliminationTV() {
         }
 
         if (eleveData.length === 0) {
-            containerEl.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40%;">Aucune élimination enregistrée.</p>';
+            inner.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40%;">Aucune élimination enregistrée.</p>';
             return;
         }
 
         renderEleves(eleveData);
     }
 
-    // Écouter les changements
+    // ============================================================
+    // ÉCOUTE FIREBASE
+    // ============================================================
     currentUnsub = onValue(joueursRef, (snap) => {
         const joueurs = snap.val() || {};
         eleveData = computeElevePositions(joueurs);
