@@ -235,14 +235,14 @@ export function renderEliminationTV() {
     }
 
     // ============================================================
-    // RENDU DES ÉLÈVES (comme natation-tv.js)
+    // RENDU DES ÉLÈVES
     // ============================================================
     function renderEleves(eleves) {
         const inner = document.getElementById('tv-scroll-inner');
         if (!inner) return;
 
         const containerWidth = window.innerWidth;
-        const eleveWidth = PHOTO_SIZE + 20 + 12; // largeur + gap
+        const eleveWidth = PHOTO_SIZE + 20 + 12;
         const totalWidth = eleves.length * eleveWidth;
         const shouldScroll = eleves.length > NB_VISIBLES;
 
@@ -252,7 +252,6 @@ export function renderEliminationTV() {
         const nbCopies = shouldScroll ? 2 : 1;
         for (let copy = 0; copy < nbCopies; copy++) {
             for (const item of eleves) {
-                // Position verticale : 0 élimination = 100% (haut), max = 0% (bas)
                 const ratio = maxElim > 0 ? item.eliminations / maxElim : 0;
                 const bottomPct = (1 - ratio) * 100;
 
@@ -284,20 +283,23 @@ export function renderEliminationTV() {
         inner.innerHTML = html;
         inner.style.width = shouldScroll ? (totalWidth * 2) + 'px' : totalWidth + 'px';
 
-        // Charger les photos après le rendu
+        // ✅ Charger les photos avec le BON ID (eleve.id, pas item.code)
         for (const item of eleves) {
             for (let copy = 0; copy < nbCopies; copy++) {
                 const photoDiv = document.getElementById(`tv-photo-${item.code}-${copy}`);
                 if (!photoDiv) continue;
-                try {
-                    const url = getPhotoUrl(item.code);
-                    url.then(u => {
-                        if (u) {
-                            photoDiv.innerHTML = `<img src="${u}" alt="${item.nom}">`;
-                        }
-                    });
-                } catch (e) {
-                    // Garder le fallback
+                // On utilise item.eleveId pour la photo
+                if (item.eleveId) {
+                    try {
+                        const url = getPhotoUrl(item.eleveId);
+                        url.then(u => {
+                            if (u) {
+                                photoDiv.innerHTML = `<img src="${u}" alt="${item.nom}">`;
+                            }
+                        });
+                    } catch (e) {
+                        // Garder le fallback
+                    }
                 }
             }
         }
@@ -340,27 +342,39 @@ export function renderEliminationTV() {
     }
 
     // ============================================================
-    // CALCUL DES POSITIONS ET CLASSEMENT
+    // CALCUL DES DONNÉES : TOUS LES ÉLÈVES DE LA CLASSE
     // ============================================================
-    function computeEleveData(joueurs) {
-        const entries = Object.entries(joueurs);
-        if (entries.length === 0) return [];
+    function computeEleveData(joueursFirebase) {
+        // 1. Récupérer TOUS les élèves de la classe
+        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+        if (eleves.length === 0) return [];
 
-        // Classement : les meilleurs sont ceux qui ont le MOINS d'éliminations
-        const sorted = entries.sort((a, b) => (a[1].eliminations || 0) - (b[1].eliminations || 0));
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+        // 2. Trier les élèves par nom/prénom
+        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
-        return sorted.map(([code, data], index) => {
-            const eleve = eleves.find(e => e.id === code) || { prenom: code, nom: '' };
-            const nom = eleve ? `${eleve.prenom} ${eleve.nom}` : code;
-            const eliminations = data.eliminations || 0;
+        // 3. Construire la liste complète avec les éliminations
+        const result = eleves.map((eleve, index) => {
+            // Le code est l'index + 1 (1 à N)
+            const code = (index + 1).toString();
+            // Récupérer les éliminations depuis Firebase (ou 0 si absent)
+            const eliminations = joueursFirebase[code]?.eliminations || 0;
             return {
-                code,
-                nom,
-                eliminations,
-                rank: index + 1
+                code: code,
+                eleveId: eleve.id,
+                nom: `${eleve.prenom} ${eleve.nom}`,
+                eliminations: eliminations
             };
         });
+
+        // 4. Trier par éliminations CROISSANTES (les meilleurs en premier)
+        result.sort((a, b) => a.eliminations - b.eliminations);
+
+        // 5. Ajouter le rang
+        result.forEach((item, index) => {
+            item.rank = index + 1;
+        });
+
+        return result;
     }
 
     // ============================================================
@@ -372,13 +386,12 @@ export function renderEliminationTV() {
             // Premier rendu : créer le fond
             const bgHtml = renderBackground();
             container.innerHTML = bgHtml;
-            // Rappeler render après la création du DOM
             setTimeout(render, 50);
             return;
         }
 
         if (eleveData.length === 0) {
-            inner.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40%;">Aucune élimination enregistrée.</p>';
+            inner.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40%;">Aucun élève dans cette classe.</p>';
             return;
         }
 
