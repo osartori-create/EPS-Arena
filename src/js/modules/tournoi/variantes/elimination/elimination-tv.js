@@ -53,7 +53,6 @@ export function renderEliminationTV() {
     container.innerHTML = '<p style="text-align:center; color:#64748b; font-size:1.5rem; margin-top:40vh;">En attente des données...</p>';
 
     // Configuration
-    const NB_VISIBLES = 10;
     const PHOTO_SIZE = 70;
     const SCROLL_SPEED = 1.2;
     const TOP_MARGIN = 80;
@@ -220,16 +219,18 @@ export function renderEliminationTV() {
     }
 
     // ============================================================
-    // RENDU DES ÉLÈVES
+    // RENDU DES ÉLÈVES (avec défilement conditionnel)
     // ============================================================
     function renderEleves(eleves) {
         const inner = document.getElementById('tv-scroll-inner');
         if (!inner) return;
 
-        const containerWidth = window.innerWidth;
+        const containerWidth = window.innerWidth - 40; // padding
         const eleveWidth = PHOTO_SIZE + 20 + 12;
         const totalWidth = eleves.length * eleveWidth;
-        const shouldScroll = eleves.length > NB_VISIBLES;
+
+        // ✅ Détermine si le défilement est nécessaire
+        const shouldScroll = totalWidth > containerWidth;
 
         const maxElim = Math.max(...eleves.map(e => e.eliminations), 1);
 
@@ -267,9 +268,28 @@ export function renderEliminationTV() {
         }
 
         inner.innerHTML = html;
-        inner.style.width = shouldScroll ? (totalWidth * 2) + 'px' : totalWidth + 'px';
 
-        // ✅ Charger les photos après rendu
+        // ✅ Largeur et positionnement selon qu'on défile ou non
+        if (shouldScroll) {
+            inner.style.width = (totalWidth * 2) + 'px';
+            const initialOffset = (containerWidth - totalWidth) / 2;
+            scrollOffset = initialOffset;
+            inner.style.transform = `translateX(${scrollOffset}px)`;
+
+            if (!animationId) {
+                animateScroll(inner, totalWidth);
+            }
+        } else {
+            inner.style.width = totalWidth + 'px';
+            const offset = (containerWidth - totalWidth) / 2;
+            inner.style.transform = `translateX(${offset}px)`;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+
+        // Charger les photos
         for (const item of eleves) {
             for (let copy = 0; copy < nbCopies; copy++) {
                 const photoDiv = document.getElementById(`tv-photo-${item.code}-${copy}`);
@@ -283,26 +303,6 @@ export function renderEliminationTV() {
                         })
                         .catch(() => {});
                 }
-            }
-        }
-
-        // Défilement
-        if (shouldScroll) {
-            const windowWidth = Math.min(containerWidth, NB_VISIBLES * eleveWidth);
-            const initialOffset = (containerWidth - windowWidth) / 2;
-            scrollOffset = initialOffset;
-            inner.style.transform = `translateX(${scrollOffset}px)`;
-
-            if (!animationId) {
-                animateScroll(inner, totalWidth);
-            }
-        } else {
-            const totalContentWidth = eleves.length * eleveWidth;
-            const offset = (containerWidth - totalContentWidth) / 2;
-            inner.style.transform = `translateX(${offset}px)`;
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
             }
         }
     }
@@ -327,14 +327,11 @@ export function renderEliminationTV() {
     // CALCUL DES DONNÉES : TOUS LES ÉLÈVES DE LA CLASSE
     // ============================================================
     function computeEleveData(joueursFirebase) {
-        // Récupérer TOUS les élèves de la classe
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
         if (eleves.length === 0) return [];
 
-        // Trier par nom pour un affichage stable
         eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
-        // Construire la liste
         const result = eleves.map((eleve, index) => {
             const code = (index + 1).toString();
             const eliminations = joueursFirebase[code]?.eliminations || 0;
@@ -346,10 +343,8 @@ export function renderEliminationTV() {
             };
         });
 
-        // Trier par éliminations CROISSANTES (les meilleurs en premier)
         result.sort((a, b) => a.eliminations - b.eliminations);
 
-        // Ajouter le rang
         result.forEach((item, index) => {
             item.rank = index + 1;
         });
@@ -363,7 +358,6 @@ export function renderEliminationTV() {
     function render() {
         const inner = document.getElementById('tv-scroll-inner');
         if (!inner) {
-            // Premier rendu
             const bgHtml = renderBackground();
             container.innerHTML = bgHtml;
             setTimeout(render, 50);
@@ -392,21 +386,27 @@ export function renderEliminationTV() {
         if (eleveData.length > 0) {
             const inner = document.getElementById('tv-scroll-inner');
             if (inner) {
-                const containerWidth = window.innerWidth;
+                const containerWidth = window.innerWidth - 40;
                 const eleveWidth = PHOTO_SIZE + 20 + 12;
                 const totalWidth = eleveData.length * eleveWidth;
-                const shouldScroll = eleveData.length > NB_VISIBLES;
+                const shouldScroll = totalWidth > containerWidth;
 
                 if (shouldScroll) {
-                    const windowWidth = Math.min(containerWidth, NB_VISIBLES * eleveWidth);
-                    const initialOffset = (containerWidth - windowWidth) / 2;
-                    scrollOffset = initialOffset;
-                    inner.style.transform = `translateX(${scrollOffset}px)`;
-                    inner.style.width = totalWidth * 2 + 'px';
+                    if (!animationId) {
+                        inner.style.width = (totalWidth * 2) + 'px';
+                        const initialOffset = (containerWidth - totalWidth) / 2;
+                        scrollOffset = initialOffset;
+                        inner.style.transform = `translateX(${scrollOffset}px)`;
+                        animateScroll(inner, totalWidth);
+                    }
                 } else {
+                    if (animationId) {
+                        cancelAnimationFrame(animationId);
+                        animationId = null;
+                    }
+                    inner.style.width = totalWidth + 'px';
                     const offset = (containerWidth - totalWidth) / 2;
                     inner.style.transform = `translateX(${offset}px)`;
-                    inner.style.width = totalWidth + 'px';
                 }
             }
         }
