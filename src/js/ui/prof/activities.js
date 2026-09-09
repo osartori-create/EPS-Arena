@@ -534,38 +534,317 @@ if (disc === 'escalade' || disc === 'bloccontest' || disc === 'natation') {
     // PURGE FIREBASE
     // ============================================================
     window.openPurgeModal = function() {
-        const choix = prompt("Purge Firebase\n1- Purger la classe active (sauf OrientShow)\n2- Purger TOUTE la base (code RNE)");
-        const baseProf = getBaseProf();
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const basePath = `etablissements/0680013V/profs/${profCode}`;
 
-        if (choix === "1") {
-            const activeClasse = document.getElementById('selectClasse').value;
-            if (activeClasse && confirm("Supprimer toutes les données de la classe " + activeClasse + " (sauf la matrice OrientShow) ?")) {
-                const classePath = `${baseProf}/${activeClasse}`;
-                const matrixBackup = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
-                remove(ref(db, classePath))
-                    .then(() => {
-                        if (Object.keys(matrixBackup).length > 0) {
-                            const configData = {
-                                activite: 'orientshow',
-                                matrix: matrixBackup,
-                                nbCircuits: 12,
-                                nbCouleurs: 5
-                            };
-                            set(ref(db, `${classePath}/orientshow/config`), configData);
-                        }
-                        location.reload();
-                    })
-                    .catch(err => alert("Erreur purge : " + err.message));
-            }
-        } else if (choix === "2") {
-            const code = prompt("Code RNE :");
-            if (code === "0680013V" && confirm("Supprimer TOUTE la base ?")) {
-                remove(ref(db))
-                    .then(() => location.reload())
-                    .catch(err => alert("Erreur purge : " + err.message));
-            }
-        }
+    // Créer le fond du modal
+    const overlay = document.createElement('div');
+    overlay.id = 'purge-modal-overlay';
+    overlay.className = 'fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4';
+    overlay.style.overflowY = 'auto';
+
+    // Conteneur du modal
+    const modal = document.createElement('div');
+    modal.className = 'bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto';
+    modal.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-black text-blue-400 uppercase">🗑️ Gestion des purges</h2>
+            <button onclick="window.closePurgeModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white transition-colors">
+                ✖ Fermer
+            </button>
+        </div>
+        <p class="text-sm text-slate-400 mb-4">
+            <span class="text-emerald-400">●</span> Sélectionne les éléments à supprimer. 
+            <span class="text-yellow-400 font-bold">⚠️ Les suppressions sont irréversibles.</span>
+            <br><span class="text-xs text-slate-500">Seul ton espace personnel (<strong>${profCode}</strong>) est accessible.</span>
+        </p>
+        <div id="purge-loading" class="text-center py-10 text-slate-400">
+            <p>⏳ Chargement des données...</p>
+        </div>
+        <div id="purge-content" class="hidden space-y-6"></div>
+        <div id="purge-actions" class="hidden mt-8 border-t border-slate-700 pt-6 space-y-3">
+            <button id="purge-selected-btn" class="w-full bg-red-600 hover:bg-red-700 py-4 rounded-2xl font-black text-white text-xl active:scale-95 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                🗑️ Supprimer les activités sélectionnées
+            </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button id="purge-all-classes-btn" class="bg-orange-600 hover:bg-orange-700 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-colors">
+                    🧹 Supprimer toutes MES classes
+                </button>
+                <button id="purge-all-data-only-btn" class="bg-amber-600 hover:bg-amber-700 py-3 rounded-xl font-black text-sm text-white active:scale-95 transition-colors">
+                    📄 Supprimer les DONNÉES (sans config) de toutes mes classes
+                </button>
+            </div>
+        </div>
+    `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    // Exposer la fonction de fermeture globalement
+    window.closePurgeModal = function() {
+        const el = document.getElementById('purge-modal-overlay');
+        if (el) el.remove();
     };
+    // Fermer en cliquant sur le fond
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) window.closePurgeModal();
+    });
+
+    // Charger les données
+    loadPurgeData(basePath);
+};
+
+// ============================================================
+// CHARGEMENT DES CLASSES ET ACTIVITÉS
+// ============================================================
+async function loadPurgeData(basePath) {
+    const loading = document.getElementById('purge-loading');
+    const content = document.getElementById('purge-content');
+    const actions = document.getElementById('purge-actions');
+
+    try {
+        // 1. Récupérer la liste des classes sous le prof
+        const classesRef = ref(db, basePath);
+        const snapshot = await new Promise((resolve) => {
+            onValue(classesRef, resolve, { onlyOnce: true });
+        });
+        const classesData = snapshot.val() || {};
+        const classNames = Object.keys(classesData).filter(key => key !== 'active_classes' && key !== 'live' && key !== 'config');
+
+        if (classNames.length === 0) {
+            loading.innerHTML = '<p class="text-yellow-400">ℹ️ Aucune classe trouvée dans ton espace.</p>';
+            return;
+        }
+
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+        actions.classList.remove('hidden');
+
+        let html = '';
+        let allActivities = {}; // Pour suivre les sélections
+
+        // Parcourir chaque classe
+        for (const className of classNames) {
+            const classPath = `${basePath}/${className}`;
+            const classRef = ref(db, classPath);
+            const classSnap = await new Promise((resolve) => {
+                onValue(classRef, resolve, { onlyOnce: true });
+            });
+            const classContent = classSnap.val() || {};
+            const activityNames = Object.keys(classContent).filter(key => 
+                !['config', 'active_classes', 'live'].includes(key) && typeof classContent[key] === 'object'
+            );
+
+            if (activityNames.length === 0) {
+                html += `
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                        <h3 class="text-lg font-black text-white">${className}</h3>
+                        <p class="text-sm text-slate-500 italic">Aucune activité détectée.</p>
+                    </div>
+                `;
+                continue;
+            }
+
+            html += `
+                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700" data-classe="${className}">
+                    <div class="flex items-center gap-3 mb-3">
+                        <input type="checkbox" class="classe-select-all w-5 h-5 accent-blue-500" data-classe="${className}">
+                        <h3 class="text-xl font-black text-white">${className}</h3>
+                        <span class="text-xs text-slate-400">(${activityNames.length} activité(s))</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 ml-6">
+            `;
+
+            for (const activity of activityNames) {
+                const hasConfig = classContent[activity]?.config !== undefined;
+                html += `
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-600 flex flex-wrap items-center gap-3" data-classe="${className}" data-activity="${activity}">
+                        <input type="checkbox" class="activity-select w-5 h-5 accent-red-500" data-classe="${className}" data-activity="${activity}">
+                        <span class="font-bold text-white text-sm flex-1">${activity}</span>
+                        <div class="flex gap-2 text-xs">
+                            <label class="flex items-center gap-1 text-slate-400">
+                                <input type="radio" name="mode_${className}_${activity}" value="data" checked class="mode-radio">
+                                Données
+                            </label>
+                            <label class="flex items-center gap-1 text-slate-400">
+                                <input type="radio" name="mode_${className}_${activity}" value="full" class="mode-radio">
+                                + Config
+                            </label>
+                        </div>
+                        ${!hasConfig ? '<span class="text-[10px] text-amber-400 bg-amber-950 px-2 py-0.5 rounded-full">(pas de config)</span>' : ''}
+                    </div>
+                `;
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+
+        content.innerHTML = html;
+
+        // --- Gestion des événements ---
+
+        // 1. "Sélectionner tout" par classe
+        document.querySelectorAll('.classe-select-all').forEach(cb => {
+            cb.addEventListener('change', function() {
+                const classe = this.dataset.classe;
+                const checkboxes = document.querySelectorAll(`.activity-select[data-classe="${classe}"]`);
+                checkboxes.forEach(c => c.checked = this.checked);
+                updatePurgeButtonState();
+            });
+        });
+
+        // 2. Mise à jour du bouton principal quand on coche/décoche une activité
+        document.querySelectorAll('.activity-select').forEach(cb => {
+            cb.addEventListener('change', updatePurgeButtonState);
+        });
+
+        // 3. Bouton "Supprimer les activités sélectionnées"
+        document.getElementById('purge-selected-btn').addEventListener('click', function() {
+            const selected = [];
+            document.querySelectorAll('.activity-select:checked').forEach(cb => {
+                const classe = cb.dataset.classe;
+                const activity = cb.dataset.activity;
+                const mode = document.querySelector(`input[name="mode_${classe}_${activity}"]:checked`)?.value || 'data';
+                selected.push({ classe, activity, mode });
+            });
+
+            if (selected.length === 0) {
+                alert('Aucune activité sélectionnée.');
+                return;
+            }
+
+            const msg = selected.map(s => `- ${s.classe} / ${s.activity} (${s.mode === 'data' ? 'Données uniquement' : 'Données + Config'})`).join('\n');
+            if (!confirm(`⚠️ Supprimer définitivement :\n${msg}\n\nCette action est irréversible. Confirmer ?`)) return;
+
+            // Exécution
+            let promises = selected.map(({ classe, activity, mode }) => {
+                const activityPath = `${basePath}/${classe}/${activity}`;
+                if (mode === 'full') {
+                    return remove(ref(db, activityPath));
+                } else {
+                    return deleteDataOnly(activityPath);
+                }
+            });
+
+            Promise.all(promises)
+                .then(() => {
+                    alert('✅ Suppression(s) effectuée(s) avec succès !');
+                    window.closePurgeModal();
+                    // On recharge la page pour rafraîchir les affichages
+                    location.reload();
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('❌ Erreur lors de la suppression : ' + err.message);
+                });
+        });
+
+        // 4. Bouton "Supprimer toutes MES classes"
+        document.getElementById('purge-all-classes-btn').addEventListener('click', function() {
+            if (!confirm(`⚠️ Supprimer TOUT ton espace (toutes les classes, toutes les activités) ?\nCette action est irréversible.`)) return;
+            if (!confirm(`✅ Dernière confirmation : supprimer définitivement le dossier "${basePath}" ?`)) return;
+
+            remove(ref(db, basePath))
+                .then(() => {
+                    alert('✅ Toutes vos classes ont été supprimées.');
+                    window.closePurgeModal();
+                    location.reload();
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('❌ Erreur : ' + err.message);
+                });
+        });
+
+        // 5. Bouton "Supprimer les DONNÉES de toutes mes classes"
+        document.getElementById('purge-all-data-only-btn').addEventListener('click', function() {
+            if (!confirm(`⚠️ Supprimer toutes les DONNÉES (résultats, passages, etc.) de toutes vos classes ?\nLes configurations (groupes, terrains, circuits) seront conservées.`)) return;
+            if (!confirm(`✅ Dernière confirmation : lancer la suppression massive des données ?`)) return;
+
+            // Récupérer toutes les classes et activités pour faire un deleteDataOnly sur chacune
+            const classesRef = ref(db, basePath);
+            onValue(classesRef, async (snap) => {
+                const data = snap.val() || {};
+                const classNames = Object.keys(data).filter(k => !['active_classes', 'live', 'config'].includes(k));
+                let total = 0;
+                let errors = [];
+
+                for (const className of classNames) {
+                    const classContent = data[className] || {};
+                    const activityNames = Object.keys(classContent).filter(k => 
+                        !['config', 'active_classes', 'live'].includes(k) && typeof classContent[k] === 'object'
+                    );
+                    for (const activity of activityNames) {
+                        const activityPath = `${basePath}/${className}/${activity}`;
+                        try {
+                            await deleteDataOnly(activityPath);
+                            total++;
+                        } catch (e) {
+                            errors.push(`${className}/${activity} : ${e.message}`);
+                        }
+                    }
+                }
+
+                if (errors.length > 0) {
+                    alert(`⚠️ ${total} activité(s) nettoyée(s), mais des erreurs sont survenues :\n${errors.join('\n')}`);
+                } else {
+                    alert(`✅ ${total} activité(s) nettoyée(s) (configs conservées).`);
+                }
+                window.closePurgeModal();
+                location.reload();
+            }, { onlyOnce: true });
+        });
+
+        // État initial du bouton
+        updatePurgeButtonState();
+
+    } catch (err) {
+        console.error(err);
+        loading.innerHTML = `<p class="text-red-400">❌ Erreur de chargement : ${err.message}</p>`;
+    }
+}
+
+// ============================================================
+// UTILITAIRE : Supprimer les données (sauf config)
+// ============================================================
+async function deleteDataOnly(activityPath) {
+    // 1. Lire le contenu du dossier activité
+    const activityRef = ref(db, activityPath);
+    const snap = await new Promise((resolve) => {
+        onValue(activityRef, resolve, { onlyOnce: true });
+    });
+    const content = snap.val() || {};
+
+    // 2. Identifier ce qu'on garde (config) et ce qu'on supprime
+    const toDelete = Object.keys(content).filter(key => key !== 'config');
+    if (toDelete.length === 0) {
+        console.log(`ℹ️ Rien à supprimer dans ${activityPath} (seulement config ou vide).`);
+        return;
+    }
+
+    // 3. Supprimer chaque sous-dossier un par un
+    const promises = toDelete.map(key => {
+        const childRef = ref(db, `${activityPath}/${key}`);
+        return remove(childRef);
+    });
+
+    await Promise.all(promises);
+    console.log(`✅ Données supprimées (config conservée) dans ${activityPath}`);
+}
+
+// ============================================================
+// METTRE À JOUR L'ÉTAT DU BOUTON PRINCIPAL
+// ============================================================
+function updatePurgeButtonState() {
+    const checked = document.querySelectorAll('.activity-select:checked').length;
+    const btn = document.getElementById('purge-selected-btn');
+    if (btn) {
+        btn.disabled = checked === 0;
+        btn.textContent = checked === 0 ? '🗑️ Supprimer les activités sélectionnées' : `🗑️ Supprimer ${checked} activité(s) sélectionnée(s)`;
+    }
+}
 
     // ============================================================
     // FONCTIONS CO (circuits)
