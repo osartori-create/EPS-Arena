@@ -129,6 +129,8 @@ C:.
         │   │       natation-interface.js
         │   │       natation-kiosk.js
         │   │       natation-live.js
+        │   │       natation-organisation.js
+        │   │       natation-relais.js
         │   │       natation-tv.js
         │   │       
         │   ├───orientshow
@@ -152,7 +154,9 @@ C:.
         │           └───elimination
         │                   elimination-core.js
         │                   elimination-kiosk.js
+        │                   elimination-live.js
         │                   elimination-prof.js
+        │                   elimination-tv.js
         │                   index.js
         │                   
         ├───services
