@@ -209,6 +209,9 @@ async function renderOrganisation(container, classe, eleves, reference, equipes,
     // ─────────────────────────────────────────────
     // SECTION 1 : RÉFÉRENCE
     // ─────────────────────────────────────────────
+        // ─────────────────────────────────────────────
+    // SECTION 1 : RÉFÉRENCE
+    // ─────────────────────────────────────────────
     if (!hasReference) {
         html += `
             <div class="bg-amber-900/20 border-2 border-amber-500 p-5 rounded-2xl">
@@ -219,7 +222,7 @@ async function renderOrganisation(container, classe, eleves, reference, equipes,
                     Cette référence servira de <strong>point de départ</strong> pour mesurer la progression sur tout le cycle.
                 </p>
                 <p class="text-xs text-slate-500 mb-4">
-                    ${nbEleves} élève(s) dans la classe · ${Object.keys(indicesCourants).length} essai(s) déjà enregistré(s)
+                    ${nbEleves} élève(s) dans la classe · <strong class="text-emerald-400">${Object.keys(indicesCourants).length}</strong> essai(s) déjà enregistré(s)
                 </p>
                 <button onclick="window.figerReferenceNatation()" 
                         class="w-full bg-amber-600 hover:bg-amber-500 py-4 rounded-2xl font-black text-white text-lg active:scale-95 transition-all">
@@ -229,27 +232,63 @@ async function renderOrganisation(container, classe, eleves, reference, equipes,
         `;
     } else {
         const nbReference = Object.keys(reference).length;
+        const nbManquants = nbEleves - nbReference;
         const dateRef = new Date(Object.values(reference)[0]?.date || Date.now());
         const dateStr = dateRef.toLocaleDateString('fr-FR');
-        html += `
-            <div class="bg-emerald-900/20 border-2 border-emerald-500 p-5 rounded-2xl">
-                <div class="flex justify-between items-start mb-3 flex-wrap gap-2">
-                    <div>
-                        <h3 class="font-black text-emerald-400 uppercase text-sm">✅ Référence figée</h3>
-                        <p class="text-xs text-slate-400 mt-1">
-                            ${nbReference} élève(s) · enregistrée le ${dateStr}
-                        </p>
+
+        // ── Cas 1 : référence partielle (il manque des élèves) ──
+        if (nbManquants > 0) {
+            html += `
+                <div class="bg-blue-900/20 border-2 border-blue-500 p-5 rounded-2xl">
+                    <div class="flex justify-between items-start mb-3 flex-wrap gap-2">
+                        <div>
+                            <h3 class="font-black text-blue-400 uppercase text-sm">📸 Référence partielle</h3>
+                            <p class="text-xs text-slate-400 mt-1">
+                                <strong class="text-emerald-400">${nbReference}</strong> élève(s) avec référence · 
+                                <strong class="text-amber-400">${nbManquants}</strong> à compléter
+                            </p>
+                            <p class="text-[10px] text-slate-500 mt-1">Enregistrée le ${dateStr}</p>
+                        </div>
+                        <div class="flex gap-2 flex-wrap">
+                            <button onclick="window.completerReferenceNatation()" 
+                                    class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                                ➕ Compléter (${nbManquants})
+                            </button>
+                            <button onclick="window.reinitialiserReferenceNatation()" 
+                                    class="bg-red-900/50 hover:bg-red-800 px-3 py-1.5 rounded-xl font-black text-xs text-red-300 active:scale-95">
+                                ↺ Refiger tout
+                            </button>
+                        </div>
                     </div>
-                    <button onclick="window.reinitialiserReferenceNatation()" 
-                            class="bg-red-900/50 hover:bg-red-800 px-3 py-1.5 rounded-xl font-black text-xs text-red-300 active:scale-95">
-                        ↺ Refiger (attention : efface la progression)
-                    </button>
+                    <p class="text-xs text-slate-400 mt-2">
+                        💡 Le bouton "Compléter" ajoute uniquement les élèves qui n'ont pas encore de référence. 
+                        Les élèves déjà enregistrés ne sont pas touchés.
+                    </p>
                 </div>
-                ${!hasEquipes ? `
-                    <p class="text-xs text-slate-400 mt-3">➡️ Étape suivante : générez les équipes.</p>
-                ` : ''}
-            </div>
-        `;
+            `;
+        } 
+        // ── Cas 2 : référence complète ──
+        else {
+            html += `
+                <div class="bg-emerald-900/20 border-2 border-emerald-500 p-5 rounded-2xl">
+                    <div class="flex justify-between items-start mb-3 flex-wrap gap-2">
+                        <div>
+                            <h3 class="font-black text-emerald-400 uppercase text-sm">✅ Référence complète</h3>
+                            <p class="text-xs text-slate-400 mt-1">
+                                ${nbReference} élève(s) · enregistrée le ${dateStr}
+                            </p>
+                        </div>
+                        <button onclick="window.reinitialiserReferenceNatation()" 
+                                class="bg-red-900/50 hover:bg-red-800 px-3 py-1.5 rounded-xl font-black text-xs text-red-300 active:scale-95">
+                            ↺ Refiger tout
+                        </button>
+                    </div>
+                    ${!hasEquipes ? `
+                        <p class="text-xs text-slate-400 mt-3">➡️ Étape suivante : générez les équipes.</p>
+                    ` : ''}
+                </div>
+            `;
+        }
     }
 
     // ─────────────────────────────────────────────
@@ -444,7 +483,10 @@ window.figerReferenceNatation = async function() {
     }
 
     try {
-        await set(ref(db, `${basePath}/reference`), referenceData);
+        // Écriture par sous-chemin (plus sûr si on complète plus tard)
+        for (const [numStr, data] of Object.entries(referenceData)) {
+            await set(ref(db, `${basePath}/reference/${numStr}`), data);
+        }
         alert(`✅ Référence figée pour ${nbIndices} élève(s) !`);
         rafraichirOrganisation(classe);
     } catch (err) {
@@ -476,6 +518,88 @@ window.reinitialiserReferenceNatation = async function() {
     }
 };
 
+// ============================================================
+// ACTION : COMPLÉTER LA RÉFÉRENCE (ajoute les élèves manquants)
+// ============================================================
+window.completerReferenceNatation = async function() {
+    const classe = getCurrentClasse();
+    if (!classe) return;
+
+    const basePath = getBasePath(classe);
+    const eleves = chargerElevesTries(classe);
+
+    // 1. Lire la référence actuelle
+    const reference = await new Promise(resolve => {
+        onValue(ref(db, `${basePath}/reference`), snap => resolve(snap.val() || {}), { onlyOnce: true });
+    });
+
+    // 2. Identifier les numéros déjà présents
+    const dejaFiges = new Set(Object.keys(reference));
+
+    // 3. Lire les indices courants
+    const indicesCourants = await getIndicesCourants(classe);
+    const { temps, coups } = await chargerMesures(classe);
+
+    // 4. Trouver les nouveaux (élèves qui n'ont PAS de référence mais qui ont un essai)
+    const aAjouter = {};
+    const sansEssai = [];
+
+    for (const eleve of eleves) {
+        const numStr = String(eleve.numero);
+        if (dejaFiges.has(numStr)) continue; // déjà figé
+
+        const idx = indicesCourants[numStr];
+        if (idx === undefined) {
+            sansEssai.push(eleve);
+            continue;
+        }
+
+        aAjouter[numStr] = {
+            valeur: Math.round(idx * 100) / 100,
+            tempsMs: temps[numStr] || null,
+            nbCoups: coups[numStr] || null,
+            date: Date.now()
+        };
+    }
+
+    const nbAAjouter = Object.keys(aAjouter).length;
+
+    if (nbAAjouter === 0) {
+        if (sansEssai.length > 0) {
+            alert(`Aucun nouvel élève à ajouter.\n\n${sansEssai.length} élève(s) n'ont toujours pas d'essai enregistré :\n${sansEssai.map(e => `• ${e.prenom} ${e.nom} (N°${e.numero})`).slice(0, 5).join('\n')}${sansEssai.length > 5 ? '\n...' : ''}`);
+        } else {
+            alert('✅ La référence est déjà complète pour tous les élèves.');
+        }
+        return;
+    }
+
+    // 5. Confirmation
+    let msg = `➕ Ajouter la référence pour ${nbAAjouter} élève(s) ?\n\n`;
+    msg += `Les ${dejaFiges.size} élèves déjà enregistrés ne seront PAS touchés.\n\n`;
+    if (sansEssai.length > 0) {
+        msg += `⚠️ ${sansEssai.length} élève(s) n'ont toujours pas d'essai et seront ignorés.`;
+    }
+
+    if (!confirm(msg)) return;
+
+    // 6. Écrire uniquement les nouveaux (set avec update partiel)
+    const chemins = {};
+    for (const [numStr, data] of Object.entries(aAjouter)) {
+        chemins[numStr] = data;
+    }
+
+    try {
+        // On utilise set par sous-chemin pour éviter d'écraser les existants
+        for (const [numStr, data] of Object.entries(chemins)) {
+            await set(ref(db, `${basePath}/reference/${numStr}`), data);
+        }
+        alert(`✅ Référence complétée pour ${nbAAjouter} élève(s) !`);
+        rafraichirOrganisation(classe);
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur : ' + err.message);
+    }
+};
 // ============================================================
 // ACTION : GÉNÉRER LES ÉQUIPES
 // ============================================================
