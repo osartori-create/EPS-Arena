@@ -184,15 +184,15 @@ function renderSaisieVitesses(container) {
     const renderZoneSelector = (type, value) => {
         let html = `<div class="grid grid-cols-7 gap-1">`;
         for (let z = 1; z <= NB_PLOTS; z++) {
-            const kmh = zoneToVitesse(z);
-            const selected = value === z;
-            html += `
-                <button onclick="window.relaisKioskSetZone('${type}', ${z})"
-                        class="py-3 rounded-lg font-black text-sm ${selected ? 'bg-blue-600 text-white ring-2 ring-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'} active:scale-95 transition-all">
-                    ${kmh}
-                </button>
-            `;
-        }
+    const kmh = zoneToVitesse(z);  // 15, 16, ..., 28
+    const selected = value === kmh;  // ← comparer avec la vitesse, pas la zone
+    html += `
+        <button onclick="window.relaisKioskSetZone('${type}', ${z})"  // ← on passe toujours la zone
+                class="py-3 rounded-lg font-black text-sm ${selected ? 'bg-blue-600 text-white ring-2 ring-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'} active:scale-95 transition-all">
+            ${kmh}
+        </button>
+    `;
+}
         html += `</div>`;
         return html;
     };
