@@ -1,24 +1,21 @@
 // src/js/modules/relais/relais-kiosk.js
 // Kiosque élève : menu principal + saisie vitesses + relais
+// ⚠️ RGPD : aucune donnée nominative n'est manipulée ici.
+// On identifie les élèves par code {groupeIdx}_{lettre} (ex: "0_a").
 
 import { db, ref, onValue, push, set } from '../../core/firebase-service.js';
-import { getCurrentClasse } from '../../core/live-engine.js';
-import { 
-    zoneToVitesse, calculerVTheorique, calculerScore, getScoreCouleur, getScoreLabel, 
-    getPairesGroupe, formatVitesse, NB_PLOTS 
+import {
+    zoneToVitesse, calculerVTheorique, calculerScore, getScoreCouleur, getScoreLabel,
+    getPairesGroupe, NB_PLOTS
 } from './relais-core.js';
 
-// ============================================================
-// ÉTAT
-// ============================================================
 const state = {
     classe: '',
-    code: '',
     config: null,
-    vitesses: {},         // { eleveId: { arret, lance } }
-    mesures: {},          // { pushId: { groupe, pairId, relayeId, relayeurId, zoneAtteinte, score, ... } }
-    mode: 'menu',         // 'menu' | 'saisie-vitesses' | 'select-eleve' | 'select-groupe' | 'select-paire' | 'saisie-zone' | 'feedback'
-    currentEleve: null,
+    vitesses: {},
+    mesures: {},
+    mode: 'menu',
+    currentCode: null,      // "0_a" (groupeIdx_lettre)
     currentGroupeIdx: null,
     currentPaire: null,
     currentVitesses: { arret: null, lance: null },
@@ -35,7 +32,6 @@ let mesuresListener = null;
 // ============================================================
 export function initRelaisKiosk(classe, code) {
     state.classe = classe;
-    state.code = code;
     state.mode = 'menu';
 
     const container = document.getElementById('relais-module');
@@ -49,21 +45,18 @@ export function initRelaisKiosk(classe, code) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/relais`;
 
-    // Config
     if (configListener) configListener();
     configListener = onValue(ref(db, `${basePath}/config`), (snap) => {
         state.config = snap.val() || null;
-        if (state.config) render();
+        render();
     });
 
-    // Vitesses
     if (vitessesListener) vitessesListener();
     vitessesListener = onValue(ref(db, `${basePath}/vitesses`), (snap) => {
         state.vitesses = snap.val() || {};
         render();
     });
 
-    // Mesures
     if (mesuresListener) mesuresListener();
     mesuresListener = onValue(ref(db, `${basePath}/mesures`), (snap) => {
         state.mesures = snap.val() || {};
@@ -72,7 +65,7 @@ export function initRelaisKiosk(classe, code) {
 }
 
 // ============================================================
-// RENDU PRINCIPAL (aiguillage)
+// RENDU PRINCIPAL
 // ============================================================
 function render() {
     const container = document.getElementById('relais-module');
@@ -84,19 +77,16 @@ function render() {
     }
 
     switch (state.mode) {
-        case 'menu':              renderMenu(container); break;
-        case 'saisie-vitesses':   renderSaisieVitesses(container); break;
-        case 'select-eleve':      renderSelectEleve(container); break;
-        case 'select-groupe':     renderSelectGroupe(container); break;
-        case 'select-paire':      renderSelectPaire(container); break;
-        case 'saisie-zone':       renderSaisieZone(container); break;
-        case 'feedback':          renderFeedback(container); break;
+        case 'menu':           renderMenu(container); break;
+        case 'select-eleve':   renderSelectCode(container); break;
+        case 'saisie-vitesses':renderSaisieVitesses(container); break;
+        case 'select-groupe':  renderSelectGroupe(container); break;
+        case 'select-paire':   renderSelectPaire(container); break;
+        case 'saisie-zone':    renderSaisieZone(container); break;
+        case 'feedback':       renderFeedback(container); break;
     }
 }
 
-// ============================================================
-// BANDEAU DE MODE
-// ============================================================
 function getBannerHtml() {
     const mode = state.config.mode || 'essai';
     if (mode === 'competition') {
@@ -117,7 +107,7 @@ function renderMenu(container) {
                 <p class="text-slate-400 text-sm">Choisis ton mode</p>
             </div>
 
-            <button onclick="window.relaisKioskGoTo('saisie-vitesses')" 
+            <button onclick="window.relaisKioskGoTo('select-eleve')" 
                     class="w-full bg-blue-600 hover:bg-blue-500 py-8 rounded-3xl font-black text-2xl text-white active:scale-95 transition-all shadow-xl">
                 🏃 Saisir mes vitesses
                 <p class="text-xs font-normal opacity-80 mt-1">Départ arrêté / Départ lancé</p>
@@ -138,11 +128,21 @@ function renderMenu(container) {
 }
 
 // ============================================================
-// SAISIE DES VITESSES DE RÉFÉRENCE
+// SAISIE DES VITESSES (sélection par code groupe+lettre)
 // ============================================================
-function renderSelectEleve(container) {
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${state.classe}`) || '[]');
-    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+function renderSelectCode(container) {
+    const groupes = state.config.groupes || {};
+    const codes = [];
+    Object.entries(groupes).forEach(([idx, groupe]) => {
+        groupe.membres.forEach(m => {
+            codes.push({
+                code: `${idx}_${m.lettre}`,
+                label: `G${groupe.numero}${m.lettre}`,
+                groupeIdx: idx,
+                lettre: m.lettre
+            });
+        });
+    });
 
     let html = `
         ${getBannerHtml()}
@@ -151,44 +151,33 @@ function renderSelectEleve(container) {
                 <h2 class="text-xl font-black text-white">🏃 Saisir mes vitesses</h2>
                 <button onclick="window.relaisKioskGoTo('menu')" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Retour</button>
             </div>
-            <p class="text-slate-400 text-sm">Cherche ton nom dans la liste</p>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[70vh] overflow-y-auto pr-2">
+            <p class="text-slate-400 text-sm">Demande à ton prof ton code (ex : G1a) et clique dessus.</p>
+            <div class="grid grid-cols-3 md:grid-cols-4 gap-3">
     `;
 
-    if (eleves.length === 0) {
-        html += `<p class="text-slate-500 col-span-full text-center py-6">Aucun élève importé. Préviens ton professeur.</p>`;
-    } else {
-        eleves.forEach((eleve, index) => {
-            const numero = index + 1;
-            const v = state.vitesses[eleve.id];
-            const hasV = v && v.arret && v.lance;
-            const badge = hasV
-                ? `<span class="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-bold">✓ saisi</span>`
-                : `<span class="text-xs bg-slate-600 text-slate-300 px-2 py-0.5 rounded-full font-bold">à faire</span>`;
+    codes.forEach(c => {
+        const v = state.vitesses[c.code] || {};
+        const hasV = v.arret && v.lance;
+        const bgClass = hasV ? 'bg-emerald-700 border-emerald-400' : 'bg-blue-700 border-blue-400';
 
-            html += `
-                <button onclick="window.relaisKioskSelectEleve('${eleve.id}')"
-                        class="bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-blue-500 p-3 rounded-xl flex items-center gap-3 active:scale-95 transition-all text-left">
-                    <span class="text-2xl font-black text-yellow-400 w-10">${numero}</span>
-                    <span class="flex-1 font-bold text-white">${eleve.prenom} ${eleve.nom}</span>
-                    ${badge}
-                </button>
-            `;
-        });
-    }
+        html += `
+            <button onclick="window.relaisKioskSelectCode('${c.code}')"
+                    class="${bgClass} p-5 rounded-2xl font-black text-2xl text-white border-2 active:scale-95 transition-all">
+                ${c.label}
+                ${hasV ? '<span class="block text-xs font-normal mt-1">✓ saisi</span>' : ''}
+            </button>
+        `;
+    });
 
     html += `</div></div>`;
     container.innerHTML = html;
 }
 
 function renderSaisieVitesses(container) {
-    const eleve = state.currentEleve;
-    if (!eleve) {
-        window.relaisKioskGoTo('saisie-vitesses');
-        return;
-    }
+    const code = state.currentCode;
+    if (!code) { window.relaisKioskGoTo('select-eleve'); return; }
 
-    const v = state.vitesses[eleve.id] || {};
+    const v = state.vitesses[code] || {};
     const arret = state.currentVitesses.arret !== null ? state.currentVitesses.arret : (v.arret || null);
     const lance = state.currentVitesses.lance !== null ? state.currentVitesses.lance : (v.lance || null);
 
@@ -212,25 +201,25 @@ function renderSaisieVitesses(container) {
         ${getBannerHtml()}
         <div class="space-y-4">
             <div class="flex justify-between items-center">
-                <h2 class="text-xl font-black text-white">🏃 ${eleve.prenom} ${eleve.nom}</h2>
-                <button onclick="window.relaisKioskGoTo('saisie-vitesses')" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Retour</button>
+                <h2 class="text-xl font-black text-white">🏃 Code : ${code.replace('_', '')}</h2>
+                <button onclick="window.relaisKioskGoTo('select-eleve')" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Retour</button>
             </div>
 
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <h3 class="font-bold text-white mb-1">🅰️ 5'' Départ arrêté</h3>
-                <p class="text-xs text-slate-400 mb-3">Zone atteinte (vitesse en km/h)</p>
+                <p class="text-xs text-slate-400 mb-3">Zone atteinte (km/h)</p>
                 ${renderZoneSelector('arret', arret)}
                 <p class="mt-2 text-sm font-bold ${arret ? 'text-emerald-400' : 'text-slate-500'}">
-                    ${arret ? `✓ Zone ${arret} = ${zoneToVitesse(arret)} km/h` : 'Aucune zone sélectionnée'}
+                    ${arret ? `✓ ${zoneToVitesse(arret)} km/h` : 'Aucune zone sélectionnée'}
                 </p>
             </div>
 
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <h3 class="font-bold text-white mb-1">🅱️ 5'' Départ lancé</h3>
-                <p class="text-xs text-slate-400 mb-3">Zone atteinte (vitesse en km/h)</p>
+                <p class="text-xs text-slate-400 mb-3">Zone atteinte (km/h)</p>
                 ${renderZoneSelector('lance', lance)}
                 <p class="mt-2 text-sm font-bold ${lance ? 'text-emerald-400' : 'text-slate-500'}">
-                    ${lance ? `✓ Zone ${lance} = ${zoneToVitesse(lance)} km/h` : 'Aucune zone sélectionnée'}
+                    ${lance ? `✓ ${zoneToVitesse(lance)} km/h` : 'Aucune zone sélectionnée'}
                 </p>
             </div>
 
@@ -279,10 +268,7 @@ function renderSelectGroupe(container) {
 function renderSelectPaire(container) {
     const groupeIdx = state.currentGroupeIdx;
     const groupe = state.config.groupes[groupeIdx];
-    if (!groupe) {
-        window.relaisKioskGoTo('select-groupe');
-        return;
-    }
+    if (!groupe) { window.relaisKioskGoTo('select-groupe'); return; }
 
     const membres = groupe.membres;
     const paires = getPairesGroupe(membres);
@@ -299,14 +285,14 @@ function renderSelectPaire(container) {
     `;
 
     paires.forEach((p, i) => {
-        // Vérifier si les vitesses sont disponibles
-        const vRelaye = state.vitesses[p.relaye.id] || {};
-        const vRelayeur = state.vitesses[p.relayeur.id] || {};
+        const codeRelaye = `${groupeIdx}_${p.relaye.lettre}`;
+        const codeRelayeur = `${groupeIdx}_${p.relayeur.lettre}`;
+        const vRelaye = state.vitesses[codeRelaye] || {};
+        const vRelayeur = state.vitesses[codeRelayeur] || {};
         const pret = vRelaye.arret && vRelayeur.lance;
 
-        // Meilleur essai existant pour cette paire ?
-        const essaisPaire = Object.values(state.mesures).filter(m => 
-            m.groupeIdx === groupeIdx && m.pairId === p.pairId
+        const essaisPaire = Object.values(state.mesures).filter(m =>
+            String(m.groupeIdx) === String(groupeIdx) && m.pairId === p.pairId
         );
         const meilleur = essaisPaire.length > 0 ? Math.max(...essaisPaire.map(m => m.score)) : null;
 
@@ -314,8 +300,6 @@ function renderSelectPaire(container) {
             <button onclick="window.relaisKioskSelectPaire(${i})"
                     class="bg-slate-800 hover:bg-slate-700 border-2 ${pret ? 'border-slate-700 hover:border-blue-500' : 'border-red-800'} p-4 rounded-2xl active:scale-95 transition-all text-left">
                 <div class="text-3xl font-black text-white mb-1">${p.relaye.lettre} → ${p.relayeur.lettre}</div>
-                <div class="text-xs text-slate-400">Relayé : ${p.relaye.prenom}</div>
-                <div class="text-xs text-slate-400">Relayeur : ${p.relayeur.prenom}</div>
                 ${meilleur !== null ? `<div class="mt-1 text-xs text-yellow-400 font-bold">🏆 Meilleur : ${meilleur.toFixed(1)} pts</div>` : ''}
                 ${!pret ? `<div class="mt-1 text-xs text-red-400 font-bold">⚠️ Vitesses manquantes</div>` : ''}
             </button>
@@ -327,15 +311,11 @@ function renderSelectPaire(container) {
 }
 
 // ============================================================
-// SAISIE DE LA ZONE ATTEINTE (RELais)
+// SAISIE DE LA ZONE ATTEINTE
 // ============================================================
 function renderSaisieZone(container) {
-    const groupeIdx = state.currentGroupeIdx;
     const paire = state.currentPaire;
-    if (!paire) {
-        window.relaisKioskGoTo('select-groupe');
-        return;
-    }
+    if (!paire) { window.relaisKioskGoTo('select-groupe'); return; }
 
     const nbPlots = state.config.nbPlots || 14;
     const zone = state.currentZone;
@@ -369,7 +349,7 @@ function renderSaisieZone(container) {
             ${gridHtml}
 
             <div class="text-center text-3xl font-black ${zone > 0 ? 'text-emerald-400' : 'text-slate-500'} py-2">
-                ${zone > 0 ? `Zone ${zone} = ${zoneToVitesse(zone)} km/h` : 'Aucune zone sélectionnée'}
+                ${zone > 0 ? `${zoneToVitesse(zone)} km/h` : 'Aucune zone sélectionnée'}
             </div>
 
             <button onclick="window.relaisKioskValiderZone()"
@@ -390,14 +370,13 @@ function renderFeedback(container) {
 
     const couleur = getScoreCouleur(fb.score);
     const label = getScoreLabel(fb.score);
-    const mode = state.config.mode || 'essai';
 
     container.innerHTML = `
         ${getBannerHtml()}
         <div class="space-y-4 text-center py-6">
             <div class="text-6xl mb-2">${fb.score >= 8 ? '🚀' : fb.score >= 5 ? '🌟' : fb.score >= 3 ? '👍' : '📈'}</div>
             <h2 class="text-3xl font-black text-white">${fb.pairId}</h2>
-            <p class="text-slate-400">${fb.relayePrenom} → ${fb.relayeurPrenom}</p>
+            <p class="text-slate-400 text-sm">Groupe ${fb.groupeNumero || (parseInt(fb.groupeIdx) + 1)}</p>
 
             <div class="bg-slate-800 p-6 rounded-3xl border-2 inline-block px-8" style="border-color: ${couleur}">
                 <div class="text-sm text-slate-400 mb-1">Score</div>
@@ -440,28 +419,22 @@ function renderFeedback(container) {
 }
 
 // ============================================================
-// ACTIONS (exposées sur window)
+// ACTIONS
 // ============================================================
 window.relaisKioskGoTo = function(mode) {
-    state.mode = mode;
-    if (mode === 'saisie-vitesses') {
-        state.mode = 'select-eleve';
-    } else if (mode === 'select-paire' && state.currentGroupeIdx !== null) {
-        // rien
-    } else if (mode !== 'feedback') {
-        state.currentEleve = null;
+    if (mode === 'menu' || mode === 'select-eleve' || mode === 'select-groupe') {
+        state.currentCode = null;
+        state.currentGroupeIdx = null;
+        state.currentPaire = null;
         state.currentVitesses = { arret: null, lance: null };
         state.currentZone = 0;
     }
+    state.mode = mode;
     render();
 };
 
-window.relaisKioskSelectEleve = function(eleveId) {
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${state.classe}`) || '[]');
-    const eleve = eleves.find(e => e.id === eleveId);
-    if (!eleve) return;
-
-    state.currentEleve = eleve;
+window.relaisKioskSelectCode = function(code) {
+    state.currentCode = code;
     state.currentVitesses = { arret: null, lance: null };
     state.mode = 'saisie-vitesses';
     render();
@@ -473,12 +446,12 @@ window.relaisKioskSetZone = function(type, zone) {
 };
 
 window.relaisKioskValiderVitesses = async function() {
-    const eleve = state.currentEleve;
+    const code = state.currentCode;
     const v = state.currentVitesses;
-    if (!eleve || !v.arret || !v.lance) return;
+    if (!code || !v.arret || !v.lance) return;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/relais/vitesses/${eleve.id}`;
+    const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/relais/vitesses/${code}`;
 
     try {
         await set(ref(db, path), {
@@ -487,7 +460,7 @@ window.relaisKioskValiderVitesses = async function() {
             timestamp: Date.now()
         });
         alert(`✅ Vitesses enregistrées !\nDépart arrêté : ${zoneToVitesse(v.arret)} km/h\nDépart lancé : ${zoneToVitesse(v.lance)} km/h`);
-        state.currentEleve = null;
+        state.currentCode = null;
         state.currentVitesses = { arret: null, lance: null };
         state.mode = 'select-eleve';
         render();
@@ -511,11 +484,14 @@ window.relaisKioskSelectPaire = function(paireIdx) {
     const paire = paires[paireIdx];
     if (!paire) return;
 
-    const vRelaye = state.vitesses[paire.relaye.id] || {};
-    const vRelayeur = state.vitesses[paire.relayeur.id] || {};
+    const codeRelaye = `${state.currentGroupeIdx}_${paire.relaye.lettre}`;
+    const codeRelayeur = `${state.currentGroupeIdx}_${paire.relayeur.lettre}`;
+
+    const vRelaye = state.vitesses[codeRelaye] || {};
+    const vRelayeur = state.vitesses[codeRelayeur] || {};
 
     if (!vRelaye.arret || !vRelayeur.lance) {
-        alert(`⚠️ Vitesses manquantes :\n- ${paire.relaye.prenom} doit avoir son "Départ arrêté" saisi\n- ${paire.relayeur.prenom} doit avoir son "Départ lancé" saisi\n\nDemande à ces élèves de saisir leurs vitesses.`);
+        alert(`⚠️ Vitesses manquantes :\n- Le relayé (${paire.relaye.lettre.toUpperCase()}) doit avoir son "Départ arrêté" saisi\n- Le relayeur (${paire.relayeur.lettre.toUpperCase()}) doit avoir son "Départ lancé" saisi\n\nDemande-leur de saisir leurs vitesses.`);
         return;
     }
 
@@ -536,21 +512,24 @@ window.relaisKioskValiderZone = async function() {
     const zone = state.currentZone;
     if (!paire || !zone) return;
 
-    const vRelaye = state.vitesses[paire.relaye.id] || {};
-    const vRelayeur = state.vitesses[paire.relayeur.id] || {};
+    const codeRelaye = `${groupeIdx}_${paire.relaye.lettre}`;
+    const codeRelayeur = `${groupeIdx}_${paire.relayeur.lettre}`;
+
+    const vRelaye = state.vitesses[codeRelaye] || {};
+    const vRelayeur = state.vitesses[codeRelayeur] || {};
+
     const vTheo = calculerVTheorique(zoneToVitesse(vRelaye.arret), zoneToVitesse(vRelayeur.lance));
     const vReelle = zoneToVitesse(zone);
     const score = calculerScore(vReelle, vTheo);
     const ecart = vReelle - vTheo;
 
+    // ⚠️ Aucune donnée nominative
     const mesure = {
         groupeIdx: groupeIdx,
         groupeNumero: state.config.groupes[groupeIdx].numero,
         pairId: paire.pairId,
-        relayeId: paire.relaye.id,
-        relayePrenom: paire.relaye.prenom,
-        relayeurId: paire.relayeur.id,
-        relayeurPrenom: paire.relayeur.prenom,
+        relayeLettre: paire.relaye.lettre,
+        relayeurLettre: paire.relayeur.lettre,
         zoneAtteinte: zone,
         vReelle: vReelle,
         vTheorique: Math.round(vTheo * 10) / 10,
@@ -573,9 +552,6 @@ window.relaisKioskValiderZone = async function() {
     }
 };
 
-// ============================================================
-// NETTOYAGE
-// ============================================================
 window.retourMenuRelais = function() {
     if (configListener) { configListener(); configListener = null; }
     if (vitessesListener) { vitessesListener(); vitessesListener = null; }

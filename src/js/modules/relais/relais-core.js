@@ -1,22 +1,11 @@
 // src/js/modules/relais/relais-core.js
 // Logique métier commune au module Relais
+// ⚠️ RGPD : les "membres" ne contiennent JAMAIS de nom/prénom/id.
 
-// ============================================================
-// CONSTANTES
-// ============================================================
-export const ZONE_MIN = 15;      // Plot 1 = 15 km/h
-export const ZONE_MAX = 28;      // Plot 14 = 28 km/h
-export const NB_PLOTS = ZONE_MAX - ZONE_MIN + 1; // 14
+export const ZONE_MIN = 15;
+export const ZONE_MAX = 28;
+export const NB_PLOTS = ZONE_MAX - ZONE_MIN + 1;
 
-// Distances de référence (5s / 10s)
-export const DIST_5S_PLOT_1 = 20.75;
-export const PAS_5S = 1.38;
-export const DIST_10S_PLOT_1 = 41.55;
-export const PAS_10S = 2.76;
-
-// ============================================================
-// CONVERSIONS
-// ============================================================
 export function zoneToVitesse(zone) {
     if (!zone || zone < 1 || zone > NB_PLOTS) return null;
     return ZONE_MIN + (zone - 1);
@@ -46,11 +35,11 @@ export function calculerScore(vReelle, vTheorique) {
 
 export function getScoreCouleur(score) {
     if (score === null) return '#64748b';
-    if (score >= 8) return '#22c55e';     // vert foncé (excellent)
-    if (score >= 6) return '#84cc16';     // vert clair
-    if (score >= 5) return '#eab308';     // jaune (pile = V_th)
-    if (score >= 3) return '#f97316';     // orange
-    return '#ef4444';                     // rouge
+    if (score >= 8) return '#22c55e';
+    if (score >= 6) return '#84cc16';
+    if (score >= 4.5) return '#eab308';
+    if (score >= 3) return '#f97316';
+    return '#ef4444';
 }
 
 export function getScoreLabel(score) {
@@ -63,16 +52,15 @@ export function getScoreLabel(score) {
 }
 
 // ============================================================
-// PAIRES D'UN GROUPE
+// PAIRES D'UN GROUPE (basé sur la LETTRE, pas sur un id)
 // ============================================================
 export function getLettre(index) {
-    return String.fromCharCode(97 + index); // a, b, c, d, ...
+    return String.fromCharCode(97 + index);
 }
 
 /**
- * Retourne toutes les paires possibles d'un groupe (n*(n-1))
- * @param {Array} membres - [{ id, prenom, nom, lettre }, ...]
- * @returns {Array} [{ relayeIdx, relayeurIdx, pairId, label, relaye, relayeur }, ...]
+ * @param {Array} membres - [{ lettre: 'a', sexe: 'M' }, ...]
+ * @returns {Array} [{ relayeIdx, relayeurIdx, pairId, label, relaye, relayeur }]
  */
 export function getPairesGroupe(membres) {
     const paires = [];
@@ -103,9 +91,6 @@ function moy(arr) {
     return Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 100) / 100;
 }
 
-/**
- * Retourne le meilleur essai par paire (score le plus haut)
- */
 export function getMeilleurEssaiParPaire(mesures) {
     const meilleur = {};
     mesures.forEach(m => {
@@ -117,15 +102,14 @@ export function getMeilleurEssaiParPaire(mesures) {
 }
 
 /**
- * Efficacité individuelle (Option B) :
- * - en tant que relayé (part arrêté)
- * - en tant que relayeur (arrive lancé)
- * Basée sur le meilleur essai de chaque paire.
+ * Efficacité individuelle (Option B)
+ * @param {Array} mesures - [{ relayeLettre, relayeurLettre, score, ... }]
+ * @param {Array} membres - [{ lettre, sexe }]
  */
 export function calculerEfficaciteIndividuelle(mesures, membres) {
     const efficacite = {};
     membres.forEach(m => {
-        efficacite[m.id] = {
+        efficacite[m.lettre] = {
             membre: m,
             scoresCommeRelaye: [],
             scoresCommeRelayeur: [],
@@ -135,25 +119,20 @@ export function calculerEfficaciteIndividuelle(mesures, membres) {
         };
     });
 
-    // On se base sur les meilleurs essais par paire
     const meilleur = getMeilleurEssaiParPaire(mesures);
 
     Object.values(meilleur).forEach(m => {
-        if (efficacite[m.relayeId]) {
-            efficacite[m.relayeId].scoresCommeRelaye.push(m.score);
+        if (efficacite[m.relayeLettre]) {
+            efficacite[m.relayeLettre].scoresCommeRelaye.push(m.score);
         }
-        if (efficacite[m.relayeurId]) {
-            efficacite[m.relayeurId].scoresCommeRelayeur.push(m.score);
+        if (efficacite[m.relayeurLettre]) {
+            efficacite[m.relayeurLettre].scoresCommeRelayeur.push(m.score);
         }
     });
 
     Object.values(efficacite).forEach(eff => {
-        if (eff.scoresCommeRelaye.length > 0) {
-            eff.moyenneCommeRelaye = moy(eff.scoresCommeRelaye);
-        }
-        if (eff.scoresCommeRelayeur.length > 0) {
-            eff.moyenneCommeRelayeur = moy(eff.scoresCommeRelayeur);
-        }
+        if (eff.scoresCommeRelaye.length > 0) eff.moyenneCommeRelaye = moy(eff.scoresCommeRelaye);
+        if (eff.scoresCommeRelayeur.length > 0) eff.moyenneCommeRelayeur = moy(eff.scoresCommeRelayeur);
         const tous = [...eff.scoresCommeRelaye, ...eff.scoresCommeRelayeur];
         eff.moyenneGlobale = tous.length > 0 ? moy(tous) : null;
     });
@@ -161,9 +140,6 @@ export function calculerEfficaciteIndividuelle(mesures, membres) {
     return efficacite;
 }
 
-/**
- * Compositions les plus efficientes : classement des paires (meilleur essai) par moyenne de score
- */
 export function calculerCompositionsEfficaces(mesures) {
     const parPaire = {};
     mesures.forEach(m => {
@@ -184,9 +160,6 @@ export function calculerCompositionsEfficaces(mesures) {
         .sort((a, b) => b.meilleurScore - a.meilleurScore);
 }
 
-/**
- * Score cumulé d'une équipe (somme des meilleurs essais par paire)
- */
 export function calculerScoreEquipe(mesures) {
     const meilleur = getMeilleurEssaiParPaire(mesures);
     const essais = Object.values(meilleur);
@@ -195,26 +168,6 @@ export function calculerScoreEquipe(mesures) {
     return Math.round(total * 10) / 10;
 }
 
-// ============================================================
-// MATCHING ÉLÈVE / VITESSES
-// ============================================================
-/**
- * Associe les vitesses (Firebase) aux membres d'un groupe
- */
-export function enrichirMembresAvecVitesses(membres, vitesses) {
-    return membres.map(m => {
-        const v = vitesses[m.id] || {};
-        return {
-            ...m,
-            vArret: v.arret || null,
-            vLance: v.lance || null
-        };
-    });
-}
-
-// ============================================================
-// UTILITAIRES
-// ============================================================
 export function formatScore(score) {
     if (score === null || score === undefined) return '--';
     const signe = score >= 5 ? '+' : '';

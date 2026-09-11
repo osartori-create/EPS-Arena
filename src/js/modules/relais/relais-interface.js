@@ -1,21 +1,16 @@
 // src/js/modules/relais/relais-interface.js
-// UI Professeur : groupes affinitaires, réglages, import CSV, transmission
+// UI Professeur : groupes, réglages, import CSV, transmission
+// ⚠️ RGPD : seules les lettres (a,b,c) et le sexe transitent sur Firebase.
+// Le mapping nom ↔ code reste dans localStorage (prof uniquement).
 
-import { db, ref, set, onValue, remove } from '../../core/firebase-service.js';
+import { db, ref, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
-import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
+import { getCurrentClasse, setLocalMapping, getLocalMapping } from '../../core/live-engine.js';
 import { getLettre } from './relais-core.js';
 
-// ============================================================
-// ÉTAT
-// ============================================================
 let currentClasse = '';
 let sortableInstances = [];
-let pendingCSVData = null;
 
-// ============================================================
-// CLÉ DE STOCKAGE
-// ============================================================
 function getStorageKey(classe) {
     return `eps_arena_relais_groupes_${classe}`;
 }
@@ -47,7 +42,6 @@ export function initRelaisInterface() {
     container.appendChild(createHeader());
     container.appendChild(createBody());
 
-    // Restaurer les valeurs sauvegardées
     const savedNbGroupes = localStorage.getItem(`eps_arena_relais_nb_groupes_${currentClasse}`) || 5;
     const savedTaille = localStorage.getItem(`eps_arena_relais_taille_${currentClasse}`) || 3;
     const savedMode = localStorage.getItem(`eps_arena_relais_mode_${currentClasse}`) || 'essai';
@@ -128,6 +122,11 @@ function createHeader() {
             🌱 Mode ESSAI — les élèves peuvent tester sans conséquence
         </div>
 
+        <div class="bg-slate-900 border border-slate-700 rounded-xl p-3 mb-4 text-[11px] text-slate-400">
+            🔒 <strong class="text-emerald-400">RGPD :</strong> seules les lettres (a, b, c) et le sexe sont transmises sur Firebase.
+            Le nom des élèves reste sur cet appareil (mapping local).
+        </div>
+
         <button onclick="window.relaisTransmettre()" 
                 class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-base uppercase tracking-widest text-white border-4 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-transform">
             📡 Transmettre aux iPads Élèves
@@ -137,9 +136,6 @@ function createHeader() {
     return div;
 }
 
-// ============================================================
-// CORPS (Réserve + Groupes)
-// ============================================================
 function createBody() {
     const div = document.createElement('div');
     div.className = 'bg-slate-800 p-5 rounded-2xl border border-slate-700';
@@ -211,12 +207,10 @@ window.relaisGenererGroupes = async function() {
     const tailleCible = parseInt(document.getElementById('relaisTailleGroupe')?.value) || 3;
     const nbPlots = parseInt(document.getElementById('relaisNbPlots')?.value) || 14;
 
-    // Sauvegarder les paramètres
     localStorage.setItem(`eps_arena_relais_nb_groupes_${activeClasse}`, nbGroupes);
     localStorage.setItem(`eps_arena_relais_taille_${activeClasse}`, tailleCible);
     localStorage.setItem(`eps_arena_relais_nb_plots_${activeClasse}`, nbPlots);
 
-    // Créer la grille
     const grid = document.getElementById('relaisGroupesGrid');
     if (!grid) return;
 
@@ -234,10 +228,8 @@ window.relaisGenererGroupes = async function() {
     }
     grid.innerHTML = html;
 
-    // Remplir la réserve
     await populateReserve(eleves);
 
-    // Init sortable
     setTimeout(() => initSortable(), 100);
     saveAffectations();
     alert(`✅ ${nbGroupes} groupes créés (taille cible : ${tailleCible}). Glissez les élèves !`);
@@ -301,9 +293,6 @@ function initSortable() {
     });
 }
 
-// ============================================================
-// LETTRES a, b, c, d...
-// ============================================================
 function updateLettres() {
     document.querySelectorAll('.groupe-members').forEach(groupeEl => {
         const children = groupeEl.querySelectorAll('[data-id]');
@@ -318,16 +307,13 @@ function updateLettres() {
 }
 
 // ============================================================
-// SAUVEGARDE
+// SAUVEGARDE / CHARGEMENT
 // ============================================================
 function saveAffectations() {
     const activeClasse = getCurrentClasse();
     if (!activeClasse) return;
 
-    const data = {
-        groupes: [],
-        reserve: []
-    };
+    const data = { groupes: [], reserve: [] };
 
     document.querySelectorAll('#relaisReserveGarcons [data-id], #relaisReserveFilles [data-id]').forEach(el => {
         data.reserve.push(el.dataset.id);
@@ -349,8 +335,15 @@ function loadAffectations() {
     if (!activeClasse) return;
 
     const data = JSON.parse(localStorage.getItem(getStorageKey(activeClasse)) || 'null');
-    if (!data) {
-        // Pas d'affectations sauvegardées : générer les groupes par défaut
+
+    // ✅ Si aucune affectation → grille par défaut + réserve remplie automatiquement
+    if (!data || !data.groupes || data.groupes.length === 0) {
+        console.log('[Relais] Aucune affectation → génération automatique');
+        setTimeout(() => {
+            if (typeof window.relaisGenererGroupes === 'function') {
+                window.relaisGenererGroupes();
+            }
+        }, 150);
         return;
     }
 
@@ -375,7 +368,6 @@ function loadAffectations() {
     }
     grid.innerHTML = html;
 
-    // Replacer les élèves
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     const placedIds = new Set();
 
@@ -391,7 +383,6 @@ function loadAffectations() {
         });
     });
 
-    // Replacer la réserve
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
     const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
     const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
@@ -414,7 +405,7 @@ function loadAffectations() {
 }
 
 // ============================================================
-// STYLE DU BANDEAU
+// BANDEAU MODE
 // ============================================================
 window.relaisUpdateModeStyle = function() {
     const mode = document.getElementById('relaisMode')?.value || 'essai';
@@ -429,7 +420,6 @@ window.relaisUpdateModeStyle = function() {
         banner.innerHTML = '🌱 Mode ESSAI — les élèves peuvent tester sans conséquence';
     }
 
-    // Sauvegarder
     const activeClasse = getCurrentClasse();
     if (activeClasse) {
         localStorage.setItem(`eps_arena_relais_mode_${activeClasse}`, mode);
@@ -437,7 +427,7 @@ window.relaisUpdateModeStyle = function() {
 };
 
 // ============================================================
-// IMPORT CSV iDoeceo
+// IMPORT CSV iDoeceo (stocke les vitesses par eleveId côté prof)
 // ============================================================
 window.relaisImportCSV = function() {
     const activeClasse = getCurrentClasse();
@@ -468,29 +458,18 @@ function importCSVFile(file, classe) {
                 const rows = result.data;
                 if (rows.length < 2) return alert('Fichier vide ou invalide.');
 
-                // Détection des colonnes
                 const header = rows[0].map(h => (h || '').toLowerCase().trim());
                 let idxNom = -1, idxArret = -1, idxLance = -1;
 
                 header.forEach((h, i) => {
-                    if (idxNom === -1 && (h.includes('nom') || h.includes('prénom') || h.includes('prenom') || h === '')) idxNom = i;
+                    if (h.includes('nom') || h.includes('prénom') || h.includes('prenom')) idxNom = i;
                     if (h.includes('arrêt') || h.includes('arret')) idxArret = i;
                     if (h.includes('lancé') || h.includes('lance')) idxLance = i;
                 });
 
-                // Fallback : si le nom n'est pas trouvé, on prend la 1ère colonne non vide
-                if (idxNom === -1) {
-                    for (let i = 0; i < header.length; i++) {
-                        if (header[i] && !header[i].includes('arrêt') && !header[i].includes('lancé')) {
-                            idxNom = i; break;
-                        }
-                    }
-                }
-
-                if (idxNom === -1 || idxArret === -1 || idxLance === -1) {
-                    alert(`❌ Détection de colonnes impossible.\nColonnes détectées : ${header.join(' | ')}\nNom: ${idxNom}, Arrêt: ${idxArret}, Lancé: ${idxLance}`);
-                    return;
-                }
+                if (idxNom === -1) idxNom = 0;
+                if (idxArret === -1) idxArret = 1;
+                if (idxLance === -1) idxLance = 2;
 
                 const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
                 const vitesses = {};
@@ -505,21 +484,19 @@ function importCSVFile(file, classe) {
                     const lance = parseFloat(row[idxLance]);
                     if (isNaN(arret) || isNaN(lance)) continue;
 
-                    // Matching élève
                     const eleve = matchEleve(nomComplet, eleves);
                     if (!eleve) {
                         console.warn(`Élève non trouvé : ${nomComplet}`);
                         continue;
                     }
 
+                    // ⚠️ Vitesses indexées par eleveId (local uniquement)
                     vitesses[eleve.id] = { arret, lance, timestamp: Date.now() };
                     nbLignes++;
                 }
 
-                // Sauvegarder en localStorage
                 localStorage.setItem(getVitessesKey(classe), JSON.stringify(vitesses));
-
-                alert(`✅ ${nbLignes} vitesse(s) importée(s) depuis le CSV.\n\nElles seront transmises à Firebase lors du clic sur "Transmettre".`);
+                alert(`✅ ${nbLignes} vitesse(s) importée(s) depuis le CSV.`);
             }
         });
     };
@@ -527,32 +504,23 @@ function importCSVFile(file, classe) {
 }
 
 function matchEleve(nomComplet, eleves) {
-    // Format : "Prenom NOM" ou "NOM Prenom"
     const norm = (s) => (s || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const normNomComplet = norm(nomComplet);
     const parts = normNomComplet.split(/\s+/);
 
-    // Essai 1 : match complet (prénom + nom dans l'ordre inverse)
     for (const e of eleves) {
         const nomE = norm(e.nom);
         const prenomE = norm(e.prenom);
-        const combine1 = `${prenomE} ${nomE}`;
-        const combine2 = `${nomE} ${prenomE}`;
-        if (normNomComplet === combine1 || normNomComplet === combine2) {
-            return e;
-        }
+        if (normNomComplet === `${prenomE} ${nomE}` || normNomComplet === `${nomE} ${prenomE}`) return e;
     }
 
-    // Essai 2 : match sur premier mot (prénom) + premier mot du nom
     for (const e of eleves) {
         if (parts.length >= 2) {
             const p1 = parts[0];
             const p2 = parts[parts.length - 1];
             const nomE = norm(e.nom);
             const prenomE = norm(e.prenom);
-            if ((p1 === prenomE && p2 === nomE) || (p1 === nomE && p2 === prenomE)) {
-                return e;
-            }
+            if ((p1 === prenomE && p2 === nomE) || (p1 === nomE && p2 === prenomE)) return e;
         }
     }
 
@@ -599,7 +567,6 @@ window.relaisImportConfig = function(event) {
             if (data.mode) localStorage.setItem(`eps_arena_relais_mode_${classe}`, data.mode);
             if (data.nbPlots) localStorage.setItem(`eps_arena_relais_nb_plots_${classe}`, data.nbPlots);
 
-            // Changer de classe si nécessaire
             const select = document.getElementById('selectClasse');
             if (select && select.value !== classe) {
                 select.value = classe;
@@ -617,7 +584,7 @@ window.relaisImportConfig = function(event) {
 };
 
 // ============================================================
-// TRANSMISSION FIREBASE
+// TRANSMISSION FIREBASE (RGPD-COMPLIANT)
 // ============================================================
 export async function transmettreRelaisConfig() {
     const activeClasse = getCurrentClasse();
@@ -626,7 +593,6 @@ export async function transmettreRelaisConfig() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const basePath = `etablissements/0680013V/profs/${profCode}/${activeClasse}/relais`;
 
-    // Récupérer les groupes
     const affectations = JSON.parse(localStorage.getItem(getStorageKey(activeClasse)) || '{}');
     if (!affectations.groupes || affectations.groupes.length === 0) {
         return alert('Générez d\'abord les groupes.');
@@ -636,7 +602,9 @@ export async function transmettreRelaisConfig() {
     const mode = document.getElementById('relaisMode')?.value || 'essai';
     const nbPlots = parseInt(document.getElementById('relaisNbPlots')?.value) || 14;
 
-    // Construire la structure
+    // ============================================================
+    // CONFIG ANONYME (RGPD)
+    // ============================================================
     const configData = {
         activite: 'relais',
         mode: mode,
@@ -644,6 +612,7 @@ export async function transmettreRelaisConfig() {
         groupes: {}
     };
 
+    // Mapping local : prof uniquement. Format : { "504_0_a": "DUPONT_P", ... }
     const localMapping = {};
 
     affectations.groupes.forEach((ids, idx) => {
@@ -651,13 +620,12 @@ export async function transmettreRelaisConfig() {
             const eleve = eleves.find(e => e.id === id);
             if (!eleve) return null;
             const lettre = getLettre(i);
+            // ✅ Mapping conservé EN LOCAL uniquement
             localMapping[`${activeClasse}_${idx}_${lettre}`] = id;
+            // ✅ Données anonymes uniquement
             return {
-                id: id,
                 lettre: lettre,
-                prenom: eleve.prenom,
-                nom: eleve.nom,
-                sexe: eleve.sexe
+                sexe: eleve.sexe || ''
             };
         }).filter(Boolean);
 
@@ -669,25 +637,43 @@ export async function transmettreRelaisConfig() {
         }
     });
 
-    setLocalMapping(activeClasse, localMapping);
+    // Fusionner avec le mapping existant (pour ne pas écraser d'autres activités)
+    const existingMapping = getLocalMapping(activeClasse) || {};
+    const mergedMapping = { ...existingMapping, ...localMapping };
+    setLocalMapping(activeClasse, mergedMapping);
+
+    // ============================================================
+    // VITESSES ANONYMES
+    // ============================================================
+    const vitessesLocales = JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}');
+    const vitessesFirebase = {};
+
+    affectations.groupes.forEach((ids, idx) => {
+        ids.forEach((id, i) => {
+            const lettre = getLettre(i);
+            const v = vitessesLocales[id];
+            if (v && v.arret && v.lance) {
+                // ✅ Code anonyme : "0_a", "0_b", ...
+                vitessesFirebase[`${idx}_${lettre}`] = {
+                    arret: v.arret,
+                    lance: v.lance,
+                    timestamp: v.timestamp || Date.now()
+                };
+            }
+        });
+    });
 
     try {
-        // 1. Config principale (relais)
         await set(ref(db, `${basePath}/config`), configData);
-
-        // 2. Config d'activité (pour que le kiosque détecte l'activité)
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/${activeClasse}/config`), { activite: 'relais' });
 
-        // 3. Vitesses importées (depuis CSV local)
-        const vitesses = JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}');
-        if (Object.keys(vitesses).length > 0) {
-            await set(ref(db, `${basePath}/vitesses`), vitesses);
+        if (Object.keys(vitessesFirebase).length > 0) {
+            await set(ref(db, `${basePath}/vitesses`), vitessesFirebase);
         }
 
-        // 4. Marquer la classe comme active
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/active_classes/${activeClasse}`), true);
 
-        alert('✅ Configuration Relais transmise aux iPads !');
+        alert(`✅ Configuration Relais transmise (${Object.keys(vitessesFirebase).length} vitesses, ${Object.keys(configData.groupes).length} groupes).`);
     } catch (err) {
         console.error(err);
         alert('❌ Erreur lors de la transmission.\nVérifie la console (F12).');
@@ -698,8 +684,4 @@ window.relaisTransmettre = async function() {
     await transmettreRelaisConfig();
 };
 
-// ============================================================
-// EXPOSITION GLOBALE
-// ============================================================
 window.initRelaisInterface = initRelaisInterface;
-window.relaisUpdateModeStyle = window.relaisUpdateModeStyle;
