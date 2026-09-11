@@ -2,22 +2,22 @@
 // Logique métier commune au module Relais
 // ⚠️ RGPD : les "membres" ne contiennent JAMAIS de nom/prénom/id.
 
-export const ZONE_MIN = 15;
-export const ZONE_MAX = 28;
-export const NB_PLOTS = ZONE_MAX - ZONE_MIN + 1;
+export const ZONE_MIN = 15;   // Vitesse minimale (km/h)
+export const ZONE_MAX = 28;   // Vitesse maximale (km/h)
+export const NB_PLOTS = ZONE_MAX - ZONE_MIN + 1; // 14
 
+/**
+ * Retourne la vitesse (km/h) quelle que soit la donnée d'entrée :
+ * - Si c'est déjà une vitesse (>= 15), elle est retournée telle quelle (cas import CSV)
+ * - Si c'est une zone 1-14 (cas kiosque élève), elle est convertie
+ */
 export function zoneToVitesse(zone) {
-    if (!zone || zone < 1 || zone > NB_PLOTS) return null;
+    if (!zone) return null;
+    // ✅ Auto-détection : c'est déjà une vitesse en km/h (>= 15)
+    if (zone >= ZONE_MIN) return zone;
+    // C'est une zone 1-14, on convertit
+    if (zone < 1 || zone > NB_PLOTS) return null;
     return ZONE_MIN + (zone - 1);
-}
-
-export function vitesseToZone(vitesse) {
-    return Math.round(vitesse) - ZONE_MIN + 1;
-}
-
-export function formatVitesse(zone) {
-    const v = zoneToVitesse(zone);
-    return v !== null ? `${v} km/h` : '--';
 }
 
 // ============================================================

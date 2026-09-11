@@ -452,7 +452,8 @@ window.relaisKioskSelectCode = function(code) {
 };
 
 window.relaisKioskSetZone = function(type, zone) {
-    state.currentVitesses[type] = zone;
+    // Stocke la vitesse km/h directement (plus cohérent avec l'import CSV)
+    state.currentVitesses[type] = zoneToVitesse(zone);
     render();
 };
 
