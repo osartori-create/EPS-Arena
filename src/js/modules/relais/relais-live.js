@@ -1,16 +1,16 @@
 // src/js/modules/relais/relais-live.js
-// Live prof : efficacité individuelle + compositions efficaces + synthèse équipes
+// Live prof : utilise le mapping local pour afficher les noms
+// ⚠️ Les noms ne viennent JAMAIS de Firebase, uniquement du localStorage prof.
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
-import { getCurrentClasse } from '../../core/live-engine.js';
+import { getCurrentClasse, getLocalMapping } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import {
     calculerEfficaciteIndividuelle,
     calculerCompositionsEfficaces,
     calculerScoreEquipe,
     getMeilleurEssaiParPaire,
-    getScoreCouleur,
-    formatVitesse
+    getScoreCouleur
 } from './relais-core.js';
 
 let currentUnsub = null;
@@ -30,9 +30,7 @@ export function renderRelaisLive() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/relais`;
 
-    let config = null;
-    let mesures = {};
-    let vitesses = {};
+    let config = null, mesures = {}, vitesses = {};
     let loaded = 0;
 
     function checkAndRender() {
@@ -44,6 +42,18 @@ export function renderRelaisLive() {
     onValue(ref(db, `${basePath}/vitesses`), snap => { vitesses = snap.val() || {}; loaded++; checkAndRender(); });
 }
 
+function getEleveIdFromMapping(classe, groupeIdx, lettre) {
+    const mapping = getLocalMapping(classe) || {};
+    return mapping[`${classe}_${groupeIdx}_${lettre}`] || null;
+}
+
+function getNomComplet(classe, eleveId, fallback) {
+    if (!eleveId) return fallback || '?';
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    const e = eleves.find(el => el.id === eleveId);
+    return e ? `${e.prenom} ${e.nom}` : (fallback || eleveId);
+}
+
 async function renderAll(container, classe, config, mesures, vitesses) {
     if (!config || !config.groupes) {
         container.innerHTML = '<p class="text-slate-500 text-center">Configuration non transmise.</p>';
@@ -52,18 +62,18 @@ async function renderAll(container, classe, config, mesures, vitesses) {
 
     const mesuresArray = Object.values(mesures);
 
-    if (mesuresArray.length === 0) {
-        container.innerHTML = '<p class="text-slate-500 text-center">Aucun essai enregistré pour l\'instant.</p>';
-        return;
-    }
-
-    // Bandeau mode
     const mode = config.mode || 'essai';
     const bannerHtml = mode === 'competition'
         ? `<div class="bg-yellow-500 text-black text-center font-black uppercase py-2 rounded-xl mb-4 text-sm">🏆 Mode compétition</div>`
         : `<div class="bg-emerald-500 text-white text-center font-black uppercase py-2 rounded-xl mb-4 text-sm">🌱 Mode essai</div>`;
 
     let html = bannerHtml;
+
+    if (mesuresArray.length === 0) {
+        html += '<p class="text-slate-500 text-center">Aucun essai enregistré pour l\'instant.</p>';
+        container.innerHTML = html;
+        return;
+    }
 
     // ============================================================
     // SYNTHÈSE PAR ÉQUIPE
@@ -80,12 +90,9 @@ async function renderAll(container, classe, config, mesures, vitesses) {
         const nbEssais = Object.keys(meilleur).length;
         const nbPaires = (groupe.membres.length) * (groupe.membres.length - 1);
 
-        equipesData.push({
-            idx, groupe, mesuresGroupe, meilleur, scoreEquipe, nbEssais, nbPaires
-        });
+        equipesData.push({ idx, groupe, mesuresGroupe, scoreEquipe, nbEssais, nbPaires });
     }
 
-    // Trier par score d'équipe
     equipesData.sort((a, b) => b.scoreEquipe - a.scoreEquipe);
 
     for (let i = 0; i < equipesData.length; i++) {
@@ -115,6 +122,7 @@ async function renderAll(container, classe, config, mesures, vitesses) {
 
     for (const eq of equipesData) {
         const groupe = eq.groupe;
+        const groupeIdx = eq.idx;
         const membres = groupe.membres;
         const efficacite = calculerEfficaciteIndividuelle(eq.mesuresGroupe, membres);
         const compositions = calculerCompositionsEfficaces(eq.mesuresGroupe);
@@ -126,16 +134,17 @@ async function renderAll(container, classe, config, mesures, vitesses) {
 
         // Efficacité individuelle
         html += `<div class="mb-4">
-            <p class="text-xs font-bold text-slate-400 uppercase mb-2">Efficacité individuelle (moy. score sur meilleurs essais)</p>
+            <p class="text-xs font-bold text-slate-400 uppercase mb-2">Efficacité individuelle (option B : relayé / relayeur)</p>
             <div class="space-y-1">`;
 
-        // Trier par moyenne globale
         const effArray = Object.values(efficacite)
             .filter(e => e.moyenneGlobale !== null)
             .sort((a, b) => b.moyenneGlobale - a.moyenneGlobale);
 
         for (const eff of effArray) {
-            const photoUrl = await getPhotoUrl(eff.membre.id);
+            const eleveId = getEleveIdFromMapping(classe, groupeIdx, eff.membre.lettre);
+            const nomComplet = getNomComplet(classe, eleveId, eff.membre.lettre);
+            const photoUrl = eleveId ? await getPhotoUrl(eleveId) : null;
             const photoHtml = photoUrl
                 ? `<img src="${photoUrl}" class="w-7 h-7 rounded-full object-cover border border-slate-600">`
                 : `<div class="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs">👤</div>`;
@@ -146,7 +155,7 @@ async function renderAll(container, classe, config, mesures, vitesses) {
                 <div class="flex items-center gap-2 bg-slate-900 p-2 rounded-lg">
                     ${photoHtml}
                     <span class="text-xs font-black text-blue-400 w-6">${eff.membre.lettre}</span>
-                    <span class="text-sm font-bold text-white flex-1">${eff.membre.prenom}</span>
+                    <span class="text-sm font-bold text-white flex-1">${nomComplet}</span>
                     <span class="text-[10px] text-slate-500">relayé:</span>
                     <span class="text-xs font-bold text-yellow-400 w-10 text-right">${eff.moyenneCommeRelaye !== null ? eff.moyenneCommeRelaye.toFixed(1) : '--'}</span>
                     <span class="text-[10px] text-slate-500">relayeur:</span>

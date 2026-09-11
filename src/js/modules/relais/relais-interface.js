@@ -319,13 +319,19 @@ function saveAffectations() {
         data.reserve.push(el.dataset.id);
     });
 
-    document.querySelectorAll('.groupe-members').forEach((el, idx) => {
+    const groupes = [];
+    document.querySelectorAll('.groupe-members').forEach((el) => {
         const membres = [];
         el.querySelectorAll('[data-id]').forEach(child => {
             membres.push(child.dataset.id);
         });
-        data.groupes[idx] = membres;
+        groupes.push(membres);
     });
+
+    // ⚠️ Tronquer les groupes vides en fin de tableau
+    let dernierNonVide = -1;
+    groupes.forEach((m, i) => { if (m.length > 0) dernierNonVide = i; });
+    data.groupes = groupes.slice(0, dernierNonVide + 1);
 
     localStorage.setItem(getStorageKey(activeClasse), JSON.stringify(data));
 }
@@ -603,58 +609,51 @@ export async function transmettreRelaisConfig() {
     const nbPlots = parseInt(document.getElementById('relaisNbPlots')?.value) || 14;
 
     // ============================================================
-    // CONFIG ANONYME (RGPD)
+    // ⚠️ NETTOYAGE : on ne garde QUE les groupes non vides
+    // et on les renumérote de 0 à n-1
     // ============================================================
-    const configData = {
-        activite: 'relais',
-        mode: mode,
-        nbPlots: nbPlots,
-        groupes: {}
-    };
-
-    // Mapping local : prof uniquement. Format : { "504_0_a": "DUPONT_P", ... }
-    const localMapping = {};
-
-    affectations.groupes.forEach((ids, idx) => {
-        const membres = ids.map((id, i) => {
-            const eleve = eleves.find(e => e.id === id);
-            if (!eleve) return null;
-            const lettre = getLettre(i);
-            // ✅ Mapping conservé EN LOCAL uniquement
-            localMapping[`${activeClasse}_${idx}_${lettre}`] = id;
-            // ✅ Données anonymes uniquement
-            return {
-                lettre: lettre,
-                sexe: eleve.sexe || ''
-            };
-        }).filter(Boolean);
-
-        if (membres.length > 0) {
-            configData.groupes[idx] = {
-                numero: idx + 1,
-                membres: membres
-            };
+    const groupesNettoyes = [];
+    affectations.groupes.forEach((ids, originalIdx) => {
+        if (ids && ids.length > 0) {
+            groupesNettoyes.push({ ids, originalIdx });
         }
     });
 
-    // Fusionner avec le mapping existant (pour ne pas écraser d'autres activités)
-    const existingMapping = getLocalMapping(activeClasse) || {};
-    const mergedMapping = { ...existingMapping, ...localMapping };
-    setLocalMapping(activeClasse, mergedMapping);
+    console.log(`[Relais] Nettoyage : ${groupesNettoyes.length} groupes non vides sur ${affectations.groupes.length}`);
 
-    // ============================================================
-    // VITESSES ANONYMES
-    // ============================================================
+    if (groupesNettoyes.length === 0) {
+        return alert('Aucun groupe ne contient d\'élève. Glissez des élèves dans les groupes.');
+    }
+
+    const configData = { activite: 'relais', mode, nbPlots, groupes: {} };
+    const localMapping = {};
     const vitessesLocales = JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}');
     const vitessesFirebase = {};
 
-    affectations.groupes.forEach((ids, idx) => {
-        ids.forEach((id, i) => {
+    // ============================================================
+    // Reconstruction avec index cohérent 0..n-1
+    // ============================================================
+    groupesNettoyes.forEach((g, newIdx) => {
+        const membres = g.ids.map((id, i) => {
+            const eleve = eleves.find(e => e.id === id);
+            if (!eleve) return null;
+            const lettre = getLettre(i);
+            // Mapping local : prof uniquement
+            localMapping[`${activeClasse}_${newIdx}_${lettre}`] = id;
+            // Données anonymes
+            return { lettre, sexe: eleve.sexe || '' };
+        }).filter(Boolean);
+
+        if (membres.length > 0) {
+            configData.groupes[newIdx] = { numero: newIdx + 1, membres };
+        }
+
+        // Vitesses : mêmes clés que les groupes (newIdx)
+        g.ids.forEach((id, i) => {
             const lettre = getLettre(i);
             const v = vitessesLocales[id];
             if (v && v.arret && v.lance) {
-                // ✅ Code anonyme : "0_a", "0_b", ...
-                vitessesFirebase[`${idx}_${lettre}`] = {
+                vitessesFirebase[`${newIdx}_${lettre}`] = {
                     arret: v.arret,
                     lance: v.lance,
                     timestamp: v.timestamp || Date.now()
@@ -663,17 +662,38 @@ export async function transmettreRelaisConfig() {
         });
     });
 
+    console.log(`[Relais] Config finale : ${Object.keys(configData.groupes).length} groupes, ${Object.keys(vitessesFirebase).length} vitesses`);
+    console.log('[Relais] Clés vitesses :', Object.keys(vitessesFirebase));
+
     try {
+        // 1. ⚠️ On écrase complètement l'ancienne config (efface les fantômes)
         await set(ref(db, `${basePath}/config`), configData);
+
+        // 2. Config d'activité pour que le kiosque détecte l'activité
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/${activeClasse}/config`), { activite: 'relais' });
 
+        // 3. Vitesses : on écrase aussi pour éviter les résidus
         if (Object.keys(vitessesFirebase).length > 0) {
             await set(ref(db, `${basePath}/vitesses`), vitessesFirebase);
+        } else {
+            await set(ref(db, `${basePath}/vitesses`), null);
         }
 
+        // 4. Marquer la classe comme active
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/active_classes/${activeClasse}`), true);
 
-        alert(`✅ Configuration Relais transmise (${Object.keys(vitessesFirebase).length} vitesses, ${Object.keys(configData.groupes).length} groupes).`);
+        // 5. Fusionner le mapping local (ne pas écraser d'autres activités)
+        const existingMapping = getLocalMapping(activeClasse) || {};
+        // Nettoyer les anciennes entrées relais (celles qui commencent par un index numérique)
+        const cleanedMapping = {};
+        for (const [k, v] of Object.entries(existingMapping)) {
+            const isRelaisKey = /^\d+_[a-z]$/.test(k.replace(`${activeClasse}_`, ''));
+            if (!isRelaisKey) cleanedMapping[k] = v;
+        }
+        const mergedMapping = { ...cleanedMapping, ...localMapping };
+        setLocalMapping(activeClasse, mergedMapping);
+
+        alert(`✅ Configuration Relais transmise.\n${Object.keys(configData.groupes).length} groupes, ${Object.keys(vitessesFirebase).length} vitesses.`);
     } catch (err) {
         console.error(err);
         alert('❌ Erreur lors de la transmission.\nVérifie la console (F12).');

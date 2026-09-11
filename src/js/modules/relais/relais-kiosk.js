@@ -273,6 +273,10 @@ function renderSelectPaire(container) {
     const membres = groupe.membres;
     const paires = getPairesGroupe(membres);
 
+    // 🔍 DEBUG
+    console.log('[Kiosk Relais] groupeIdx =', groupeIdx, '| membres =', membres.map(m => m.lettre));
+    console.log('[Kiosk Relais] Clés vitesses disponibles =', Object.keys(state.vitesses));
+
     let html = `
         ${getBannerHtml()}
         <div class="space-y-4">
@@ -290,6 +294,13 @@ function renderSelectPaire(container) {
         const vRelaye = state.vitesses[codeRelaye] || {};
         const vRelayeur = state.vitesses[codeRelayeur] || {};
         const pret = vRelaye.arret && vRelayeur.lance;
+
+        // 🔍 DEBUG par paire
+        if (i === 0) {
+            console.log(`[Kiosk Relais] Paire exemple ${p.pairId} :`);
+            console.log(`  codeRelaye = "${codeRelaye}"`, vRelaye);
+            console.log(`  codeRelayeur = "${codeRelayeur}"`, vRelayeur);
+        }
 
         const essaisPaire = Object.values(state.mesures).filter(m =>
             String(m.groupeIdx) === String(groupeIdx) && m.pairId === p.pairId
