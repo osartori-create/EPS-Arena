@@ -184,6 +184,15 @@ function createHeader() {
     };
     right.appendChild(btnOrganisation);
 
+        // ✅ NOUVEAU : Bouton Relais
+    const btnRelais = document.createElement('button');
+    btnRelais.className = 'bg-orange-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-orange-400 active:scale-95';
+    btnRelais.textContent = '🏁 Relais';
+    btnRelais.onclick = async () => {
+        const module = await import('./natation-relais.js');
+        module.openRelaisNatation();
+    };
+    right.appendChild(btnRelais);
     // Bouton Export iDoceo
     const btnExportIdoceo = document.createElement('button');
     btnExportIdoceo.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400 active:scale-95';
