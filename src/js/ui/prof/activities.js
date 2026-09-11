@@ -17,6 +17,7 @@ import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
 import '../../modules/escalade/escalade-prof.js';
 import '../../modules/multi/multi-prof.js';
 import '../../modules/co/co-prof.js';
+import '../../modules/relais/index.js';
 
 let currentDiscipline = 'multi';
 
@@ -64,7 +65,8 @@ export function initActivities() {
             'viewArcathlonSettings',
             'viewEvaluationSettings',
             'viewTournoiSettings',
-            'viewNatationSettings'
+            'viewNatationSettings',
+            'viewRelaisSettings'
         ];
 
         // --- Masquer TOUTES les vues de manière FORCÉE ---
@@ -97,7 +99,8 @@ export function initActivities() {
             'arcathlon': 'viewArcathlonSettings',
             'evaluation': 'viewEvaluationSettings',
             'tournoi': 'viewTournoiSettings',
-            'natation': 'viewNatationSettings'
+            'natation': 'viewNatationSettings',
+            'relais': 'viewRelaisSettings'
         };
 
         const targetId = viewMap[disc];
@@ -176,10 +179,14 @@ export function initActivities() {
             }
         } else if (disc === 'natation') {
             initNatationInterface();
+        } else if (disc === 'relais') {
+            import('../../modules/relais/relais-interface.js')
+                .then(m => m.initRelaisInterface())
+                .catch(err => console.error('Erreur init Relais :', err));
         }
 
         // Mise à jour des boutons de discipline
-        const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation'];
+        const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais'];
         btnIds.forEach(id => {
             const btn = document.getElementById(`btnDisc-${id}`);
             if (btn) {
@@ -195,7 +202,6 @@ export function initActivities() {
     window.addEventListener('escalade-mode-changed', (e) => {
         const mode = e.detail.mode;
         currentDiscipline = (mode === 'bloc') ? 'bloccontest' : 'escalade';
-        // Mettre à jour les modules Live et TV
         import('../../modules/escalade/escalade-live.js').then(module => {
             if (module.setEscaladeMode) module.setEscaladeMode(mode);
         });
@@ -218,6 +224,15 @@ export function initActivities() {
             'natation': () => {
                 initNatationInterface();
                 alert('Liste des élèves mise à jour.');
+            },
+            'relais': async () => {
+                const relaisModule = getModule('relais');
+                if (relaisModule?.generateTeams) {
+                    await relaisModule.generateTeams(activeClasse);
+                } else {
+                    const m = await import('../../modules/relais/relais-interface.js');
+                    if (m.relaisGenererGroupes) window.relaisGenererGroupes();
+                }
             },
             'co': async () => {
                 const coModule = getModule('co');
@@ -289,7 +304,7 @@ export function initActivities() {
         const settingsViews = [
             'viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
             'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings',
-            'viewTournoiSettings', 'viewNatationSettings'
+            'viewTournoiSettings', 'viewNatationSettings', 'viewRelaisSettings'
         ];
         settingsViews.forEach(id => {
             const el = document.getElementById(id);
@@ -313,7 +328,8 @@ export function initActivities() {
                 'evaluation': 'viewEvaluationSettings',
                 'tournoi': 'viewTournoiSettings',
                 'natation': 'viewNatationSettings',
-                'bloccontest': 'viewEscaladeSettings'
+                'bloccontest': 'viewEscaladeSettings',
+                'relais': 'viewRelaisSettings'
             };
             const targetId = map[disc];
             if (targetId) {
@@ -336,6 +352,11 @@ export function initActivities() {
                     multiModule.initProf(classe);
                 }
             }
+            if (disc === 'relais') {
+                import('../../modules/relais/relais-interface.js')
+                    .then(m => m.initRelaisInterface())
+                    .catch(err => console.error('Erreur init Relais :', err));
+            }
             if (disc === 'co') {
                 const coModule = getModule('co');
                 if (coModule?.renderLive) {
@@ -355,7 +376,7 @@ export function initActivities() {
             const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
 
             // Par défaut, on les masque pour les disciplines où ils ne sont pas utiles
-            if (disc === 'escalade' || disc === 'bloccontest' || disc === 'natation') {
+            if (disc === 'escalade' || disc === 'bloccontest' || disc === 'natation' || disc === 'relais') {
                 if (exportCSVBtn) exportCSVBtn.style.display = 'none';
                 if (exportIDoceoBtn) exportIDoceoBtn.style.display = 'none';
             } else {
@@ -388,7 +409,7 @@ export function initActivities() {
                 },
                 'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
                 'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
-                // <-- MODIFICATION TOURNOI LIVE
+                'relais': () => import('../../modules/relais/relais-live.js').then(m => m.renderRelaisLive()),
                 'tournoi': () => {
                     return import('../../modules/tournoi/variantes/elimination/elimination-live.js')
                         .then(module => module.renderEliminationLive())
@@ -421,7 +442,7 @@ export function initActivities() {
                         },
                         'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
                         'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
-                        // <-- MODIFICATION TOURNOI TV
+                        'relais': () => import('../../modules/relais/relais-tv.js').then(m => m.renderRelaisTV()),
                         'tournoi': () => {
                             return import('../../modules/tournoi/variantes/elimination/elimination-tv.js')
                                 .then(module => module.renderEliminationTV())
@@ -450,6 +471,10 @@ export function initActivities() {
         const baseProf = getBaseProf();
 
         const handlers = {
+            'relais': async () => {
+                const m = await import('../../modules/relais/relais-interface.js');
+                await m.transmettreRelaisConfig();
+            },
             'escalade': async () => {
                 const escaladeModule = getModule('escalade');
                 if (escaladeModule?.transmettre) {
@@ -506,15 +531,12 @@ export function initActivities() {
             },
             'badminton': async () => {
                 await transmettreBadmintonConfig();
-                // transmettreBadmintonConfig gère déjà son propre alert
             },
             'arcathlon': async () => {
                 await transmettreArcathlonConfig();
-                // transmettreArcathlonConfig gère déjà son propre alert
             },
             'natation': async () => {
                 await transmettreNatationConfig();
-                // transmettreNatationConfig gère déjà son propre alert
             },
             'tournoi': async () => {
                 const configData = { activite: 'tournoi', mode: window.tournoiMode || 'elimination' };
@@ -537,19 +559,17 @@ export function initActivities() {
     };
 
     // ============================================================
-    // NOUVEAU MODAL DE PURGE (remplace l'ancien prompt)
+    // MODAL DE PURGE
     // ============================================================
     window.openPurgeModal = function() {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         const basePath = `etablissements/0680013V/profs/${profCode}`;
 
-        // Créer le fond du modal
         const overlay = document.createElement('div');
         overlay.id = 'purge-modal-overlay';
         overlay.className = 'fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4';
         overlay.style.overflowY = 'auto';
 
-        // Conteneur du modal
         const modal = document.createElement('div');
         modal.className = 'bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto';
         modal.innerHTML = `
@@ -585,30 +605,23 @@ export function initActivities() {
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
 
-        // Exposer la fonction de fermeture globalement
         window.closePurgeModal = function() {
             const el = document.getElementById('purge-modal-overlay');
             if (el) el.remove();
         };
-        // Fermer en cliquant sur le fond
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) window.closePurgeModal();
         });
 
-        // Charger les données
         loadPurgeData(basePath);
     };
 
-    // ============================================================
-    // CHARGEMENT DES CLASSES ET ACTIVITÉS (pour le modal de purge)
-    // ============================================================
     async function loadPurgeData(basePath) {
         const loading = document.getElementById('purge-loading');
         const content = document.getElementById('purge-content');
         const actions = document.getElementById('purge-actions');
 
         try {
-            // 1. Récupérer la liste des classes sous le prof
             const classesRef = ref(db, basePath);
             const snapshot = await new Promise((resolve) => {
                 onValue(classesRef, resolve, { onlyOnce: true });
@@ -627,7 +640,6 @@ export function initActivities() {
 
             let html = '';
 
-            // Parcourir chaque classe
             for (const className of classNames) {
                 const classPath = `${basePath}/${className}`;
                 const classRef = ref(db, classPath);
@@ -688,9 +700,6 @@ export function initActivities() {
 
             content.innerHTML = html;
 
-            // --- Gestion des événements ---
-
-            // 1. "Sélectionner tout" par classe
             document.querySelectorAll('.classe-select-all').forEach(cb => {
                 cb.addEventListener('change', function() {
                     const classe = this.dataset.classe;
@@ -700,12 +709,10 @@ export function initActivities() {
                 });
             });
 
-            // 2. Mise à jour du bouton principal quand on coche/décoche une activité
             document.querySelectorAll('.activity-select').forEach(cb => {
                 cb.addEventListener('change', updatePurgeButtonState);
             });
 
-            // 3. Bouton "Supprimer les activités sélectionnées"
             document.getElementById('purge-selected-btn').addEventListener('click', function() {
                 const selected = [];
                 document.querySelectorAll('.activity-select:checked').forEach(cb => {
@@ -723,7 +730,6 @@ export function initActivities() {
                 const msg = selected.map(s => `- ${s.classe} / ${s.activity} (${s.mode === 'data' ? 'Données uniquement' : 'Données + Config'})`).join('\n');
                 if (!confirm(`⚠️ Supprimer définitivement :\n${msg}\n\nCette action est irréversible. Confirmer ?`)) return;
 
-                // Exécution
                 let promises = selected.map(({ classe, activity, mode }) => {
                     const activityPath = `${basePath}/${classe}/${activity}`;
                     if (mode === 'full') {
@@ -737,7 +743,6 @@ export function initActivities() {
                     .then(() => {
                         alert('✅ Suppression(s) effectuée(s) avec succès !');
                         window.closePurgeModal();
-                        // On recharge la page pour rafraîchir les affichages
                         location.reload();
                     })
                     .catch(err => {
@@ -746,7 +751,6 @@ export function initActivities() {
                     });
             });
 
-            // 4. Bouton "Supprimer toutes MES classes"
             document.getElementById('purge-all-classes-btn').addEventListener('click', function() {
                 if (!confirm(`⚠️ Supprimer TOUT ton espace (toutes les classes, toutes les activités) ?\nCette action est irréversible.`)) return;
                 if (!confirm(`✅ Dernière confirmation : supprimer définitivement le dossier "${basePath}" ?`)) return;
@@ -763,12 +767,10 @@ export function initActivities() {
                     });
             });
 
-            // 5. Bouton "Supprimer les DONNÉES de toutes mes classes"
             document.getElementById('purge-all-data-only-btn').addEventListener('click', function() {
-                if (!confirm(`⚠️ Supprimer toutes les DONNÉES (résultats, passages, etc.) de toutes vos classes ?\nLes configurations (groupes, terrains, circuits) seront conservées.`)) return;
+                if (!confirm(`⚠️ Supprimer toutes les DONNÉES (résultats, passages, etc.) de toutes vos classes ?\nLes configurations seront conservées.`)) return;
                 if (!confirm(`✅ Dernière confirmation : lancer la suppression massive des données ?`)) return;
 
-                // Récupérer toutes les classes et activités pour faire un deleteDataOnly sur chacune
                 const classesRef = ref(db, basePath);
                 onValue(classesRef, async (snap) => {
                     const data = snap.val() || {};
@@ -802,7 +804,6 @@ export function initActivities() {
                 }, { onlyOnce: true });
             });
 
-            // État initial du bouton
             updatePurgeButtonState();
 
         } catch (err) {
@@ -811,25 +812,19 @@ export function initActivities() {
         }
     }
 
-    // ============================================================
-    // UTILITAIRE : Supprimer les données (sauf config)
-    // ============================================================
     async function deleteDataOnly(activityPath) {
-        // 1. Lire le contenu du dossier activité
         const activityRef = ref(db, activityPath);
         const snap = await new Promise((resolve) => {
             onValue(activityRef, resolve, { onlyOnce: true });
         });
         const content = snap.val() || {};
 
-        // 2. Identifier ce qu'on garde (config) et ce qu'on supprime
         const toDelete = Object.keys(content).filter(key => key !== 'config');
         if (toDelete.length === 0) {
             console.log(`ℹ️ Rien à supprimer dans ${activityPath} (seulement config ou vide).`);
             return;
         }
 
-        // 3. Supprimer chaque sous-dossier un par un
         const promises = toDelete.map(key => {
             const childRef = ref(db, `${activityPath}/${key}`);
             return remove(childRef);
@@ -839,9 +834,6 @@ export function initActivities() {
         console.log(`✅ Données supprimées (config conservée) dans ${activityPath}`);
     }
 
-    // ============================================================
-    // METTRE À JOUR L'ÉTAT DU BOUTON PRINCIPAL (purge)
-    // ============================================================
     function updatePurgeButtonState() {
         const checked = document.querySelectorAll('.activity-select:checked').length;
         const btn = document.getElementById('purge-selected-btn');
@@ -887,7 +879,7 @@ export function initActivities() {
     };
 
     // ============================================================
-    // EXPORTS / IMPORTS (conservés)
+    // EXPORTS / IMPORTS
     // ============================================================
     window.exportCOConfig = exportCOConfig;
     window.importCOConfig = importCOConfig;
@@ -912,9 +904,6 @@ export function initActivities() {
     }, 100);
 }
 
-// ============================================================
-// EXPORT PAR DÉFAUT
-// ============================================================
 export default {
     initActivities
 };

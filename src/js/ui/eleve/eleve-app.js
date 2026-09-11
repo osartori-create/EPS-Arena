@@ -11,6 +11,7 @@ import { initOrientShowKiosk } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 import { initNatationKiosk } from '../../modules/natation/natation-kiosk.js';
+import { initRelaisKiosk, cleanupRelaisKiosk } from '../../modules/relais/relais-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -34,8 +35,9 @@ const multiModule = document.getElementById('multi-module');
 const osModule = document.getElementById('orientshow-module');
 const badmintonModule = document.getElementById('badminton-module');
 const natationModule = document.getElementById('natation-module');
+const relaisModule = document.getElementById('relais-module');
 
-// Éléments CO à masquer pour Natation
+// Éléments CO à masquer pour Natation / Relais
 const codeInfo = document.getElementById('code-info');
 const btnQuit = document.getElementById('btn-quit');
 const btnBackTerrain = document.getElementById('btn-back-terrain');
@@ -88,19 +90,20 @@ export function initApp() {
                     showLoginArcathlon();
                 } else if (config.activite === 'natation') {
                     console.log('[eleve] Activité Natation détectée');
-                    // Masquer les éléments CO
                     masquerElementsCO();
                     showLoginNatation();
+                } else if (config.activite === 'relais') {
+                    console.log('[eleve] Activité Relais détectée');
+                    masquerElementsCO();
+                    showLoginRelais();
                 } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
                     currentConfig = config;
-                    // Réafficher les éléments CO si nécessaire
                     afficherElementsCO();
                     showLogin();
                 } else {
                     showWaiting();
                 }
             } else {
-                // Vérifier si une config Arcathlon existe
                 const arcConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
                 if (arcathlonConfigListener) arcathlonConfigListener();
                 arcathlonConfigListener = onValue(arcConfigRef, (snap) => {
@@ -133,7 +136,7 @@ function masquerElementsCO() {
 function afficherElementsCO() {
     if (codeInfo) codeInfo.style.display = '';
     if (btnQuit) btnQuit.style.display = '';
-    if (btnBackTerrain) btnBackTerrain.style.display = 'none'; // par défaut caché
+    if (btnBackTerrain) btnBackTerrain.style.display = 'none';
 }
 
 // ============================================================
@@ -143,15 +146,11 @@ function showWaiting() {
     loginScreen.classList.add('hidden');
     activityScreen.classList.add('hidden');
     waitingScreen.classList.remove('hidden');
-    // S'assurer que les éléments CO sont visibles par défaut
     afficherElementsCO();
 }
 
 function showLogin() {
-    // 🔽 Revenir en mode normal pour les autres activités
     setContainerWidth(false);
-    
-    // Réafficher les éléments CO
     afficherElementsCO();
     
     loginScreen.classList.remove('hidden');
@@ -176,6 +175,7 @@ function showLogin() {
         multiModule.classList.add('hidden');
         if (osModule) osModule.classList.add('hidden');
         if (natationModule) natationModule.classList.add('hidden');
+        if (relaisModule) relaisModule.classList.add('hidden');
         codeInfo.classList.add('hidden');
         btnQuit.classList.add('hidden');
         btnBackTerrain.classList.remove('hidden');
@@ -198,6 +198,7 @@ function showLogin() {
         if (osModule) osModule.classList.add('hidden');
         badmintonModule.classList.add('hidden');
         if (natationModule) natationModule.classList.add('hidden');
+        if (relaisModule) relaisModule.classList.add('hidden');
         codeInfo.classList.add('hidden');
         btnQuit.classList.add('hidden');
         btnBackTerrain.classList.add('hidden');
@@ -314,6 +315,7 @@ function showLogin() {
                         if (osModule) osModule.classList.add('hidden');
                         badmintonModule.classList.add('hidden');
                         if (natationModule) natationModule.classList.add('hidden');
+                        if (relaisModule) relaisModule.classList.add('hidden');
                         
                         if (osModule) {
                             osModule.classList.remove('hidden');
@@ -363,6 +365,7 @@ function showLogin() {
                     if (osModule) osModule.classList.add('hidden');
                     badmintonModule.classList.add('hidden');
                     if (natationModule) natationModule.classList.add('hidden');
+                    if (relaisModule) relaisModule.classList.add('hidden');
                     import('../../modules/co/co-kiosk.js').then(module => {
                         module.initCoKiosk(selectedClass, code);
                     }).catch(err => {
@@ -379,6 +382,7 @@ function showLogin() {
     // Pour les autres activités (escalade, multi)
     badmintonModule.classList.add('hidden');
     if (natationModule) natationModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
     codeInfo.classList.remove('hidden');
     btnQuit.classList.remove('hidden');
     btnBackTerrain.classList.add('hidden');
@@ -408,17 +412,15 @@ function showLoginNatation() {
     activityScreen.classList.remove('hidden');
     waitingScreen.classList.add('hidden');
     
-    // 🔽 Passer en mode large pour Natation
     setContainerWidth(true);
     
-    // Masquer tous les autres modules
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
     if (osModule) osModule.classList.add('hidden');
     badmintonModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
     
-    // Afficher le module Natation
     if (natationModule) {
         natationModule.classList.remove('hidden');
         natationModule.style.display = 'block';
@@ -427,7 +429,34 @@ function showLoginNatation() {
         console.warn('Conteneur natation-module introuvable');
     }
     
-    // Masquer les éléments CO
+    masquerElementsCO();
+}
+
+// ============================================================
+// SPÉCIAL RELAIS
+// ============================================================
+function showLoginRelais() {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+
+    setContainerWidth(true);
+
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
+
+    if (relaisModule) {
+        relaisModule.classList.remove('hidden');
+        relaisModule.style.display = 'block';
+        initRelaisKiosk(selectedClass, '');
+    } else {
+        console.warn('Conteneur relais-module introuvable');
+    }
+
     masquerElementsCO();
 }
 
@@ -445,6 +474,7 @@ function showLoginArcathlon() {
     if (osModule) osModule.classList.add('hidden');
     badmintonModule.classList.add('hidden');
     if (natationModule) natationModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
 
     codeInfo.classList.add('hidden');
     btnQuit.classList.add('hidden');
@@ -585,15 +615,14 @@ function selectCode(code) {
     loginScreen.classList.add('hidden');
     activityScreen.classList.remove('hidden');
     
-    // Cacher tous les modules par défaut
     escaladeModule.classList.add('hidden');
     coModule.classList.add('hidden');
     multiModule.classList.add('hidden');
     if (osModule) osModule.classList.add('hidden');
     badmintonModule.classList.add('hidden');
     if (natationModule) natationModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
 
-    // Dispatch selon l'activité
     if (currentConfig.activite === 'escalade') {
         escaladeModule.classList.remove('hidden');
         initEscaladeKiosk(selectedClass, selectedCode);
@@ -665,6 +694,14 @@ function selectCode(code) {
             initNatationKiosk(selectedClass);
         }
     }
+    else if (currentConfig.activite === 'relais') {
+        if (relaisModule) {
+            relaisModule.classList.remove('hidden');
+            relaisModule.style.display = 'block';
+            masquerElementsCO();
+            initRelaisKiosk(selectedClass, '');
+        }
+    }
     else {
         multiModule.classList.remove('hidden');
     }
@@ -688,13 +725,11 @@ export function getDB() { return db; }
 export function getConfig() { return currentConfig; }
 
 export function resetToLogin() {
-    // 🔽 Revenir en mode normal
     setContainerWidth(false);
     
-    // Réinitialiser la sélection
     selectedCode = '';
     document.getElementById('selected-code').innerText = '--';
-    // Cacher le conteneur du kiosk si présent
+    
     if (osModule) {
         osModule.style.display = 'none';
         osModule.innerHTML = '';
@@ -703,17 +738,23 @@ export function resetToLogin() {
         natationModule.style.display = 'none';
         natationModule.innerHTML = '';
     }
-    // Nettoyer les écouteurs du kiosk
+    if (relaisModule) {
+        relaisModule.style.display = 'none';
+        relaisModule.innerHTML = '';
+    }
+    
     import('../../modules/eleve/orientshow-kiosk.js').then(module => {
         if (module.cleanupOrientShowKiosk) {
             module.cleanupOrientShowKiosk();
         }
     }).catch(() => {});
-    // Réafficher les éléments CO
+    
+    cleanupRelaisKiosk();
+    
     afficherElementsCO();
-    // Revenir à l'écran de connexion
     showLogin();
 }
+
 // ============================================================
 // GESTION DE LA LARGEUR DU CONTENEUR
 // ============================================================
