@@ -2,6 +2,7 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
+import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
 
 let currentClasse = '';
 let elevesData = [];
@@ -173,6 +174,16 @@ function createHeader() {
     btnBareme.textContent = '⚙️ Barème';
     btnBareme.onclick = ouvrirBaremeModal;
     right.appendChild(btnBareme);
+
+    // ✅ NOUVEAU : Bouton Organisation pédagogique
+    const btnOrganisation = document.createElement('button');
+    btnOrganisation.className = 'bg-pink-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-pink-400 active:scale-95';
+    btnOrganisation.textContent = '🎓 Organisation';
+    btnOrganisation.onclick = async () => {
+        const module = await import('./natation-organisation.js');
+        module.openOrganisationNatation();
+    };
+    right.appendChild(btnOrganisation);
 
     // Bouton Export iDoceo
     const btnExportIdoceo = document.createElement('button');
