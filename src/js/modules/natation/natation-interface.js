@@ -2,7 +2,6 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
-import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
 
 let currentClasse = '';
 let elevesData = [];
