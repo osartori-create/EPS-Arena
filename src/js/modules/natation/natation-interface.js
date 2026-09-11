@@ -295,7 +295,7 @@ window.sauvegarderBareme = function() {
 };
 
 // ============================================================
-// GRILLE DES ÉLÈVES (avec numéro bien visible)
+// GRILLE DES ÉLÈVES
 // ============================================================
 function createGrid() {
     const div = document.createElement('div');
@@ -314,8 +314,10 @@ async function renderGrid(container) {
 
     let html = '';
     for (const eleve of elevesAffiches) {
-        const temps = tempsData[eleve.id] || null;
-        const coups = coupsData[eleve.id] || null;
+        // ✅ CORRECTION : la clé côté Firebase est le NUMÉRO de l'élève
+        const cle = String(eleve.numero);
+        const temps = tempsData[cle] || null;
+        const coups = coupsData[cle] || null;
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { couleur: 'bg-slate-600', label: '--' };
 
@@ -340,7 +342,6 @@ async function renderGrid(container) {
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="font-black text-white text-sm truncate">${eleve.prenom} ${eleve.nom}</div>
-                        <!-- ✅ NUMÉRO BEAUCOUP PLUS GROS ET LISIBLE -->
                         <div class="text-2xl font-black text-yellow-400">N° ${eleve.numero}</div>
                         <div class="flex items-center gap-2 mt-1 flex-wrap">
                             <span class="text-yellow-400 font-bold text-sm">${tempsStr}</span>
@@ -365,14 +366,16 @@ async function renderGrid(container) {
 window.modifierTempsNatation = function(eleveId) {
     const eleve = elevesData.find(e => e.id === eleveId);
     if (!eleve) return;
-    const tempsActuel = tempsData[eleveId] || null;
-    const coupsActuel = coupsData[eleveId] || null;
+    // ✅ CORRECTION : lecture avec le numéro
+    const cle = String(eleve.numero);
+    const tempsActuel = tempsData[cle] || null;
+    const coupsActuel = coupsData[cle] || null;
     
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
     modal.innerHTML = `
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
-            <h3 class="text-xl font-black text-white text-center mb-4">${eleve.prenom} ${eleve.nom}</h3>
+            <h3 class="text-xl font-black text-white text-center mb-4">${eleve.prenom} ${eleve.nom} (N° ${eleve.numero})</h3>
             <div class="space-y-4">
                 <div>
                     <label class="text-xs font-bold text-slate-400 uppercase">Temps (secondes)</label>
@@ -403,6 +406,9 @@ window.fermerEditNatation = function() {
 };
 
 window.sauvegarderEditNatation = function(eleveId) {
+    const eleve = elevesData.find(e => e.id === eleveId);
+    if (!eleve) return;
+
     const tempsInput = document.getElementById('edit-temps');
     const coupsInput = document.getElementById('edit-coups');
     const temps = parseFloat(tempsInput.value.replace(',', '.'));
@@ -418,25 +424,26 @@ window.sauvegarderEditNatation = function(eleveId) {
     }
     
     const tempsMs = Math.round(temps * 1000);
-    sauvegarderTemps(eleveId, tempsMs);
-    sauvegarderCoups(eleveId, coups);
+    // ✅ CORRECTION : sauvegarde avec le numéro
+    sauvegarderTemps(eleve.numero, tempsMs);
+    sauvegarderCoups(eleve.numero, coups);
     window.fermerEditNatation();
 };
 
-function sauvegarderTemps(eleveId, tempsMs) {
+function sauvegarderTemps(numero, tempsMs) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${eleveId}`);
+    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
     set(tempsRef, tempsMs);
 }
 
-function sauvegarderCoups(eleveId, nbCoups) {
+function sauvegarderCoups(numero, nbCoups) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${eleveId}`);
+    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
     set(coupsRef, nbCoups);
 }
 
 // ============================================================
-// EXPORT iDoceo (via service centralisé)
+// EXPORT iDoceo
 // ============================================================
 function exportNatationIDoceo() {
     const classe = currentClasse || getCurrentClasse();
@@ -452,8 +459,10 @@ function exportNatationIDoceo() {
     }
     
     const donnees = eleves.map(e => {
-        const temps = tempsData[e.id] || null;
-        const coups = coupsData[e.id] || null;
+        // ✅ CORRECTION : lecture avec le numéro
+        const cle = String(e.numero);
+        const temps = tempsData[cle] || null;
+        const coups = coupsData[cle] || null;
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
         
@@ -486,7 +495,6 @@ window.exportNatationIDoceo = exportNatationIDoceo;
 // ============================================================
 // TRANSMISSION FIREBASE
 // ============================================================
-// Dans transmettreNatationConfig
 export async function transmettreNatationConfig() {
     const classe = currentClasse || getCurrentClasse();
     if (!classe) return alert('Sélectionnez une classe.');
@@ -495,8 +503,14 @@ export async function transmettreNatationConfig() {
     const baseProf = `etablissements/0680013V/profs/${profCode}`;
     const distance = parseInt(document.getElementById('natation-distance')?.value) || 25;
 
-    // ✅ Plus de mapping envoyé à Firebase
-    // On conserve seulement la config (distance + nombre d'élèves)
+    // ✅ On conserve le mapping local : il permet au prof de retrouver un élève
+    // à partir de son numéro (au cas où l'ordre change côté iPad)
+    const localMapping = {};
+    elevesData.forEach(e => {
+        localMapping[`${classe}_${e.numero}`] = e.id;
+    });
+    localStorage.setItem(`eps_arena_local_mapping_${classe}`, JSON.stringify(localMapping));
+
     const configData = {
         activite: 'natation',
         distance: distance,

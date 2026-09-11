@@ -91,8 +91,12 @@ export function renderNatationLive() {
     let tempsData = {};
     let coupsData = {};
     let historiqueData = {};
-    const mapping = getLocalMapping(currentClasse) || {};
+
+    // ✅ CORRECTION : on trie la liste des élèves comme le prof pour retrouver par numéro
     const eleves = getExistingEleves(currentClasse);
+    const elevesTries = [...eleves].sort((a, b) =>
+        a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
+    );
 
     async function render() {
         if (Object.keys(tempsData).length === 0 && Object.keys(coupsData).length === 0) {
@@ -107,8 +111,9 @@ export function renderNatationLive() {
             if (seenNumeros.has(numero)) continue;
             seenNumeros.add(numero);
 
-            const eleveId = mapping[`${currentClasse}_${numero}`];
-            const eleve = eleves.find(e => e.id === eleveId);
+            // ✅ CORRECTION : retrouver l'élève par son numéro (index dans la liste triée)
+            const index = parseInt(numero) - 1;
+            const eleve = elevesTries[index];
             if (!eleve) continue;
 
             const coups = coupsData[numero] || null;
@@ -244,10 +249,11 @@ export function renderNatationLive() {
         }
         const historiqueUnique = Array.from(uniqueMap.values()).sort((a, b) => a.timestamp - b.timestamp);
 
-        const eleveId = (getLocalMapping(currentClasse) || {})[`${currentClasse}_${numero}`];
-        const eleve = getExistingEleves(currentClasse).find(e => e.id === eleveId);
+        // ✅ CORRECTION : retrouver l'élève par numéro
+        const index = parseInt(numero) - 1;
+        const eleve = elevesTries[index];
         if (!eleve) {
-            alert('Élève non trouvé dans le mapping local.');
+            alert('Élève non trouvé dans la liste triée.');
             return;
         }
 
@@ -365,7 +371,6 @@ export function renderNatationLive() {
             ]).then(() => {
                 alert('✅ Données mises à jour !');
                 modal.remove();
-                render();
             }).catch(err => {
                 console.error('Erreur sauvegarde :', err);
                 alert('❌ Erreur lors de la sauvegarde.');
@@ -414,8 +419,6 @@ export function renderNatationLive() {
                 </div>
             `;
             document.body.appendChild(modal);
-            
-            window._essaiModifieRef = { numero, index, historiqueRef };
             
         }, { onlyOnce: true });
     };
