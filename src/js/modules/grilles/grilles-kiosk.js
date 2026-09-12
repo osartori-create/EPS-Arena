@@ -222,13 +222,18 @@ function renderConfirmation() {
             <div class="text-6xl mb-4">✅</div>
             <h2 class="text-2xl font-black text-white">Auto-évaluation enregistrée !</h2>
             <p class="text-slate-400 text-sm">Ton prof verra tes réponses de manière anonyme.</p>
+
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mt-4">
+                <p class="text-sm text-slate-400">Code : <span class="text-yellow-400 font-black text-lg">${currentCode}</span></p>
+            </div>
+
             <button onclick="window.grillesKioskRetourCode()"
                     class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-white text-lg active:scale-95 transition-all mt-4">
-                🔄 Nouvelle auto-évaluation
+                🔄 Élève suivant
             </button>
             <button onclick="window.retourMenuGrilles()"
                     class="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-2xl font-black text-sm text-white active:scale-95">
-                ← Retour au menu
+                ← Quitter l'auto-évaluation
             </button>
         </div>
     `;

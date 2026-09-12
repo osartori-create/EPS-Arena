@@ -46,12 +46,16 @@ function renderBibliotheque(container) {
 
     let html = `
         <div class="space-y-4">
-            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
+                        <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
                 <div>
                     <h2 class="text-xl font-black text-blue-400">📋 Bibliothèque de grilles</h2>
                     <p class="text-xs text-slate-400">${grilles.length} grille(s) disponible(s)</p>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="window.grillesVoirAutoEvals()"
+                            class="bg-cyan-600 hover:bg-cyan-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-cyan-400 active:scale-95">
+                        👁️ Voir les auto-évaluations
+                    </button>
                     <button onclick="window.grillesImporterXLSX()"
                             class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400 active:scale-95">
                         📥 Importer XLSX
@@ -622,6 +626,158 @@ window.grillesGenererDonneesTest = async function() {
     }
 
     alert(`✅ Données test générées !\n${nb10s} essais 10s\n${nb2z} essais 2 zones\n\nLes boutons 🤖 Auto devraient maintenant fonctionner.`);
+};
+// ============================================================
+// AUTO-ÉVALUATIONS REÇUES
+// ============================================================
+window.grillesVoirAutoEvals = function() {
+    if (!currentClasse) {
+        alert('Sélectionne une classe.');
+        return;
+    }
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'auto-evals-modal';
+    overlay.className = 'fixed inset-0 bg-black/95 z-50 flex items-start justify-center p-4 overflow-y-auto';
+    overlay.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-5xl my-8">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-2xl font-black text-cyan-400 uppercase">👁️ Auto-évaluations reçues</h2>
+                    <p class="text-xs text-slate-400">Classe ${currentClasse}</p>
+                    <p class="text-[10px] text-amber-400 mt-1">🔒 Données anonymes — codes élèves</p>
+                </div>
+                <button onclick="document.getElementById('auto-evals-modal').remove()" 
+                        class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white">
+                    ✖ Fermer
+                </button>
+            </div>
+
+            <div class="mb-3 flex gap-2 flex-wrap">
+                <button onclick="window.grillesFiltrerAutoEvals('toutes')" id="filtrer-toutes" class="bg-blue-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">Toutes</button>
+                <button onclick="window.grillesFiltrerAutoEvals('Début')" id="filtrer-Début" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Début</button>
+                <button onclick="window.grillesFiltrerAutoEvals('Milieu')" id="filtrer-Milieu" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Milieu</button>
+                <button onclick="window.grillesFiltrerAutoEvals('Fin')" id="filtrer-Fin" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Fin</button>
+            </div>
+
+            <div id="auto-evals-content" class="space-y-3">
+                <p class="text-slate-400 text-center py-8">⏳ Chargement...</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // Écouter Firebase
+    import('../../core/firebase-service.js').then(({ db, ref, onValue }) => {
+        onValue(ref(db, path), (snap) => {
+            const data = snap.val() || {};
+            window._grillesAutoEvalsData = data;
+            window.grillesFiltrerAutoEvals('toutes');
+        });
+    });
+};
+
+window.grillesFiltrerAutoEvals = function(periode) {
+    const data = window._grillesAutoEvalsData || {};
+    const container = document.getElementById('auto-evals-content');
+    if (!container) return;
+
+    // Mettre à jour les boutons
+    ['toutes', 'Début', 'Milieu', 'Fin'].forEach(p => {
+        const btn = document.getElementById(`filtrer-${p}`);
+        if (btn) {
+            btn.className = p === periode
+                ? 'bg-blue-600 px-3 py-1.5 rounded-xl font-black text-xs text-white'
+                : 'bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white';
+        }
+    });
+
+    // Filtrer
+    const all = Object.entries(data).map(([key, val]) => ({ _key: key, ...val }));
+    const filtered = periode === 'toutes' ? all : all.filter(e => e.periode === periode);
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-slate-500 text-center py-8">Aucune auto-évaluation ${periode === 'toutes' ? '' : 'pour la période ' + periode}.</p>`;
+        return;
+    }
+
+    // Grouper par grilleId + periode
+    const groupes = {};
+    filtered.forEach(e => {
+        const key = `${e.grilleId}__${e.periode}`;
+        if (!groupes[key]) groupes[key] = { grilleId: e.grilleId, periode: e.periode, items: [] };
+        groupes[key].items.push(e);
+    });
+
+    // Charger les codes élèves pour mapping
+    const eleves = getExistingEleves(currentClasse);
+    const codeToNom = {};
+    eleves.forEach(e => { codeToNom[String(e.codeAutoEval)] = `${e.prenom} ${e.nom}`; });
+
+    // Trier par timestamp desc
+    Object.values(groupes).forEach(g => g.items.sort((a, b) => b.timestamp - a.timestamp));
+
+    let html = '';
+    Object.values(groupes).forEach(g => {
+        const grille = getGrille(g.grilleId);
+        const titreGrille = grille ? grille.titre : g.grilleId;
+
+        html += `
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-black text-white">${titreGrille}</h3>
+                    <span class="text-xs bg-blue-600 px-2 py-0.5 rounded-full text-white font-bold">${g.periode}</span>
+                </div>
+                <p class="text-xs text-slate-400 mb-3">${g.items.length} réponse(s)</p>
+                <div class="space-y-2 max-h-96 overflow-y-auto">
+        `;
+
+        g.items.forEach(item => {
+            const nom = codeToNom[String(item.code)] || '?';
+            const date = new Date(item.timestamp).toLocaleString('fr-FR', { 
+                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+            });
+
+            // Calcul de la note finale
+            let noteHtml = '';
+            if (grille) {
+                const note = calculerNoteFinale(item.notes, grille.criteres);
+                noteHtml = `<span class="text-yellow-400 font-black">${note.sur100 !== null ? note.sur100 + '/100' : '--'}</span>
+                            <span class="text-emerald-400 font-black ml-2">${note.sur20 !== null ? note.sur20 + '/20' : '--'}</span>`;
+            }
+
+            // Détail des notes par critère
+            const notesDetail = grille ? grille.criteres.map(c => {
+                const val = item.notes[c.id];
+                if (val === undefined) return '';
+                return `<span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded">${c.nom.split('(')[0].substring(0, 15)}: <span class="text-white font-black">${val}</span></span>`;
+            }).join('') : '';
+
+            html += `
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                    <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-cyan-600 text-white font-black text-lg w-10 h-10 rounded-full flex items-center justify-center">${item.code}</span>
+                            <span class="text-sm font-bold text-white">${nom}</span>
+                        </div>
+                        <div class="text-right">
+                            ${noteHtml}
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1 mb-1">${notesDetail}</div>
+                    <div class="text-[10px] text-slate-500 mt-1">${date}</div>
+                </div>
+            `;
+        });
+
+        html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
 };
 
 export function cleanupGrillesInterface() {

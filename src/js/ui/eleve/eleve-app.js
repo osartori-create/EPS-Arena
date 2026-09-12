@@ -180,6 +180,11 @@ function showLogin() {
         codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
         return;
     }
+        // SPÉCIAL GRILLES
+    if (config.activite === 'grilles') {
+        showLoginGrilles();
+        return;
+    }
 
     // SPÉCIAL BADMINTON
     if (config.activite === 'badminton') {
@@ -732,11 +737,18 @@ export function resetToLogin() {
     if (typeof cleanupGrillesKiosk === 'function') cleanupGrillesKiosk();
     if (typeof cleanupRelaisKiosk === 'function') cleanupRelaisKiosk();
 
-    import('../../modules/eleve/orientshow-kiosk.js').then(module => {
+        import('../../modules/eleve/orientshow-kiosk.js').then(module => {
         if (module.cleanupOrientShowKiosk) module.cleanupOrientShowKiosk();
     }).catch(() => {});
 
     afficherElementsCO();
+
+    // ✅ Si on est en auto-évaluation, on rappelle l'écran dédié
+    if (currentConfig && currentConfig.activite === 'grilles') {
+        showLoginGrilles();
+        return;
+    }
+
     showLogin();
 }
 
