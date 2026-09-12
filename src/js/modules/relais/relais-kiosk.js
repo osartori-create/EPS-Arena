@@ -5,8 +5,14 @@
 
 import { db, ref, onValue, push, set } from '../../core/firebase-service.js';
 import {
-    zoneToVitesse, calculerVTheorique, calculerScore, getScoreCouleur, getScoreLabel,
-    getPairesGroupe, NB_PLOTS
+    zoneToVitesse,
+    calculerVTheorique,
+    calculerScore,
+    getScoreCouleur,
+    getScoreLabel,
+    getPairesGroupe,
+    NB_PLOTS,
+    calculerScoreEquipe  // ✅ AJOUTÉ
 } from './relais-core.js';
 
 const state = {
