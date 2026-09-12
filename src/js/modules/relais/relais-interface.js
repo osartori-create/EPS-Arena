@@ -261,7 +261,7 @@ async function populateReserve(eleves) {
 function initSortable() {
     if (typeof Sortable === 'undefined') return;
 
-    sortableInstances.forEach(s => s.destroy());
+    sortableInstances.forEach(s => { try { s.destroy(); } catch (e) {} });
     sortableInstances = [];
 
     const garcons = document.getElementById('relaisReserveGarcons');
@@ -328,21 +328,31 @@ function saveAffectations() {
         groupes.push(membres);
     });
 
-    // ⚠️ Tronquer les groupes vides en fin de tableau
-    let dernierNonVide = -1;
-    groupes.forEach((m, i) => { if (m.length > 0) dernierNonVide = i; });
-    data.groupes = groupes.slice(0, dernierNonVide + 1);
+    // ✅ FIX RADICAL : on ne garde QUE les groupes non vides,
+    // peu importe leur position (début, milieu, fin)
+    data.groupes = groupes.filter(g => g.length > 0);
 
     localStorage.setItem(getStorageKey(activeClasse), JSON.stringify(data));
+    console.log(`[Relais] Save : ${data.groupes.length} groupes non vides, ${data.reserve.length} en réserve`);
 }
 
 function loadAffectations() {
     const activeClasse = getCurrentClasse();
     if (!activeClasse) return;
 
-    const data = JSON.parse(localStorage.getItem(getStorageKey(activeClasse)) || 'null');
+    let data = JSON.parse(localStorage.getItem(getStorageKey(activeClasse)) || 'null');
 
-    // ✅ Si aucune affectation → grille par défaut + réserve remplie automatiquement
+    // ✅ NETTOYAGE AUTO des données polluées (groupes vides au milieu/début)
+    if (data && data.groupes) {
+        const avant = data.groupes.length;
+        data.groupes = data.groupes.filter(g => g && g.length > 0);
+        if (data.groupes.length !== avant) {
+            console.log(`[Relais] 🧹 Nettoyage auto : ${avant} → ${data.groupes.length} groupes`);
+            localStorage.setItem(getStorageKey(activeClasse), JSON.stringify(data));
+        }
+    }
+
+    // Si aucune affectation valide → grille par défaut
     if (!data || !data.groupes || data.groupes.length === 0) {
         console.log('[Relais] Aucune affectation → génération automatique');
         setTimeout(() => {
@@ -374,6 +384,7 @@ function loadAffectations() {
     }
     grid.innerHTML = html;
 
+    // Replacer les élèves
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
     const placedIds = new Set();
 
@@ -389,6 +400,7 @@ function loadAffectations() {
         });
     });
 
+    // Replacer la réserve
     const nonPlaces = eleves.filter(e => !placedIds.has(e.id));
     const garcons = nonPlaces.filter(e => e.sexe === 'M').sort((a, b) => a.nom.localeCompare(b.nom));
     const filles = nonPlaces.filter(e => e.sexe === 'F').sort((a, b) => a.nom.localeCompare(b.nom));
