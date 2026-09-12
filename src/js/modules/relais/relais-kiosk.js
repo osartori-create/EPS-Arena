@@ -84,6 +84,7 @@ function render() {
         case 'select-paire':   renderSelectPaire(container); break;
         case 'saisie-zone':    renderSaisieZone(container); break;
         case 'feedback':       renderFeedback(container); break;
+        case 'classement':     renderClassement(container); break;
     }
 }
 
@@ -99,6 +100,10 @@ function getBannerHtml() {
 // MENU PRINCIPAL
 // ============================================================
 function renderMenu(container) {
+    // Calcul du total global (tous groupes confondus) pour info élève
+    const mesuresArray = Object.values(state.mesures);
+    const totalEssais = mesuresArray.length;
+
     container.innerHTML = `
         ${getBannerHtml()}
         <div class="space-y-4">
@@ -117,6 +122,12 @@ function renderMenu(container) {
                     class="w-full bg-orange-600 hover:bg-orange-500 py-8 rounded-3xl font-black text-2xl text-white active:scale-95 transition-all shadow-xl">
                 🏁 Courir un relais
                 <p class="text-xs font-normal opacity-80 mt-1">Choisir un groupe et une paire</p>
+            </button>
+
+            <button onclick="window.relaisKioskGoTo('classement')" 
+                    class="w-full bg-purple-600 hover:bg-purple-500 py-6 rounded-3xl font-black text-xl text-white active:scale-95 transition-all shadow-xl">
+                🏆 Voir le classement
+                <p class="text-xs font-normal opacity-80 mt-1">${totalEssais} essai${totalEssais > 1 ? 's' : ''} enregistré${totalEssais > 1 ? 's' : ''}</p>
             </button>
 
             <button onclick="window.retourMenuRelais()" 
@@ -237,6 +248,20 @@ function renderSaisieVitesses(container) {
 // ============================================================
 function renderSelectGroupe(container) {
     const groupes = state.config.groupes || {};
+    const mesuresArray = Object.values(state.mesures);
+
+    // Calculer les scores par groupe pour le classement
+    const scoresParGroupe = {};
+    Object.entries(groupes).forEach(([idx, groupe]) => {
+        const mesuresGroupe = mesuresArray.filter(m => String(m.groupeIdx) === String(idx));
+        scoresParGroupe[idx] = calculerScoreEquipe(mesuresGroupe);
+    });
+
+    // Rang de chaque groupe
+    const rangs = {};
+    const sorted = Object.entries(scoresParGroupe).sort((a, b) => b[1] - a[1]);
+    sorted.forEach(([idx], rank) => { rangs[idx] = rank + 1; });
+
     let html = `
         ${getBannerHtml()}
         <div class="space-y-4">
@@ -249,11 +274,17 @@ function renderSelectGroupe(container) {
 
     Object.entries(groupes).forEach(([idx, groupe]) => {
         const membresStr = (groupe.membres || []).map(m => m.lettre).join(', ');
+        const score = scoresParGroupe[idx] || 0;
+        const rang = rangs[idx];
+        const medaille = rang === 1 ? '🥇' : (rang === 2 ? '🥈' : (rang === 3 ? '🥉' : ''));
+
         html += `
             <button onclick="window.relaisKioskSelectGroupe(${idx})"
-                    class="bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-blue-500 p-4 rounded-2xl active:scale-95 transition-all text-left">
+                    class="bg-slate-800 hover:bg-slate-700 border-2 border-slate-700 hover:border-blue-500 p-4 rounded-2xl active:scale-95 transition-all text-left relative">
+                ${medaille ? `<span class="absolute top-2 right-2 text-xl">${medaille}</span>` : ''}
                 <div class="text-2xl font-black text-yellow-400 mb-1">G${groupe.numero || (parseInt(idx) + 1)}</div>
                 <div class="text-xs text-slate-400">Élèves : ${membresStr}</div>
+                <div class="mt-2 text-lg font-black text-emerald-400">${score.toFixed(1)} pts</div>
             </button>
         `;
     });
@@ -273,15 +304,28 @@ function renderSelectPaire(container) {
     const membres = groupe.membres;
     const paires = getPairesGroupe(membres);
 
-    // 🔍 DEBUG
-    console.log('[Kiosk Relais] groupeIdx =', groupeIdx, '| membres =', membres.map(m => m.lettre));
-    console.log('[Kiosk Relais] Clés vitesses disponibles =', Object.keys(state.vitesses));
+    // Score total du groupe
+    const mesuresArray = Object.values(state.mesures);
+    const mesuresGroupe = mesuresArray.filter(m => String(m.groupeIdx) === String(groupeIdx));
+    const scoreGroupe = calculerScoreEquipe(mesuresGroupe);
+
+    // Rang du groupe
+    const scoresTous = {};
+    Object.entries(state.config.groupes).forEach(([idx]) => {
+        const mg = mesuresArray.filter(m => String(m.groupeIdx) === String(idx));
+        scoresTous[idx] = calculerScoreEquipe(mg);
+    });
+    const sortedIdx = Object.entries(scoresTous).sort((a, b) => b[1] - a[1]).map(([idx]) => idx);
+    const rangGroupe = sortedIdx.indexOf(String(groupeIdx)) + 1;
 
     let html = `
         ${getBannerHtml()}
         <div class="space-y-4">
             <div class="flex justify-between items-center">
-                <h2 class="text-xl font-black text-white">Groupe ${groupe.numero}</h2>
+                <div>
+                    <h2 class="text-xl font-black text-white">Groupe ${groupe.numero}</h2>
+                    <p class="text-xs text-slate-400">${rangGroupe}e du classement · ${scoreGroupe.toFixed(1)} pts</p>
+                </div>
                 <button onclick="window.relaisKioskGoTo('select-groupe')" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Retour</button>
             </div>
             <p class="text-slate-400 text-sm">Quel binôme va courir ?</p>
@@ -295,16 +339,7 @@ function renderSelectPaire(container) {
         const vRelayeur = state.vitesses[codeRelayeur] || {};
         const pret = vRelaye.arret && vRelayeur.lance;
 
-        // 🔍 DEBUG par paire
-        if (i === 0) {
-            console.log(`[Kiosk Relais] Paire exemple ${p.pairId} :`);
-            console.log(`  codeRelaye = "${codeRelaye}"`, vRelaye);
-            console.log(`  codeRelayeur = "${codeRelayeur}"`, vRelayeur);
-        }
-
-        const essaisPaire = Object.values(state.mesures).filter(m =>
-            String(m.groupeIdx) === String(groupeIdx) && m.pairId === p.pairId
-        );
+        const essaisPaire = mesuresGroupe.filter(m => m.pairId === p.pairId);
         const meilleur = essaisPaire.length > 0 ? Math.max(...essaisPaire.map(m => m.score)) : null;
 
         html += `
@@ -429,6 +464,71 @@ function renderFeedback(container) {
     `;
 }
 
+// ============================================================
+// CLASSEMENT (accessible aux élèves)
+// ============================================================
+function renderClassement(container) {
+    const groupes = state.config.groupes || {};
+    const mesuresArray = Object.values(state.mesures);
+
+    // Calcul des scores par groupe
+    const equipes = Object.entries(groupes).map(([idx, groupe]) => {
+        const mg = mesuresArray.filter(m => String(m.groupeIdx) === String(idx));
+        return {
+            idx,
+            groupe,
+            score: calculerScoreEquipe(mg),
+            nbEssais: mg.length
+        };
+    }).sort((a, b) => b.score - a.score);
+
+    const scoreMax = Math.max(...equipes.map(e => e.score), 1);
+
+    let html = `
+        ${getBannerHtml()}
+        <div class="space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-black text-white">🏆 Classement</h2>
+                <button onclick="window.relaisKioskGoTo('menu')" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Retour</button>
+            </div>
+    `;
+
+    if (equipes.length === 0) {
+        html += `<p class="text-slate-500 text-center py-10">Aucun groupe.</p>`;
+    } else {
+        html += `<div class="space-y-3">`;
+
+        equipes.forEach((eq, i) => {
+            const pct = (eq.score / scoreMax) * 100;
+            const medaille = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
+            const couleur = i === 0 ? 'from-yellow-500 to-yellow-700' : (i === 1 ? 'from-slate-400 to-slate-600' : (i === 2 ? 'from-amber-600 to-amber-800' : 'from-blue-600 to-blue-800'));
+
+            html += `
+                <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700">
+                    <div class="flex items-center gap-3 mb-2">
+                        <span class="text-3xl min-w-[44px]">${medaille}</span>
+                        <div class="flex-1">
+                            <div class="font-black text-white text-lg">Groupe ${eq.groupe.numero}</div>
+                            <div class="text-xs text-slate-400">
+                                ${eq.nbEssais} essai${eq.nbEssais > 1 ? 's' : ''} · 
+                                élèves : ${eq.groupe.membres.map(m => m.lettre).join(', ')}
+                            </div>
+                        </div>
+                        <div class="text-2xl font-black text-yellow-400">${eq.score.toFixed(1)}</div>
+                    </div>
+                    <div class="w-full h-3 bg-slate-900 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r ${couleur} transition-all" style="width: ${pct}%"></div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+}
 // ============================================================
 // ACTIONS
 // ============================================================
