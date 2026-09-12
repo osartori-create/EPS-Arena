@@ -37,12 +37,11 @@ const osModule = document.getElementById('orientshow-module');
 const badmintonModule = document.getElementById('badminton-module');
 const natationModule = document.getElementById('natation-module');
 const relaisModule = document.getElementById('relais-module');
+const grillesModule = document.getElementById('grilles-module');
 
-// Éléments CO à masquer pour Natation / Relais
 const codeInfo = document.getElementById('code-info');
 const btnQuit = document.getElementById('btn-quit');
 const btnBackTerrain = document.getElementById('btn-back-terrain');
-const grillesModule = document.getElementById('grilles-module');
 
 export function initApp() {
     currentConfig = null;
@@ -98,6 +97,10 @@ export function initApp() {
                     console.log('[eleve] Activité Relais détectée');
                     masquerElementsCO();
                     showLoginRelais();
+                } else if (config.activite === 'grilles') {
+                    console.log('[eleve] Activité Auto-évaluation détectée');
+                    masquerElementsCO();
+                    showLoginGrilles();
                 } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
                     currentConfig = config;
                     afficherElementsCO();
@@ -127,7 +130,7 @@ export function initApp() {
 }
 
 // ============================================================
-// FONCTIONS DE MASQUAGE / AFFICHAGE DES ÉLÉMENTS CO
+// MASQUAGE / AFFICHAGE DES ÉLÉMENTS CO
 // ============================================================
 function masquerElementsCO() {
     if (codeInfo) codeInfo.style.display = 'none';
@@ -141,8 +144,19 @@ function afficherElementsCO() {
     if (btnBackTerrain) btnBackTerrain.style.display = 'none';
 }
 
+function masquerTousLesModules() {
+    if (escaladeModule) escaladeModule.classList.add('hidden');
+    if (coModule) coModule.classList.add('hidden');
+    if (multiModule) multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    if (badmintonModule) badmintonModule.classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
+    if (grillesModule) grillesModule.classList.add('hidden');
+}
+
 // ============================================================
-// AFFICHAGE DES ÉCRANS
+// ÉCRANS
 // ============================================================
 function showWaiting() {
     loginScreen.classList.add('hidden');
@@ -166,45 +180,13 @@ function showLogin() {
         codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
         return;
     }
-    // SPÉCIAL AUTO-ÉVALUATION
-if (config.activite === 'grilles') {
-    setContainerWidth(true);
-    loginScreen.classList.add('hidden');
-    activityScreen.classList.remove('hidden');
-    waitingScreen.classList.add('hidden');
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    if (natationModule) natationModule.classList.add('hidden');
-    if (relaisModule) relaisModule.classList.add('hidden');
-    codeInfo.classList.add('hidden');
-    btnQuit.classList.add('hidden');
-    btnBackTerrain.classList.remove('hidden');
-
-    const grillesModule = document.getElementById('grilles-module');
-    if (grillesModule) {
-        grillesModule.classList.remove('hidden');
-        grillesModule.style.display = 'block';
-        initGrillesKiosk(selectedClass);
-    } else {
-        console.error('[eleve] Conteneur grilles-module introuvable !');
-    }
-    return;
-}
 
     // SPÉCIAL BADMINTON
     if (config.activite === 'badminton') {
         setContainerWidth(true);
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
-        escaladeModule.classList.add('hidden');
-        coModule.classList.add('hidden');
-        multiModule.classList.add('hidden');
-        if (osModule) osModule.classList.add('hidden');
-        if (natationModule) natationModule.classList.add('hidden');
-        if (relaisModule) relaisModule.classList.add('hidden');
+        masquerTousLesModules();
         codeInfo.classList.add('hidden');
         btnQuit.classList.add('hidden');
         btnBackTerrain.classList.remove('hidden');
@@ -221,13 +203,7 @@ if (config.activite === 'grilles') {
         setContainerWidth(true);
         loginScreen.classList.add('hidden');
         activityScreen.classList.remove('hidden');
-        escaladeModule.classList.add('hidden');
-        coModule.classList.add('hidden');
-        multiModule.classList.add('hidden');
-        if (osModule) osModule.classList.add('hidden');
-        badmintonModule.classList.add('hidden');
-        if (natationModule) natationModule.classList.add('hidden');
-        if (relaisModule) relaisModule.classList.add('hidden');
+        masquerTousLesModules();
         codeInfo.classList.add('hidden');
         btnQuit.classList.add('hidden');
         btnBackTerrain.classList.add('hidden');
@@ -273,12 +249,7 @@ if (config.activite === 'grilles') {
                             document.getElementById('selected-code').innerText = code;
                             loginScreen.classList.add('hidden');
                             activityScreen.classList.remove('hidden');
-                            escaladeModule.classList.add('hidden');
-                            coModule.classList.add('hidden');
-                            multiModule.classList.add('hidden');
-                            if (osModule) osModule.classList.add('hidden');
-                            badmintonModule.classList.add('hidden');
-                            if (natationModule) natationModule.classList.add('hidden');
+                            masquerTousLesModules();
                             let blocContainer = document.getElementById('bloc-kiosk-container');
                             if (!blocContainer) {
                                 blocContainer = document.createElement('div');
@@ -305,7 +276,7 @@ if (config.activite === 'grilles') {
         return;
     }
 
-    // SPÉCIAL ORIENTSHOW (via CO)
+    // SPÉCIAL ORIENTSHOW
     if (config.activite === 'orientshow') {
         loginScreen.classList.remove('hidden');
         activityScreen.classList.add('hidden');
@@ -338,14 +309,7 @@ if (config.activite === 'grilles') {
                         document.getElementById('selected-code').innerText = code;
                         loginScreen.classList.add('hidden');
                         activityScreen.classList.remove('hidden');
-                        escaladeModule.classList.add('hidden');
-                        coModule.classList.add('hidden');
-                        multiModule.classList.add('hidden');
-                        if (osModule) osModule.classList.add('hidden');
-                        badmintonModule.classList.add('hidden');
-                        if (natationModule) natationModule.classList.add('hidden');
-                        if (relaisModule) relaisModule.classList.add('hidden');
-                        
+                        masquerTousLesModules();
                         if (osModule) {
                             osModule.classList.remove('hidden');
                             osModule.style.display = 'block';
@@ -367,7 +331,7 @@ if (config.activite === 'grilles') {
         return;
     }
 
-    // SPÉCIAL CO (classique)
+    // SPÉCIAL CO
     if (config.activite === 'co') {
         loginScreen.classList.remove('hidden');
         activityScreen.classList.add('hidden');
@@ -387,14 +351,9 @@ if (config.activite === 'grilles') {
                     document.getElementById('selected-code').innerText = code;
                     loginScreen.classList.add('hidden');
                     activityScreen.classList.remove('hidden');
-                    escaladeModule.classList.add('hidden');
+                    masquerTousLesModules();
                     coModule.classList.remove('hidden');
                     coModule.style.display = 'block';
-                    multiModule.classList.add('hidden');
-                    if (osModule) osModule.classList.add('hidden');
-                    badmintonModule.classList.add('hidden');
-                    if (natationModule) natationModule.classList.add('hidden');
-                    if (relaisModule) relaisModule.classList.add('hidden');
                     import('../../modules/co/co-kiosk.js').then(module => {
                         module.initCoKiosk(selectedClass, code);
                     }).catch(err => {
@@ -408,33 +367,8 @@ if (config.activite === 'grilles') {
         return;
     }
 
-    // SPÉCIAL AUTO-ÉVALUATION
-if (config.activite === 'grilles') {
-    setContainerWidth(true);
-    loginScreen.classList.add('hidden');
-    activityScreen.classList.remove('hidden');
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    if (natationModule) natationModule.classList.add('hidden');
-    if (relaisModule) relaisModule.classList.add('hidden');
-    codeInfo.classList.add('hidden');
-    btnQuit.classList.add('hidden');
-    btnBackTerrain.classList.remove('hidden');
-
-    if (grillesModule) {
-        grillesModule.classList.remove('hidden');
-        grillesModule.style.display = 'block';
-        initGrillesKiosk(selectedClass);
-    }
-    return;
-}
-    // Pour les autres activités (escalade, multi)
-    badmintonModule.classList.add('hidden');
-    if (natationModule) natationModule.classList.add('hidden');
-    if (relaisModule) relaisModule.classList.add('hidden');
+    // AUTRES ACTIVITÉS (escalade, multi)
+    masquerTousLesModules();
     codeInfo.classList.remove('hidden');
     btnQuit.classList.remove('hidden');
     btnBackTerrain.classList.add('hidden');
@@ -463,16 +397,10 @@ function showLoginNatation() {
     loginScreen.classList.add('hidden');
     activityScreen.classList.remove('hidden');
     waitingScreen.classList.add('hidden');
-    
+
     setContainerWidth(true);
-    
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    if (relaisModule) relaisModule.classList.add('hidden');
-    
+    masquerTousLesModules();
+
     if (natationModule) {
         natationModule.classList.remove('hidden');
         natationModule.style.display = 'block';
@@ -480,7 +408,7 @@ function showLoginNatation() {
     } else {
         console.warn('Conteneur natation-module introuvable');
     }
-    
+
     masquerElementsCO();
 }
 
@@ -493,13 +421,7 @@ function showLoginRelais() {
     waitingScreen.classList.add('hidden');
 
     setContainerWidth(true);
-
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    if (natationModule) natationModule.classList.add('hidden');
+    masquerTousLesModules();
 
     if (relaisModule) {
         relaisModule.classList.remove('hidden');
@@ -513,6 +435,28 @@ function showLoginRelais() {
 }
 
 // ============================================================
+// SPÉCIAL GRILLES (auto-évaluation)
+// ============================================================
+function showLoginGrilles() {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+
+    setContainerWidth(true);
+    masquerTousLesModules();
+
+    if (grillesModule) {
+        grillesModule.classList.remove('hidden');
+        grillesModule.style.display = 'block';
+        initGrillesKiosk(selectedClass);
+    } else {
+        console.error('[eleve] Conteneur grilles-module introuvable !');
+    }
+
+    masquerElementsCO();
+}
+
+// ============================================================
 // SPÉCIAL ARCATHLON
 // ============================================================
 function showLoginArcathlon() {
@@ -520,14 +464,7 @@ function showLoginArcathlon() {
     loginScreen.classList.add('hidden');
     activityScreen.classList.remove('hidden');
 
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    if (natationModule) natationModule.classList.add('hidden');
-    if (relaisModule) relaisModule.classList.add('hidden');
-
+    masquerTousLesModules();
     codeInfo.classList.add('hidden');
     btnQuit.classList.add('hidden');
     btnBackTerrain.classList.remove('hidden');
@@ -570,10 +507,7 @@ function showLoginArcathlon() {
             const arcConfig = snap.val();
             const equipes = arcConfig?.equipes || {};
             const eqData = equipes[equipeId];
-            if (!eqData) {
-                alert('Équipe introuvable.');
-                return;
-            }
+            if (!eqData) { alert('Équipe introuvable.'); return; }
             const pin = eqData.pin || '000';
             arcModule.innerHTML = `
                 <div class="text-center py-6">
@@ -623,9 +557,7 @@ function showLoginArcathlon() {
                     window.clearPinArcathlon();
                 }
             };
-            window.retourChoixEquipeArcathlon = () => {
-                showLoginArcathlon();
-            };
+            window.retourChoixEquipeArcathlon = () => { showLoginArcathlon(); };
         }, { onlyOnce: true });
     };
 
@@ -633,9 +565,7 @@ function showLoginArcathlon() {
         selectedCode = code;
         arcModule.innerHTML = '<div class="text-center py-10 text-slate-400"><p>Chargement...</p></div>';
         import('../../modules/arcathlon/arcathlon-kiosk.js')
-            .then(m => {
-                m.initArcathlonKiosk(selectedClass, selectedCode);
-            })
+            .then(m => { m.initArcathlonKiosk(selectedClass, selectedCode); })
             .catch(err => {
                 console.error('Erreur chargement Arcathlon :', err);
                 arcModule.innerHTML = `
@@ -659,30 +589,24 @@ function showLoginArcathlon() {
 }
 
 // ============================================================
-// SÉLECTION D'UN CODE (dispatch vers les activités)
+// SÉLECTION D'UN CODE
 // ============================================================
 function selectCode(code) {
     selectedCode = code;
     document.getElementById('selected-code').innerText = code;
     loginScreen.classList.add('hidden');
     activityScreen.classList.remove('hidden');
-    
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    if (natationModule) natationModule.classList.add('hidden');
-    if (relaisModule) relaisModule.classList.add('hidden');
+
+    masquerTousLesModules();
 
     if (currentConfig.activite === 'escalade') {
         escaladeModule.classList.remove('hidden');
         initEscaladeKiosk(selectedClass, selectedCode);
-    } 
+    }
     else if (currentConfig.activite === 'co') {
         coModule.classList.remove('hidden');
         console.log('CO kiosk à implémenter');
-    } 
+    }
     else if (currentConfig.activite === 'orientshow') {
         if (osModule) {
             osModule.classList.remove('hidden');
@@ -694,7 +618,7 @@ function selectCode(code) {
                 osModule.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
             });
         }
-    } 
+    }
     else if (currentConfig.activite === 'arcathlon') {
         let arcModule = document.getElementById('arcathlon-module');
         if (!arcModule) {
@@ -706,9 +630,7 @@ function selectCode(code) {
         arcModule.classList.remove('hidden');
         arcModule.innerHTML = '<div class="text-center py-10 text-slate-400"><p>Chargement...</p></div>';
         import('../../modules/arcathlon/arcathlon-kiosk.js')
-            .then(m => {
-                m.initArcathlonKiosk(selectedClass, selectedCode);
-            })
+            .then(m => { m.initArcathlonKiosk(selectedClass, selectedCode); })
             .catch(err => {
                 console.error('Erreur chargement Arcathlon :', err);
                 arcModule.innerHTML = `
@@ -720,7 +642,7 @@ function selectCode(code) {
                     </div>
                 `;
             });
-    } 
+    }
     else if (currentConfig.activite === 'bloccontest') {
         let blocContainer = document.getElementById('bloc-kiosk-container');
         if (!blocContainer) {
@@ -737,7 +659,7 @@ function selectCode(code) {
             console.error('Erreur chargement Bloc Kiosk :', err);
             blocContainer.innerHTML = `<div class="text-center py-10 text-red-400"><p>❌ Erreur de chargement du module.</p></div>`;
         });
-    } 
+    }
     else if (currentConfig.activite === 'natation') {
         if (natationModule) {
             natationModule.classList.remove('hidden');
@@ -752,6 +674,14 @@ function selectCode(code) {
             relaisModule.style.display = 'block';
             masquerElementsCO();
             initRelaisKiosk(selectedClass, '');
+        }
+    }
+    else if (currentConfig.activite === 'grilles') {
+        if (grillesModule) {
+            grillesModule.classList.remove('hidden');
+            grillesModule.style.display = 'block';
+            masquerElementsCO();
+            initGrillesKiosk(selectedClass);
         }
     }
     else {
@@ -778,10 +708,10 @@ export function getConfig() { return currentConfig; }
 
 export function resetToLogin() {
     setContainerWidth(false);
-    
+
     selectedCode = '';
     document.getElementById('selected-code').innerText = '--';
-    
+
     if (osModule) {
         osModule.style.display = 'none';
         osModule.innerHTML = '';
@@ -795,18 +725,17 @@ export function resetToLogin() {
         relaisModule.innerHTML = '';
     }
     if (grillesModule) {
-    grillesModule.style.display = 'none';
-    grillesModule.innerHTML = '';
-}
-cleanupGrillesKiosk();
+        grillesModule.style.display = 'none';
+        grillesModule.innerHTML = '';
+    }
+
+    if (typeof cleanupGrillesKiosk === 'function') cleanupGrillesKiosk();
+    if (typeof cleanupRelaisKiosk === 'function') cleanupRelaisKiosk();
+
     import('../../modules/eleve/orientshow-kiosk.js').then(module => {
-        if (module.cleanupOrientShowKiosk) {
-            module.cleanupOrientShowKiosk();
-        }
+        if (module.cleanupOrientShowKiosk) module.cleanupOrientShowKiosk();
     }).catch(() => {});
-    
-    cleanupRelaisKiosk();
-    
+
     afficherElementsCO();
     showLogin();
 }
