@@ -101,11 +101,17 @@ function renderBibliotheque(container) {
                             <span class="bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">${nbCriteres} critères</span>
                             ${nbAuto > 0 ? `<span class="bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded-full">${nbAuto} auto</span>` : ''}
                         </div>
-                        <div class="flex gap-2">
+                                                <div class="flex gap-2 flex-wrap">
                             <button onclick="window.grillesUtiliser('${g.id}')"
                                     class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-xl font-black text-xs text-white active:scale-95">
                                 ✏️ Évaluer
                             </button>
+                            <button onclick="window.grillesVoirContenu('${g.id}')"
+                                    class="bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95"
+                                    title="Voir le contenu de la grille">👁️</button>
+                            <button onclick="window.grillesRenommer('${g.id}')"
+                                    class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95"
+                                    title="Renommer la grille">✏️</button>
                             <button onclick="window.grillesExporterVierge('${g.id}')"
                                     class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95"
                                     title="Exporter la grille vierge">⬇️</button>
@@ -936,6 +942,120 @@ window.grillesFiltrerAutoEvals = function(periode) {
     container.innerHTML = html;
 };
 
+// ============================================================
+// VOIR LE CONTENU D'UNE GRILLE
+// ============================================================
+window.grillesVoirContenu = function(id) {
+    const grille = getGrille(id);
+    if (!grille) return;
+
+    // Ordre des niveaux : 4 (gauche) → 1 (droite)
+    const niveauxOrdre = [...NIVEAUX].sort((a, b) => b.valeur - a.valeur);
+
+    const modal = document.createElement('div');
+    modal.id = 'grille-content-modal';
+    modal.className = 'fixed inset-0 bg-black/95 z-50 flex items-start justify-center p-4 overflow-y-auto';
+
+    // Tableau : lignes = critères, colonnes = niveaux
+    let tableHtml = `
+        <table class="w-full text-xs" style="table-layout: fixed; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th class="p-2 text-left bg-slate-800 text-slate-400 uppercase text-[10px] sticky left-0" style="width: 180px;">Critère</th>
+                    ${niveauxOrdre.map(n => `
+                        <th class="p-2 text-center text-white font-black"
+                            style="background-color: ${n.couleur}; width: 20%;">
+                            ${n.label}
+                            <span class="block text-lg">${n.valeur}</span>
+                        </th>
+                    `).join('')}
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    grille.criteres.forEach(c => {
+        tableHtml += `<tr class="border-t border-slate-700">`;
+        tableHtml += `
+            <td class="p-2 bg-slate-800 align-top sticky left-0" style="width: 180px;">
+                <div class="font-black text-white text-[11px] leading-tight">${c.nom}</div>
+                ${c.ponderation > 0 ? `<div class="text-[10px] text-yellow-400 mt-1 font-bold">${c.ponderation}%</div>` : `<div class="text-[10px] text-slate-500 mt-1">équipondéré</div>`}
+                ${c.type === 'auto' ? `<div class="text-[10px] text-emerald-400 mt-1 font-bold">🤖 AUTO</div>` : ''}
+            </td>
+        `;
+        niveauxOrdre.forEach(n => {
+            const desc = (c.niveaux || []).find(x => x.valeur === n.valeur);
+            tableHtml += `
+                <td class="p-2 align-top border-l border-slate-700" style="background-color: ${n.couleur}15;">
+                    <div class="text-slate-200 text-[11px] leading-snug">${desc?.descripteur || '--'}</div>
+                </td>
+            `;
+        });
+        tableHtml += `</tr>`;
+    });
+
+    tableHtml += `</tbody></table>`;
+
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-6xl my-8">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4 flex-wrap gap-2">
+                <div>
+                    <h2 class="text-2xl font-black text-cyan-400 uppercase">👁️ ${grille.titre || grille.id}</h2>
+                    <p class="text-xs text-slate-400">
+                        Activité : <span class="text-blue-400 font-bold">${grille.activite}</span> · 
+                        Niveau : <span class="text-blue-400 font-bold">${grille.niveau}</span> · 
+                        ${grille.criteres.length} critères
+                    </p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="window.grillesRenommer('${grille.id}'); document.getElementById('grille-content-modal').remove();"
+                            class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white">
+                        ✏️ Renommer
+                    </button>
+                    <button onclick="document.getElementById('grille-content-modal').remove()"
+                            class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white">
+                        ✖ Fermer
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                ${tableHtml}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+};
+
+// ============================================================
+// RENOMMER UNE GRILLE
+// ============================================================
+window.grillesRenommer = function(id) {
+    const grille = getGrille(id);
+    if (!grille) return;
+
+    const nouveauTitre = prompt(
+        `Nouveau titre pour cette grille :\n\n(Actuel : "${grille.titre}")`,
+        grille.titre || ''
+    );
+    if (nouveauTitre === null) return;
+    if (!nouveauTitre.trim()) {
+        alert('Le titre ne peut pas être vide.');
+        return;
+    }
+
+    grille.titre = nouveauTitre.trim();
+    sauvegarderGrille(grille);
+
+    // Rafraîchir la vue
+    if (currentGrille && currentGrille.id === id) {
+        currentGrille = getGrille(id);
+        renderPassation(document.getElementById('viewEvaluations'));
+    } else {
+        renderBibliotheque(document.getElementById('viewEvaluations'));
+    }
+    console.log(`[Grilles] Renommée : "${nouveauTitre}"`);
+};
 // ============================================================
 // CLEANUP
 // ============================================================

@@ -20,14 +20,13 @@ export function importerGrilleXLSX(file) {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
 
-                // Prendre la 1ère feuille
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
 
-                // Convertir en tableau 2D
                 const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-                const grille = parserGrille(rows, sheetName);
+                // ✅ On passe le NOM DU FICHIER en priorité, la feuille en fallback
+                const grille = parserGrille(rows, file.name, sheetName);
 
                 if (!grille) {
                     reject(new Error('Format de grille non reconnu.'));
@@ -48,7 +47,7 @@ export function importerGrilleXLSX(file) {
 /**
  * Parse le contenu d'une feuille en grille structurée.
  */
-function parserGrille(rows, sheetName) {
+function parserGrille(rows, fileName, sheetName) {
     const lignes = rows.filter(r => r.some(cell => String(cell).trim() !== ''));
     if (lignes.length < 3) return null;
 
@@ -64,7 +63,6 @@ function parserGrille(rows, sheetName) {
         }
     }
 
-    // Fallback : 4 dernières colonnes
     if (niveaux.length < 4) {
         niveaux.length = 0;
         for (let i = header.length - 4; i < header.length; i++) {
@@ -72,10 +70,8 @@ function parserGrille(rows, sheetName) {
         }
     }
 
-    // ✅ FIX : on assume l'ordre standard 4, 3, 2, 1 de gauche à droite.
-    // On n'essaie PLUS d'extraire un chiffre du header (qui pouvait être 50, 40, 25, 10...)
     const niveauxParses = niveaux.slice(-4).map((n, idx) => {
-        const valeur = 4 - idx;  // 4, 3, 2, 1 selon la position
+        const valeur = 4 - idx;
         const headerLower = n.header.toLowerCase();
         let label;
         if (headerLower.includes('très') || headerLower.includes('tres') || headerLower.includes('excellent')) {
@@ -92,7 +88,7 @@ function parserGrille(rows, sheetName) {
         return { valeur, label, colIndex: n.colIndex };
     });
 
-    // Critères : lignes suivantes
+    // Critères
     const criteres = [];
     for (let i = 1; i < lignes.length; i++) {
         const row = lignes[i];
@@ -121,16 +117,14 @@ function parserGrille(rows, sheetName) {
 
     if (criteres.length === 0) return null;
 
-    const niveauMatch = sheetName.match(/\b(C[1-5]|[3-6]e|6ème|5ème|4ème|3ème)\b/i);
-    const niveau = niveauMatch ? niveauMatch[1] : 'C4';
-
-    const activite = detecterActivite(sheetName);
+    // ✅ Détection depuis le NOM DU FICHIER (priorité) puis la feuille (fallback)
+    const infoFichier = parserNomFichier(fileName) || parserNomFichier(sheetName) || { activite: 'autre', niveau: 'C4' };
 
     const grille = {
-        id: genererIdGrille(activite, niveau),
-        activite: activite,
-        niveau: niveau,
-        titre: sheetName,
+        id: genererIdGrille(infoFichier.activite, infoFichier.niveau),
+        activite: infoFichier.activite,
+        niveau: infoFichier.niveau,
+        titre: infoFichier.titreComplet,
         dateCreation: Date.now(),
         dateImport: Date.now(),
         figee: false,
@@ -139,6 +133,66 @@ function parserGrille(rows, sheetName) {
     };
 
     return grille;
+}
+
+/**
+ * Parse le nom du fichier (ou de la feuille) pour extraire activité + niveau.
+ * Ex : "Rubrique_-_ badminton_4e.xlsx" → { activite: "badminton", niveau: "4e" }
+ * Ex : "Rubrique_-_Escalade_C3.xlsx" → { activite: "escalade", niveau: "C3" }
+ */
+function parserNomFichier(nom) {
+    if (!nom) return null;
+
+    // Enlever l'extension
+    let n = nom.replace(/\.(xlsx?|XLSX?|csv|CSV)$/, '');
+
+    // Enlever le préfixe "Rubrique_-_" ou similaire
+    n = n.replace(/^[Rr]ubrique[-_ ]*/i, '');
+
+    // Remplacer les underscores/tirets par des espaces (sauf pour les patterns C4, 4e, etc.)
+    n = n.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Détecter le niveau (C1-C5 ou 3e-6e)
+    const niveauMatch = n.match(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i);
+    let niveau = 'C4';
+    if (niveauMatch) {
+        niveau = niveauMatch[1];
+        // Normaliser : "6ème" → "6e"
+        if (niveau.toLowerCase().endsWith('ème')) {
+            niveau = niveau.replace(/ème/i, 'e');
+        }
+    }
+
+    // Enlever le niveau du nom pour isoler l'activité
+    let activite = n.replace(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i, '').trim();
+    // Enlever les mots parasites ("sur 10s", "vitesse", etc.)
+    activite = activite.replace(/\b(sur|vitesse|vitesses|relais)\b.*/i, '').trim();
+    activite = activite.split(' ')[0]; // premier mot restant
+
+    activite = activite.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Mapping vers les identifiants standard
+    const map = {
+        'badminton': 'badminton',
+        'escalade': 'escalade',
+        'arcathlon': 'arcathlon',
+        'hand': 'hand',
+        'demifond': 'demi_fond',
+        'demif': 'demi_fond',
+        'natation': 'natation',
+        'relais': 'relais',
+        'co': 'co',
+        'courseorientation': 'co',
+        'volley': 'volley'
+    };
+    activite = map[activite] || activite;
+
+    // Construire un titre propre
+    let titreComplet = n.replace(/\s+/g, ' ').trim();
+    // Capitaliser première lettre
+    titreComplet = titreComplet.charAt(0).toUpperCase() + titreComplet.slice(1);
+
+    return { activite, niveau, titreComplet };
 }
 
 /**
