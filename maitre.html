@@ -61,13 +61,14 @@
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
                 <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
                 <p class="text-xs text-slate-400 w-full">Les noms et photos restent sur cet appareil (IndexedDB).</p>
-                <div class="flex gap-2">
-                    <button onclick="window.openImportModal()" class="btn btn-primary text-xs uppercase">📥 Import iDoceo</button>
-                    <button onclick="document.getElementById('zipFile').click()" class="btn btn-primary text-xs uppercase">📸 Import ZIP Photos</button>
-                    <input type="file" id="zipFile" accept=".zip" class="hidden">
-                    <button onclick="addEleve()" class="btn bg-slate-700 text-xs uppercase border border-slate-500">+ Élève</button>
-                    <button onclick="purgeEleves()" class="btn btn-danger text-xs uppercase">🗑 Purger</button>
-                </div>
+                <div class="flex gap-2 flex-wrap">
+    <button onclick="window.openImportModal()" class="btn btn-primary text-xs uppercase">📥 Import iDoceo</button>
+    <button onclick="document.getElementById('zipFile').click()" class="btn btn-primary text-xs uppercase">📸 Import ZIP Photos</button>
+    <input type="file" id="zipFile" accept=".zip" class="hidden">
+    <button onclick="addEleve()" class="btn bg-slate-700 text-xs uppercase border border-slate-500">+ Élève</button>
+    <button onclick="window.afficherCodesEleves()" class="btn bg-indigo-600 text-xs uppercase border border-indigo-400">🔢 Codes élèves</button>
+    <button onclick="purgeEleves()" class="btn btn-danger text-xs uppercase">🗑 Purger</button>
+</div>
             </div>
             <div id="eleveList" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
         </div>

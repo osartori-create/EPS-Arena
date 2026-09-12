@@ -2,6 +2,7 @@
 import { getPhotoUrl } from '../../../../services/admin-service.js';
 import { getJoueurs, getCurrentClasse, exportTournoiData, importTournoiData } from '../../tournoi-core.js';
 import { ajouterElimination, reinitialiserJoueur, toggleExclure, reinitialiserTournoi, getExclus, initCore } from './elimination-core.js';
+import { getExistingEleves } from '../../../../services/admin-service.js';
 
 let currentClasse = '';
 let showExclus = false;
@@ -32,16 +33,17 @@ async function renderProf() {
     const joueurs = getJoueurs();
     const exclus = getExclus();
 
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    const elevesTries = eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+       const eleves = getExistingEleves(currentClasse);
+    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
-    const codes = elevesTries.map((_, index) => (index + 1).toString());
+    // ✅ Utiliser le codeAutoEval de chaque élève (stable et permanent)
+    const codes = eleves.map(e => e.codeAutoEval).filter(c => c !== undefined && c !== null);
 
     if (codes.length === 0) {
         container.innerHTML = `
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
-                <p class="text-slate-400">Aucun élève dans cette classe.</p>
-                <p class="text-xs text-slate-500 mt-2">Importez d'abord les élèves depuis l'onglet Administration.</p>
+                <p class="text-slate-400">Aucun code élève attribué.</p>
+                <p class="text-xs text-slate-500 mt-2">Va dans Administration → 🔢 Codes élèves pour attribuer les codes.</p>
             </div>
         `;
         return;
@@ -53,7 +55,7 @@ async function renderProf() {
                 <div>
                     <h3 class="font-black text-blue-400 uppercase text-sm">🏆 Tournoi Élimination</h3>
                     <p class="text-xs text-slate-400">Classe : ${currentClasse} (${codes.length} élèves)</p>
-                    <p class="text-[10px] text-slate-500 mt-1">🚫 Cliquer sur "Exclure" pour les absents/inaptes</p>
+                    <p class="text-[10px] text-slate-500 mt-1">🔢 Code élève = codeAutoEval</p>
                 </div>
                 <div class="flex gap-2 flex-wrap">
                     <button onclick="window.tournoiReinitialiser()" class="bg-red-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">🔄 Réinitialiser</button>
@@ -77,9 +79,10 @@ async function renderProf() {
     });
 
     for (const code of sortedCodes) {
-        const index = parseInt(code) - 1;
-        const eleve = elevesTries[index];
+        // ✅ Retrouver l'élève par codeAutoEval
+        const eleve = eleves.find(e => String(e.codeAutoEval) === String(code));
         if (!eleve) continue;
+        // ... suite identique mais utilise eleve au lieu de elevesTries[index]
 
         const info = joueurs[code] || { eliminations: 0 };
         const isExclu = !!exclus[code];

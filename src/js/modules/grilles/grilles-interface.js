@@ -230,7 +230,7 @@ function renderPassation(container) {
                 </tbody>
             </table>
         </div>
-        <div class="flex gap-3 flex-wrap">
+                <div class="flex gap-3 flex-wrap">
             <button onclick="window.grillesSauvegarder()"
                     class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-3 rounded-2xl font-black text-white active:scale-95">
                 💾 Sauvegarder les notes
@@ -240,6 +240,18 @@ function renderPassation(container) {
                     ${currentGrille.figee ? 'disabled' : ''}>
                 🔒 ${currentGrille.figee ? 'Déjà figée' : 'Figer la grille'}
             </button>
+            <button onclick="window.grillesActiver()"
+                    class="bg-blue-600 hover:bg-blue-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95 border-2 border-blue-400">
+                📡 Activer pour les iPads
+            </button>
+            <button onclick="window.grillesDesactiver()"
+                    class="bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
+                ⏹ Désactiver
+            </button>
+            <button onclick="window.grillesGenererDonneesTest()"
+                    class="bg-pink-600 hover:bg-pink-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
+                🧪 Générer données test
+            </button>
             <button onclick="window.grillesExporterNotes()"
                     class="bg-indigo-600 hover:bg-indigo-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
                 📥 Export notes iDoeceo
@@ -248,10 +260,6 @@ function renderPassation(container) {
                     class="bg-purple-600 hover:bg-purple-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
                 📥 Export rubrique iDoeceo
             </button>
-            <button onclick="window.grillesActiver()"
-        class="bg-emerald-600 hover:bg-emerald-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95 border-2 border-emerald-400">
-    📡 Activer pour les iPads
-</button>
         </div>
     `;
 
@@ -430,6 +438,174 @@ window.grillesDesactiver = async function() {
     await set(ref(db, path), { actif: false });
     alert('✅ Auto-évaluation désactivée.');
 };
+
+// ============================================================
+// ACTIVATION POUR LES IPADS
+// ============================================================
+window.grillesActiver = async function() {
+    if (!currentGrille) return;
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { db, ref, set } = await import('../../core/firebase-service.js');
+    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
+
+    try {
+        await set(ref(db, path), {
+            actif: true,
+            grilleId: currentGrille.id,
+            periode: currentPeriode,
+            timestamp: Date.now()
+        });
+        // Config activité principale (déclencheur kiosque)
+        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), {
+            activite: 'grilles'
+        });
+        alert(`✅ Auto-évaluation activée pour les iPads.\nGrille : ${currentGrille.titre}\nPériode : ${currentPeriode}`);
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur lors de l\'activation.');
+    }
+};
+
+window.grillesDesactiver = async function() {
+    if (!currentClasse) return;
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { db, ref, set } = await import('../../core/firebase-service.js');
+    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
+
+    try {
+        await set(ref(db, path), { actif: false });
+        alert('✅ Auto-évaluation désactivée.');
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur.');
+    }
+};
+
+// ============================================================
+// GÉNÉRATION DE DONNÉES TEST (pour valider le pré-remplissage)
+// ============================================================
+window.grillesGenererDonneesTest = async function() {
+    if (!currentClasse) {
+        alert('Sélectionne une classe.');
+        return;
+    }
+
+    const eleves = getExistingEleves(currentClasse);
+    if (eleves.length === 0) {
+        alert('Aucun élève dans cette classe.');
+        return;
+    }
+
+    // Vérifier s'il existe déjà des mesures
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { db, ref, set, get } = await import('../../core/firebase-service.js');
+
+    const mesures10sPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
+    const mesures2zPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
+    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/config`;
+
+    // Vérifier la config relais
+    const configSnap = await new Promise(resolve => {
+        const { onValue } = window._fb || {};
+        // Fallback : import direct
+        import('../../core/firebase-service.js').then(m => {
+            m.onValue(m.ref(m.db, configPath), resolve, { onlyOnce: true });
+        });
+    });
+
+    const config = configSnap.val();
+    if (!config || !config.groupes) {
+        alert('⚠️ Aucune configuration Relais trouvée.\nTransmets d\'abord une config Relais (onglet Activités → Relais).');
+        return;
+    }
+
+    if (!confirm(`Générer 3 essais 10s + 3 essais 2 zones par élève ?\n\nClasse : ${currentClasse}\n${eleves.length} élèves\n${Object.keys(config.groupes).length} groupes`)) {
+        return;
+    }
+
+    const { push } = await import('../../core/firebase-service.js');
+    let nb10s = 0, nb2z = 0;
+
+    // Parcourir les groupes et élèves
+    for (const [groupeIdx, groupe] of Object.entries(config.groupes)) {
+        for (const membre of groupe.membres) {
+            const lettre = membre.lettre;
+
+            // 3 essais 10s
+            for (let i = 0; i < 3; i++) {
+                const vTheo = 20 + Math.random() * 5; // entre 20 et 25
+                const ecart = (Math.random() - 0.5) * 4; // -2 à +2
+                const vReelle = Math.round((vTheo + ecart) * 10) / 10;
+                const score = Math.round((5 + ecart) * 10) / 10;
+                const zoneAtteinte = Math.round(vReelle - 14); // zone 1-14
+
+                const mesure = {
+                    sousActivite: 'relais10s',
+                    groupeIdx: parseInt(groupeIdx),
+                    groupeNumero: groupe.numero,
+                    pairId: `${lettre}-${lettre}`,
+                    relayeLettre: lettre,
+                    relayeurLettre: lettre,
+                    zoneAtteinte,
+                    vReelle,
+                    vTheorique: Math.round(vTheo * 10) / 10,
+                    score,
+                    ecart: Math.round(ecart * 10) / 10,
+                    timestamp: Date.now() - (3 - i) * 60000
+                };
+                await push(ref(db, mesures10sPath), mesure);
+                nb10s++;
+            }
+
+            // 3 essais 2 zones
+            for (let i = 0; i < 3; i++) {
+                const vZ1 = 18 + Math.random() * 6;
+                const vZ2 = 18 + Math.random() * 6;
+                const moyenne = (vZ1 + vZ2) / 2;
+                const pct = 60 + Math.random() * 45; // 60 à 105%
+                const vTrans = moyenne * pct / 100;
+
+                // Calcul du score selon les paliers
+                let points = 0;
+                if (pct >= 100) points = 5;
+                else if (pct >= 90) points = 4;
+                else if (pct >= 80) points = 3;
+                else if (pct >= 70) points = 2;
+                else if (pct >= 60) points = 1;
+
+                const mesure = {
+                    sousActivite: 'relais2zones',
+                    groupeIdx: parseInt(groupeIdx),
+                    groupeNumero: groupe.numero,
+                    pairId: `${lettre}-${lettre}`,
+                    relayeLettre: lettre,
+                    relayeurLettre: lettre,
+                    distances: { z1: 20, trans: 10, z2: 20 },
+                    temps: {
+                        z1: Math.round(20000 / vZ1 * 3.6),
+                        trans: Math.round(10000 / vTrans * 3.6),
+                        z2: Math.round(20000 / vZ2 * 3.6)
+                    },
+                    vitesses: {
+                        z1: Math.round(vZ1 * 10) / 10,
+                        trans: Math.round(vTrans * 10) / 10,
+                        z2: Math.round(vZ2 * 10) / 10
+                    },
+                    vMoyenne3z: Math.round(moyenne * 10) / 10,
+                    vTheorique: Math.round(moyenne * 10) / 10,
+                    pourcentageTransmission: Math.round(pct),
+                    score: points,
+                    timestamp: Date.now() - (3 - i) * 60000
+                };
+                await push(ref(db, mesures2zPath), mesure);
+                nb2z++;
+            }
+        }
+    }
+
+    alert(`✅ Données test générées !\n${nb10s} essais 10s\n${nb2z} essais 2 zones\n\nLes boutons 🤖 Auto devraient maintenant fonctionner.`);
+};
+
 export function cleanupGrillesInterface() {
     currentGrille = null;
     currentClasse = '';

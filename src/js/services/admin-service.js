@@ -62,13 +62,76 @@ function normalizeForComparison(str) {
         .toUpperCase();
 }
 
+// ============================================================
+// CODES AUTO-ÉVAL
+// ============================================================
 /**
- * Parse le nom de fichier pour extraire nom, prénom et sexe
+ * Retourne le prochain code numérique libre (jamais réutilisé).
  */
+function getProchainCodeLibre(eleves) {
+    const codesUtilises = new Set(
+        eleves.map(e => parseInt(e.codeAutoEval)).filter(n => !isNaN(n))
+    );
+    let code = 1;
+    while (codesUtilises.has(code)) code++;
+    return code;
+}
+
+/**
+ * Assure que tous les élèves ont un codeAutoEval.
+ * Attribue les codes manquants dans l'ordre alphabétique.
+ * Retourne true si des codes ont été attribués.
+ */
+export function migrerCodesAutoEval(classeName) {
+    const eleves = getExistingEleves(classeName);
+    if (eleves.length === 0) return false;
+
+    const sansCode = eleves.filter(e => e.codeAutoEval === undefined || e.codeAutoEval === null);
+    if (sansCode.length === 0) return false;
+
+    sansCode.sort((a, b) => {
+        const nomA = (a.nom || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const nomB = (b.nom || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const cmp = nomA.localeCompare(nomB);
+        if (cmp !== 0) return cmp;
+        const preA = (a.prenom || '').toUpperCase();
+        const preB = (b.prenom || '').toUpperCase();
+        return preA.localeCompare(preB);
+    });
+
+    sansCode.forEach(e => {
+        e.codeAutoEval = getProchainCodeLibre(eleves);
+    });
+
+    saveEleves(classeName, eleves);
+    console.log(`[Admin] Codes auto-éval attribués à ${sansCode.length} élève(s)`);
+    return true;
+}
+
+/**
+ * Récupère le codeAutoEval d'un élève à partir de son ID.
+ */
+export function getCodeAutoEval(classeName, eleveId) {
+    const eleves = getExistingEleves(classeName);
+    const eleve = eleves.find(e => e.id === eleveId);
+    return eleve ? eleve.codeAutoEval : null;
+}
+
+/**
+ * Récupère un élève à partir de son codeAutoEval.
+ */
+export function getEleveFromCodeAutoEval(classeName, code) {
+    const eleves = getExistingEleves(classeName);
+    return eleves.find(e => String(e.codeAutoEval) === String(code)) || null;
+}
+
+// ============================================================
+// PARSING DES NOMS DE FICHIERS ZIP
+// ============================================================
 function parseZipFileName(fileName) {
     let decoded = decodeAccents(fileName);
     const nameWithoutExt = decoded.replace(/\.[^.]+$/, '');
-    
+
     // 1. Ancien format avec virgule
     let match = nameWithoutExt.match(/^_?(.+),(.+)_([MF])$/i);
     if (match) {
@@ -84,21 +147,20 @@ function parseZipFileName(fileName) {
             cleUnique: `${normalizeForComparison(nomBrut)}_${normalizeForComparison(prenomBrut).charAt(0)}`
         };
     }
-    
-    // 2. Nouveau format : Prénom_Nom_M_302.jpg (ou F)
+
+    // 2. Nouveau format : Prénom_Nom_M_302.jpg
     const parts = nameWithoutExt.split('_');
     if (parts.length < 3) {
         console.warn(`Ignoré (trop peu d'éléments) : ${fileName}`);
         return null;
     }
-    
+
     const prenomBrut = parts[0] || '';
     if (!prenomBrut) {
         console.warn(`Ignoré (prénom manquant) : ${fileName}`);
         return null;
     }
-    
-    // Trouver le sexe
+
     let sexe = null;
     let sexeIndex = -1;
     for (let i = 0; i < parts.length; i++) {
@@ -109,13 +171,12 @@ function parseZipFileName(fileName) {
             break;
         }
     }
-    
+
     if (!sexe) {
         console.warn(`Ignoré (sexe non trouvé) : ${fileName}`);
         return null;
     }
-    
-    // Nom = tout entre prénom et sexe
+
     let nomParts = [];
     for (let i = 1; i < sexeIndex; i++) {
         let part = parts[i].trim();
@@ -124,14 +185,14 @@ function parseZipFileName(fileName) {
     }
     let nomBrut = nomParts.join(' ');
     nomBrut = nomBrut.replace(/\s*-\s*/g, ' - ').replace(/\s+/g, ' ');
-    
+
     if (!nomBrut) {
         console.warn(`Ignoré (nom manquant) : ${fileName}`);
         return null;
     }
-    
+
     const prenomClean = prenomBrut.replace(/^_+|_+$/g, '');
-    
+
     return {
         nom: nomBrut,
         prenom: prenomClean,
@@ -142,6 +203,9 @@ function parseZipFileName(fileName) {
     };
 }
 
+// ============================================================
+// STOCKAGE LOCAL
+// ============================================================
 function getStorageKey(classeName) {
     return `eps_arena_eleves_${classeName}`;
 }
@@ -151,14 +215,11 @@ export function getExistingEleves(classeName) {
 }
 
 export function saveEleves(classeName, eleves) {
-    // Tri alphabétique par nom (insensible aux accents)
     const sorted = [...eleves].sort((a, b) => {
-        // On compare les noms normalisés pour ignorer accents et casse
         const nomA = a.nom ? a.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
         const nomB = b.nom ? b.nom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
         const cmp = nomA.localeCompare(nomB);
         if (cmp !== 0) return cmp;
-        // Si même nom, on compare par prénom
         const preA = a.prenom ? a.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
         const preB = b.prenom ? b.prenom.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
         return preA.localeCompare(preB);
@@ -166,6 +227,9 @@ export function saveEleves(classeName, eleves) {
     localStorage.setItem(getStorageKey(classeName), JSON.stringify(sorted));
 }
 
+// ============================================================
+// IMPORT ZIP PHOTOS
+// ============================================================
 export async function importZIP(file, classeName) {
     const zip = await JSZip.loadAsync(file);
     const elevesExistants = getExistingEleves(classeName);
@@ -179,6 +243,8 @@ export async function importZIP(file, classeName) {
 
     let parsedCount = 0;
     const ignoredFiles = [];
+
+    // Boucle principale : créer / mettre à jour les élèves
     for (const entry of zipEntries) {
         const infos = parseZipFileName(entry.name);
         if (!infos) {
@@ -187,6 +253,7 @@ export async function importZIP(file, classeName) {
         }
 
         parsedCount++;
+
         let eleve = elevesExistants.find(e =>
             normalizeForComparison(e.nom) === infos.nomNormalise &&
             normalizeForComparison(e.prenom) === infos.prenomNormalise
@@ -194,7 +261,6 @@ export async function importZIP(file, classeName) {
 
         if (eleve) {
             if (eleve.sexe !== infos.sexe) eleve.sexe = infos.sexe;
-            // Mise à jour des noms avec la version corrigée
             if (eleve.nom !== infos.nom) eleve.nom = infos.nom;
             if (eleve.prenom !== infos.prenom) eleve.prenom = infos.prenom;
             const blob = await entry.async('blob');
@@ -223,6 +289,7 @@ export async function importZIP(file, classeName) {
         throw new Error(`Aucun fichier reconnu dans le ZIP. Vérifie le format : Prénom_Nom_M_302.jpg ou _NOM,_Prénom_M.jpg.\nExemples ignorés : ${sample}`);
     }
 
+    // Fusion des nouveaux élèves
     const tousLesEleves = [...elevesExistants];
     nouveauxEleves.forEach(n => {
         if (!tousLesEleves.some(e => e.id === n.id)) {
@@ -230,15 +297,25 @@ export async function importZIP(file, classeName) {
         }
     });
 
+    // ✅ Attribution des codes auto-éval APRÈS la fusion (au bon endroit)
+    tousLesEleves.forEach(e => {
+        if (e.codeAutoEval === undefined || e.codeAutoEval === null) {
+            e.codeAutoEval = getProchainCodeLibre(tousLesEleves);
+        }
+    });
+
     saveEleves(classeName, tousLesEleves);
     return tousLesEleves;
 }
 
+// ============================================================
+// IMPORT CSV iDoceo
+// ============================================================
 export async function importCSV(file, classeName) {
     return new Promise((resolve) => {
         Papa.parse(file, {
             delimiter: ";",
-            header: true, // Utiliser la première ligne comme en-têtes
+            header: true,
             skipEmptyLines: true,
             complete: async (results) => {
                 const elevesExistants = getExistingEleves(classeName);
@@ -247,7 +324,6 @@ export async function importCSV(file, classeName) {
 
                 let modifie = false;
                 results.data.forEach(row => {
-                    // Colonnes : @name (prénom), @lastname (nom), @birthday (date), @sexe
                     const prenom = row['@name']?.trim() || '';
                     const nom = row['@lastname']?.trim() || '';
                     const dateNaissance = row['@birthday']?.trim() || '';
@@ -259,7 +335,6 @@ export async function importCSV(file, classeName) {
 
                     let eleve = map[id];
                     if (eleve) {
-                        // Mettre à jour les infos
                         if (eleve.prenom !== prenom) { eleve.prenom = prenom; modifie = true; }
                         if (eleve.nom !== nom) { eleve.nom = nom; modifie = true; }
                         if (eleve.sexe !== sexe) { eleve.sexe = sexe; modifie = true; }
@@ -284,8 +359,15 @@ export async function importCSV(file, classeName) {
                 });
 
                 if (modifie) {
+                    // Attribution des codes auto-éval
+                    elevesExistants.forEach(e => {
+                        if (e.codeAutoEval === undefined || e.codeAutoEval === null) {
+                            e.codeAutoEval = getProchainCodeLibre(elevesExistants);
+                        }
+                    });
                     saveEleves(classeName, elevesExistants);
                 }
+
                 resolve(elevesExistants);
             }
         });

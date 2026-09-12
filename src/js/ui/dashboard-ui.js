@@ -1,6 +1,7 @@
 // src/js/ui/dashboard-ui.js
 import { importCSV, importZIP, getPhotoUrl, getExistingEleves, saveEleves, updateStudentForce, updateStudentName } from '../services/admin-service.js';
 import { openImportModal } from '../services/import-service.js';
+import { migrerCodesAutoEval } from '../services/admin-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
@@ -256,6 +257,150 @@ window.purgeEleves = function() {
     currentEleves = [];
     saveEleves(activeClasse, []);
     loadLocalEleves();
+};
+
+// ============================================================
+// MODALE : LISTE DES CODES ÉLÈVES
+// ============================================================
+window.afficherCodesEleves = function() {
+    const classe = document.getElementById('selectClasse')?.value;
+    if (!classe) {
+        alert('Sélectionne une classe d\'abord.');
+        return;
+    }
+
+    // Migration automatique
+    const migre = migrerCodesAutoEval(classe);
+    if (migre) {
+        console.log('[Admin] Codes auto-éval migrés.');
+    }
+
+    const eleves = getExistingEleves(classe);
+    if (eleves.length === 0) {
+        alert('Aucun élève dans cette classe.');
+        return;
+    }
+
+    // Trier par codeAutoEval
+    eleves.sort((a, b) => (a.codeAutoEval || 999) - (b.codeAutoEval || 999));
+
+    const modal = document.createElement('div');
+    modal.id = 'codes-modal';
+    modal.className = 'fixed inset-0 bg-black/95 z-50 flex items-start justify-center p-4 overflow-y-auto';
+
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl my-8">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-2xl font-black text-indigo-400 uppercase">🔢 Codes élèves</h2>
+                    <p class="text-xs text-slate-400">Classe ${classe} · ${eleves.length} élève(s)</p>
+                    <p class="text-[10px] text-amber-400 mt-1">⚠️ Ces codes restent sur cet appareil (RGPD)</p>
+                </div>
+                <button onclick="document.getElementById('codes-modal').remove()" 
+                        class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white">
+                    ✖ Fermer
+                </button>
+            </div>
+
+            <div class="bg-amber-900/20 border border-amber-500/50 rounded-xl p-3 mb-4 text-xs text-amber-200">
+                💡 <strong class="text-amber-400">Comment ça marche ?</strong> Chaque élève reçoit un code unique et permanent. 
+                Ce code est utilisé pour l'auto-évaluation et le tournoi. Il ne change jamais, même si l'élève change de groupe.
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-slate-800 text-slate-400 text-xs uppercase">
+                            <th class="p-2 text-left">Code</th>
+                            <th class="p-2 text-left">Nom</th>
+                            <th class="p-2 text-left">Prénom</th>
+                            <th class="p-2 text-left">Sexe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${eleves.map(e => `
+                            <tr class="border-b border-slate-800 hover:bg-slate-800/50">
+                                <td class="p-2 font-black text-2xl text-yellow-400">${e.codeAutoEval || '--'}</td>
+                                <td class="p-2 font-bold text-white">${e.nom || ''}</td>
+                                <td class="p-2 text-slate-300">${e.prenom || ''}</td>
+                                <td class="p-2 text-slate-500">${e.sexe || ''}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex gap-3 mt-4">
+                <button onclick="window.imprimerCodesEleves()"
+                        class="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    🖨️ Imprimer
+                </button>
+                <button onclick="window.exporterCodesElevesCSV()"
+                        class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-black text-sm text-white active:scale-95">
+                    📥 Export CSV
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+
+    // Stocker pour les boutons
+    window._codesElevesData = { classe, eleves };
+};
+
+window.imprimerCodesEleves = function() {
+    const data = window._codesElevesData;
+    if (!data) return;
+
+    const win = window.open('', '_blank');
+    win.document.write(`
+        <html><head><title>Codes élèves - ${data.classe}</title>
+        <style>
+            body { font-family: Arial; padding: 20px; }
+            h1 { color: #3b82f6; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+            th { background: #f0f0f0; }
+            td.code { font-size: 24px; font-weight: bold; color: #dc2626; width: 80px; }
+        </style></head><body>
+            <h1>Codes élèves - Classe ${data.classe}</h1>
+            <p>Document à conserver. Les codes sont uniques et permanents.</p>
+            <table>
+                <thead><tr><th>Code</th><th>Nom</th><th>Prénom</th></tr></thead>
+                <tbody>
+                    ${data.eleves.map(e => `
+                        <tr>
+                            <td class="code">${e.codeAutoEval || '--'}</td>
+                            <td>${e.nom || ''}</td>
+                            <td>${e.prenom || ''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </body></html>
+    `);
+    win.document.close();
+    setTimeout(() => win.print(), 500);
+};
+
+window.exporterCodesElevesCSV = function() {
+    const data = window._codesElevesData;
+    if (!data) return;
+
+    let csv = '\uFEFF"Code";"Nom";"Prénom"\n';
+    data.eleves.forEach(e => {
+        csv += `"${e.codeAutoEval || ''}";"${e.nom || ''}";"${e.prenom || ''}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Codes_${data.classe}.csv`;
+    a.click();
 };
 
 window.openImportModal = function() {
