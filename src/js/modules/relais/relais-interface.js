@@ -127,6 +127,11 @@ function createHeader() {
             Le nom des élèves reste sur cet appareil (mapping local).
         </div>
 
+                <div class="bg-pink-900/20 border border-pink-500/40 rounded-xl p-3 mb-4 text-[11px] text-pink-200">
+            💡 <strong class="text-pink-400">Variante disponible sur le kiosque :</strong> "Relais 2 zones" (chrono rapide sans données nominatives).
+            Accessible depuis le menu kiosque élève.
+        </div>
+
         <button onclick="window.relaisTransmettre()" 
                 class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-base uppercase tracking-widest text-white border-4 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-transform">
             📡 Transmettre aux iPads Élèves

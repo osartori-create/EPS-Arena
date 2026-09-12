@@ -4,6 +4,7 @@
 // On identifie les élèves par code {groupeIdx}_{lettre} (ex: "0_a").
 
 import { db, ref, onValue, push, set } from '../../core/firebase-service.js';
+import { initRelais2ZonesKiosk } from './variantes/relais-2zones/index.js';
 import {
     zoneToVitesse,
     calculerVTheorique,
@@ -106,7 +107,6 @@ function getBannerHtml() {
 // MENU PRINCIPAL
 // ============================================================
 function renderMenu(container) {
-    // Calcul du total global (tous groupes confondus) pour info élève
     const mesuresArray = Object.values(state.mesures);
     const totalEssais = mesuresArray.length;
 
@@ -119,13 +119,13 @@ function renderMenu(container) {
             </div>
 
             <button onclick="window.relaisKioskGoTo('select-eleve')" 
-                    class="w-full bg-blue-600 hover:bg-blue-500 py-8 rounded-3xl font-black text-2xl text-white active:scale-95 transition-all shadow-xl">
+                    class="w-full bg-blue-600 hover:bg-blue-500 py-6 rounded-3xl font-black text-xl text-white active:scale-95 transition-all shadow-xl">
                 🏃 Saisir mes vitesses
                 <p class="text-xs font-normal opacity-80 mt-1">Départ arrêté / Départ lancé</p>
             </button>
 
             <button onclick="window.relaisKioskGoTo('select-groupe')" 
-                    class="w-full bg-orange-600 hover:bg-orange-500 py-8 rounded-3xl font-black text-2xl text-white active:scale-95 transition-all shadow-xl">
+                    class="w-full bg-orange-600 hover:bg-orange-500 py-6 rounded-3xl font-black text-xl text-white active:scale-95 transition-all shadow-xl">
                 🏁 Courir un relais
                 <p class="text-xs font-normal opacity-80 mt-1">Choisir un groupe et une paire</p>
             </button>
@@ -134,6 +134,13 @@ function renderMenu(container) {
                     class="w-full bg-purple-600 hover:bg-purple-500 py-6 rounded-3xl font-black text-xl text-white active:scale-95 transition-all shadow-xl">
                 🏆 Voir le classement
                 <p class="text-xs font-normal opacity-80 mt-1">${totalEssais} essai${totalEssais > 1 ? 's' : ''} enregistré${totalEssais > 1 ? 's' : ''}</p>
+            </button>
+
+            <!-- ✅ NOUVEAU : Variante 2 zones -->
+            <button onclick="window.relaisKioskOpen2Zones()" 
+                    class="w-full bg-pink-600 hover:bg-pink-500 py-6 rounded-3xl font-black text-xl text-white active:scale-95 transition-all shadow-xl">
+                ⏱️ Relais 2 zones
+                <p class="text-xs font-normal opacity-80 mt-1">Chrono rapide (binôme)</p>
             </button>
 
             <button onclick="window.retourMenuRelais()" 
@@ -668,6 +675,16 @@ window.relaisKioskValiderZone = async function() {
         console.error(err);
         alert('❌ Erreur lors de l\'enregistrement.');
     }
+};
+
+// ============================================================
+// OUVERTURE DU MODULE 2 ZONES (variante autonome)
+// ============================================================
+window.relaisKioskOpen2Zones = function() {
+    console.log('[Relais Kiosk] Ouverture variante 2 zones');
+    // On nettoie les listeners en cours (on revient au module quand on quitte)
+    // Note : on ne touche PAS aux listeners Firebase car la variante ne les utilise pas
+    initRelais2ZonesKiosk();
 };
 
 window.retourMenuRelais = function() {
