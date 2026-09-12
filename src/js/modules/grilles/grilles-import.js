@@ -49,19 +49,17 @@ export function importerGrilleXLSX(file) {
  * Parse le contenu d'une feuille en grille structurée.
  */
 function parserGrille(rows, sheetName) {
-    // Filtrer les lignes vides
     const lignes = rows.filter(r => r.some(cell => String(cell).trim() !== ''));
     if (lignes.length < 3) return null;
 
-    // Ligne 1 (index 0) : en-tête des niveaux
     const header = lignes[0];
 
-    // Détecter les colonnes de niveaux (doit contenir "MAÎTRISE" ou des chiffres)
-    // On suppose que les 4 dernières colonnes sont les niveaux
+    // Détecter les colonnes de niveaux
     const niveaux = [];
     for (let i = 1; i < header.length; i++) {
         const cell = String(header[i] || '').trim();
-        if (cell && (cell.includes('MAÎTRISE') || cell.includes('MAITRISE') || /^\d$/.test(cell))) {
+        const cellUpper = cell.toUpperCase();
+        if (cell && (cellUpper.includes('MAÎTRISE') || cellUpper.includes('MAITRISE') || cellUpper.includes('EXCELLENT') || cellUpper.includes('INSATISFAISANT') || /^\d$/.test(cell))) {
             niveaux.push({ colIndex: i, header: cell });
         }
     }
@@ -74,36 +72,42 @@ function parserGrille(rows, sheetName) {
         }
     }
 
-    // Extraire les valeurs numériques des niveaux (4, 3, 2, 1) depuis le header
+    // ✅ FIX : on assume l'ordre standard 4, 3, 2, 1 de gauche à droite.
+    // On n'essaie PLUS d'extraire un chiffre du header (qui pouvait être 50, 40, 25, 10...)
     const niveauxParses = niveaux.slice(-4).map((n, idx) => {
-        const match = n.header.match(/(\d)/);
-        const valeur = match ? parseInt(match[1]) : (4 - idx);
-        // Extraire le libellé (avant le <br> ou le retour ligne)
-        const label = n.header.split(/\n|<br>/)[0].trim() || `Niveau ${valeur}`;
+        const valeur = 4 - idx;  // 4, 3, 2, 1 selon la position
+        const headerLower = n.header.toLowerCase();
+        let label;
+        if (headerLower.includes('très') || headerLower.includes('tres') || headerLower.includes('excellent')) {
+            label = 'TRÈS BONNE MAÎTRISE';
+        } else if (headerLower.includes('satisfaisant')) {
+            label = 'MAÎTRISE SATISFAISANTE';
+        } else if (headerLower.includes('fragile')) {
+            label = 'MAÎTRISE FRAGILE';
+        } else if (headerLower.includes('insuffisant')) {
+            label = 'MAÎTRISE INSUFFISANTE';
+        } else {
+            label = `Niveau ${valeur}`;
+        }
         return { valeur, label, colIndex: n.colIndex };
     });
 
-    // Critères : lignes suivantes (index 1 à n)
+    // Critères : lignes suivantes
     const criteres = [];
     for (let i = 1; i < lignes.length; i++) {
         const row = lignes[i];
         const nomCell = String(row[0] || '').trim();
         if (!nomCell) continue;
 
-        // Détecter la pondération dans le nom (ex: "20%")
         const pondMatch = nomCell.match(/(\d+)\s*%/);
         const ponderation = pondMatch ? parseInt(pondMatch[1]) : 0;
-
-        // Nettoyer le nom (retirer la pondération et les retours ligne)
         const nom = nomCell.replace(/\s*\d+\s*%\s*$/, '').trim();
 
-        // Extraire les descripteurs pour chaque niveau
         const descripteurs = niveauxParses.map(n => {
             const cell = String(row[n.colIndex] || '').trim();
             return { valeur: n.valeur, descripteur: cell };
         });
 
-        // Détecter le type (auto si un connecteur existe, sinon prof)
         const type = detecterTypeCritere(nom);
 
         criteres.push({
@@ -117,11 +121,9 @@ function parserGrille(rows, sheetName) {
 
     if (criteres.length === 0) return null;
 
-    // Détecter le niveau C3/C4 ou 6e/5e/4e/3e depuis le nom de la feuille
     const niveauMatch = sheetName.match(/\b(C[1-5]|[3-6]e|6ème|5ème|4ème|3ème)\b/i);
     const niveau = niveauMatch ? niveauMatch[1] : 'C4';
 
-    // Détecter l'activité depuis le nom de la feuille
     const activite = detecterActivite(sheetName);
 
     const grille = {
