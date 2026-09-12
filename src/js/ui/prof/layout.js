@@ -76,7 +76,6 @@ export function initLayout() {
     const targetBtn = document.getElementById('btnTab' + map[tabName]);
     if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
-    // ✅ NOUVEAU : charger le module grilles quand on clique sur l'onglet
     if (tabName === 'evaluations') {
         import('../../modules/grilles/grilles-interface.js').then(m => {
             m.initGrillesInterface();
