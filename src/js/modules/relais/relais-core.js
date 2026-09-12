@@ -1,27 +1,68 @@
 // src/js/modules/relais/relais-core.js
-// Logique métier commune au module Relais
+// Logique métier commune au module Relais (2 sous-activités : relais10s, relais2zones)
 // ⚠️ RGPD : les "membres" ne contiennent JAMAIS de nom/prénom/id.
 
-export const ZONE_MIN = 15;   // Vitesse minimale (km/h)
-export const ZONE_MAX = 28;   // Vitesse maximale (km/h)
-export const NB_PLOTS = ZONE_MAX - ZONE_MIN + 1; // 14
+export const ZONE_MIN = 15;
+export const ZONE_MAX = 28;
+export const NB_PLOTS = ZONE_MAX - ZONE_MIN + 1;
 
-/**
- * Retourne la vitesse (km/h) quelle que soit la donnée d'entrée :
- * - Si c'est déjà une vitesse (>= 15), elle est retournée telle quelle (cas import CSV)
- * - Si c'est une zone 1-14 (cas kiosque élève), elle est convertie
- */
+// Distances par défaut pour la sous-activité 2 zones
+export const DISTANCES_2ZONES_DEFAUT = { z1: 20, trans: 10, z2: 20 };
+
+// ============================================================
+// GRILLE DE CONVERSION % → POINTS (2 zones)
+// ============================================================
+export const PALIERS_TRANSMISSION = [
+    { min: 100, points: 5, couleur: '#22c55e', label: '🚀 Parfait' },
+    { min: 90,  points: 4, couleur: '#84cc16', label: '🌟 Très bien' },
+    { min: 80,  points: 3, couleur: '#eab308', label: '✅ Bien' },
+    { min: 70,  points: 2, couleur: '#f97316', label: '👍 Moyen' },
+    { min: 60,  points: 1, couleur: '#f43f5e', label: '📈 À améliorer' },
+    { min: 0,   points: 0, couleur: '#ef4444', label: '⚠️ Faible' }
+];
+
+export function getPalierTransmission(pct) {
+    if (pct === null || pct === undefined || isNaN(pct)) return PALIERS_TRANSMISSION[PALIERS_TRANSMISSION.length - 1];
+    for (const p of PALIERS_TRANSMISSION) {
+        if (pct >= p.min) return p;
+    }
+    return PALIERS_TRANSMISSION[PALIERS_TRANSMISSION.length - 1];
+}
+
+export function calculerPointsTransmission(pct) {
+    return getPalierTransmission(pct).points;
+}
+
+export function getScoreCouleurTransmission(pct) {
+    return getPalierTransmission(pct).couleur;
+}
+
+export function getLabelTransmission(pct) {
+    return getPalierTransmission(pct).label;
+}
+
+// ============================================================
+// CONVERSIONS VITESSE / ZONE (sous-activité relais10s)
+// ============================================================
 export function zoneToVitesse(zone) {
     if (!zone) return null;
-    // ✅ Auto-détection : c'est déjà une vitesse en km/h (>= 15)
+    // Auto-détection : c'est déjà une vitesse (>= 15)
     if (zone >= ZONE_MIN) return zone;
-    // C'est une zone 1-14, on convertit
     if (zone < 1 || zone > NB_PLOTS) return null;
     return ZONE_MIN + (zone - 1);
 }
 
+export function vitesseToZone(vitesse) {
+    return Math.round(vitesse) - ZONE_MIN + 1;
+}
+
+export function formatVitesse(zone) {
+    const v = zoneToVitesse(zone);
+    return v !== null ? `${v} km/h` : '--';
+}
+
 // ============================================================
-// CALCULS RELAIS
+// CALCULS 10S
 // ============================================================
 export function calculerVTheorique(vArret, vLance) {
     if (vArret === null || vLance === null) return null;
@@ -52,16 +93,28 @@ export function getScoreLabel(score) {
 }
 
 // ============================================================
-// PAIRES D'UN GROUPE (basé sur la LETTRE, pas sur un id)
+// CALCULS 2 ZONES
+// ============================================================
+/**
+ * @param {number} vZ1 - vitesse zone 1 (km/h)
+ * @param {number} vTrans - vitesse transmission (km/h)
+ * @param {number} vZ2 - vitesse zone 2 (km/h)
+ * @returns {number|null} pourcentage de transmission
+ */
+export function calculerPourcentageTransmission(vZ1, vTrans, vZ2) {
+    if (vZ1 === null || vTrans === null || vZ2 === null) return null;
+    const moyenne = (vZ1 + vZ2) / 2;
+    if (moyenne <= 0) return null;
+    return Math.round((vTrans / moyenne) * 100);
+}
+
+// ============================================================
+// PAIRES D'UN GROUPE
 // ============================================================
 export function getLettre(index) {
     return String.fromCharCode(97 + index);
 }
 
-/**
- * @param {Array} membres - [{ lettre: 'a', sexe: 'M' }, ...]
- * @returns {Array} [{ relayeIdx, relayeurIdx, pairId, label, relaye, relayeur }]
- */
 export function getPairesGroupe(membres) {
     const paires = [];
     for (let i = 0; i < membres.length; i++) {
@@ -91,9 +144,14 @@ function moy(arr) {
     return Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 100) / 100;
 }
 
+/**
+ * Retourne le meilleur essai par paire.
+ * @param {Array} mesures - [{ pairId, score, ... }] où score = points (nombre)
+ */
 export function getMeilleurEssaiParPaire(mesures) {
     const meilleur = {};
     mesures.forEach(m => {
+        if (m.score === null || m.score === undefined) return;
         if (!meilleur[m.pairId] || m.score > meilleur[m.pairId].score) {
             meilleur[m.pairId] = m;
         }
@@ -101,11 +159,6 @@ export function getMeilleurEssaiParPaire(mesures) {
     return meilleur;
 }
 
-/**
- * Efficacité individuelle (Option B)
- * @param {Array} mesures - [{ relayeLettre, relayeurLettre, score, ... }]
- * @param {Array} membres - [{ lettre, sexe }]
- */
 export function calculerEfficaciteIndividuelle(mesures, membres) {
     const efficacite = {};
     membres.forEach(m => {
@@ -122,12 +175,8 @@ export function calculerEfficaciteIndividuelle(mesures, membres) {
     const meilleur = getMeilleurEssaiParPaire(mesures);
 
     Object.values(meilleur).forEach(m => {
-        if (efficacite[m.relayeLettre]) {
-            efficacite[m.relayeLettre].scoresCommeRelaye.push(m.score);
-        }
-        if (efficacite[m.relayeurLettre]) {
-            efficacite[m.relayeurLettre].scoresCommeRelayeur.push(m.score);
-        }
+        if (efficacite[m.relayeLettre]) efficacite[m.relayeLettre].scoresCommeRelaye.push(m.score);
+        if (efficacite[m.relayeurLettre]) efficacite[m.relayeurLettre].scoresCommeRelayeur.push(m.score);
     });
 
     Object.values(efficacite).forEach(eff => {
@@ -143,9 +192,8 @@ export function calculerEfficaciteIndividuelle(mesures, membres) {
 export function calculerCompositionsEfficaces(mesures) {
     const parPaire = {};
     mesures.forEach(m => {
-        if (!parPaire[m.pairId]) {
-            parPaire[m.pairId] = { pairId: m.pairId, scores: [], count: 0 };
-        }
+        if (m.score === null || m.score === undefined) return;
+        if (!parPaire[m.pairId]) parPaire[m.pairId] = { pairId: m.pairId, scores: [], count: 0 };
         parPaire[m.pairId].scores.push(m.score);
         parPaire[m.pairId].count++;
     });
@@ -166,10 +214,4 @@ export function calculerScoreEquipe(mesures) {
     if (essais.length === 0) return 0;
     const total = essais.reduce((sum, e) => sum + e.score, 0);
     return Math.round(total * 10) / 10;
-}
-
-export function formatScore(score) {
-    if (score === null || score === undefined) return '--';
-    const signe = score >= 5 ? '+' : '';
-    return `${signe}${(score - 5).toFixed(1)}`;
 }

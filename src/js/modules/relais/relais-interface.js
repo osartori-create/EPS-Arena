@@ -1,27 +1,19 @@
 // src/js/modules/relais/relais-interface.js
-// UI Professeur : groupes, réglages, import CSV, transmission
+// UI Professeur : groupes, vitesses, réglages, transmission
 // ⚠️ RGPD : seules les lettres (a,b,c) et le sexe transitent sur Firebase.
-// Le mapping nom ↔ code reste dans localStorage (prof uniquement).
 
 import { db, ref, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, setLocalMapping, getLocalMapping } from '../../core/live-engine.js';
-import { getLettre } from './relais-core.js';
+import { getLettre, PALIERS_TRANSMISSION, DISTANCES_2ZONES_DEFAUT } from './relais-core.js';
 
 let currentClasse = '';
 let sortableInstances = [];
 
-function getStorageKey(classe) {
-    return `eps_arena_relais_groupes_${classe}`;
-}
-
-function getVitessesKey(classe) {
-    return `eps_arena_relais_vitesses_${classe}`;
-}
-
-function getSousActiviteKey(classe) {
-    return `eps_arena_relais_sous_activite_${classe}`;
-}
+function getStorageKey(classe) { return `eps_arena_relais_groupes_${classe}`; }
+function getVitessesKey(classe) { return `eps_arena_relais_vitesses_${classe}`; }
+function getSousActiviteKey(classe) { return `eps_arena_relais_sous_activite_${classe}`; }
+function getDistancesKey(classe) { return `eps_arena_relais_distances_${classe}`; }
 
 // ============================================================
 // INITIALISATION
@@ -29,7 +21,6 @@ function getSousActiviteKey(classe) {
 export function initRelaisInterface() {
     const container = document.getElementById('viewRelaisSettings');
     if (!container) {
-        console.warn('[Relais] Conteneur introuvable, création dynamique');
         const parent = document.getElementById('viewActivities');
         if (!parent) return;
         const div = document.createElement('div');
@@ -42,22 +33,30 @@ export function initRelaisInterface() {
 
     currentClasse = getCurrentClasse();
     container.innerHTML = '';
-
     container.appendChild(createHeader());
     container.appendChild(createBody());
 
+    // Restaurer les valeurs
     const savedNbGroupes = localStorage.getItem(`eps_arena_relais_nb_groupes_${currentClasse}`) || 5;
     const savedTaille = localStorage.getItem(`eps_arena_relais_taille_${currentClasse}`) || 3;
     const savedMode = localStorage.getItem(`eps_arena_relais_mode_${currentClasse}`) || 'essai';
     const savedNbPlots = localStorage.getItem(`eps_arena_relais_nb_plots_${currentClasse}`) || 14;
+    const savedDistances = JSON.parse(localStorage.getItem(getDistancesKey(currentClasse)) || 'null') || DISTANCES_2ZONES_DEFAUT;
+
     const elNbG = document.getElementById('relaisNbGroupes');
     const elT = document.getElementById('relaisTailleGroupe');
     const elM = document.getElementById('relaisMode');
     const elP = document.getElementById('relaisNbPlots');
+    const elZ1 = document.getElementById('relaisDistZ1');
+    const elZtr = document.getElementById('relaisDistTrans');
+    const elZ2 = document.getElementById('relaisDistZ2');
     if (elNbG) elNbG.value = savedNbGroupes;
     if (elT) elT.value = savedTaille;
     if (elM) elM.value = savedMode;
     if (elP) elP.value = savedNbPlots;
+    if (elZ1) elZ1.value = savedDistances.z1;
+    if (elZtr) elZtr.value = savedDistances.trans;
+    if (elZ2) elZ2.value = savedDistances.z2;
 
     setTimeout(() => {
         window.relaisUpdateSousActiviteUI();
@@ -73,6 +72,15 @@ function createHeader() {
     const div = document.createElement('div');
     div.className = 'bg-slate-800 p-5 rounded-2xl border border-slate-700';
 
+    // Générer la grille des paliers pour affichage
+    const grilleHtml = PALIERS_TRANSMISSION.map(p => `
+        <div class="flex items-center gap-2 bg-slate-900 px-2 py-1 rounded-lg">
+            <span class="font-black text-xs w-14 text-right" style="color:${p.couleur}">${p.min}%+</span>
+            <span class="text-xs text-slate-400">→</span>
+            <span class="font-black text-sm" style="color:${p.couleur}">${p.points} pt${p.points > 1 ? 's' : ''}</span>
+        </div>
+    `).join('');
+
     div.innerHTML = `
         <div class="flex justify-between items-center mb-4 flex-wrap gap-3">
             <h3 class="font-black text-blue-400 uppercase text-sm">🏁 Relais – Configuration</h3>
@@ -85,11 +93,11 @@ function createHeader() {
                         class="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-purple-400 active:scale-95">
                     📥 Import CSV iDoeceo
                 </button>
-                <button onclick="window.relaisExportConfig()" 
+                <button onclick="window.relaisExportConfig()"
                         class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400 active:scale-95">
                     ⬇️ Export JSON
                 </button>
-                <button onclick="document.getElementById('relaisImportJSON').click()" 
+                <button onclick="document.getElementById('relaisImportJSON').click()"
                         class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400 active:scale-95">
                     ⬆️ Import JSON
                 </button>
@@ -104,17 +112,18 @@ function createHeader() {
                 <button id="relaisSubAct-relais10s" onclick="window.relaisSetSousActivite('relais10s')"
                         class="p-4 rounded-xl font-black text-sm border-2 text-left active:scale-95 transition-all">
                     <div class="text-xl mb-1">🏁 Relais 10s</div>
-                    <div class="text-[10px] font-normal opacity-80">Groupes + binômes + vitesses + classement</div>
+                    <div class="text-[10px] font-normal opacity-80">Zone atteinte après 10s — score = 5 + (V_réelle − V_théorique)</div>
                 </button>
                 <button id="relaisSubAct-relais2zones" onclick="window.relaisSetSousActivite('relais2zones')"
                         class="p-4 rounded-xl font-black text-sm border-2 text-left active:scale-95 transition-all">
                     <div class="text-xl mb-1">⏱️ Relais 2 zones</div>
-                    <div class="text-[10px] font-normal opacity-80">Chrono simple (4 clics) — binôme</div>
+                    <div class="text-[10px] font-normal opacity-80">Chrono 4 clics — score basé sur le % de transmission</div>
                 </button>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4" id="relaisOptionsBlock">
+        <!-- OPTIONS RELAIS 10S -->
+        <div id="relaisOptionsBlock-10s" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
             <div>
                 <label class="text-xs font-bold text-slate-400 uppercase block mb-1">Mode</label>
                 <select id="relaisMode" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm" onchange="window.relaisUpdateModeStyle()">
@@ -140,6 +149,40 @@ function createHeader() {
             </div>
         </div>
 
+        <!-- OPTIONS RELAIS 2 ZONES -->
+        <div id="relaisOptionsBlock-2zones" class="hidden space-y-3 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase block mb-1">Mode</label>
+                    <select id="relaisMode2" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-sm" onchange="window.relaisUpdateModeStyle()">
+                        <option value="essai">🌱 Essai (indicatif)</option>
+                        <option value="competition">🏆 Compétition (classement)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-orange-400 uppercase block mb-1">Distance Z1 (m)</label>
+                    <input type="number" id="relaisDistZ1" value="20" min="5" max="100" step="5"
+                           class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-blue-400 uppercase block mb-1">Distance Transmission (m)</label>
+                    <input type="number" id="relaisDistTrans" value="10" min="5" max="100" step="5"
+                           class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-green-400 uppercase block mb-1">Distance Z2 (m)</label>
+                    <input type="number" id="relaisDistZ2" value="20" min="5" max="100" step="5"
+                           class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-sm">
+                </div>
+            </div>
+            <div class="bg-slate-900 border border-blue-500/40 rounded-xl p-3">
+                <p class="text-xs font-bold text-blue-400 uppercase mb-2">📊 Grille de conversion (transmission → points)</p>
+                <div class="flex flex-wrap gap-2">
+                    ${grilleHtml}
+                </div>
+            </div>
+        </div>
+
         <div id="relaisBannerInfo" class="text-center text-xs font-bold py-2 rounded-xl mb-4 bg-emerald-900/30 text-emerald-300 border border-emerald-500/50">
             🌱 Mode ESSAI — les élèves peuvent tester sans conséquence
         </div>
@@ -149,7 +192,7 @@ function createHeader() {
             Le nom des élèves reste sur cet appareil (mapping local).
         </div>
 
-        <button onclick="window.relaisTransmettre()" 
+        <button onclick="window.relaisTransmettre()"
                 class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-base uppercase tracking-widest text-white border-4 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] active:scale-[0.98] transition-transform">
             📡 Transmettre aux iPads Élèves
         </button>
@@ -161,7 +204,6 @@ function createHeader() {
 function createBody() {
     const div = document.createElement('div');
     div.className = 'bg-slate-800 p-5 rounded-2xl border border-slate-700';
-
     div.innerHTML = `
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
@@ -177,14 +219,12 @@ function createBody() {
                     </div>
                 </div>
             </div>
-
             <div class="lg:col-span-2">
                 <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Groupes (a, b, c, d... par élève)</h4>
                 <div id="relaisGroupesGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
             </div>
         </div>
     `;
-
     return div;
 }
 
@@ -193,9 +233,7 @@ function createBody() {
 // ============================================================
 window.relaisSetSousActivite = function(sousActivite) {
     const activeClasse = getCurrentClasse();
-    if (activeClasse) {
-        localStorage.setItem(getSousActiviteKey(activeClasse), sousActivite);
-    }
+    if (activeClasse) localStorage.setItem(getSousActiviteKey(activeClasse), sousActivite);
     window.relaisUpdateSousActiviteUI();
 };
 
@@ -205,27 +243,26 @@ window.relaisUpdateSousActiviteUI = function() {
 
     const btn10 = document.getElementById('relaisSubAct-relais10s');
     const btn2z = document.getElementById('relaisSubAct-relais2zones');
-    const optsBlock = document.getElementById('relaisOptionsBlock');
+    const opts10 = document.getElementById('relaisOptionsBlock-10s');
+    const opts2z = document.getElementById('relaisOptionsBlock-2zones');
     const bannerInfo = document.getElementById('relaisBannerInfo');
-    const btnGen = document.getElementById('relaisBtnGenerer');
-    const btnCSV = document.getElementById('relaisBtnImportCSV');
+
+    const baseClass = 'p-4 rounded-xl font-black text-sm border-2 text-left active:scale-95 transition-all';
 
     if (sousActivite === 'relais2zones') {
-        if (btn10) btn10.className = 'p-4 rounded-xl font-black text-sm border-2 border-slate-700 bg-slate-800 text-slate-300 text-left active:scale-95 transition-all';
-        if (btn2z) btn2z.className = 'p-4 rounded-xl font-black text-sm border-2 border-blue-500 bg-blue-900/40 text-white text-left active:scale-95 transition-all ring-2 ring-blue-400';
-        if (optsBlock) optsBlock.style.display = 'none';
+        if (btn10) btn10.className = `${baseClass} border-slate-700 bg-slate-800 text-slate-300`;
+        if (btn2z) btn2z.className = `${baseClass} border-blue-500 bg-blue-900/40 text-white ring-2 ring-blue-400`;
+        if (opts10) opts10.classList.add('hidden');
+        if (opts2z) opts2z.classList.remove('hidden');
         if (bannerInfo) {
             bannerInfo.className = 'text-center text-xs font-bold py-2 rounded-xl mb-4 bg-blue-900/30 text-blue-300 border border-blue-500/50';
-            bannerInfo.innerHTML = '⏱️ Mode RELAIS 2 ZONES — chrono simple (4 clics)';
+            bannerInfo.innerHTML = '⏱️ Mode RELAIS 2 ZONES — chrono 4 clics + % transmission';
         }
-        if (btnGen) btnGen.style.display = 'none';
-        if (btnCSV) btnCSV.style.display = 'none';
     } else {
-        if (btn10) btn10.className = 'p-4 rounded-xl font-black text-sm border-2 border-blue-500 bg-blue-900/40 text-white text-left active:scale-95 transition-all ring-2 ring-blue-400';
-        if (btn2z) btn2z.className = 'p-4 rounded-xl font-black text-sm border-2 border-slate-700 bg-slate-800 text-slate-300 text-left active:scale-95 transition-all';
-        if (optsBlock) optsBlock.style.display = '';
-        if (btnGen) btnGen.style.display = '';
-        if (btnCSV) btnCSV.style.display = '';
+        if (btn10) btn10.className = `${baseClass} border-blue-500 bg-blue-900/40 text-white ring-2 ring-blue-400`;
+        if (btn2z) btn2z.className = `${baseClass} border-slate-700 bg-slate-800 text-slate-300`;
+        if (opts10) opts10.classList.remove('hidden');
+        if (opts2z) opts2z.classList.add('hidden');
         window.relaisUpdateModeStyle();
     }
 };
@@ -293,10 +330,9 @@ window.relaisGenererGroupes = async function() {
     grid.innerHTML = html;
 
     await populateReserve(eleves);
-
     setTimeout(() => initSortable(), 100);
     saveAffectations();
-    alert(`✅ ${nbGroupes} groupes créés (taille cible : ${tailleCible}). Glissez les élèves !`);
+    alert(`✅ ${nbGroupes} groupes créés. Glissez les élèves !`);
 };
 
 async function populateReserve(eleves) {
@@ -333,24 +369,21 @@ function initSortable() {
 
     if (garcons) {
         garcons.__sortable = new Sortable(garcons, {
-            group: 'relais',
-            animation: 150,
+            group: 'relais', animation: 150,
             onEnd: () => { saveAffectations(); updateLettres(); }
         });
         sortableInstances.push(garcons.__sortable);
     }
     if (filles) {
         filles.__sortable = new Sortable(filles, {
-            group: 'relais',
-            animation: 150,
+            group: 'relais', animation: 150,
             onEnd: () => { saveAffectations(); updateLettres(); }
         });
         sortableInstances.push(filles.__sortable);
     }
     document.querySelectorAll('.groupe-members').forEach(el => {
         el.__sortable = new Sortable(el, {
-            group: 'relais',
-            animation: 150,
+            group: 'relais', animation: 150,
             onEnd: () => { saveAffectations(); updateLettres(); }
         });
         sortableInstances.push(el.__sortable);
@@ -371,7 +404,7 @@ function updateLettres() {
 }
 
 // ============================================================
-// SAUVEGARDE (tronque les vides au milieu et à la fin)
+// SAUVEGARDE / CHARGEMENT
 // ============================================================
 function saveAffectations() {
     const activeClasse = getCurrentClasse();
@@ -386,45 +419,31 @@ function saveAffectations() {
     const groupes = [];
     document.querySelectorAll('.groupe-members').forEach((el) => {
         const membres = [];
-        el.querySelectorAll('[data-id]').forEach(child => {
-            membres.push(child.dataset.id);
-        });
+        el.querySelectorAll('[data-id]').forEach(child => membres.push(child.dataset.id));
         groupes.push(membres);
     });
 
-    // ✅ FIX : on ne garde QUE les groupes non vides
     data.groupes = groupes.filter(g => g.length > 0);
-
     localStorage.setItem(getStorageKey(activeClasse), JSON.stringify(data));
-    console.log(`[Relais] Save : ${data.groupes.length} groupes non vides, ${data.reserve.length} en réserve`);
 }
 
-// ============================================================
-// CHARGEMENT (nettoie les données polluées)
-// ============================================================
 function loadAffectations() {
     const activeClasse = getCurrentClasse();
     if (!activeClasse) return;
 
     let data = JSON.parse(localStorage.getItem(getStorageKey(activeClasse)) || 'null');
 
-    // ✅ NETTOYAGE AUTO
     if (data && data.groupes) {
         const avant = data.groupes.length;
         data.groupes = data.groupes.filter(g => g && g.length > 0);
         if (data.groupes.length !== avant) {
-            console.log(`[Relais] 🧹 Nettoyage auto : ${avant} → ${data.groupes.length} groupes`);
             localStorage.setItem(getStorageKey(activeClasse), JSON.stringify(data));
         }
     }
 
-    // Aucune affectation valide → grille par défaut
     if (!data || !data.groupes || data.groupes.length === 0) {
-        console.log('[Relais] Aucune affectation → génération automatique');
         setTimeout(() => {
-            if (typeof window.relaisGenererGroupes === 'function') {
-                window.relaisGenererGroupes();
-            }
+            if (typeof window.relaisGenererGroupes === 'function') window.relaisGenererGroupes();
         }, 150);
         return;
     }
@@ -480,17 +499,16 @@ function loadAffectations() {
         for (const e of filles) createEleveCard(e).then(c => fillesContainer.appendChild(c));
     }
 
-    setTimeout(() => {
-        updateLettres();
-        initSortable();
-    }, 100);
+    setTimeout(() => { updateLettres(); initSortable(); }, 100);
 }
 
 // ============================================================
-// STYLE BANDEAU MODE
+// BANDEAU MODE
 // ============================================================
 window.relaisUpdateModeStyle = function() {
-    const mode = document.getElementById('relaisMode')?.value || 'essai';
+    const sousActivite = localStorage.getItem(getSousActiviteKey(getCurrentClasse())) || 'relais10s';
+    const modeEl = document.getElementById(sousActivite === 'relais2zones' ? 'relaisMode2' : 'relaisMode');
+    const mode = modeEl?.value || 'essai';
     const banner = document.getElementById('relaisBannerInfo');
     if (!banner) return;
 
@@ -503,13 +521,11 @@ window.relaisUpdateModeStyle = function() {
     }
 
     const activeClasse = getCurrentClasse();
-    if (activeClasse) {
-        localStorage.setItem(`eps_arena_relais_mode_${activeClasse}`, mode);
-    }
+    if (activeClasse) localStorage.setItem(`eps_arena_relais_mode_${activeClasse}`, mode);
 };
 
 // ============================================================
-// IMPORT CSV iDoeceo
+// IMPORT CSV
 // ============================================================
 window.relaisImportCSV = function() {
     const activeClasse = getCurrentClasse();
@@ -520,8 +536,7 @@ window.relaisImportCSV = function() {
     input.accept = '.csv';
     input.onchange = (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-        importCSVFile(file, activeClasse);
+        if (file) importCSVFile(file, activeClasse);
     };
     input.click();
 };
@@ -533,9 +548,7 @@ function importCSVFile(file, classe) {
         const separateur = csv.includes(';') ? ';' : ',';
 
         Papa.parse(csv, {
-            delimiter: separateur,
-            header: false,
-            skipEmptyLines: true,
+            delimiter: separateur, header: false, skipEmptyLines: true,
             complete: (result) => {
                 const rows = result.data;
                 if (rows.length < 2) return alert('Fichier vide ou invalide.');
@@ -567,17 +580,14 @@ function importCSVFile(file, classe) {
                     if (isNaN(arret) || isNaN(lance)) continue;
 
                     const eleve = matchEleve(nomComplet, eleves);
-                    if (!eleve) {
-                        console.warn(`Élève non trouvé : ${nomComplet}`);
-                        continue;
-                    }
+                    if (!eleve) continue;
 
                     vitesses[eleve.id] = { arret, lance, timestamp: Date.now() };
                     nbLignes++;
                 }
 
                 localStorage.setItem(getVitessesKey(classe), JSON.stringify(vitesses));
-                alert(`✅ ${nbLignes} vitesse(s) importée(s) depuis le CSV.`);
+                alert(`✅ ${nbLignes} vitesse(s) importée(s).`);
             }
         });
     };
@@ -590,21 +600,16 @@ function matchEleve(nomComplet, eleves) {
     const parts = normNomComplet.split(/\s+/);
 
     for (const e of eleves) {
-        const nomE = norm(e.nom);
-        const prenomE = norm(e.prenom);
+        const nomE = norm(e.nom), prenomE = norm(e.prenom);
         if (normNomComplet === `${prenomE} ${nomE}` || normNomComplet === `${nomE} ${prenomE}`) return e;
     }
-
     for (const e of eleves) {
         if (parts.length >= 2) {
-            const p1 = parts[0];
-            const p2 = parts[parts.length - 1];
-            const nomE = norm(e.nom);
-            const prenomE = norm(e.prenom);
+            const p1 = parts[0], p2 = parts[parts.length - 1];
+            const nomE = norm(e.nom), prenomE = norm(e.prenom);
             if ((p1 === prenomE && p2 === nomE) || (p1 === nomE && p2 === prenomE)) return e;
         }
     }
-
     return null;
 }
 
@@ -616,7 +621,7 @@ window.relaisExportConfig = function() {
     if (!activeClasse) return alert('Sélectionnez une classe.');
 
     const data = {
-        version: 1,
+        version: 2,
         classe: activeClasse,
         activite: 'relais',
         date: new Date().toISOString().slice(0,10).replace(/-/g,''),
@@ -624,7 +629,12 @@ window.relaisExportConfig = function() {
         groupes: JSON.parse(localStorage.getItem(getStorageKey(activeClasse)) || '{}'),
         vitesses: JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}'),
         mode: document.getElementById('relaisMode')?.value || 'essai',
-        nbPlots: parseInt(document.getElementById('relaisNbPlots')?.value) || 14
+        nbPlots: parseInt(document.getElementById('relaisNbPlots')?.value) || 14,
+        distances2zones: {
+            z1: parseInt(document.getElementById('relaisDistZ1')?.value) || 20,
+            trans: parseInt(document.getElementById('relaisDistTrans')?.value) || 10,
+            z2: parseInt(document.getElementById('relaisDistZ2')?.value) || 20
+        }
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -649,6 +659,7 @@ window.relaisImportConfig = function(event) {
             if (data.mode) localStorage.setItem(`eps_arena_relais_mode_${classe}`, data.mode);
             if (data.nbPlots) localStorage.setItem(`eps_arena_relais_nb_plots_${classe}`, data.nbPlots);
             if (data.sousActivite) localStorage.setItem(getSousActiviteKey(classe), data.sousActivite);
+            if (data.distances2zones) localStorage.setItem(getDistancesKey(classe), JSON.stringify(data.distances2zones));
 
             const select = document.getElementById('selectClasse');
             if (select && select.value !== classe) {
@@ -667,7 +678,7 @@ window.relaisImportConfig = function(event) {
 };
 
 // ============================================================
-// TRANSMISSION FIREBASE (RGPD-COMPLIANT + SOUS-ACTIVITÉ)
+// TRANSMISSION FIREBASE
 // ============================================================
 export async function transmettreRelaisConfig() {
     const activeClasse = getCurrentClasse();
@@ -677,37 +688,9 @@ export async function transmettreRelaisConfig() {
     const basePath = `etablissements/0680013V/profs/${profCode}/${activeClasse}/relais`;
 
     const sousActivite = localStorage.getItem(getSousActiviteKey(activeClasse)) || 'relais10s';
-    const mode = document.getElementById('relaisMode')?.value || 'essai';
-    const nbPlots = parseInt(document.getElementById('relaisNbPlots')?.value) || 14;
+    const modeEl = document.getElementById(sousActivite === 'relais2zones' ? 'relaisMode2' : 'relaisMode');
+    const mode = modeEl?.value || 'essai';
 
-    const configData = {
-        activite: 'relais',
-        sousActivite: sousActivite,
-        mode: mode,
-        nbPlots: nbPlots,
-        groupes: {}
-    };
-
-    // ============================================================
-    // CAS 1 : RELAIS 2 ZONES (pas de groupes, pas de vitesses)
-    // ============================================================
-    if (sousActivite === 'relais2zones') {
-        try {
-            await set(ref(db, `${basePath}/config`), configData);
-            await set(ref(db, `${basePath}/vitesses`), null);  // Purger au cas où
-            await set(ref(db, `etablissements/0680013V/profs/${profCode}/${activeClasse}/config`), { activite: 'relais' });
-            await set(ref(db, `etablissements/0680013V/profs/${profCode}/active_classes/${activeClasse}`), true);
-            alert('✅ Mode RELAIS 2 ZONES transmis aux iPads.');
-        } catch (err) {
-            console.error(err);
-            alert('❌ Erreur lors de la transmission.\nVérifie la console (F12).');
-        }
-        return;
-    }
-
-    // ============================================================
-    // CAS 2 : RELAIS 10S (groupes + vitesses + classement)
-    // ============================================================
     const affectations = JSON.parse(localStorage.getItem(getStorageKey(activeClasse)) || '{}');
     if (!affectations.groupes || affectations.groupes.length === 0) {
         return alert('Générez d\'abord les groupes.');
@@ -718,19 +701,30 @@ export async function transmettreRelaisConfig() {
     const vitessesLocales = JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}');
     const vitessesFirebase = {};
 
-    // Nettoyer les groupes vides au milieu
+    // Nettoyage : ne garder que les groupes non vides, renuméroter 0..n-1
     const groupesNettoyes = [];
-    affectations.groupes.forEach((ids, originalIdx) => {
-        if (ids && ids.length > 0) {
-            groupesNettoyes.push({ ids, originalIdx });
-        }
+    affectations.groupes.forEach((ids) => {
+        if (ids && ids.length > 0) groupesNettoyes.push({ ids });
     });
 
-    if (groupesNettoyes.length === 0) {
-        return alert('Aucun groupe ne contient d\'élève.');
-    }
+    if (groupesNettoyes.length === 0) return alert('Aucun groupe ne contient d\'élève.');
 
-    console.log(`[Relais] Nettoyage : ${groupesNettoyes.length} groupes non vides sur ${affectations.groupes.length}`);
+    const configData = {
+        activite: 'relais',
+        sousActivite: sousActivite,
+        mode: mode,
+        groupes: {}
+    };
+
+    if (sousActivite === 'relais10s') {
+        configData.nbPlots = parseInt(document.getElementById('relaisNbPlots')?.value) || 14;
+    } else {
+        configData.distances2zones = {
+            z1: parseInt(document.getElementById('relaisDistZ1')?.value) || 20,
+            trans: parseInt(document.getElementById('relaisDistTrans')?.value) || 10,
+            z2: parseInt(document.getElementById('relaisDistZ2')?.value) || 20
+        };
+    }
 
     groupesNettoyes.forEach((g, newIdx) => {
         const membres = g.ids.map((id, i) => {
@@ -750,47 +744,33 @@ export async function transmettreRelaisConfig() {
             const v = vitessesLocales[id];
             if (v && v.arret && v.lance) {
                 vitessesFirebase[`${newIdx}_${lettre}`] = {
-                    arret: v.arret,
-                    lance: v.lance,
-                    timestamp: v.timestamp || Date.now()
+                    arret: v.arret, lance: v.lance, timestamp: v.timestamp || Date.now()
                 };
             }
         });
     });
 
-    console.log(`[Relais] Config finale : ${Object.keys(configData.groupes).length} groupes, ${Object.keys(vitessesFirebase).length} vitesses`);
-
     try {
         await set(ref(db, `${basePath}/config`), configData);
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/${activeClasse}/config`), { activite: 'relais' });
-
-        if (Object.keys(vitessesFirebase).length > 0) {
-            await set(ref(db, `${basePath}/vitesses`), vitessesFirebase);
-        } else {
-            await set(ref(db, `${basePath}/vitesses`), null);
-        }
-
+        await set(ref(db, `${basePath}/vitesses`), Object.keys(vitessesFirebase).length > 0 ? vitessesFirebase : null);
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/active_classes/${activeClasse}`), true);
 
-        // Fusionner mapping local (nettoyage des anciennes entrées relais)
+        // Fusionner le mapping local
         const existingMapping = getLocalMapping(activeClasse) || {};
         const cleanedMapping = {};
         for (const [k, v] of Object.entries(existingMapping)) {
             const isRelaisKey = /^\d+_[a-z]$/.test(k.replace(`${activeClasse}_`, ''));
             if (!isRelaisKey) cleanedMapping[k] = v;
         }
-        const mergedMapping = { ...cleanedMapping, ...localMapping };
-        setLocalMapping(activeClasse, mergedMapping);
+        setLocalMapping(activeClasse, { ...cleanedMapping, ...localMapping });
 
-        alert(`✅ Configuration Relais 10s transmise. ${Object.keys(configData.groupes).length} groupes, ${Object.keys(vitessesFirebase).length} vitesses.`);
+        alert(`✅ Configuration transmise.\n${Object.keys(configData.groupes).length} groupes · ${sousActivite === 'relais2zones' ? 'Mode 2 zones' : 'Mode 10s'}`);
     } catch (err) {
         console.error(err);
-        alert('❌ Erreur lors de la transmission.\nVérifie la console (F12).');
+        alert('❌ Erreur lors de la transmission.');
     }
 }
 
-window.relaisTransmettre = async function() {
-    await transmettreRelaisConfig();
-};
-
+window.relaisTransmettre = async function() { await transmettreRelaisConfig(); };
 window.initRelaisInterface = initRelaisInterface;
