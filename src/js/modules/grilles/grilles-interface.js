@@ -1,5 +1,5 @@
 // src/js/modules/grilles/grilles-interface.js
-// UI Prof : bibliothèque + passation + export
+// UI Prof : bibliothèque + passation + export + auto-évaluations reçues
 
 import {
     getToutesGrilles, getGrille, sauvegarderGrille, supprimerGrille, figerGrille,
@@ -17,9 +17,10 @@ let currentClasse = '';
 let currentGrille = null;
 let currentPeriode = 'Début';
 let currentEvaluations = {};
+let _vueCompacte = false;
 
 // ============================================================
-// POINT D'ENTRÉE (appelé depuis layout.js)
+// POINT D'ENTRÉE
 // ============================================================
 export function initGrillesInterface() {
     const container = document.getElementById('viewEvaluations');
@@ -28,7 +29,11 @@ export function initGrillesInterface() {
     currentClasse = getCurrentClasse();
     container.innerHTML = '';
 
-    renderBibliotheque(container);
+    if (currentGrille) {
+        renderPassation(container);
+    } else {
+        renderBibliotheque(container);
+    }
 }
 
 // ============================================================
@@ -37,7 +42,6 @@ export function initGrillesInterface() {
 function renderBibliotheque(container) {
     const grilles = getToutesGrilles();
 
-    // Grouper par activité
     const parActivite = {};
     grilles.forEach(g => {
         if (!parActivite[g.activite]) parActivite[g.activite] = [];
@@ -46,7 +50,7 @@ function renderBibliotheque(container) {
 
     let html = `
         <div class="space-y-4">
-                        <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
+            <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
                 <div>
                     <h2 class="text-xl font-black text-blue-400">📋 Bibliothèque de grilles</h2>
                     <p class="text-xs text-slate-400">${grilles.length} grille(s) disponible(s)</p>
@@ -104,14 +108,10 @@ function renderBibliotheque(container) {
                             </button>
                             <button onclick="window.grillesExporterVierge('${g.id}')"
                                     class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95"
-                                    title="Exporter la grille vierge">
-                                ⬇️
-                            </button>
+                                    title="Exporter la grille vierge">⬇️</button>
                             <button onclick="window.grillesSupprimer('${g.id}')"
                                     class="bg-red-900/50 hover:bg-red-800 px-3 py-2 rounded-xl font-black text-xs text-red-300 active:scale-95"
-                                    title="Supprimer">
-                                🗑️
-                            </button>
+                                    title="Supprimer">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -146,6 +146,7 @@ function renderPassation(container) {
 
     let html = `
         <div class="space-y-4">
+            <!-- EN-TÊTE + PÉRIODES -->
             <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
                 <div>
                     <button onclick="window.grillesRetourBibliotheque()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95 mb-2">
@@ -163,6 +164,47 @@ function renderPassation(container) {
                     `).join('')}
                 </div>
             </div>
+
+            <!-- ✅ MENU D'ACTIONS EN HAUT -->
+            <div class="flex gap-2 flex-wrap bg-slate-800 p-3 rounded-2xl border border-slate-700">
+                <button onclick="window.grillesSauvegarder()"
+                        class="flex-1 min-w-[130px] bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
+                    💾 Sauvegarder
+                </button>
+                <button onclick="window.grillesRemplirAutoGlobal()"
+                        class="flex-1 min-w-[130px] bg-pink-600 hover:bg-pink-500 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95 border-2 border-pink-400">
+                    🤖 Tout remplir auto
+                </button>
+                <button onclick="window.grillesToggleVueCompacte()"
+                        class="flex-1 min-w-[130px] bg-cyan-700 hover:bg-cyan-600 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
+                    <span id="grilles-vue-label">👁️ Vue compacte</span>
+                </button>
+                <button onclick="window.grillesActiver()"
+                        class="bg-blue-600 hover:bg-blue-500 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95 border-2 border-blue-400">
+                    📡 Activer iPads
+                </button>
+                <button onclick="window.grillesDesactiver()"
+                        class="bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
+                    ⏹ Désactiver
+                </button>
+                <button onclick="window.grillesGenererDonneesTest()"
+                        class="bg-orange-700 hover:bg-orange-600 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
+                    🧪 Test
+                </button>
+                <button onclick="window.grillesFiger()"
+                        class="bg-amber-600 hover:bg-amber-500 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95 ${currentGrille.figee ? 'opacity-50 cursor-not-allowed' : ''}"
+                        ${currentGrille.figee ? 'disabled' : ''}>
+                    🔒 ${currentGrille.figee ? 'Figée' : 'Figer'}
+                </button>
+                <button onclick="window.grillesExporterNotes()"
+                        class="bg-indigo-600 hover:bg-indigo-500 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
+                    📥 Notes XLS
+                </button>
+                <button onclick="window.grillesExporterRubrique()"
+                        class="bg-purple-600 hover:bg-purple-500 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
+                    📥 Rubrique XLS
+                </button>
+            </div>
     `;
 
     // Bandeau dernier niveau Élève
@@ -172,15 +214,69 @@ function renderPassation(container) {
             html += `
                 <div class="bg-amber-900/20 border border-amber-500/50 rounded-xl p-3 text-xs text-amber-200">
                     💡 <strong class="text-amber-400">Info :</strong> Certains élèves ont déjà un niveau "Élève" enregistré dans une autre activité.
-                    Il sera pré-rempli automatiquement lors de la saisie.
+                    Il sera pré-rempli automatiquement.
                 </div>
             `;
         }
     }
 
-    // Tableau
-    html += `
-        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 overflow-x-auto">
+    // ============================================================
+    // VUE COMPACTE
+    // ============================================================
+    if (_vueCompacte) {
+        html += `<div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="text-[10px] text-slate-400 uppercase">
+                        <th class="p-2 text-left sticky left-0 bg-slate-800 min-w-[130px]">Élève</th>
+                        ${currentGrille.criteres.map(c => `
+                            <th class="p-1 text-center min-w-[80px]">
+                                <div class="font-black text-white text-[9px] leading-tight">${c.nom.substring(0, 22)}</div>
+                            </th>
+                        `).join('')}
+                        <th class="p-1 text-center min-w-[50px]">/100</th>
+                        <th class="p-1 text-center min-w-[50px]">/20</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        for (const e of eleves) {
+            const notes = eleveData[e.id]?.notes || {};
+            const noteFinale = calculerNoteFinale(notes, currentGrille.criteres);
+
+            html += `<tr class="border-t border-slate-700 hover:bg-slate-700/30">`;
+            html += `<td class="p-1 sticky left-0 bg-slate-800 font-bold text-white text-[11px]">${e.prenom} ${e.nom}</td>`;
+
+            for (const c of currentGrille.criteres) {
+                const val = notes[c.id];
+                const couleur = val !== undefined ? getCouleurNiveau(val) : '#334155';
+                html += `
+                    <td class="p-1 text-center">
+                        <button onclick="window.grillesCycleNote('${e.id}', '${c.id}')"
+                                class="w-full h-9 rounded font-black text-sm transition-all active:scale-95"
+                                style="background-color: ${couleur}; color: white;"
+                                title="${val !== undefined ? 'Niveau ' + val : 'Non évalué'}">
+                            ${val !== undefined ? val : '--'}
+                        </button>
+                    </td>
+                `;
+            }
+
+            html += `<td class="p-1 text-center font-black text-yellow-400">${noteFinale.sur100 !== null ? noteFinale.sur100 : '--'}</td>`;
+            html += `<td class="p-1 text-center font-black text-emerald-400">${noteFinale.sur20 !== null ? noteFinale.sur20 : '--'}</td>`;
+            html += `</tr>`;
+        }
+
+        html += `</tbody></table>
+            <p class="text-[10px] text-slate-500 mt-2 text-center">
+                💡 Clique sur une case pour cycler : 4 → 3 → 2 → 1 → 4
+            </p>
+        </div>`;
+    } else {
+        // ============================================================
+        // VUE DÉTAILLÉE
+        // ============================================================
+        html += `<div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>
                     <tr class="text-xs text-slate-400 uppercase border-b border-slate-700">
@@ -196,80 +292,45 @@ function renderPassation(container) {
                         <th class="p-2 text-center">Note /20</th>
                     </tr>
                 </thead>
-                <tbody>
-    `;
+                <tbody>`;
 
-    for (const e of eleves) {
-        const notes = eleveData[e.id]?.notes || {};
-        const noteFinale = calculerNoteFinale(notes, currentGrille.criteres);
+        for (const e of eleves) {
+            const notes = eleveData[e.id]?.notes || {};
+            const noteFinale = calculerNoteFinale(notes, currentGrille.criteres);
 
-        html += `<tr class="border-b border-slate-700/50 hover:bg-slate-700/30">`;
-        html += `<td class="p-2 sticky left-0 bg-slate-800 font-bold text-white">${e.prenom} ${e.nom}</td>`;
+            html += `<tr class="border-b border-slate-700/50 hover:bg-slate-700/30">`;
+            html += `<td class="p-2 sticky left-0 bg-slate-800 font-bold text-white">${e.prenom} ${e.nom}</td>`;
 
-        for (const c of currentGrille.criteres) {
-            const val = notes[c.id];
-            html += `
-                <td class="p-2 text-center">
-                    <div class="flex justify-center gap-1">
-                        ${NIVEAUX.map(n => `
-                            <button onclick="window.grillesSetNote('${e.id}', '${c.id}', ${n.valeur})"
-                                    class="w-8 h-8 rounded-lg font-black text-xs ${val === n.valeur ? 'text-white ring-2 ring-white' : 'text-slate-400 hover:text-white'}"
-                                    style="background-color: ${val === n.valeur ? n.couleur : '#334155'};"
-                                    title="${n.label}">
-                                ${n.valeur}
-                            </button>
-                        `).join('')}
-                    </div>
-                    ${c.type === 'auto' ? `<button onclick="window.grillesRemplirAuto('${e.id}', '${c.id}')" class="text-[9px] text-emerald-400 hover:text-emerald-300 mt-0.5 font-bold">🤖 Auto</button>` : ''}
-                </td>
-            `;
+            for (const c of currentGrille.criteres) {
+                const val = notes[c.id];
+                html += `
+                    <td class="p-2 text-center">
+                        <div class="flex justify-center gap-1">
+                            ${NIVEAUX.map(n => `
+                                <button onclick="window.grillesSetNote('${e.id}', '${c.id}', ${n.valeur})"
+                                        class="w-8 h-8 rounded-lg font-black text-xs ${val === n.valeur ? 'text-white ring-2 ring-white' : 'text-slate-400 hover:text-white'}"
+                                        style="background-color: ${val === n.valeur ? n.couleur : '#334155'};"
+                                        title="${n.label}">
+                                    ${n.valeur}
+                                </button>
+                            `).join('')}
+                        </div>
+                        ${c.type === 'auto' ? `<button onclick="window.grillesRemplirAuto('${e.id}', '${c.id}')" class="text-[9px] text-emerald-400 hover:text-emerald-300 mt-0.5 font-bold">🤖 Auto</button>` : ''}
+                    </td>
+                `;
+            }
+
+            html += `<td class="p-2 text-center font-black text-yellow-400">${noteFinale.sur100 !== null ? noteFinale.sur100 : '--'}</td>`;
+            html += `<td class="p-2 text-center font-black text-emerald-400">${noteFinale.sur20 !== null ? noteFinale.sur20 : '--'}</td>`;
+            html += `</tr>`;
         }
 
-        html += `<td class="p-2 text-center font-black text-yellow-400">${noteFinale.sur100 !== null ? noteFinale.sur100 : '--'}</td>`;
-        html += `<td class="p-2 text-center font-black text-emerald-400">${noteFinale.sur20 !== null ? noteFinale.sur20 : '--'}</td>`;
-        html += `</tr>`;
+        html += `</tbody></table></div>`;
     }
 
-    html += `
-                </tbody>
-            </table>
-        </div>
-                <div class="flex gap-3 flex-wrap">
-            <button onclick="window.grillesSauvegarder()"
-                    class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-3 rounded-2xl font-black text-white active:scale-95">
-                💾 Sauvegarder les notes
-            </button>
-            <button onclick="window.grillesFiger()"
-                    class="bg-amber-600 hover:bg-amber-500 px-4 py-3 rounded-2xl font-black text-white active:scale-95 ${currentGrille.figee ? 'opacity-50 cursor-not-allowed' : ''}"
-                    ${currentGrille.figee ? 'disabled' : ''}>
-                🔒 ${currentGrille.figee ? 'Déjà figée' : 'Figer la grille'}
-            </button>
-            <button onclick="window.grillesActiver()"
-                    class="bg-blue-600 hover:bg-blue-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95 border-2 border-blue-400">
-                📡 Activer pour les iPads
-            </button>
-            <button onclick="window.grillesDesactiver()"
-                    class="bg-slate-700 hover:bg-slate-600 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
-                ⏹ Désactiver
-            </button>
-            <button onclick="window.grillesGenererDonneesTest()"
-                    class="bg-pink-600 hover:bg-pink-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
-                🧪 Générer données test
-            </button>
-            <button onclick="window.grillesExporterNotes()"
-                    class="bg-indigo-600 hover:bg-indigo-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
-                📥 Export notes iDoeceo
-            </button>
-            <button onclick="window.grillesExporterRubrique()"
-                    class="bg-purple-600 hover:bg-purple-500 px-4 py-3 rounded-2xl font-black text-xs text-white active:scale-95">
-                📥 Export rubrique iDoeceo
-            </button>
-        </div>
-    `;
-
+    html += `</div>`;
     container.innerHTML = html;
 
-    // Charger les données auto pour le Relais
     if (currentGrille.activite === 'relais') {
         chargerDonneesAutoRelais(eleves);
     }
@@ -283,12 +344,10 @@ async function chargerDonneesAutoRelais(eleves) {
         const config = snap.val();
         if (!config) return;
 
-        // Calculer les niveaux auto pour chaque élève
+        window._grillesAutoData = window._grillesAutoData || {};
         for (const e of eleves) {
             const niveaux = await calculerNiveauxRelais(currentClasse, e.id, config);
             if (Object.keys(niveaux).length > 0) {
-                // Stocker temporairement pour utilisation par le bouton "Auto"
-                window._grillesAutoData = window._grillesAutoData || {};
                 window._grillesAutoData[e.id] = niveaux;
             }
         }
@@ -297,7 +356,7 @@ async function chargerDonneesAutoRelais(eleves) {
 }
 
 // ============================================================
-// ACTIONS GLOBALES
+// ACTIONS
 // ============================================================
 window.grillesImporterXLSX = function() {
     document.getElementById('grillesInputFile').click();
@@ -309,7 +368,6 @@ window.grillesTraiterImport = async function(event) {
 
     try {
         const grille = await importerGrilleXLSX(file);
-        // Vérifier si une grille avec le même id existe
         const existante = getGrille(grille.id);
         if (existante) {
             if (!confirm(`Une grille "${grille.titre}" existe déjà. La remplacer ?`)) {
@@ -337,6 +395,7 @@ window.grillesUtiliser = function(id) {
 
 window.grillesRetourBibliotheque = function() {
     currentGrille = null;
+    _vueCompacte = false;
     const container = document.getElementById('viewEvaluations');
     renderBibliotheque(container);
 };
@@ -357,7 +416,6 @@ window.grillesSetNote = function(eleveId, critereId, valeur) {
     evals[currentGrille.id][currentPeriode][eleveId].notes[critereId] = valeur;
     evals[currentGrille.id][currentPeriode][eleveId].timestamp = Date.now();
 
-    // Sauvegarder le niveau "Élève" si c'est ce critère
     const critere = currentGrille.criteres.find(c => c.id === critereId);
     if (critere && critere.nom.toLowerCase().includes('élève')) {
         setDernierNiveauEleve(currentClasse, eleveId, valeur, currentGrille.activite);
@@ -366,6 +424,17 @@ window.grillesSetNote = function(eleveId, critereId, valeur) {
     sauvegarderEvaluation(currentClasse, currentGrille.id, currentPeriode, eleveId, evals[currentGrille.id][currentPeriode][eleveId].notes);
     const container = document.getElementById('viewEvaluations');
     renderPassation(container);
+};
+
+// Cycle 4 → 3 → 2 → 1 → 4 (vue compacte)
+window.grillesCycleNote = function(eleveId, critereId) {
+    const evals = getEvaluationsClasse(currentClasse);
+    const actuel = evals[currentGrille.id]?.[currentPeriode]?.[eleveId]?.notes?.[critereId];
+    let suivant;
+    if (actuel === undefined || actuel === null) suivant = 4;
+    else if (actuel === 1) suivant = 4;
+    else suivant = actuel - 1;
+    window.grillesSetNote(eleveId, critereId, suivant);
 };
 
 window.grillesRemplirAuto = function(eleveId, critereId) {
@@ -378,7 +447,6 @@ window.grillesRemplirAuto = function(eleveId, critereId) {
     const critere = currentGrille.criteres.find(c => c.id === critereId);
     if (!critere) return;
 
-    // Mapper par pattern sur le nom du critère
     const nomLower = (critere.nom || '').toLowerCase();
     let valeur = null;
     let source = '';
@@ -389,17 +457,105 @@ window.grillesRemplirAuto = function(eleveId, critereId) {
     } else if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
         valeur = data['qualite_de_transmission'];
         source = 'transmission 2 zones';
+    } else if (nomLower.includes('projet')) {
+        valeur = data['projet'];
+        source = 'projet arcathlon';
+    } else if (nomLower.includes('allure')) {
+        valeur = data['allure'];
+        source = 'allure';
+    } else if (nomLower.includes('grimpeur')) {
+        valeur = data['grimpeur'] || data['grimpeur_bloc'] || data['grimpeur_voies'];
+        source = 'escalade';
     }
 
     if (valeur === undefined || valeur === null) {
-        alert(`Pas de donnée auto pour ce critère.\n\nNom du critère : "${critere.nom}"\nClés disponibles : ${Object.keys(data).join(', ')}`);
+        alert(`Pas de donnée auto pour ce critère.\n\nNom : "${critere.nom}"\nClés dispo : ${Object.keys(data).join(', ')}`);
         return;
     }
 
-    console.log(`[Grilles] 🤖 Auto : ${critere.nom} → niveau ${valeur} (source : ${source})`);
+    console.log(`[Grilles] 🤖 Auto : ${critere.nom} → niveau ${valeur} (${source})`);
     window.grillesSetNote(eleveId, critereId, valeur);
 };
 
+// ============================================================
+// TOUT REMPLIR EN AUTO
+// ============================================================
+window.grillesRemplirAutoGlobal = async function() {
+    if (!currentGrille) return;
+    if (!window._grillesAutoData || Object.keys(window._grillesAutoData).length === 0) {
+        alert('Aucune donnée auto disponible.\n\nVérifie que :\n- Le module Relais a des mesures\n- Clique sur 🧪 Test pour générer des données bidons');
+        return;
+    }
+
+    const eleves = getExistingEleves(currentClasse);
+    const evals = getEvaluationsClasse(currentClasse);
+    if (!evals[currentGrille.id]) evals[currentGrille.id] = {};
+    if (!evals[currentGrille.id][currentPeriode]) evals[currentGrille.id][currentPeriode] = {};
+
+    let nbRemplis = 0;
+    let nbCriteresAuto = 0;
+
+    for (const eleve of eleves) {
+        const data = window._grillesAutoData[eleve.id];
+        if (!data) continue;
+
+        const notesEleve = evals[currentGrille.id][currentPeriode][eleve.id]?.notes || {};
+
+        for (const critere of currentGrille.criteres) {
+            if (critere.type !== 'auto') continue;
+            nbCriteresAuto++;
+
+            const nomLower = (critere.nom || '').toLowerCase();
+            let valeur = null;
+
+            if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
+                valeur = data['performance_donneur'];
+            } else if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
+                valeur = data['qualite_de_transmission'];
+            } else if (nomLower.includes('projet')) {
+                valeur = data['projet'];
+            } else if (nomLower.includes('allure')) {
+                valeur = data['allure'];
+            } else if (nomLower.includes('grimpeur')) {
+                valeur = data['grimpeur'] || data['grimpeur_bloc'] || data['grimpeur_voies'];
+            }
+
+            if (valeur !== undefined && valeur !== null) {
+                notesEleve[critere.id] = valeur;
+                nbRemplis++;
+            }
+        }
+
+        evals[currentGrille.id][currentPeriode][eleve.id] = {
+            notes: notesEleve,
+            timestamp: Date.now()
+        };
+    }
+
+    // Sauvegarder
+    const all = JSON.parse(localStorage.getItem('eps_arena_grilles_evaluations') || '{}');
+    if (!all[currentClasse]) all[currentClasse] = {};
+    if (!all[currentClasse][currentGrille.id]) all[currentClasse][currentGrille.id] = {};
+    all[currentClasse][currentGrille.id][currentPeriode] = evals[currentGrille.id][currentPeriode];
+    localStorage.setItem('eps_arena_grilles_evaluations', JSON.stringify(all));
+
+    alert(`🤖 ${nbRemplis} case(s) remplie(s) automatiquement sur ${nbCriteresAuto} possible(s).`);
+    renderPassation(document.getElementById('viewEvaluations'));
+};
+
+// ============================================================
+// VUE COMPACTE
+// ============================================================
+window.grillesToggleVueCompacte = function() {
+    _vueCompacte = !_vueCompacte;
+    const label = document.getElementById('grilles-vue-label');
+    if (label) label.textContent = _vueCompacte ? '📊 Vue détaillée' : '👁️ Vue compacte';
+    renderPassation(document.getElementById('viewEvaluations'));
+};
+
+// ============================================================
+// SAUVEGARDE / FIGER / EXPORT
+// ============================================================
 window.grillesSauvegarder = function() {
     alert('✅ Notes sauvegardées automatiquement.');
 };
@@ -437,32 +593,8 @@ window.grillesSupprimer = function(id) {
     initGrillesInterface();
 };
 
-window.grillesActiver = async function() {
-    if (!currentGrille) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { db, ref, set } = await import('../../core/firebase-service.js');
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
-    await set(ref(db, path), {
-        actif: true,
-        grilleId: currentGrille.id,
-        periode: currentPeriode,
-        timestamp: Date.now()
-    });
-    // Config activité principale
-    await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), { activite: 'grilles' });
-    alert('✅ Auto-évaluation activée pour les iPads.');
-};
-
-window.grillesDesactiver = async function() {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { db, ref, set } = await import('../../core/firebase-service.js');
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
-    await set(ref(db, path), { actif: false });
-    alert('✅ Auto-évaluation désactivée.');
-};
-
 // ============================================================
-// ACTIVATION POUR LES IPADS
+// ACTIVATION IPADS
 // ============================================================
 window.grillesActiver = async function() {
     if (!currentGrille) return;
@@ -477,7 +609,6 @@ window.grillesActiver = async function() {
             periode: currentPeriode,
             timestamp: Date.now()
         });
-        // Config activité principale (déclencheur kiosque)
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), {
             activite: 'grilles'
         });
@@ -504,7 +635,7 @@ window.grillesDesactiver = async function() {
 };
 
 // ============================================================
-// GÉNÉRATION DE DONNÉES TEST (pour valider le pré-remplissage)
+// GÉNÉRATION DONNÉES TEST
 // ============================================================
 window.grillesGenererDonneesTest = async function() {
     if (!currentClasse) {
@@ -518,21 +649,15 @@ window.grillesGenererDonneesTest = async function() {
         return;
     }
 
-    // Vérifier s'il existe déjà des mesures
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { db, ref, set, get } = await import('../../core/firebase-service.js');
+    const { db, ref, set, push, onValue } = await import('../../core/firebase-service.js');
 
     const mesures10sPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
     const mesures2zPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
     const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/config`;
 
-    // Vérifier la config relais
     const configSnap = await new Promise(resolve => {
-        const { onValue } = window._fb || {};
-        // Fallback : import direct
-        import('../../core/firebase-service.js').then(m => {
-            m.onValue(m.ref(m.db, configPath), resolve, { onlyOnce: true });
-        });
+        onValue(ref(db, configPath), resolve, { onlyOnce: true });
     });
 
     const config = configSnap.val();
@@ -545,23 +670,21 @@ window.grillesGenererDonneesTest = async function() {
         return;
     }
 
-    const { push } = await import('../../core/firebase-service.js');
     let nb10s = 0, nb2z = 0;
 
-    // Parcourir les groupes et élèves
     for (const [groupeIdx, groupe] of Object.entries(config.groupes)) {
         for (const membre of groupe.membres) {
             const lettre = membre.lettre;
 
             // 3 essais 10s
             for (let i = 0; i < 3; i++) {
-                const vTheo = 20 + Math.random() * 5; // entre 20 et 25
-                const ecart = (Math.random() - 0.5) * 4; // -2 à +2
+                const vTheo = 20 + Math.random() * 5;
+                const ecart = (Math.random() - 0.5) * 4;
                 const vReelle = Math.round((vTheo + ecart) * 10) / 10;
                 const score = Math.round((5 + ecart) * 10) / 10;
-                const zoneAtteinte = Math.round(vReelle - 14); // zone 1-14
+                const zoneAtteinte = Math.round(vReelle - 14);
 
-                const mesure = {
+                await push(ref(db, mesures10sPath), {
                     sousActivite: 'relais10s',
                     groupeIdx: parseInt(groupeIdx),
                     groupeNumero: groupe.numero,
@@ -574,8 +697,7 @@ window.grillesGenererDonneesTest = async function() {
                     score,
                     ecart: Math.round(ecart * 10) / 10,
                     timestamp: Date.now() - (3 - i) * 60000
-                };
-                await push(ref(db, mesures10sPath), mesure);
+                });
                 nb10s++;
             }
 
@@ -584,10 +706,9 @@ window.grillesGenererDonneesTest = async function() {
                 const vZ1 = 18 + Math.random() * 6;
                 const vZ2 = 18 + Math.random() * 6;
                 const moyenne = (vZ1 + vZ2) / 2;
-                const pct = 60 + Math.random() * 45; // 60 à 105%
+                const pct = 60 + Math.random() * 45;
                 const vTrans = moyenne * pct / 100;
 
-                // Calcul du score selon les paliers
                 let points = 0;
                 if (pct >= 100) points = 5;
                 else if (pct >= 90) points = 4;
@@ -595,7 +716,7 @@ window.grillesGenererDonneesTest = async function() {
                 else if (pct >= 70) points = 2;
                 else if (pct >= 60) points = 1;
 
-                const mesure = {
+                await push(ref(db, mesures2zPath), {
                     sousActivite: 'relais2zones',
                     groupeIdx: parseInt(groupeIdx),
                     groupeNumero: groupe.numero,
@@ -618,8 +739,7 @@ window.grillesGenererDonneesTest = async function() {
                     pourcentageTransmission: Math.round(pct),
                     score: points,
                     timestamp: Date.now() - (3 - i) * 60000
-                };
-                await push(ref(db, mesures2zPath), mesure);
+                });
                 nb2z++;
             }
         }
@@ -627,6 +747,7 @@ window.grillesGenererDonneesTest = async function() {
 
     alert(`✅ Données test générées !\n${nb10s} essais 10s\n${nb2z} essais 2 zones\n\nLes boutons 🤖 Auto devraient maintenant fonctionner.`);
 };
+
 // ============================================================
 // AUTO-ÉVALUATIONS REÇUES
 // ============================================================
@@ -650,7 +771,7 @@ window.grillesVoirAutoEvals = function() {
                     <p class="text-xs text-slate-400">Classe ${currentClasse}</p>
                     <p class="text-[10px] text-amber-400 mt-1">🔒 Données anonymes — codes élèves</p>
                 </div>
-                <button onclick="document.getElementById('auto-evals-modal').remove()" 
+                <button onclick="document.getElementById('auto-evals-modal').remove()"
                         class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white">
                     ✖ Fermer
                 </button>
@@ -671,7 +792,6 @@ window.grillesVoirAutoEvals = function() {
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
-    // Écouter Firebase
     import('../../core/firebase-service.js').then(({ db, ref, onValue }) => {
         onValue(ref(db, path), (snap) => {
             const data = snap.val() || {};
@@ -686,7 +806,6 @@ window.grillesFiltrerAutoEvals = function(periode) {
     const container = document.getElementById('auto-evals-content');
     if (!container) return;
 
-    // Mettre à jour les boutons
     ['toutes', 'Début', 'Milieu', 'Fin'].forEach(p => {
         const btn = document.getElementById(`filtrer-${p}`);
         if (btn) {
@@ -696,7 +815,6 @@ window.grillesFiltrerAutoEvals = function(periode) {
         }
     });
 
-    // Filtrer
     const all = Object.entries(data).map(([key, val]) => ({ _key: key, ...val }));
     const filtered = periode === 'toutes' ? all : all.filter(e => e.periode === periode);
 
@@ -705,7 +823,6 @@ window.grillesFiltrerAutoEvals = function(periode) {
         return;
     }
 
-    // Grouper par grilleId + periode
     const groupes = {};
     filtered.forEach(e => {
         const key = `${e.grilleId}__${e.periode}`;
@@ -713,12 +830,10 @@ window.grillesFiltrerAutoEvals = function(periode) {
         groupes[key].items.push(e);
     });
 
-    // Charger les codes élèves pour mapping
     const eleves = getExistingEleves(currentClasse);
     const codeToNom = {};
     eleves.forEach(e => { codeToNom[String(e.codeAutoEval)] = `${e.prenom} ${e.nom}`; });
 
-    // Trier par timestamp desc
     Object.values(groupes).forEach(g => g.items.sort((a, b) => b.timestamp - a.timestamp));
 
     let html = '';
@@ -738,11 +853,10 @@ window.grillesFiltrerAutoEvals = function(periode) {
 
         g.items.forEach(item => {
             const nom = codeToNom[String(item.code)] || '?';
-            const date = new Date(item.timestamp).toLocaleString('fr-FR', { 
-                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+            const date = new Date(item.timestamp).toLocaleString('fr-FR', {
+                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
             });
 
-            // Calcul de la note finale
             let noteHtml = '';
             if (grille) {
                 const note = calculerNoteFinale(item.notes, grille.criteres);
@@ -750,7 +864,6 @@ window.grillesFiltrerAutoEvals = function(periode) {
                             <span class="text-emerald-400 font-black ml-2">${note.sur20 !== null ? note.sur20 + '/20' : '--'}</span>`;
             }
 
-            // Détail des notes par critère
             const notesDetail = grille ? grille.criteres.map(c => {
                 const val = item.notes[c.id];
                 if (val === undefined) return '';
@@ -764,9 +877,7 @@ window.grillesFiltrerAutoEvals = function(periode) {
                             <span class="bg-cyan-600 text-white font-black text-lg w-10 h-10 rounded-full flex items-center justify-center">${item.code}</span>
                             <span class="text-sm font-bold text-white">${nom}</span>
                         </div>
-                        <div class="text-right">
-                            ${noteHtml}
-                        </div>
+                        <div class="text-right">${noteHtml}</div>
                     </div>
                     <div class="flex flex-wrap gap-1 mb-1">${notesDetail}</div>
                     <div class="text-[10px] text-slate-500 mt-1">${date}</div>
@@ -780,8 +891,12 @@ window.grillesFiltrerAutoEvals = function(periode) {
     container.innerHTML = html;
 };
 
+// ============================================================
+// CLEANUP
+// ============================================================
 export function cleanupGrillesInterface() {
     currentGrille = null;
     currentClasse = '';
     currentEvaluations = {};
+    _vueCompacte = false;
 }

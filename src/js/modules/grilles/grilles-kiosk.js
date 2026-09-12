@@ -3,8 +3,7 @@
 // ⚠️ Aucune donnée nominative
 
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
-import { NIVEAUX, getCouleurNiveau } from './grilles-core.js';
-import { getToutesGrilles } from './grilles-core.js';
+import { NIVEAUX, getCouleurNiveau, getToutesGrilles } from './grilles-core.js';
 
 let currentClasse = '';
 let currentGrille = null;
@@ -14,7 +13,7 @@ let currentNotes = {};
 let configListener = null;
 
 // ============================================================
-// POINT D'ENTRÉE (appelé depuis eleve-app.js)
+// POINT D'ENTRÉE
 // ============================================================
 export function initGrillesKiosk(classe) {
     currentClasse = classe;
@@ -51,8 +50,6 @@ export function initGrillesKiosk(classe) {
 // ÉCRAN 1 : SAISIE DU CODE
 // ============================================================
 function renderChoixCode(container) {
-    let inputCode = '';
-
     container.innerHTML = `
         <div class="space-y-4 max-w-md mx-auto">
             <div class="text-center py-4">
@@ -110,10 +107,12 @@ function renderChoixCode(container) {
 }
 
 // ============================================================
-// ÉCRAN 2 : ÉVALUATION
+// ÉCRAN 2 : AUTO-ÉVALUATION (tableau)
 // ============================================================
 function renderEvaluation(container) {
     const criteres = currentGrille.criteres;
+    // Ordre des niveaux : 4 (à gauche) → 1 (à droite)
+    const niveauxTries = [...NIVEAUX].sort((a, b) => b.valeur - a.valeur);
 
     let html = `
         <div class="space-y-4">
@@ -125,35 +124,51 @@ function renderEvaluation(container) {
                 <button onclick="window.grillesKioskRetourCode()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Retour</button>
             </div>
 
-            <p class="text-slate-400 text-sm text-center">Pour chaque critère, choisis la phrase qui te correspond le mieux.</p>
+            <p class="text-slate-400 text-sm text-center">Pour chaque critère, touche la case qui te correspond le mieux.</p>
     `;
 
     criteres.forEach(c => {
+        const selected = currentNotes[c.id];
         html += `
-            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <h3 class="font-black text-white mb-3">${c.nom}</h3>
-                <div class="space-y-2">
+            <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 overflow-x-auto">
+                <h3 class="font-black text-white mb-3 text-sm">${c.nom}</h3>
+                <table class="w-full" style="table-layout: fixed; border-collapse: separate; border-spacing: 4px;">
+                    <thead>
+                        <tr>
+                            ${niveauxTries.map(n => `
+                                <th style="width: 25%; vertical-align: top;">
+                                    <div class="rounded-t-lg p-2 font-black text-[10px] leading-tight text-white text-center"
+                                         style="background-color: ${n.couleur};">
+                                        ${n.label}
+                                        <span class="block text-xl mt-0.5">${n.valeur}</span>
+                                    </div>
+                                </th>
+                            `).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            ${niveauxTries.map(n => {
+                                const isSelected = selected === n.valeur;
+                                return `
+                                    <td style="vertical-align: top;">
+                                        <button onclick="window.grillesKioskSetNote('${c.id}', ${n.valeur})"
+                                                class="w-full p-2 rounded-b-lg border-2 text-left text-[11px] leading-snug transition-all active:scale-95"
+                                                style="min-height: 100px;
+                                                       border-color: ${isSelected ? n.couleur : '#334155'};
+                                                       background-color: ${isSelected ? n.couleur + '40' : '#0f172a'};
+                                                       ${isSelected ? 'box-shadow: 0 0 0 2px ' + n.couleur + ';' : ''}">
+                                            ${isSelected ? '<div class="text-center text-lg mb-1" style="color:' + n.couleur + '">✓</div>' : ''}
+                                            <div class="text-slate-200">${n.descripteur || '--'}</div>
+                                        </button>
+                                    </td>
+                                `;
+                            }).join('')}
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         `;
-        // Niveaux du plus élevé au plus bas
-        const niveauxTries = [...c.niveaux].sort((a, b) => b.valeur - a.valeur);
-        niveauxTries.forEach(n => {
-            const selected = currentNotes[c.id] === n.valeur;
-            const couleur = getCouleurNiveau(n.valeur);
-            html += `
-                <button onclick="window.grillesKioskSetNote('${c.id}', ${n.valeur})"
-                        class="w-full text-left p-3 rounded-xl border-2 transition-all active:scale-95 ${selected ? 'ring-2 ring-white' : ''}"
-                        style="border-color: ${selected ? couleur : '#334155'}; background-color: ${selected ? couleur + '20' : '#0f172a'};">
-                    <div class="flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center font-black text-white flex-shrink-0"
-                             style="background-color: ${couleur}">
-                            ${n.valeur}
-                        </div>
-                        <div class="text-sm text-slate-200 flex-1">${n.descripteur || '--'}</div>
-                    </div>
-                </button>
-            `;
-        });
-        html += `</div></div>`;
     });
 
     html += `
@@ -186,14 +201,12 @@ window.grillesKioskSetNote = function(critereId, valeur) {
 window.grillesKioskValider = function() {
     if (!currentCode || !currentGrille) return;
 
-    // Vérifier que tous les critères sont remplis
     const manquants = currentGrille.criteres.filter(c => currentNotes[c.id] === undefined);
     if (manquants.length > 0) {
         alert(`Il manque ${manquants.length} critère(s) à évaluer.`);
         return;
     }
 
-    // Envoi anonyme vers Firebase
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
 
