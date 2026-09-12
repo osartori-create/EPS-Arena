@@ -367,14 +367,32 @@ window.grillesSetNote = function(eleveId, critereId, valeur) {
 window.grillesRemplirAuto = function(eleveId, critereId) {
     const data = window._grillesAutoData?.[eleveId];
     if (!data) {
-        alert('Aucune donnée automatique disponible pour cet élève.');
+        alert('Aucune donnée automatique pour cet élève.\n\nVérifie que :\n- Le module Relais est configuré\n- Il y a au moins 1 essai 10s et 1 essai 2 zones pour cet élève');
         return;
     }
-    const valeur = data[critereId];
-    if (valeur === undefined) {
-        alert('Pas de donnée auto pour ce critère.');
+
+    const critere = currentGrille.criteres.find(c => c.id === critereId);
+    if (!critere) return;
+
+    // Mapper par pattern sur le nom du critère
+    const nomLower = (critere.nom || '').toLowerCase();
+    let valeur = null;
+    let source = '';
+
+    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
+        valeur = data['performance_donneur'];
+        source = 'performance 10s';
+    } else if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
+        valeur = data['qualite_de_transmission'];
+        source = 'transmission 2 zones';
+    }
+
+    if (valeur === undefined || valeur === null) {
+        alert(`Pas de donnée auto pour ce critère.\n\nNom du critère : "${critere.nom}"\nClés disponibles : ${Object.keys(data).join(', ')}`);
         return;
     }
+
+    console.log(`[Grilles] 🤖 Auto : ${critere.nom} → niveau ${valeur} (source : ${source})`);
     window.grillesSetNote(eleveId, critereId, valeur);
 };
 

@@ -166,6 +166,33 @@ function showLogin() {
         codeList.innerHTML = '<p class="text-red-400 text-center">Aucune activité transmise.<br>Veuillez patienter...</p>';
         return;
     }
+    // SPÉCIAL AUTO-ÉVALUATION
+if (config.activite === 'grilles') {
+    setContainerWidth(true);
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
+    codeInfo.classList.add('hidden');
+    btnQuit.classList.add('hidden');
+    btnBackTerrain.classList.remove('hidden');
+
+    const grillesModule = document.getElementById('grilles-module');
+    if (grillesModule) {
+        grillesModule.classList.remove('hidden');
+        grillesModule.style.display = 'block';
+        initGrillesKiosk(selectedClass);
+    } else {
+        console.error('[eleve] Conteneur grilles-module introuvable !');
+    }
+    return;
+}
 
     // SPÉCIAL BADMINTON
     if (config.activite === 'badminton') {
