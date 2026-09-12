@@ -12,6 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="./libs/xlsx.full.min.js"></script>
     <!-- Ajout du CSS spécifique Évaluation -->
     <link rel="stylesheet" href="./src/css/evaluation.css">
     <style>
@@ -50,6 +51,7 @@
         <button id="btnTab1" onclick="switchTab('admin')" class="px-4 py-2 text-slate-500 tab-active text-blue-500 whitespace-nowrap">👨‍🏫 Administration</button>
         <button id="btnTab2" onclick="switchTab('activities')" class="px-4 py-2 text-slate-500 whitespace-nowrap">⚙️ Activités</button>
         <button id="btnTab5" onclick="switchTab('tools')" class="px-4 py-2 text-slate-500 whitespace-nowrap">🧰 Outils</button>
+        <button id="btnTab6" onclick="switchTab('evaluations')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📋 Évaluations</button>
     </nav>
 
     <div class="space-y-6">
@@ -474,6 +476,10 @@
                 <div id="calculateur-module" class="w-full max-w-xl"></div>
             </div>
         </div> <!-- Fin viewTools -->
+        <!-- ONGLET 6 : ÉVALUATIONS -->
+<div id="viewEvaluations" class="hidden space-y-4">
+    <!-- Rempli dynamiquement -->
+</div>
     </div> <!-- Fin space-y-6 -->
 
     <script type="module">

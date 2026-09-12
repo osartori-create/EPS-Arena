@@ -43,47 +43,46 @@ export function initLayout() {
 
     // 1. Gestion des onglets (CORRIGÉ : on n'utilise plus el.style.display pour les vues standard)
     window.switchTab = function(tabName) {
-        
-        // On cache TOUTES les vues standard en utilisant UNIQUEMENT la classe 'hidden'
-        ['admin', 'activities', 'live', 'tools'].forEach(t => {
-            const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
-            const el = document.getElementById(viewId);
-            if (el) {
-                el.classList.add('hidden'); 
-                // ⚠️ NE PAS TOUCHER à el.style.display ici, sinon ça écrase la classe Tailwind !
-            }
-        });
+    ['admin', 'activities', 'live', 'tools', 'evaluations'].forEach(t => {
+        const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
+        const el = document.getElementById(viewId);
+        if (el) el.classList.add('hidden');
+    });
 
-        // Cas spécial TV (plein écran)
-        const tvView = document.getElementById('viewTV');
-        if (tvView) {
-            if (tabName === 'tv') tvView.style.display = 'block';
-            else tvView.style.display = 'none';
+    const tvView = document.getElementById('viewTV');
+    if (tvView) {
+        if (tabName === 'tv') tvView.style.display = 'block';
+        else tvView.style.display = 'none';
+    }
+
+    ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5', 'btnTab6'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            btn.classList.remove('tab-active', 'text-blue-500');
+            btn.classList.add('text-slate-500');
         }
+    });
 
-        // Mise à jour des boutons d'onglets
-        ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5'].forEach(id => {
-            const btn = document.getElementById(id);
-            if (btn) {
-                btn.classList.remove('tab-active', 'text-blue-500');
-                btn.classList.add('text-slate-500');
-            }
-        });
+    const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5', 'evaluations': '6' };
 
-        const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5' };
-
-        // Afficher la vue demandée
-        if (tabName !== 'tv') {
-            const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
-            if (targetView) {
-                targetView.classList.remove('hidden');
-                targetView.style.display = ''; // Réinitialiser le style pour être sûr
-            }
+    if (tabName !== 'tv') {
+        const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
+        if (targetView) {
+            targetView.classList.remove('hidden');
+            targetView.style.display = '';
         }
+    }
 
-        const targetBtn = document.getElementById('btnTab' + map[tabName]);
-        if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
-    };
+    const targetBtn = document.getElementById('btnTab' + map[tabName]);
+    if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
+
+    // ✅ NOUVEAU : charger le module grilles quand on clique sur l'onglet
+    if (tabName === 'evaluations') {
+        import('../../modules/grilles/grilles-interface.js').then(m => {
+            m.initGrillesInterface();
+        }).catch(err => console.error('Erreur init Grilles :', err));
+    }
+};
 
     // 2. Gestion des classes
     function initClassesSelect() {

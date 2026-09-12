@@ -12,6 +12,7 @@ import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 import { initNatationKiosk } from '../../modules/natation/natation-kiosk.js';
 import { initRelaisKiosk, cleanupRelaisKiosk } from '../../modules/relais/relais-kiosk.js';
+import { initGrillesKiosk, cleanupGrillesKiosk } from '../../modules/grilles/grilles-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -41,6 +42,7 @@ const relaisModule = document.getElementById('relais-module');
 const codeInfo = document.getElementById('code-info');
 const btnQuit = document.getElementById('btn-quit');
 const btnBackTerrain = document.getElementById('btn-back-terrain');
+const grillesModule = document.getElementById('grilles-module');
 
 export function initApp() {
     currentConfig = null;
@@ -379,6 +381,29 @@ function showLogin() {
         return;
     }
 
+    // SPÉCIAL AUTO-ÉVALUATION
+if (config.activite === 'grilles') {
+    setContainerWidth(true);
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
+    codeInfo.classList.add('hidden');
+    btnQuit.classList.add('hidden');
+    btnBackTerrain.classList.remove('hidden');
+
+    if (grillesModule) {
+        grillesModule.classList.remove('hidden');
+        grillesModule.style.display = 'block';
+        initGrillesKiosk(selectedClass);
+    }
+    return;
+}
     // Pour les autres activités (escalade, multi)
     badmintonModule.classList.add('hidden');
     if (natationModule) natationModule.classList.add('hidden');
@@ -742,7 +767,11 @@ export function resetToLogin() {
         relaisModule.style.display = 'none';
         relaisModule.innerHTML = '';
     }
-    
+    if (grillesModule) {
+    grillesModule.style.display = 'none';
+    grillesModule.innerHTML = '';
+}
+cleanupGrillesKiosk();
     import('../../modules/eleve/orientshow-kiosk.js').then(module => {
         if (module.cleanupOrientShowKiosk) {
             module.cleanupOrientShowKiosk();
