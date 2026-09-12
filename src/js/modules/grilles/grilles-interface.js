@@ -751,6 +751,9 @@ window.grillesGenererDonneesTest = async function() {
 // ============================================================
 // AUTO-ÉVALUATIONS REÇUES
 // ============================================================
+// ============================================================
+// AUTO-ÉVALUATIONS REÇUES
+// ============================================================
 window.grillesVoirAutoEvals = function() {
     if (!currentClasse) {
         alert('Sélectionne une classe.');
@@ -764,7 +767,7 @@ window.grillesVoirAutoEvals = function() {
     overlay.id = 'auto-evals-modal';
     overlay.className = 'fixed inset-0 bg-black/95 z-50 flex items-start justify-center p-4 overflow-y-auto';
     overlay.innerHTML = `
-        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-5xl my-8">
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-6xl my-8">
             <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
                 <div>
                     <h2 class="text-2xl font-black text-cyan-400 uppercase">👁️ Auto-évaluations reçues</h2>
@@ -784,7 +787,7 @@ window.grillesVoirAutoEvals = function() {
                 <button onclick="window.grillesFiltrerAutoEvals('Fin')" id="filtrer-Fin" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Fin</button>
             </div>
 
-            <div id="auto-evals-content" class="space-y-3">
+            <div id="auto-evals-content" class="space-y-4">
                 <p class="text-slate-400 text-center py-8">⏳ Chargement...</p>
             </div>
         </div>
@@ -806,6 +809,7 @@ window.grillesFiltrerAutoEvals = function(periode) {
     const container = document.getElementById('auto-evals-content');
     if (!container) return;
 
+    // Mise à jour des boutons
     ['toutes', 'Début', 'Milieu', 'Fin'].forEach(p => {
         const btn = document.getElementById(`filtrer-${p}`);
         if (btn) {
@@ -815,77 +819,118 @@ window.grillesFiltrerAutoEvals = function(periode) {
         }
     });
 
-    const all = Object.entries(data).map(([key, val]) => ({ _key: key, ...val }));
-    const filtered = periode === 'toutes' ? all : all.filter(e => e.periode === periode);
+    // ============================================================
+    // INDEX : { [grilleId]: { [periode]: { [code]: item } } }
+    // (garde la réponse la plus récente par élève)
+    // ============================================================
+    const index = {};
+    Object.values(data).forEach(item => {
+        if (!item.grilleId || !item.periode || item.code === undefined) return;
+        if (!index[item.grilleId]) index[item.grilleId] = {};
+        if (!index[item.grilleId][item.periode]) index[item.grilleId][item.periode] = {};
+        const code = String(item.code);
+        const existing = index[item.grilleId][item.periode][code];
+        if (!existing || (existing.timestamp || 0) < (item.timestamp || 0)) {
+            index[item.grilleId][item.periode][code] = item;
+        }
+    });
 
-    if (filtered.length === 0) {
-        container.innerHTML = `<p class="text-slate-500 text-center py-8">Aucune auto-évaluation ${periode === 'toutes' ? '' : 'pour la période ' + periode}.</p>`;
+    // Liste des élèves triée alphabétiquement
+    const eleves = getExistingEleves(currentClasse);
+    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+
+    // Grilles qui ont au moins une auto-éval
+    const toutesGrilles = getToutesGrilles();
+    const grillesAvecEval = toutesGrilles.filter(g => index[g.id]);
+
+    if (grillesAvecEval.length === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-8">Aucune auto-évaluation enregistrée.</p>';
         return;
     }
 
-    const groupes = {};
-    filtered.forEach(e => {
-        const key = `${e.grilleId}__${e.periode}`;
-        if (!groupes[key]) groupes[key] = { grilleId: e.grilleId, periode: e.periode, items: [] };
-        groupes[key].items.push(e);
-    });
-
-    const eleves = getExistingEleves(currentClasse);
-    const codeToNom = {};
-    eleves.forEach(e => { codeToNom[String(e.codeAutoEval)] = `${e.prenom} ${e.nom}`; });
-
-    Object.values(groupes).forEach(g => g.items.sort((a, b) => b.timestamp - a.timestamp));
+    // Périodes à afficher
+    const periodesAffichees = periode === 'toutes'
+        ? ['Début', 'Milieu', 'Fin']
+        : [periode];
 
     let html = '';
-    Object.values(groupes).forEach(g => {
-        const grille = getGrille(g.grilleId);
-        const titreGrille = grille ? grille.titre : g.grilleId;
 
-        html += `
-            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="font-black text-white">${titreGrille}</h3>
-                    <span class="text-xs bg-blue-600 px-2 py-0.5 rounded-full text-white font-bold">${g.periode}</span>
-                </div>
-                <p class="text-xs text-slate-400 mb-3">${g.items.length} réponse(s)</p>
-                <div class="space-y-2 max-h-96 overflow-y-auto">
-        `;
+    grillesAvecEval.forEach(g => {
+        periodesAffichees.forEach(per => {
+            const evalsPeriode = index[g.id]?.[per] || {};
+            const nbReponses = Object.keys(evalsPeriode).length;
 
-        g.items.forEach(item => {
-            const nom = codeToNom[String(item.code)] || '?';
-            const date = new Date(item.timestamp).toLocaleString('fr-FR', {
-                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-            });
-
-            let noteHtml = '';
-            if (grille) {
-                const note = calculerNoteFinale(item.notes, grille.criteres);
-                noteHtml = `<span class="text-yellow-400 font-black">${note.sur100 !== null ? note.sur100 + '/100' : '--'}</span>
-                            <span class="text-emerald-400 font-black ml-2">${note.sur20 !== null ? note.sur20 + '/20' : '--'}</span>`;
-            }
-
-            const notesDetail = grille ? grille.criteres.map(c => {
-                const val = item.notes[c.id];
-                if (val === undefined) return '';
-                return `<span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded">${c.nom.split('(')[0].substring(0, 15)}: <span class="text-white font-black">${val}</span></span>`;
-            }).join('') : '';
+            // Si on filtre par période et qu'il n'y a pas de réponse, on skip
+            if (periode !== 'toutes' && nbReponses === 0) return;
 
             html += `
-                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
-                    <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
+                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+                    <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
+                        <h3 class="font-black text-white">${g.titre || g.id}</h3>
                         <div class="flex items-center gap-2">
-                            <span class="bg-cyan-600 text-white font-black text-lg w-10 h-10 rounded-full flex items-center justify-center">${item.code}</span>
-                            <span class="text-sm font-bold text-white">${nom}</span>
+                            <span class="text-xs bg-blue-600 px-2 py-0.5 rounded-full text-white font-bold">${per}</span>
+                            <span class="text-xs text-slate-400">${nbReponses}/${eleves.length} réponse(s)</span>
                         </div>
-                        <div class="text-right">${noteHtml}</div>
                     </div>
-                    <div class="flex flex-wrap gap-1 mb-1">${notesDetail}</div>
-                    <div class="text-[10px] text-slate-500 mt-1">${date}</div>
-                </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="text-[10px] text-slate-400 uppercase border-b border-slate-700">
+                                    <th class="p-2 text-left sticky left-0 bg-slate-800 min-w-[130px]">Élève</th>
+                                    ${g.criteres.map(c => `
+                                        <th class="p-1 text-center min-w-[70px]" title="${c.nom}">
+                                            <div class="font-black text-white text-[9px] leading-tight">${c.nom.substring(0, 20)}</div>
+                                        </th>
+                                    `).join('')}
+                                    <th class="p-1 text-center min-w-[50px]">/100</th>
+                                    <th class="p-1 text-center min-w-[50px]">/20</th>
+                                </tr>
+                            </thead>
+                            <tbody>
             `;
-        });
 
-        html += `</div></div>`;
+            eleves.forEach(e => {
+                const code = String(e.codeAutoEval);
+                const rep = evalsPeriode[code];
+                const notes = rep?.notes || {};
+
+                let note100 = '--';
+                let note20 = '--';
+                if (rep) {
+                    const nf = calculerNoteFinale(notes, g.criteres);
+                    note100 = nf.sur100 !== null ? nf.sur100 : '--';
+                    note20 = nf.sur20 !== null ? nf.sur20 : '--';
+                }
+
+                html += `<tr class="border-b border-slate-800 hover:bg-slate-900/50">`;
+                html += `<td class="p-1.5 sticky left-0 bg-slate-800 font-bold text-white text-[11px]">${e.prenom} ${e.nom}</td>`;
+
+                g.criteres.forEach(c => {
+                    const val = notes[c.id];
+                    if (val === undefined || val === null) {
+                        // Élève n'a rien rempli → on affiche juste une case vide grisée
+                        html += `<td class="p-1 text-center">
+                            <div class="rounded font-black text-sm py-1 bg-slate-900 text-slate-600 border border-slate-700">
+                                —
+                            </div>
+                        </td>`;
+                    } else {
+                        const couleur = getCouleurNiveau(val);
+                        html += `<td class="p-1 text-center">
+                            <div class="rounded font-black text-sm py-1" style="background-color: ${couleur}; color: white;">
+                                ${val}
+                            </div>
+                        </td>`;
+                    }
+                });
+
+                html += `<td class="p-1 text-center font-black text-yellow-400">${note100}</td>`;
+                html += `<td class="p-1 text-center font-black text-emerald-400">${note20}</td>`;
+                html += `</tr>`;
+            });
+
+            html += `</tbody></table></div></div>`;
+        });
     });
 
     container.innerHTML = html;

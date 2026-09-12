@@ -111,8 +111,8 @@ function renderChoixCode(container) {
 // ============================================================
 function renderEvaluation(container) {
     const criteres = currentGrille.criteres;
-    // Ordre des niveaux : 4 (à gauche) → 1 (à droite)
-    const niveauxTries = [...NIVEAUX].sort((a, b) => b.valeur - a.valeur);
+    // Ordre des niveaux : 4 (gauche) → 1 (droite)
+    const niveauxOrdre = [...NIVEAUX].sort((a, b) => b.valeur - a.valeur);
 
     let html = `
         <div class="space-y-4">
@@ -129,13 +129,19 @@ function renderEvaluation(container) {
 
     criteres.forEach(c => {
         const selected = currentNotes[c.id];
+        // Croiser NIVEAUX (label + couleur) avec c.niveaux (descripteurs importés)
+        const niveauxAffiches = niveauxOrdre.map(n => {
+            const desc = (c.niveaux || []).find(x => x.valeur === n.valeur);
+            return { ...n, descripteur: desc?.descripteur || '' };
+        });
+
         html += `
             <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 overflow-x-auto">
                 <h3 class="font-black text-white mb-3 text-sm">${c.nom}</h3>
                 <table class="w-full" style="table-layout: fixed; border-collapse: separate; border-spacing: 4px;">
                     <thead>
                         <tr>
-                            ${niveauxTries.map(n => `
+                            ${niveauxAffiches.map(n => `
                                 <th style="width: 25%; vertical-align: top;">
                                     <div class="rounded-t-lg p-2 font-black text-[10px] leading-tight text-white text-center"
                                          style="background-color: ${n.couleur};">
@@ -148,7 +154,7 @@ function renderEvaluation(container) {
                     </thead>
                     <tbody>
                         <tr>
-                            ${niveauxTries.map(n => {
+                            ${niveauxAffiches.map(n => {
                                 const isSelected = selected === n.valeur;
                                 return `
                                     <td style="vertical-align: top;">
