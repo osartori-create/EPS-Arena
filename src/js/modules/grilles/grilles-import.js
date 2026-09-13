@@ -137,8 +137,7 @@ function parserGrille(rows, fileName, sheetName) {
 
 /**
  * Parse le nom du fichier (ou de la feuille) pour extraire activité + niveau.
- * Ex : "Rubrique_-_ badminton_4e.xlsx" → { activite: "badminton", niveau: "4e" }
- * Ex : "Rubrique_-_Escalade_C3.xlsx" → { activite: "escalade", niveau: "C3" }
+ * Amélioration : cherche le mot-clé d'activité N'IMPORTE OÙ dans le nom.
  */
 function parserNomFichier(nom) {
     if (!nom) return null;
@@ -146,10 +145,15 @@ function parserNomFichier(nom) {
     // Enlever l'extension
     let n = nom.replace(/\.(xlsx?|XLSX?|csv|CSV)$/, '');
 
-    // Enlever le préfixe "Rubrique_-_" ou similaire
-    n = n.replace(/^[Rr]ubrique[-_ ]*/i, '');
+    // Enlever le préfixe "Rubrique_-_" ou "Arena-EPS_-_" ou similaire
+    n = n.replace(/^[A-Za-z_-]+[_-]+/i, m => {
+        // Ne supprime que si ce n'est pas une activité connue
+        const test = m.replace(/[_-]+$/, '').toLowerCase();
+        const activitesConnues = ['escalade', 'badminton', 'demi', 'relais', 'arcathlon', 'hand', 'natation', 'co'];
+        return activitesConnues.some(a => test.includes(a)) ? m : '';
+    });
 
-    // Remplacer les underscores/tirets par des espaces (sauf pour les patterns C4, 4e, etc.)
+    // Remplacer underscores/tirets par des espaces
     n = n.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 
     // Détecter le niveau (C1-C5 ou 3e-6e)
@@ -157,39 +161,43 @@ function parserNomFichier(nom) {
     let niveau = 'C4';
     if (niveauMatch) {
         niveau = niveauMatch[1];
-        // Normaliser : "6ème" → "6e"
         if (niveau.toLowerCase().endsWith('ème')) {
             niveau = niveau.replace(/ème/i, 'e');
         }
     }
 
-    // Enlever le niveau du nom pour isoler l'activité
-    let activite = n.replace(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i, '').trim();
-    // Enlever les mots parasites ("sur 10s", "vitesse", etc.)
-    activite = activite.replace(/\b(sur|vitesse|vitesses|relais)\b.*/i, '').trim();
-    activite = activite.split(' ')[0]; // premier mot restant
+    // ✅ NOUVEAU : chercher l'activité n'importe où dans le nom
+    const nLower = n.toLowerCase();
 
-    activite = activite.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Chercher les mots-clés d'activité dans TOUT le nom
+    const activitesMap = [
+        { mots: ['demi-fond', 'demi fond', 'demifond', 'demi_fond', '1/2 fond', '1/2fond', 'demi'], act: 'demi_fond' },
+        { mots: ['badminton'], act: 'badminton' },
+        { mots: ['escalade', 'grimpe', 'bloc'], act: 'escalade' },
+        { mots: ['arcathlon', 'arcat'], act: 'arcathlon' },
+        { mots: ['relais', 'relai'], act: 'relais' },
+        { mots: ['hand'], act: 'hand' },
+        { mots: ['natation', 'nage'], act: 'natation' },
+        { mots: ['course orientation', 'co ', 'orienteshow', 'orientshow'], act: 'co' },
+        { mots: ['volley', 'volley-ball', 'volleyball'], act: 'volley' }
+    ];
 
-    // Mapping vers les identifiants standard
-    const map = {
-        'badminton': 'badminton',
-        'escalade': 'escalade',
-        'arcathlon': 'arcathlon',
-        'hand': 'hand',
-        'demifond': 'demi_fond',
-        'demif': 'demi_fond',
-        'natation': 'natation',
-        'relais': 'relais',
-        'co': 'co',
-        'courseorientation': 'co',
-        'volley': 'volley'
-    };
-    activite = map[activite] || activite;
+    let activite = 'autre';
+    for (const item of activitesMap) {
+        if (item.mots.some(m => nLower.includes(m))) {
+            activite = item.act;
+            break;
+        }
+    }
+
+    // Fallback : premier mot restant (comme avant)
+    if (activite === 'autre') {
+        let premierMot = n.replace(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i, '').trim().split(' ')[0] || '';
+        activite = premierMot.toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
 
     // Construire un titre propre
     let titreComplet = n.replace(/\s+/g, ' ').trim();
-    // Capitaliser première lettre
     titreComplet = titreComplet.charAt(0).toUpperCase() + titreComplet.slice(1);
 
     return { activite, niveau, titreComplet };
