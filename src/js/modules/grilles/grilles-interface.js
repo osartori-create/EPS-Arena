@@ -338,27 +338,59 @@ function renderPassation(container) {
     container.innerHTML = html;
 
     if (currentGrille.activite === 'relais') {
-        chargerDonneesAutoRelais(eleves);
+        chargerDonneesAutoGenerique(eleves);
     }
 }
 
-async function chargerDonneesAutoRelais(eleves) {
+async function chargerDonneesAutoGenerique(eleves) {
+    if (!currentGrille) return;
+
+    const activite = currentGrille.activite;
+    const niveauGrille = currentGrille.niveau;
+
+    let connecteur = null;
+    if (activite === 'relais') {
+        connecteur = (await import('./connecteurs/relais.js')).calculerNiveauxRelais;
+    } else if (activite === 'arcathlon') {
+        connecteur = (await import('./connecteurs/arcathlon.js')).calculerNiveauxArcathlon;
+    } else if (activite === 'escalade') {
+        connecteur = (await import('./connecteurs/escalade.js')).calculerNiveauxEscalade;
+    }
+
+    if (!connecteur) {
+        console.log(`[Grilles] Pas de connecteur pour "${activite}"`);
+        return;
+    }
+
+    // Charger la config de l'activité si nécessaire
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/config`);
+    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/${activite}/config`;
 
-    onValue(configRef, async (snap) => {
-        const config = snap.val();
-        if (!config) return;
+    const configSnap = await new Promise((resolve) => {
+        onValue(ref(db, configPath), resolve, { onlyOnce: true });
+    });
+    const config = configSnap.val();
+    if (!config) {
+        console.log(`[Grilles] Config ${activite} non transmise`);
+        return;
+    }
 
-        window._grillesAutoData = window._grillesAutoData || {};
-        for (const e of eleves) {
-            const niveaux = await calculerNiveauxRelais(currentClasse, e.id, config);
+    window._grillesAutoData = window._grillesAutoData || {};
+    let nbLoad = 0;
+
+    for (const e of eleves) {
+        try {
+            const niveaux = await connecteur(currentClasse, e.id, config, { niveau: niveauGrille });
             if (Object.keys(niveaux).length > 0) {
                 window._grillesAutoData[e.id] = niveaux;
+                nbLoad++;
             }
+        } catch (err) {
+            console.error(`[Grilles] Erreur connecteur pour ${e.id}:`, err);
         }
-        console.log('[Grilles] Données auto chargées pour', Object.keys(window._grillesAutoData || {}).length, 'élèves');
-    }, { onlyOnce: true });
+    }
+
+    console.log(`[Grilles] Données auto chargées pour ${nbLoad}/${eleves.length} élèves (${activite})`);
 }
 
 // ============================================================
@@ -443,43 +475,149 @@ window.grillesCycleNote = function(eleveId, critereId) {
     window.grillesSetNote(eleveId, critereId, suivant);
 };
 
+// Fonction utilitaire de matching
+function matcherCritere(critere, data) {
+    if (!data) return undefined;
+    const nomLower = (critere.nom || '').toLowerCase();
+
+    // Projet (Arcathlon, Demi-fond)
+    if (nomLower.includes('projet')) {
+        return data['projet'] ?? data['coureur_projet'] ?? data['coureur_son_projet'];
+    }
+
+    // Performance / Tir (Arcathlon)
+    if (nomLower.includes('performance') && nomLower.includes('tir')) {
+        return data['performance_tir'] ?? data['tir'];
+    }
+
+    // Performance Donneur (Relais)
+    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
+        return data['performance_donneur'];
+    }
+
+    // Transmission (Relais)
+    if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
+        return data['qualite_de_transmission'] ?? data['transmission'];
+    }
+
+    // Grimpeur bloc (Escalade C4)
+    if (nomLower.includes('grimpeur') && nomLower.includes('bloc')) {
+        return data['grimpeur_bloc']; // souvent null (prof)
+    }
+
+    // Grimpeur voies (Escalade C4)
+    if (nomLower.includes('grimpeur') && (nomLower.includes('voie') || nomLower.includes('2 voies'))) {
+        return data['grimpeur_voies'] ?? data['grimpeur_c4'];
+    }
+
+    // Grimpeur (Escalade C3 ou générique)
+    if (nomLower.includes('grimpeur')) {
+        return data['grimpeur'] ?? data['grimpeur_c3'];
+    }
+
+    // Allure (Demi-fond, Arcathlon)
+    if (nomLower.includes('allure')) {
+        return data['allure'];
+    }
+
+    // Badiste (Badminton)
+    if (nomLower.includes('badiste')) {
+        return data['badiste'];
+    }
+
+    return undefined;
+}
+
 window.grillesRemplirAuto = function(eleveId, critereId) {
     const data = window._grillesAutoData?.[eleveId];
     if (!data) {
-        alert('Aucune donnée automatique pour cet élève.\n\nVérifie que :\n- Le module Relais est configuré\n- Il y a au moins 1 essai 10s et 1 essai 2 zones pour cet élève');
+        alert('Aucune donnée automatique pour cet élève.\n\nVérifie que :\n- Le module de l\'activité est configuré\n- Il y a au moins 1 mesure enregistrée');
         return;
     }
 
     const critere = currentGrille.criteres.find(c => c.id === critereId);
     if (!critere) return;
 
-    const nomLower = (critere.nom || '').toLowerCase();
-    let valeur = null;
-    let source = '';
-
-    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
-        valeur = data['performance_donneur'];
-        source = 'performance 10s';
-    } else if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
-        valeur = data['qualite_de_transmission'];
-        source = 'transmission 2 zones';
-    } else if (nomLower.includes('projet')) {
-        valeur = data['projet'];
-        source = 'projet arcathlon';
-    } else if (nomLower.includes('allure')) {
-        valeur = data['allure'];
-        source = 'allure';
-    } else if (nomLower.includes('grimpeur')) {
-        valeur = data['grimpeur'] || data['grimpeur_bloc'] || data['grimpeur_voies'];
-        source = 'escalade';
-    }
+    const valeur = matcherCritere(critere, data);
 
     if (valeur === undefined || valeur === null) {
         alert(`Pas de donnée auto pour ce critère.\n\nNom : "${critere.nom}"\nClés dispo : ${Object.keys(data).join(', ')}`);
         return;
     }
 
-    console.log(`[Grilles] 🤖 Auto : ${critere.nom} → niveau ${valeur} (${source})`);
+    console.log(`[Grilles] 🤖 Auto : ${critere.nom} → niveau ${valeur}`);
+    window.grillesSetNote(eleveId, critereId, valeur);
+};// Fonction utilitaire de matching
+function matcherCritere(critere, data) {
+    if (!data) return undefined;
+    const nomLower = (critere.nom || '').toLowerCase();
+
+    // Projet (Arcathlon, Demi-fond)
+    if (nomLower.includes('projet')) {
+        return data['projet'] ?? data['coureur_projet'] ?? data['coureur_son_projet'];
+    }
+
+    // Performance / Tir (Arcathlon)
+    if (nomLower.includes('performance') && nomLower.includes('tir')) {
+        return data['performance_tir'] ?? data['tir'];
+    }
+
+    // Performance Donneur (Relais)
+    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
+        return data['performance_donneur'];
+    }
+
+    // Transmission (Relais)
+    if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
+        return data['qualite_de_transmission'] ?? data['transmission'];
+    }
+
+    // Grimpeur bloc (Escalade C4)
+    if (nomLower.includes('grimpeur') && nomLower.includes('bloc')) {
+        return data['grimpeur_bloc']; // souvent null (prof)
+    }
+
+    // Grimpeur voies (Escalade C4)
+    if (nomLower.includes('grimpeur') && (nomLower.includes('voie') || nomLower.includes('2 voies'))) {
+        return data['grimpeur_voies'] ?? data['grimpeur_c4'];
+    }
+
+    // Grimpeur (Escalade C3 ou générique)
+    if (nomLower.includes('grimpeur')) {
+        return data['grimpeur'] ?? data['grimpeur_c3'];
+    }
+
+    // Allure (Demi-fond, Arcathlon)
+    if (nomLower.includes('allure')) {
+        return data['allure'];
+    }
+
+    // Badiste (Badminton)
+    if (nomLower.includes('badiste')) {
+        return data['badiste'];
+    }
+
+    return undefined;
+}
+
+window.grillesRemplirAuto = function(eleveId, critereId) {
+    const data = window._grillesAutoData?.[eleveId];
+    if (!data) {
+        alert('Aucune donnée automatique pour cet élève.\n\nVérifie que :\n- Le module de l\'activité est configuré\n- Il y a au moins 1 mesure enregistrée');
+        return;
+    }
+
+    const critere = currentGrille.criteres.find(c => c.id === critereId);
+    if (!critere) return;
+
+    const valeur = matcherCritere(critere, data);
+
+    if (valeur === undefined || valeur === null) {
+        alert(`Pas de donnée auto pour ce critère.\n\nNom : "${critere.nom}"\nClés dispo : ${Object.keys(data).join(', ')}`);
+        return;
+    }
+
+    console.log(`[Grilles] 🤖 Auto : ${critere.nom} → niveau ${valeur}`);
     window.grillesSetNote(eleveId, critereId, valeur);
 };
 
@@ -489,7 +627,7 @@ window.grillesRemplirAuto = function(eleveId, critereId) {
 window.grillesRemplirAutoGlobal = async function() {
     if (!currentGrille) return;
     if (!window._grillesAutoData || Object.keys(window._grillesAutoData).length === 0) {
-        alert('Aucune donnée auto disponible.\n\nVérifie que :\n- Le module Relais a des mesures\n- Clique sur 🧪 Test pour générer des données bidons');
+        alert('Aucune donnée auto disponible.\n\nVérifie que :\n- Le module de l\'activité a des mesures\n- Clique sur 🧪 Test pour générer des données bidons');
         return;
     }
 
@@ -511,21 +649,7 @@ window.grillesRemplirAutoGlobal = async function() {
             if (critere.type !== 'auto') continue;
             nbCriteresAuto++;
 
-            const nomLower = (critere.nom || '').toLowerCase();
-            let valeur = null;
-
-            if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
-                valeur = data['performance_donneur'];
-            } else if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
-                valeur = data['qualite_de_transmission'];
-            } else if (nomLower.includes('projet')) {
-                valeur = data['projet'];
-            } else if (nomLower.includes('allure')) {
-                valeur = data['allure'];
-            } else if (nomLower.includes('grimpeur')) {
-                valeur = data['grimpeur'] || data['grimpeur_bloc'] || data['grimpeur_voies'];
-            }
-
+            const valeur = matcherCritere(critere, data);
             if (valeur !== undefined && valeur !== null) {
                 notesEleve[critere.id] = valeur;
                 nbRemplis++;
