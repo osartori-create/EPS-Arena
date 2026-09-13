@@ -10,7 +10,7 @@ import { getExistingEleves } from '../../services/admin-service.js';
 export const COULEURS_GROUPES = [
     { id: 'BLEU',  label: 'Bleu',  bg: '#3b82f6', text: '#ffffff', border: '#1e40af' },
     { id: 'ROUGE', label: 'Rouge', bg: '#ef4444', text: '#ffffff', border: '#991b1b' },
-    { id: 'NOIR',  label: 'Noir',  bg: '#1f2937', text: '#ffffff', border: '#000000' },
+    { id: 'VERT',  label: 'Vert',  bg: '#22c55e', text: '#ffffff', border: '#166534' },
     { id: 'JAUNE', label: 'Jaune', bg: '#eab308', text: '#000000', border: '#854d0e' }
 ];
 
