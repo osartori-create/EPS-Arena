@@ -143,43 +143,20 @@ function parserNomFichier(nom) {
     if (!nom) return null;
 
     // Enlever l'extension
-    let n = nom.replace(/\.(xlsx?|XLSX?|csv|CSV)$/, '');
-
-    // Enlever le préfixe "Rubrique_-_" ou "Arena-EPS_-_" ou similaire
-    n = n.replace(/^[A-Za-z_-]+[_-]+/i, m => {
-        // Ne supprime que si ce n'est pas une activité connue
-        const test = m.replace(/[_-]+$/, '').toLowerCase();
-        const activitesConnues = ['escalade', 'badminton', 'demi', 'relais', 'arcathlon', 'hand', 'natation', 'co'];
-        return activitesConnues.some(a => test.includes(a)) ? m : '';
-    });
-
-    // Remplacer underscores/tirets par des espaces
-    n = n.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-
-    // Détecter le niveau (C1-C5 ou 3e-6e)
-    const niveauMatch = n.match(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i);
-    let niveau = 'C4';
-    if (niveauMatch) {
-        niveau = niveauMatch[1];
-        if (niveau.toLowerCase().endsWith('ème')) {
-            niveau = niveau.replace(/ème/i, 'e');
-        }
-    }
-
-    // ✅ NOUVEAU : chercher l'activité n'importe où dans le nom
+    let n = nom.replace(/\.(xlsx?|csv)$/i, '');
     const nLower = n.toLowerCase();
 
-    // Chercher les mots-clés d'activité dans TOUT le nom
+    // ✅ Détecter l'activité PARTOUT dans le nom (avant tout nettoyage)
     const activitesMap = [
-        { mots: ['demi-fond', 'demi fond', 'demifond', 'demi_fond', '1/2 fond', '1/2fond', 'demi'], act: 'demi_fond' },
+        { mots: ['demi-fond', 'demi fond', 'demifond', 'demi_fond', '1/2 fond', '1/2fond'], act: 'demi_fond' },
         { mots: ['badminton'], act: 'badminton' },
-        { mots: ['escalade', 'grimpe', 'bloc'], act: 'escalade' },
-        { mots: ['arcathlon', 'arcat'], act: 'arcathlon' },
+        { mots: ['escalade', 'grimpe'], act: 'escalade' },
+        { mots: ['arcathlon'], act: 'arcathlon' },
         { mots: ['relais', 'relai'], act: 'relais' },
         { mots: ['hand'], act: 'hand' },
         { mots: ['natation', 'nage'], act: 'natation' },
-        { mots: ['course orientation', 'co ', 'orienteshow', 'orientshow'], act: 'co' },
-        { mots: ['volley', 'volley-ball', 'volleyball'], act: 'volley' }
+        { mots: ['orientshow'], act: 'co' },
+        { mots: ['volley'], act: 'volley' }
     ];
 
     let activite = 'autre';
@@ -190,17 +167,23 @@ function parserNomFichier(nom) {
         }
     }
 
-    // Fallback : premier mot restant (comme avant)
-    if (activite === 'autre') {
-        let premierMot = n.replace(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i, '').trim().split(' ')[0] || '';
-        activite = premierMot.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Détecter le niveau
+    const niveauMatch = n.match(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i);
+    let niveau = 'C4';
+    if (niveauMatch) {
+        niveau = niveauMatch[1];
+        if (niveau.toLowerCase().endsWith('ème')) {
+            niveau = niveau.replace(/ème/i, 'e');
+        }
     }
 
-    // Construire un titre propre
-    let titreComplet = n.replace(/\s+/g, ' ').trim();
-    titreComplet = titreComplet.charAt(0).toUpperCase() + titreComplet.slice(1);
+    // Titre propre
+    let titre = n.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    // Retirer les préfixes type "Arena-EPS", "Rubrique", etc.
+    titre = titre.replace(/^(arena[- ]?eps|rubrique|rubriques)\s+/i, '');
+    titre = titre.charAt(0).toUpperCase() + titre.slice(1);
 
-    return { activite, niveau, titreComplet };
+    return { activite, niveau, titreComplet: titre };
 }
 
 /**
