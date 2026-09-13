@@ -11,6 +11,7 @@ import { initEvaluationInterface } from '../../modules/evaluation/evaluation-int
 import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { getModule, getAllModules } from '../../modules/registry.js';
 import { initNatationInterface, transmettreNatationConfig } from '../../modules/natation/index.js';
+import '../../modules/demi-fond/index.js';
 
 // Imports nécessaires pour l’enregistrement des modules
 import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
@@ -66,7 +67,8 @@ export function initActivities() {
             'viewEvaluationSettings',
             'viewTournoiSettings',
             'viewNatationSettings',
-            'viewRelaisSettings'
+            'viewRelaisSettings' ,
+            'viewDemiFondSettings'
         ];
 
         // --- Masquer TOUTES les vues de manière FORCÉE ---
@@ -100,7 +102,8 @@ export function initActivities() {
             'evaluation': 'viewEvaluationSettings',
             'tournoi': 'viewTournoiSettings',
             'natation': 'viewNatationSettings',
-            'relais': 'viewRelaisSettings'
+            'relais': 'viewRelaisSettings' ,
+            'demi-fond': 'viewDemiFondSettings'
         };
 
         const targetId = viewMap[disc];
@@ -186,7 +189,7 @@ export function initActivities() {
         }
 
         // Mise à jour des boutons de discipline
-        const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais'];
+        const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais', 'demi-fond'];
         btnIds.forEach(id => {
             const btn = document.getElementById(`btnDisc-${id}`);
             if (btn) {
@@ -410,6 +413,7 @@ export function initActivities() {
                 'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
                 'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
                 'relais': () => import('../../modules/relais/relais-live.js').then(m => m.renderRelaisLive()),
+                'demi-fond': () => import('../../modules/demi-fond/demifond-live.js').then(m => m.renderDemiFondLive()),
                 'tournoi': () => {
                     return import('../../modules/tournoi/variantes/elimination/elimination-live.js')
                         .then(module => module.renderEliminationLive())
@@ -443,6 +447,7 @@ export function initActivities() {
                         'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
                         'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
                         'relais': () => import('../../modules/relais/relais-tv.js').then(m => m.renderRelaisTV()),
+                        'demi-fond': () => import('../../modules/demi-fond/demifond-tv.js').then(m => m.renderDemiFondTV()),
                         'tournoi': () => {
                             return import('../../modules/tournoi/variantes/elimination/elimination-tv.js')
                                 .then(module => module.renderEliminationTV())
@@ -543,7 +548,13 @@ export function initActivities() {
                 await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
                 await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
                 alert("✅ Module Tournoi activé pour les iPads !");
-            }
+            },
+            'demi-fond': async () => {
+    const m = await import('../../modules/demi-fond/variantes/trois-cinq-min/trois-cinq-min-interface.js');
+    // La transmission est gérée par le bouton dédié dans l'interface
+    // (on passe par window.troisCinqMinTransmettre)
+    if (window.troisCinqMinTransmettre) window.troisCinqMinTransmettre();
+}
         };
 
         if (handlers[currentDiscipline]) {
