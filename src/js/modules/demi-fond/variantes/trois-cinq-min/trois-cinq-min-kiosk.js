@@ -147,7 +147,7 @@ function tick() {
         phase = 'bilan'; courseNum = 3;
     }
 
-    // Détection de transition
+        // Détection de transition
     if (state.phase !== phase || state.courseNum !== courseNum) {
         const anciennePhase = state.phase;
         const ancienneCourse = state.courseNum;
@@ -160,8 +160,11 @@ function tick() {
         // Transition Pause → Course suivante : on prépare une nouvelle course
         if (anciennePhase === 'pause' && phase === 'course' && courseNum !== ancienneCourse) {
             preparerNouvelleCourse(courseNum);
+            // ✅ Mettre à jour le timestamp de début pour cette nouvelle course
+            state.timestampDebut = Date.now() - (2 * state.config.duree + 2 * state.config.pause) * 1000;
         }
 
+        // ✅ Mettre à jour AVANT le render pour que les IDs soient bons
         state.phase = phase;
         state.courseNum = courseNum;
         render();
@@ -603,7 +606,7 @@ function renderPause(container) {
                 </div>
                 <div class="text-right">
                     <div class="text-[10px] font-bold uppercase text-slate-400">Reprise dans</div>
-                    <div class="text-3xl font-mono font-black text-yellow-400">${min}:${String(sec).padStart(2, '0')}</div>
+                    <div id="dmf-chrono-pause" class="text-3xl font-mono font-black text-yellow-400">${min}:${String(sec).padStart(2, '0')}</div>
                 </div>
             </div>
 
@@ -702,52 +705,65 @@ function renderBilan(container) {
 // UI REFRESH (anti-double-clic)
 // ============================================================
 function refreshButtons() {
-    if (state.phase !== 'course') return;
-    if (!state.config) return;
+    if (state.phase === 'course' && state.config) {
+        const antiClic = state.config.antiDoubleClic || 30000;
+        const couleur = getCouleurGroupe(state.couleur);
 
-    const antiClic = state.config.antiDoubleClic || 30000;
-    const couleur = getCouleurGroupe(state.couleur);
-    let needFullRender = false;
+        state.codes.forEach(code => {
+            const btn = document.getElementById(`dmf-btn-${code}`);
+            if (!btn) return;
 
-    state.codes.forEach(code => {
-        const btn = document.getElementById(`dmf-btn-${code}`);
-        if (!btn) return;
+            const lastClick = state.lastClickAt[code] || 0;
+            const ecoule = Date.now() - lastClick;
+            const bloqué = ecoule < antiClic;
+            const abandon = state.abandonsParEleve[code];
 
-        const lastClick = state.lastClickAt[code] || 0;
-        const ecoule = Date.now() - lastClick;
-        const bloqué = ecoule < antiClic;
-        const abandon = state.abandonsParEleve[code];
+            if (abandon) return;
 
-        if (abandon) {
-            // Rien à faire
-        } else if (bloqué) {
-            // ✅ Mettre à jour le texte du compteur (sans re-render)
-            const restantSec = Math.ceil((antiClic - ecoule) / 1000);
             const spans = btn.querySelectorAll('span');
             const dernier = spans[spans.length - 1];
-            if (dernier && dernier.textContent.startsWith('⏱')) {
-                dernier.textContent = `⏱ ${restantSec}s`;
-            }
-        } else {
-            // ✅ Le bouton était bloqué et vient de se débloquer
-            if (btn.disabled) {
-                needFullRender = true;
-            }
-        }
-    });
+            if (!dernier) return;
 
-    // Rafraîchir le chrono du bandeau
-    const chronoEl = document.getElementById('dmf-chrono-restant');
-    if (chronoEl && state.timestampDebut) {
-        const elapsed = (Date.now() - state.timestampDebut) / 1000;
-        const restant = Math.max(0, state.config.duree - elapsed);
-        const min = Math.floor(restant / 60);
-        const sec = Math.floor(restant % 60);
-        chronoEl.textContent = `${min}:${String(sec).padStart(2, '0')}`;
+            if (bloqué) {
+                const restantSec = Math.ceil((antiClic - ecoule) / 1000);
+                if (dernier.textContent.startsWith('⏱')) {
+                    dernier.textContent = `⏱ ${restantSec}s`;
+                }
+            } else {
+                // ✅ Débloqué : retirer le "⏱" et restaurer le texte
+                if (dernier.textContent.startsWith('⏱')) {
+                    const nb = (state.timestampsParEleve[code] || []).length;
+                    dernier.textContent = `${nb} tour${nb > 1 ? 's' : ''}`;
+                }
+                if (btn.disabled) {
+                    btn.disabled = false;
+                    btn.style.cssText = `background:${couleur.bg}; color:${couleur.text}; border-color:${couleur.border}; min-height:110px;`;
+                }
+            }
+        });
+
+        // Mise à jour du chrono course
+        const chronoEl = document.getElementById('dmf-chrono-restant');
+        if (chronoEl && state.timestampDebut) {
+            const elapsed = (Date.now() - state.timestampDebut) / 1000;
+            const restant = Math.max(0, state.config.duree - elapsed);
+            const min = Math.floor(restant / 60);
+            const sec = Math.floor(restant % 60);
+            chronoEl.textContent = `${min}:${String(sec).padStart(2, '0')}`;
+        }
     }
 
-    // ✅ Re-render complet UNIQUEMENT quand un bouton se débloque
-    if (needFullRender) render();
+    // ✅ Mise à jour du chrono pause (indépendamment de la phase)
+    const pauseEl = document.getElementById('dmf-chrono-pause');
+    if (pauseEl && state.timestampDebut && state.config) {
+        const elapsed = (Date.now() - state.timestampDebut) / 1000;
+        const pauseDebut = state.config.duree + (state.courseNum - 1) * (state.config.duree + state.config.pause);
+        const elapsedPause = elapsed - pauseDebut;
+        const restant = Math.max(0, state.config.pause - elapsedPause);
+        const min = Math.floor(restant / 60);
+        const sec = Math.floor(restant % 60);
+        pauseEl.textContent = `${min}:${String(sec).padStart(2, '0')}`;
+    }
 }
 
 // ============================================================

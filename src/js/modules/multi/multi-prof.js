@@ -18,18 +18,16 @@ let sortableInstances = [];
 // FONCTIONS D’INITIALISATION
 // ============================================================
 
-export function initProf(classe) {
+export async function initProf(classe) {
     currentClasse = classe;
-    // Initialiser la palette de couleurs
     initPalette();
-    // Charger les équipes sauvegardées
     loadTeamsFromStorage(classe);
-    // Restaurer les couleurs
     const savedColors = JSON.parse(localStorage.getItem('eps_arena_team_colors') || '{}');
     teamColorState = savedColors;
-    // Afficher les équipes si elles existent
     if (lastTeams.length > 0) {
-        renderTeams(lastTeams);
+        // ✅ Réenrichir avec les photos AVANT de rendre
+        const teamsWithPhotos = await enrichTeamsWithPhotos(lastTeams);
+        renderTeams(teamsWithPhotos);
     }
 }
 
