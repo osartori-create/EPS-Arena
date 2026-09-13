@@ -377,6 +377,30 @@
 <!-- PARAMÈTRES 1/2 FOND -->
 <div id="viewDemiFondSettings" class="hidden space-y-4"></div>
 
+<!-- ONGLET 3 : LIVE -->
+<div id="viewLive" class="hidden space-y-4">
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-black text-blue-400 uppercase text-sm">📊 Résultats en direct</h3>
+            <button onclick="exportResultsLive()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">📥 Export CSV</button>
+            <button onclick="exportCOiDoceo()" class="bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (CO)</button>
+        </div>
+        <div id="live-content" class="space-y-4">
+            <p class="text-slate-500 text-center">En attente des données des élèves...</p>
+        </div>
+    </div>
+</div>
+
+<!-- ONGLET 4 : TV -->
+<div id="viewTV" style="display: none;">
+    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📺 Mode Diffusion (Montagne collective)</h3>
+        <div id="tvGlobe" style="width: 100%; height: 600px; background: #1e293b; border-radius: 16px; overflow: hidden; position: relative;">
+            <p class="text-slate-500 text-center mt-20">En attente des performances...</p>
+        </div>
+    </div>
+</div>
+
         </div> <!-- Fin viewActivities -->
 
         <!-- VUE TOURNOI ÉLIMINATION -->
@@ -387,29 +411,7 @@
         </div>
     </div>
 </div>
-        <!-- ONGLET 3 : LIVE -->
-        <div id="viewLive" class="hidden space-y-4">
-            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-black text-blue-400 uppercase text-sm">📊 Résultats en direct</h3>
-                    <button onclick="exportResultsLive()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white">📥 Export CSV</button>
-                    <button onclick="exportCOiDoceo()" class="bg-green-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-green-400">⬇️ Export iDoceo (CO)</button>
-                </div>
-                <div id="live-content" class="space-y-4">
-                    <p class="text-slate-500 text-center">En attente des données des élèves...</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- ONGLET 4 : TV -->
-        <div id="viewTV" style="display: none;">
-            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-                <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📺 Mode Diffusion (Montagne collective)</h3>
-                <div id="tvGlobe" style="width: 100%; height: 600px; background: #1e293b; border-radius: 16px; overflow: hidden; position: relative;">
-                    <p class="text-slate-500 text-center mt-20">En attente des performances...</p>
-                </div>
-            </div>
-        </div>
+        
 
         <!-- ONGLET 5 : OUTILS -->
         <div id="viewTools" class="hidden w-full h-screen bg-slate-950 flex flex-col items-center justify-center overflow-hidden">
