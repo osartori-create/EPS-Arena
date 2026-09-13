@@ -349,6 +349,30 @@ async function chargerDonneesAutoGenerique(eleves) {
     const activite = currentGrille.activite;
     const niveauGrille = currentGrille.niveau;
 
+    // Liste des activités avec connecteur
+    const ACTIVITES_AVEC_CONNECTEUR = ['relais', 'arcathlon', 'escalade'];
+
+    // ✅ Si pas de connecteur, désactiver le bouton et vider les données
+    window._grillesAutoData = {};
+    const btnGlobal = document.querySelector('[onclick*="grillesRemplirAutoGlobal"]');
+    if (!ACTIVITES_AVEC_CONNECTEUR.includes(activite)) {
+        if (btnGlobal) {
+            btnGlobal.disabled = true;
+            btnGlobal.className = btnGlobal.className.replace('bg-pink-600', 'bg-slate-600').replace('hover:bg-pink-500', 'cursor-not-allowed');
+            btnGlobal.textContent = `🤖 Auto indisponible (${activite})`;
+            btnGlobal.title = `Le remplissage auto n'est pas disponible pour "${activite}". Toutes les évaluations sont en saisie prof.`;
+        }
+        console.log(`[Grilles] Pas de connecteur pour "${activite}" — mode prof uniquement`);
+        return;
+    } else {
+        if (btnGlobal) {
+            btnGlobal.disabled = false;
+            btnGlobal.className = btnGlobal.className.replace('bg-slate-600', 'bg-pink-600').replace('cursor-not-allowed', 'hover:bg-pink-500');
+            btnGlobal.textContent = '🤖 Tout remplir auto';
+            btnGlobal.title = '';
+        }
+    }
+
     // Charger le bon connecteur
     let connecteur = null;
     try {
@@ -364,10 +388,7 @@ async function chargerDonneesAutoGenerique(eleves) {
         return;
     }
 
-    if (!connecteur) {
-        console.log(`[Grilles] Pas de connecteur pour "${activite}" — mode prof uniquement`);
-        return;
-    }
+    if (!connecteur) return;
 
     // Charger la config Firebase de l'activité
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
