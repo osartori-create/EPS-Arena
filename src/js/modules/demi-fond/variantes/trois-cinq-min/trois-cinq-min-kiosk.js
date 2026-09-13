@@ -410,7 +410,7 @@ function renderCourse(container) {
                 </div>
                 <div class="text-right">
                     <div class="text-[10px] font-bold uppercase text-slate-400">Temps restant</div>
-                    <div class="text-3xl font-mono font-black text-yellow-400">${min}:${String(sec).padStart(2, '0')}</div>
+                    <div id="dmf-chrono-restant" class="text-3xl font-mono font-black text-yellow-400">${min}:${String(sec).padStart(2, '0')}</div>
                 </div>
             </div>
 
@@ -719,27 +719,25 @@ function refreshButtons() {
         const abandon = state.abandonsParEleve[code];
 
         if (abandon) {
-            btn.disabled = true;
-            btn.style.cssText = 'background:#7f1d1d; color:#fca5a5; border-color:#991b1b; opacity:0.5; min-height:110px;';
+            // Rien à faire
         } else if (bloqué) {
-            btn.disabled = true;
-            btn.style.cssText = `background:${couleur.bg}40; color:#ffffff80; border-color:${couleur.border}40; min-height:110px;`;
+            // ✅ Mettre à jour le texte du compteur (sans re-render)
             const restantSec = Math.ceil((antiClic - ecoule) / 1000);
-            // Mettre à jour le texte du compteur sans re-render complet
-            const span = btn.querySelector('span:last-child');
-            if (span && span.textContent.startsWith('⏱')) {
-                span.textContent = `⏱ ${restantSec}s`;
+            const spans = btn.querySelectorAll('span');
+            const dernier = spans[spans.length - 1];
+            if (dernier && dernier.textContent.startsWith('⏱')) {
+                dernier.textContent = `⏱ ${restantSec}s`;
             }
         } else {
-            // Le bouton vient peut-être de se débloquer
+            // ✅ Le bouton était bloqué et vient de se débloquer
             if (btn.disabled) {
                 needFullRender = true;
             }
         }
     });
 
-    // Rafraîchir le chrono toutes les 200ms (indépendamment)
-    const chronoEl = document.querySelector('.text-3xl.font-mono.font-black.text-yellow-400');
+    // Rafraîchir le chrono du bandeau
+    const chronoEl = document.getElementById('dmf-chrono-restant');
     if (chronoEl && state.timestampDebut) {
         const elapsed = (Date.now() - state.timestampDebut) / 1000;
         const restant = Math.max(0, state.config.duree - elapsed);
@@ -747,6 +745,9 @@ function refreshButtons() {
         const sec = Math.floor(restant % 60);
         chronoEl.textContent = `${min}:${String(sec).padStart(2, '0')}`;
     }
+
+    // ✅ Re-render complet UNIQUEMENT quand un bouton se débloque
+    if (needFullRender) render();
 }
 
 // ============================================================
