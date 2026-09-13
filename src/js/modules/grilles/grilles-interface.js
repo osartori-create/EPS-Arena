@@ -350,7 +350,7 @@ async function chargerDonneesAutoGenerique(eleves) {
     const niveauGrille = currentGrille.niveau;
 
     // Liste des activités avec connecteur
-    const ACTIVITES_AVEC_CONNECTEUR = ['relais', 'arcathlon', 'escalade'];
+    const ACTIVITES_AVEC_CONNECTEUR = ['relais', 'arcathlon', 'escalade', 'demi-fond'];
 
     // ✅ Si pas de connecteur, désactiver le bouton et vider les données
     window._grillesAutoData = {};
@@ -382,6 +382,8 @@ async function chargerDonneesAutoGenerique(eleves) {
             connecteur = (await import('./connecteurs/arcathlon.js')).calculerNiveauxArcathlon;
         } else if (activite === 'escalade') {
             connecteur = (await import('./connecteurs/escalade.js')).calculerNiveauxEscalade;
+        } else if (activite === 'demi-fond') {
+            connecteur = (await import('./connecteurs/demi-fond.js')).calculerNiveauxDemiFond;
         }
     } catch (err) {
         console.warn(`[Grilles] Connecteur "${activite}" non disponible :`, err);
@@ -438,50 +440,34 @@ function matcherCritere(critere, data) {
     if (!data) return undefined;
     const nomLower = (critere.nom || '').toLowerCase();
 
-    // Projet (Arcathlon)
-    if (nomLower.includes('projet')) {
-        return data['projet'] ?? data['coureur_projet'] ?? data['coureur_son_projet'];
+    // ✅ Cas Demi-fond : on matche sur le contenu des descripteurs (plus fiable que le nom)
+    // Les critères demi-fond ont 4 niveaux avec ces signatures :
+    // - Allure : descripteurs contiennent "croissante / constante / décroissante"
+    // - Performance : descripteurs contiennent "km/h"
+    // - Régularité : descripteurs contiennent "CV" ou "coefficient de variation"
+    const tousDesc = (critere.niveaux || []).map(n => (n.descripteur || '').toLowerCase()).join(' ');
+
+    if (tousDesc.includes('croissante') || tousDesc.includes('constante') || tousDesc.includes('décroissante')) {
+        return data['allure'] ?? data['coureur_allure'];
+    }
+    if (tousDesc.includes('km/h') && (tousDesc.includes('c3') || tousDesc.includes('course 3'))) {
+        return data['performance'] ?? data['coureur_performance'];
+    }
+    if (tousDesc.includes('coefficient de variation') || tousDesc.includes('cv ')) {
+        return data['regularite'] ?? data['régularité'] ?? data['coureur_regularite'];
     }
 
-    // Performance / Tir (Arcathlon)
-    if (nomLower.includes('performance') && nomLower.includes('tir')) {
-        return data['performance_tir'] ?? data['tir'];
-    }
-
-    // Performance Donneur (Relais)
-    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
-        return data['performance_donneur'];
-    }
-
-    // Transmission (Relais)
-    if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
-        return data['qualite_de_transmission'] ?? data['transmission'];
-    }
-
-    // Grimpeur bloc (Escalade C4)
-    if (nomLower.includes('grimpeur') && nomLower.includes('bloc')) {
-        return data['grimpeur_bloc'];
-    }
-
-    // Grimpeur voies (Escalade C4)
-    if (nomLower.includes('grimpeur') && (nomLower.includes('voie') || nomLower.includes('2 voies'))) {
-        return data['grimpeur_voies'] ?? data['grimpeur_c4'];
-    }
-
-    // Grimpeur (Escalade C3 ou générique)
-    if (nomLower.includes('grimpeur')) {
-        return data['grimpeur'] ?? data['grimpeur_c3'];
-    }
-
-    // Allure (Demi-fond)
-    if (nomLower.includes('allure')) {
-        return data['allure'];
-    }
-
-    // Badiste (Badminton)
-    if (nomLower.includes('badiste')) {
-        return data['badiste'];
-    }
+    // ============================================================
+    // Cas génériques (par nom de critère)
+    // ============================================================
+    if (nomLower.includes('projet')) return data['projet'];
+    if (nomLower.includes('performance') && nomLower.includes('tir')) return data['performance_tir'];
+    if (nomLower.includes('performance') && nomLower.includes('donneur')) return data['performance_donneur'];
+    if (nomLower.includes('transmission') || nomLower.includes('qualité')) return data['qualite_de_transmission'];
+    if (nomLower.includes('grimpeur') && nomLower.includes('bloc')) return data['grimpeur_bloc'];
+    if (nomLower.includes('grimpeur') && nomLower.includes('voie')) return data['grimpeur_voies'];
+    if (nomLower.includes('grimpeur')) return data['grimpeur'] ?? data['grimpeur_c3'];
+    if (nomLower.includes('badiste')) return data['badiste'];
 
     return undefined;
 }
