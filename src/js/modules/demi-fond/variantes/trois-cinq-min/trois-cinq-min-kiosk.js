@@ -9,33 +9,29 @@ import { COULEURS_GROUPES, getCouleurGroupe, getBasePath } from '../../demifond-
 // ============================================================
 let state = {
     classe: '',
-    couleur: null,          // 'BLEU' | 'ROUGE' | 'VERT' | 'JAUNE' | null
-    config: null,           // Config Firebase
-    sequence: null,         // État de la séquence Firebase
-    codes: [],              // Codes des élèves du groupe couleur
-    timestampsParEleve: {}, // { code: [t1, t2, ...] } (relatif au début de la course)
-    partielsParEleve: {},   // { code: 6 }
-    abandonsParEleve: {},   // { code: 'blessure' | 'mental' }
-    lastClickAt: {},        // { code: Date.now() } pour anti-double-clic
+    couleur: null,
+    config: null,
+    sequence: null,
+    codes: [],
+    timestampsParEleve: {},
+    partielsParEleve: {},
+    abandonsParEleve: {},
+    lastClickAt: {},
 
-    phase: 'choix',         // 'choix' | 'attente' | 'course' | 'pause' | 'bilan'
+    phase: 'choix',
     courseNum: 1,
-    timestampDebut: null,   // Timestamp absolu du début de la course actuelle
+    timestampDebut: null,
     derniereCourseEnvoyee: 0,
 
-    // UI
-    dernierClic: null,      // { code, timestamp } pour annulation
+    dernierClic: null,
     feedbackMsg: null,
     feedbackTimeout: null,
 
-    // Abandon modal
     modaleAbandon: false,
     modaleAbandonCode: null,
 
-    // Audio
     audioCtx: null,
 
-    // Timers
     tickInterval: null,
     uiRefreshInterval: null
 };
@@ -62,7 +58,6 @@ export function initTroisCinqMinKiosk(classe) {
     const container = document.getElementById('demi-fond-module');
     if (!container) return;
 
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const basePath = getBasePath(classe);
 
     // Écoute config
@@ -81,15 +76,9 @@ export function initTroisCinqMinKiosk(classe) {
         const ancienEtat = state.sequence?.etat;
         state.sequence = seq;
 
-        // GO initial
-        if (seq.etat === 'course1' && state.phase === 'attente' && state.couleur) {
+        // GO initial (idle → course1)
+        if (seq.etat === 'course1' && ancienEtat !== 'course1' && state.couleur) {
             demarrerCourse(1, seq.timestampDebut);
-        }
-        // Skip manuel du prof
-        else if (seq.etat === 'course' && seq.forceSkip && state.phase === 'pause') {
-            // Le prof a forcé le passage à la course suivante
-            const nextNum = (seq.courseNum || state.courseNum + 1);
-            demarrerCourse(nextNum, seq.timestampMaj);
         }
         // Stop
         else if (seq.etat === 'termine') {
@@ -110,13 +99,12 @@ export function initTroisCinqMinKiosk(classe) {
     if (state.tickInterval) clearInterval(state.tickInterval);
     state.tickInterval = setInterval(tick, 500);
 
-    // Timer UI (compte à rebours anti-double-clic)
+    // Timer UI (compte à rebours anti-double-clic + chronos)
     if (state.uiRefreshInterval) clearInterval(state.uiRefreshInterval);
     state.uiRefreshInterval = setInterval(refreshButtons, 200);
 
     render();
 
-    // Retourner la fonction de cleanup
     return cleanupTroisCinqMinKiosk;
 }
 
@@ -130,7 +118,6 @@ function tick() {
     const duree = state.config.duree;
     const pause = state.config.pause;
 
-    // Calcul de la phase et de la course en cours
     let phase, courseNum;
 
     if (elapsed < duree) {
@@ -147,24 +134,22 @@ function tick() {
         phase = 'bilan'; courseNum = 3;
     }
 
-        // Détection de transition
+    // Détection de transition
     if (state.phase !== phase || state.courseNum !== courseNum) {
         const anciennePhase = state.phase;
         const ancienneCourse = state.courseNum;
 
-        // Transition Course → Pause ou Bilan : on envoie les résultats
+        // Course → Pause ou Bilan : on envoie les résultats
         if (anciennePhase === 'course' && phase !== 'course') {
             envoyerResultatsCourse(ancienneCourse);
         }
 
-        // Transition Pause → Course suivante : on prépare une nouvelle course
+        // Pause → Course suivante
         if (anciennePhase === 'pause' && phase === 'course' && courseNum !== ancienneCourse) {
             preparerNouvelleCourse(courseNum);
-            // ✅ Mettre à jour le timestamp de début pour cette nouvelle course
-            state.timestampDebut = Date.now() - (2 * state.config.duree + 2 * state.config.pause) * 1000;
+            // ✅ NE PAS toucher au timestampDebut : il reste fixe depuis le GO initial
         }
 
-        // ✅ Mettre à jour AVANT le render pour que les IDs soient bons
         state.phase = phase;
         state.courseNum = courseNum;
         render();
@@ -180,7 +165,6 @@ function demarrerCourse(num, timestampDebut) {
     state.timestampDebut = timestampDebut || Date.now();
     state.dernierClic = null;
 
-    // Reset des clics de cette course
     const nouveauxTimestamps = {};
     state.codes.forEach(code => { nouveauxTimestamps[code] = []; });
     state.timestampsParEleve = nouveauxTimestamps;
@@ -190,7 +174,6 @@ function demarrerCourse(num, timestampDebut) {
 }
 
 function preparerNouvelleCourse(num) {
-    // Reset des données de la course
     state.timestampsParEleve = {};
     state.partielsParEleve = {};
     state.abandonsParEleve = {};
@@ -219,7 +202,7 @@ async function envoyerResultatsCourse(courseNum) {
             if (timestamps.length === 0 && !abandon && !partiel) continue;
 
             await set(ref(db, `${basePath}/observations/course-${courseNum}/${code}`), {
-                timestamps: timestamps.map(t => t - state.timestampDebut), // relatif au départ
+                timestamps: timestamps.map(t => t - state.timestampDebut),
                 partiel,
                 abandon,
                 duree: state.config.duree,
@@ -268,7 +251,6 @@ function render() {
 // ÉCRAN 1 : CHOIX COULEUR
 // ============================================================
 function renderChoixCouleur(container) {
-    // Filtrer les couleurs qui ont au moins 1 élève
     const couleursDispo = COULEURS_GROUPES.filter(c => {
         const codes = state.config?.groupes?.[c.id] || [];
         return codes.length > 0;
@@ -350,12 +332,16 @@ window.dmfKioskRetourChoixCouleur = function() {
 // ============================================================
 function renderCourse(container) {
     const couleur = getCouleurGroupe(state.couleur);
-    const elapsed = (Date.now() - state.timestampDebut) / 1000;
+
+    // ✅ Calcul du temps restant avec prise en compte de la course en cours
+    const elapsedTotal = (Date.now() - state.timestampDebut) / 1000;
+    const courseDebut = (state.courseNum - 1) * (state.config.duree + state.config.pause);
+    const elapsed = elapsedTotal - courseDebut;
     const restant = Math.max(0, state.config.duree - elapsed);
     const min = Math.floor(restant / 60);
     const sec = Math.floor(restant % 60);
 
-    // Grille adaptative selon le nombre de codes
+    // Grille adaptative
     const nbCodes = state.codes.length;
     let cols;
     if (nbCodes <= 6) cols = 3;
@@ -371,7 +357,6 @@ function renderCourse(container) {
         const bloqué = ecoule < antiClic;
         const restantSec = bloqué ? Math.ceil((antiClic - ecoule) / 1000) : 0;
 
-        // Style du bouton
         let btnStyle = '';
         let disabled = '';
 
@@ -380,6 +365,7 @@ function renderCourse(container) {
             disabled = 'disabled';
         } else if (bloqué) {
             btnStyle = `background:${couleur.bg}40; color:#ffffff80; border-color:${couleur.border}40;`;
+            disabled = 'disabled';   // ✅ FIX : bloqué = disabled
         } else {
             btnStyle = `background:${couleur.bg}; color:${couleur.text}; border-color:${couleur.border};`;
         }
@@ -400,7 +386,6 @@ function renderCourse(container) {
 
     container.innerHTML = `
         <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
-            <!-- Bandeau haut : chrono + course -->
             <div class="flex justify-between items-center bg-slate-900/90 backdrop-blur p-4 rounded-2xl mb-3 border-2"
                  style="border-color:${couleur.border};">
                 <div>
@@ -417,19 +402,16 @@ function renderCourse(container) {
                 </div>
             </div>
 
-            <!-- Bandeau feedback (si un clic récent) -->
             ${state.feedbackMsg ? `
                 <div class="text-center py-3 mb-3 bg-emerald-500 text-white rounded-2xl font-black text-2xl animate-pulse">
                     ${state.feedbackMsg}
                 </div>
             ` : ''}
 
-            <!-- Grille des numéros -->
             <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(${cols}, minmax(0, 1fr));">
                 ${gridHtml}
             </div>
 
-            <!-- Boutons bas -->
             <div class="flex gap-2">
                 <button onclick="window.dmfKioskAnnulerDernier()"
                         class="flex-1 bg-slate-700 hover:bg-slate-600 py-4 rounded-2xl font-black text-white active:scale-95 ${state.dernierClic ? '' : 'opacity-40 cursor-not-allowed'}"
@@ -453,18 +435,15 @@ window.dmfKioskClickCoureur = function(code) {
     const lastClick = state.lastClickAt[code] || 0;
     if (Date.now() - lastClick < antiClic) return;
 
-    // Enregistrer le timestamp
     if (!state.timestampsParEleve[code]) state.timestampsParEleve[code] = [];
     const t = Date.now();
     state.timestampsParEleve[code].push(t);
     state.lastClickAt[code] = t;
     state.dernierClic = { code, timestamp: t };
 
-    // Feedback : vibration + son + visuel
     if (navigator.vibrate) navigator.vibrate(80);
     playBeep();
 
-    // Feedback visuel temporaire
     state.feedbackMsg = `✓ ${code}`;
     if (state.feedbackTimeout) clearTimeout(state.feedbackTimeout);
     state.feedbackTimeout = setTimeout(() => {
@@ -479,12 +458,10 @@ window.dmfKioskAnnulerDernier = function() {
     if (!state.dernierClic) return;
     const { code } = state.dernierClic;
 
-    // Retirer le dernier timestamp de cet élève
     const arr = state.timestampsParEleve[code] || [];
     arr.pop();
     state.timestampsParEleve[code] = arr;
 
-    // Reset lastClickAt pour cet élève
     delete state.lastClickAt[code];
 
     state.dernierClic = null;
@@ -503,7 +480,6 @@ window.dmfKioskOuvrirAbandon = function() {
 function renderModaleAbandon(container) {
     let contenu;
     if (!state.modaleAbandonCode) {
-        // Étape 1 : choisir le code
         contenu = `
             <div class="text-center">
                 <h3 class="text-2xl font-black text-white mb-3">Qui abandonne ?</h3>
@@ -523,7 +499,6 @@ function renderModaleAbandon(container) {
             </div>
         `;
     } else {
-        // Étape 2 : choisir la raison
         contenu = `
             <div class="text-center">
                 <h3 class="text-2xl font-black text-white mb-3">Élève ${state.modaleAbandonCode}</h3>
@@ -586,14 +561,15 @@ window.dmfKioskFermerAbandon = function() {
 // ============================================================
 function renderPause(container) {
     const couleur = getCouleurGroupe(state.couleur);
-    const elapsed = (Date.now() - state.timestampDebut) / 1000;
+
+    // ✅ Calcul du temps restant de pause
+    const elapsedTotal = (Date.now() - state.timestampDebut) / 1000;
     const pauseDebut = state.config.duree + (state.courseNum - 1) * (state.config.duree + state.config.pause);
-    const elapsedPause = elapsed - pauseDebut;
+    const elapsedPause = elapsedTotal - pauseDebut;
     const restant = Math.max(0, state.config.pause - elapsedPause);
     const min = Math.floor(restant / 60);
     const sec = Math.floor(restant % 60);
 
-    // Filtrer les élèves non-abandonnés
     const elevesActifs = state.codes.filter(c => !state.abandonsParEleve[c]);
 
     let html = `
@@ -690,7 +666,7 @@ function renderBilan(container) {
             <p class="text-slate-300 mb-8">Les résultats ont été enregistrés.</p>
             <div class="bg-slate-800/80 p-6 rounded-3xl border-2 max-w-md text-center" style="border-color:${couleur.border};">
                 <p class="text-slate-300 text-sm">
-                    ${state.phase === 'bilan' ? '🏁 La consultation des bilans arrive dans la prochaine mise à jour.' : 'En attente...'}
+                    🏁 La consultation des bilans arrive dans la prochaine mise à jour.
                 </p>
             </div>
             <button onclick="window.retourMenuDemiFond()"
@@ -702,9 +678,10 @@ function renderBilan(container) {
 }
 
 // ============================================================
-// UI REFRESH (anti-double-clic)
+// UI REFRESH (anti-double-clic + chronos)
 // ============================================================
 function refreshButtons() {
+    // ---------- Phase COURSE ----------
     if (state.phase === 'course' && state.config) {
         const antiClic = state.config.antiDoubleClic || 30000;
         const couleur = getCouleurGroupe(state.couleur);
@@ -742,10 +719,12 @@ function refreshButtons() {
             }
         });
 
-        // Mise à jour du chrono course
+        // Chrono course (avec gestion de la course en cours)
         const chronoEl = document.getElementById('dmf-chrono-restant');
         if (chronoEl && state.timestampDebut) {
-            const elapsed = (Date.now() - state.timestampDebut) / 1000;
+            const elapsedTotal = (Date.now() - state.timestampDebut) / 1000;
+            const courseDebut = (state.courseNum - 1) * (state.config.duree + state.config.pause);
+            const elapsed = elapsedTotal - courseDebut;
             const restant = Math.max(0, state.config.duree - elapsed);
             const min = Math.floor(restant / 60);
             const sec = Math.floor(restant % 60);
@@ -753,12 +732,12 @@ function refreshButtons() {
         }
     }
 
-    // ✅ Mise à jour du chrono pause (indépendamment de la phase)
+    // ---------- Phase PAUSE ----------
     const pauseEl = document.getElementById('dmf-chrono-pause');
     if (pauseEl && state.timestampDebut && state.config) {
-        const elapsed = (Date.now() - state.timestampDebut) / 1000;
+        const elapsedTotal = (Date.now() - state.timestampDebut) / 1000;
         const pauseDebut = state.config.duree + (state.courseNum - 1) * (state.config.duree + state.config.pause);
-        const elapsedPause = elapsed - pauseDebut;
+        const elapsedPause = elapsedTotal - pauseDebut;
         const restant = Math.max(0, state.config.pause - elapsedPause);
         const min = Math.floor(restant / 60);
         const sec = Math.floor(restant % 60);
