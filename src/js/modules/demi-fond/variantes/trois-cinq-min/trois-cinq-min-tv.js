@@ -103,7 +103,7 @@ async function renderTV() {
             const eleve = eleves.find(e => e.id === eleveId);
 
             const cours = [1, 2, 3].map(n => {
-                const obs = observations[`course${n}`]?.[code];
+                const obs = observations[`course${n}`]?.[String(code)];
                 if (!obs) return null;
                 const distance = calculerDistance(obs.timestamps || [], obs.partiel || 0, config.tour, config.plots);
                 const vitesse = obs.abandon ? 0 : calculerVitesse(distance, config.duree);

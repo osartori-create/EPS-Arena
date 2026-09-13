@@ -295,7 +295,18 @@ export function initActivities() {
     // SOUS-ONGLETS (Réglages / Live / TV)
     // ============================================================
     window.switchActivitySubTab = function(subTab) {
-        const disc = currentDiscipline;
+    const disc = currentDiscipline;
+    
+    // ✅ NOUVEAU : cacher TOUT dans viewActivities sauf les 2 premiers blocs (sélecteur + sous-onglets)
+    const viewActivitiesEl = document.getElementById('viewActivities');
+    if (viewActivitiesEl) {
+        [...viewActivitiesEl.children].forEach((child, idx) => {
+            if (idx >= 2) {
+                child.classList.add('hidden');
+                child.style.display = '';
+            }
+        });
+    }
 
         // Mise à jour des boutons
         ['settings', 'live', 'tv'].forEach(tab => {

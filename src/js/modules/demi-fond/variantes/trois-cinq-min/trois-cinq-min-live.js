@@ -186,7 +186,7 @@ function renderEleveCard(code, couleur, observations, config, eleves, mapping) {
 
     // Calculs
     const cours = [1, 2, 3].map(n => {
-        const obs = observations[`course${n}`]?.[code];
+        const obs = observations[`course${n}`]?.[String(code)];
         if (!obs) return null;
         const distance = calculerDistance(obs.timestamps || [], obs.partiel || 0, config.tour, config.plots);
         const vitesse = obs.abandon ? 0 : calculerVitesse(distance, config.duree);
@@ -340,9 +340,9 @@ function calculerStatsGlobales(observations, config, eleves, mapping) {
     let nbVitesses = 0;
 
     Object.values(config.groupes || {}).flat().forEach(code => {
-        const c1 = observations.course1?.[code];
-        const c2 = observations.course2?.[code];
-        const c3 = observations.course3?.[code];
+        const c1 = observations.course1?.[String(code)];
+        const c2 = observations.course2?.[String(code)];
+        const c3 = observations.course3?.[String(code)];
         if (!c1 && !c2 && !c3) return;
 
         nbSuivis++;

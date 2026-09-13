@@ -2,7 +2,7 @@
 // UI Professeur pour le sous-module 3x5min
 
 import { db, ref, set, onValue } from '../../../../core/firebase-service.js';
-import { getPhotoUrl, getExistingEleves } from '../../../../services/admin-service.js';
+import { getPhotoUrl, getExistingEleves, migrerCodesAutoEval } from '../../../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../../core/live-engine.js';
 import { COULEURS_GROUPES, getCouleurGroupe, getGroupesKey, getConfigKey, getBasePath, getVMAEleve } from '../../demifond-common.js';
 import { DEFAUT_PARAMS, SOUS_MODULE_ID, TITRE_AFFICHE, repartirEnGroupes } from './trois-cinq-min-core.js';
@@ -31,6 +31,11 @@ export function initTroisCinqMinInterface(container) {
     if (!container) return;
     currentContainer = container;
     currentClasse = getCurrentClasse();
+
+    // ✅ Migration automatique des codes
+    if (currentClasse) {
+        migrerCodesAutoEval(currentClasse);
+    }
 
     container.innerHTML = '';
 
@@ -793,7 +798,6 @@ window.troisCinqMinTransmettre = async function() {
         return alert('Génère d\'abord les groupes.');
     }
 
-    const eleves = getExistingEleves(currentClasse);
     const localMapping = {};
     const vmaParCode = {};
     const configData = {
@@ -810,6 +814,14 @@ window.troisCinqMinTransmettre = async function() {
         groupes: {}
     };
 
+        // ✅ S'assurer que tous les élèves ont un codeAutoEval
+    migrerCodesAutoEval(currentClasse);
+    const eleves = getExistingEleves(currentClasse);
+    const sansCode = eleves.filter(e => !e.codeAutoEval);
+    if (sansCode.length > 0) {
+        alert(`⚠️ ${sansCode.length} élève(s) n'ont pas de code d'auto-évaluation.\n\nVa dans Administration → 🔢 Codes élèves pour les attribuer.`);
+        return;
+    }
     COULEURS_GROUPES.forEach(c => {
         const ids = groupes[c.id] || [];
         const codes = [];
