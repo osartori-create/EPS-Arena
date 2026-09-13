@@ -915,12 +915,12 @@ window.troisCinqMinImportConfig = function(event) {
 window.troisCinqMinGenererTest = async function() {
     if (!currentClasse) return alert('Sélectionne une classe.');
 
-    const groupes = chargerGroupes();
+    const groupes = chargerGroupes();  // Contient des IDs élèves
     if (!groupes || Object.values(groupes).every(arr => arr.length === 0)) {
         return alert('Génère d\'abord les groupes.');
     }
 
-    if (!confirm('⚠️ Générer des observations bidons pour TOUS les élèves ?\n\nCela va simuler 3 courses complètes avec clics et partiels.\n\nLa configuration actuelle (durée, pause, plots) sera utilisée.')) {
+    if (!confirm('⚠️ Générer des observations bidons pour TOUS les élèves ?\n\nCela va simuler 3 courses complètes avec clics et partiels.')) {
         return;
     }
 
@@ -933,67 +933,62 @@ window.troisCinqMinGenererTest = async function() {
     const tour = config.tour;
     const plots = config.plots;
 
+    // ✅ Map id élève → codeAutoEval
+    const idVersCode = {};
+    eleves.forEach(e => {
+        if (e.codeAutoEval !== undefined && e.codeAutoEval !== null) {
+            idVersCode[e.id] = e.codeAutoEval;
+        }
+    });
+
     let nbObservations = 0;
 
-    // Pour chaque couleur
     for (const couleur of Object.keys(groupes)) {
-        const codes = groupes[couleur] || [];
-        if (codes.length === 0) continue;
+        const ids = groupes[couleur] || [];
+        if (ids.length === 0) continue;
 
-        for (const code of codes) {
-            // Générer des données réalistes selon le profil de l'élève
-            const eleve = eleves.find(e => e.codeAutoEval === code);
-            const vma = eleve ? getVMAEleve(currentClasse, eleve.id) : null;
+        for (const id of ids) {
+            const code = idVersCode[id];
+            if (!code) {
+                console.warn(`[Test] Pas de codeAutoEval pour ${id}, ignoré`);
+                continue;
+            }
 
-            // Profil aléatoire : 20% très bon, 50% moyen, 30% faible
+            const vma = getVMAEleve(currentClasse, id);
+
+            // Profil aléatoire
             const profil = Math.random();
-            let vitesseCible; // en km/h
-            if (profil < 0.2) vitesseCible = (vma || 13) * 0.95;      // très bon
-            else if (profil < 0.7) vitesseCible = (vma || 12) * 0.85; // moyen
-            else vitesseCible = (vma || 11) * 0.75;                   // faible
+            let vitesseCible;
+            if (profil < 0.2) vitesseCible = (vma || 13) * 0.95;
+            else if (profil < 0.7) vitesseCible = (vma || 12) * 0.85;
+            else vitesseCible = (vma || 11) * 0.75;
 
-            // Parfois abandon (5%)
             const abandon = Math.random() < 0.05 ? (Math.random() < 0.5 ? 'blessure' : 'mental') : null;
             const abandonCourse = abandon ? (1 + Math.floor(Math.random() * 3)) : null;
 
-            // 3 courses avec une variation d'allure
             for (let courseNum = 1; courseNum <= 3; courseNum++) {
-                // Variation d'allure
                 let facteur = 1;
-                if (profil >= 0.2 && profil < 0.7) {
-                    // Profil moyen : allure constante
-                    facteur = 1;
-                } else if (profil < 0.2) {
-                    // Bon profil : allure croissante
-                    facteur = 1 + (courseNum - 1) * 0.05;
-                } else {
-                    // Faible profil : allure décroissante
-                    facteur = 1 - (courseNum - 1) * 0.08;
-                }
+                if (profil >= 0.2 && profil < 0.7) facteur = 1;
+                else if (profil < 0.2) facteur = 1 + (courseNum - 1) * 0.05;
+                else facteur = 1 - (courseNum - 1) * 0.08;
 
                 const vitesseCourse = vitesseCible * facteur;
                 const distanceTotale = (vitesseCourse / 3.6) * duree;
 
                 if (abandon && courseNum === abandonCourse) {
-                    // Abandon : moitié du temps seulement
                     const distancePartielle = distanceTotale * (0.3 + Math.random() * 0.4);
                     await genererObservationCourse(basePath, courseNum, code, {
-                        duree,
-                        tour,
-                        plots,
+                        duree, tour, plots,
                         distance: distancePartielle,
                         abandon,
                         regulier: false
                     });
                     nbObservations++;
                 } else if (abandon && courseNum > abandonCourse) {
-                    // Après l'abandon, pas de course
                     continue;
                 } else {
                     await genererObservationCourse(basePath, courseNum, code, {
-                        duree,
-                        tour,
-                        plots,
+                        duree, tour, plots,
                         distance: distanceTotale,
                         abandon: null,
                         regulier: profil >= 0.2 && profil < 0.7
@@ -1004,43 +999,36 @@ window.troisCinqMinGenererTest = async function() {
         }
     }
 
-    alert(`✅ ${nbObservations} observations générées.\n\nVa sur le kiosque élève, connecte-toi à une couleur, puis passe en mode "séquence terminée" pour tester le bilan.`);
+    alert(`✅ ${nbObservations} observations générées pour ${eleves.filter(e => e.codeAutoEval).length} élèves.\n\nVa sur le Live pour vérifier.`);
 };
 
 async function genererObservationCourse(basePath, courseNum, code, options) {
     const { duree, tour, plots, distance, abandon, regulier } = options;
 
     if (abandon) {
-        // Abandon : quelques tours puis arrêt
         const nbToursAvantAbandon = Math.max(1, Math.floor((distance / tour)));
         const timestamps = genererTimestamps(nbToursAvantAbandon, duree, tour, distance / nbToursAvantAbandon, regulier);
-        const partiel = 0;
 
         await set(ref(db, `${basePath}/observations/course-${courseNum}/${code}`), {
             timestamps,
-            partiel,
+            partiel: 0,
             abandon,
-            duree,
-            tour,
-            plots,
+            duree, tour, plots,
             timestamp: Date.now()
         });
         return;
     }
 
-    // Course normale : atteindre la distance cible
     const nbToursComplets = Math.floor(distance / tour);
     const distanceRestante = distance - (nbToursComplets * tour);
     const distanceParPlot = tour / plots;
     const partiel = Math.min(plots, Math.round(distanceRestante / distanceParPlot));
 
-    // Générer les timestamps (temps de chaque tour)
     const tempsMoyenParTour = duree / (nbToursComplets + partiel / plots);
     const timestamps = [];
     let tempsCumule = 0;
 
     for (let i = 0; i < nbToursComplets; i++) {
-        // Variation entre -10% et +10% si pas régulier, sinon -3% / +3%
         const variation = regulier
             ? (Math.random() - 0.5) * 0.06
             : (Math.random() - 0.5) * 0.2;
@@ -1055,9 +1043,7 @@ async function genererObservationCourse(basePath, courseNum, code, options) {
         timestamps,
         partiel,
         abandon: null,
-        duree,
-        tour,
-        plots,
+        duree, tour, plots,
         timestamp: Date.now()
     });
 }
