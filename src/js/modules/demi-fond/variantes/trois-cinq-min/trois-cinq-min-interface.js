@@ -2,9 +2,9 @@
 // UI Professeur pour le sous-module 3x5min
 // ⚠️ RGPD : seules les codeAutoEval transitent
 
-import { db, ref, set } from '../../../core/firebase-service.js';
-import { getPhotoUrl, getExistingEleves } from '../../../services/admin-service.js';
-import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../core/live-engine.js';
+import { db, ref, set } from '../../../../core/firebase-service.js';
+import { getPhotoUrl, getExistingEleves } from '../../../../services/admin-service.js';
+import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../../core/live-engine.js';
 import { COULEURS_GROUPES, getCouleurGroupe, getGroupesKey, getConfigKey, getBasePath, getVMAEleve } from '../../demifond-common.js';
 import { DEFAUT_PARAMS, SOUS_MODULE_ID, TITRE_AFFICHE, repartirEnGroupes } from './trois-cinq-min-core.js';
 
