@@ -176,6 +176,58 @@ function createGroupesBlock() {
 }
 
 // ============================================================
+// CONTRÔLES DE SÉQUENCE
+// ============================================================
+function createSequenceControls() {
+    const div = document.createElement('div');
+    div.className = 'bg-slate-800 p-4 rounded-2xl border-2 border-blue-500/40';
+    div.innerHTML = `
+        <h4 class="font-black text-blue-400 uppercase text-xs mb-3">🚀 Contrôle de la séquence</h4>
+        <p class="text-[11px] text-slate-400 mb-3">Un seul GO lance la séquence complète (3 courses + pauses).</p>
+        <div class="flex flex-wrap gap-2">
+            <button onclick="window.troisCinqMinGo()"
+                    class="flex-1 min-w-[140px] bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-black text-base uppercase text-white border-4 border-emerald-400 active:scale-95 shadow-[0_0_15px_rgba(34,197,94,0.5)]">
+                🚀 GO
+            </button>
+            <button onclick="window.troisCinqMinPauseManuelle()"
+                    class="bg-amber-600 hover:bg-amber-500 px-4 py-4 rounded-2xl font-black text-sm uppercase text-white active:scale-95">
+                ⏸️ Pause
+            </button>
+            <button onclick="window.troisCinqMinReprendre()"
+                    class="bg-blue-600 hover:bg-blue-500 px-4 py-4 rounded-2xl font-black text-sm uppercase text-white active:scale-95">
+                ▶️ Reprendre
+            </button>
+            <button onclick="window.troisCinqMinSkipCourse()"
+                    class="bg-slate-600 hover:bg-slate-500 px-4 py-4 rounded-2xl font-black text-sm uppercase text-white active:scale-95">
+                ⏭️ Skip
+            </button>
+            <button onclick="window.troisCinqMinStop()"
+                    class="bg-red-600 hover:bg-red-500 px-4 py-4 rounded-2xl font-black text-sm uppercase text-white active:scale-95">
+                🛑 Stop
+            </button>
+        </div>
+        <div id="dmfSequenceState" class="mt-3 text-xs text-slate-400 text-center">
+            État : <span class="font-black text-white">idle</span>
+        </div>
+    `;
+    return div;
+}
+
+// ============================================================
+// BOUTON TRANSMISSION
+// ============================================================
+function createTransmissionButton() {
+    const div = document.createElement('div');
+    div.innerHTML = `
+        <button onclick="window.troisCinqMinTransmettre()"
+                class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-base uppercase tracking-widest text-white border-4 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.5)] active:scale-[0.98]">
+            📡 Transmettre aux iPads Élèves
+        </button>
+    `;
+    return div;
+}
+
+// ============================================================
 // CARTE ÉLÈVE
 // ============================================================
 async function createEleveCard(eleve) {
