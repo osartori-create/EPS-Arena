@@ -186,6 +186,10 @@ export function initActivities() {
             import('../../modules/relais/relais-interface.js')
                 .then(m => m.initRelaisInterface())
                 .catch(err => console.error('Erreur init Relais :', err));
+        } else if (disc === 'demi-fond') {
+    import('../../modules/demi-fond/demifond-interface.js')
+        .then(m => m.initDemiFondInterface())
+        .catch(err => console.error('Erreur init DemiFond :', err));
         }
 
         // Mise à jour des boutons de discipline
