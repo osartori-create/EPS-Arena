@@ -388,17 +388,27 @@ async function chargerDonneesAutoGenerique(eleves) {
         return;
     }
 
-    if (!connecteur) return;
+        if (!connecteur) return;
 
-    // Charger la config Firebase de l'activité
+    // ✅ Récupérer la config Firebase (chemin différent selon l'activité)
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/${activite}/config`;
+
+    // L'escalade stocke sa config directement à la racine {classe}/config
+    // (voir escalade-prof.js), contrairement à Relais/Arcathlon qui ont un sous-dossier dédié.
+    let configPath;
+    if (activite === 'escalade') {
+        configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`;
+    } else {
+        configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/${activite}/config`;
+    }
 
     const configSnap = await new Promise((resolve) => {
         onValue(ref(db, configPath), resolve, { onlyOnce: true });
     });
     const config = configSnap.val();
-    if (!config) {
+
+    // Pour l'escalade, la config n'est pas indispensable (le connecteur utilise le mapping local)
+    if (!config && activite !== 'escalade') {
         console.log(`[Grilles] Config ${activite} non transmise`);
         return;
     }
