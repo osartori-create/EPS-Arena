@@ -8,7 +8,6 @@ import {
 } from './grilles-core.js';
 import { importerGrilleXLSX } from './grilles-import.js';
 import { exporterNotesIDoceo, exporterRubriqueIDoceo, exporterGrilleVierge } from './grilles-export.js';
-import { calculerNiveauxRelais } from './connecteurs/relais.js';
 import { getExistingEleves, getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
@@ -101,7 +100,7 @@ function renderBibliotheque(container) {
                             <span class="bg-slate-700 px-2 py-0.5 rounded-full text-slate-300">${nbCriteres} critères</span>
                             ${nbAuto > 0 ? `<span class="bg-emerald-900/50 text-emerald-300 px-2 py-0.5 rounded-full">${nbAuto} auto</span>` : ''}
                         </div>
-                                                <div class="flex gap-2 flex-wrap">
+                        <div class="flex gap-2 flex-wrap">
                             <button onclick="window.grillesUtiliser('${g.id}')"
                                     class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded-xl font-black text-xs text-white active:scale-95">
                                 ✏️ Évaluer
@@ -183,7 +182,7 @@ function renderPassation(container) {
                 </button>
                 <button onclick="window.grillesToggleVueCompacte()"
                         class="flex-1 min-w-[130px] bg-cyan-700 hover:bg-cyan-600 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
-                    <span id="grilles-vue-label">👁️ Vue compacte</span>
+                    <span id="grilles-vue-label">${_vueCompacte ? '📊 Vue détaillée' : '👁️ Vue compacte'}</span>
                 </button>
                 <button onclick="window.grillesActiver()"
                         class="bg-blue-600 hover:bg-blue-500 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95 border-2 border-blue-400">
@@ -337,32 +336,40 @@ function renderPassation(container) {
     html += `</div>`;
     container.innerHTML = html;
 
-    if (currentGrille.activite === 'relais') {
-        chargerDonneesAutoGenerique(eleves);
-    }
+    // ✅ Charger les données auto (connecteur générique)
+    chargerDonneesAutoGenerique(eleves);
 }
 
+// ============================================================
+// CHARGEMENT DES DONNÉES AUTO (générique)
+// ============================================================
 async function chargerDonneesAutoGenerique(eleves) {
     if (!currentGrille) return;
 
     const activite = currentGrille.activite;
     const niveauGrille = currentGrille.niveau;
 
+    // Charger le bon connecteur
     let connecteur = null;
-    if (activite === 'relais') {
-        connecteur = (await import('./connecteurs/relais.js')).calculerNiveauxRelais;
-    } else if (activite === 'arcathlon') {
-        connecteur = (await import('./connecteurs/arcathlon.js')).calculerNiveauxArcathlon;
-    } else if (activite === 'escalade') {
-        connecteur = (await import('./connecteurs/escalade.js')).calculerNiveauxEscalade;
-    }
-
-    if (!connecteur) {
-        console.log(`[Grilles] Pas de connecteur pour "${activite}"`);
+    try {
+        if (activite === 'relais') {
+            connecteur = (await import('./connecteurs/relais.js')).calculerNiveauxRelais;
+        } else if (activite === 'arcathlon') {
+            connecteur = (await import('./connecteurs/arcathlon.js')).calculerNiveauxArcathlon;
+        } else if (activite === 'escalade') {
+            connecteur = (await import('./connecteurs/escalade.js')).calculerNiveauxEscalade;
+        }
+    } catch (err) {
+        console.warn(`[Grilles] Connecteur "${activite}" non disponible :`, err);
         return;
     }
 
-    // Charger la config de l'activité si nécessaire
+    if (!connecteur) {
+        console.log(`[Grilles] Pas de connecteur pour "${activite}" — mode prof uniquement`);
+        return;
+    }
+
+    // Charger la config Firebase de l'activité
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/${activite}/config`;
 
@@ -391,6 +398,61 @@ async function chargerDonneesAutoGenerique(eleves) {
     }
 
     console.log(`[Grilles] Données auto chargées pour ${nbLoad}/${eleves.length} élèves (${activite})`);
+}
+
+// ============================================================
+// MATCHING CRITÈRE → DONNÉE AUTO
+// ============================================================
+function matcherCritere(critere, data) {
+    if (!data) return undefined;
+    const nomLower = (critere.nom || '').toLowerCase();
+
+    // Projet (Arcathlon)
+    if (nomLower.includes('projet')) {
+        return data['projet'] ?? data['coureur_projet'] ?? data['coureur_son_projet'];
+    }
+
+    // Performance / Tir (Arcathlon)
+    if (nomLower.includes('performance') && nomLower.includes('tir')) {
+        return data['performance_tir'] ?? data['tir'];
+    }
+
+    // Performance Donneur (Relais)
+    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
+        return data['performance_donneur'];
+    }
+
+    // Transmission (Relais)
+    if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
+        return data['qualite_de_transmission'] ?? data['transmission'];
+    }
+
+    // Grimpeur bloc (Escalade C4)
+    if (nomLower.includes('grimpeur') && nomLower.includes('bloc')) {
+        return data['grimpeur_bloc'];
+    }
+
+    // Grimpeur voies (Escalade C4)
+    if (nomLower.includes('grimpeur') && (nomLower.includes('voie') || nomLower.includes('2 voies'))) {
+        return data['grimpeur_voies'] ?? data['grimpeur_c4'];
+    }
+
+    // Grimpeur (Escalade C3 ou générique)
+    if (nomLower.includes('grimpeur')) {
+        return data['grimpeur'] ?? data['grimpeur_c3'];
+    }
+
+    // Allure (Demi-fond)
+    if (nomLower.includes('allure')) {
+        return data['allure'];
+    }
+
+    // Badiste (Badminton)
+    if (nomLower.includes('badiste')) {
+        return data['badiste'];
+    }
+
+    return undefined;
 }
 
 // ============================================================
@@ -464,7 +526,6 @@ window.grillesSetNote = function(eleveId, critereId, valeur) {
     renderPassation(container);
 };
 
-// Cycle 4 → 3 → 2 → 1 → 4 (vue compacte)
 window.grillesCycleNote = function(eleveId, critereId) {
     const evals = getEvaluationsClasse(currentClasse);
     const actuel = evals[currentGrille.id]?.[currentPeriode]?.[eleveId]?.notes?.[critereId];
@@ -475,131 +536,6 @@ window.grillesCycleNote = function(eleveId, critereId) {
     window.grillesSetNote(eleveId, critereId, suivant);
 };
 
-// Fonction utilitaire de matching
-function matcherCritere(critere, data) {
-    if (!data) return undefined;
-    const nomLower = (critere.nom || '').toLowerCase();
-
-    // Projet (Arcathlon, Demi-fond)
-    if (nomLower.includes('projet')) {
-        return data['projet'] ?? data['coureur_projet'] ?? data['coureur_son_projet'];
-    }
-
-    // Performance / Tir (Arcathlon)
-    if (nomLower.includes('performance') && nomLower.includes('tir')) {
-        return data['performance_tir'] ?? data['tir'];
-    }
-
-    // Performance Donneur (Relais)
-    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
-        return data['performance_donneur'];
-    }
-
-    // Transmission (Relais)
-    if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
-        return data['qualite_de_transmission'] ?? data['transmission'];
-    }
-
-    // Grimpeur bloc (Escalade C4)
-    if (nomLower.includes('grimpeur') && nomLower.includes('bloc')) {
-        return data['grimpeur_bloc']; // souvent null (prof)
-    }
-
-    // Grimpeur voies (Escalade C4)
-    if (nomLower.includes('grimpeur') && (nomLower.includes('voie') || nomLower.includes('2 voies'))) {
-        return data['grimpeur_voies'] ?? data['grimpeur_c4'];
-    }
-
-    // Grimpeur (Escalade C3 ou générique)
-    if (nomLower.includes('grimpeur')) {
-        return data['grimpeur'] ?? data['grimpeur_c3'];
-    }
-
-    // Allure (Demi-fond, Arcathlon)
-    if (nomLower.includes('allure')) {
-        return data['allure'];
-    }
-
-    // Badiste (Badminton)
-    if (nomLower.includes('badiste')) {
-        return data['badiste'];
-    }
-
-    return undefined;
-}
-
-window.grillesRemplirAuto = function(eleveId, critereId) {
-    const data = window._grillesAutoData?.[eleveId];
-    if (!data) {
-        alert('Aucune donnée automatique pour cet élève.\n\nVérifie que :\n- Le module de l\'activité est configuré\n- Il y a au moins 1 mesure enregistrée');
-        return;
-    }
-
-    const critere = currentGrille.criteres.find(c => c.id === critereId);
-    if (!critere) return;
-
-    const valeur = matcherCritere(critere, data);
-
-    if (valeur === undefined || valeur === null) {
-        alert(`Pas de donnée auto pour ce critère.\n\nNom : "${critere.nom}"\nClés dispo : ${Object.keys(data).join(', ')}`);
-        return;
-    }
-
-    console.log(`[Grilles] 🤖 Auto : ${critere.nom} → niveau ${valeur}`);
-    window.grillesSetNote(eleveId, critereId, valeur);
-};// Fonction utilitaire de matching
-function matcherCritere(critere, data) {
-    if (!data) return undefined;
-    const nomLower = (critere.nom || '').toLowerCase();
-
-    // Projet (Arcathlon, Demi-fond)
-    if (nomLower.includes('projet')) {
-        return data['projet'] ?? data['coureur_projet'] ?? data['coureur_son_projet'];
-    }
-
-    // Performance / Tir (Arcathlon)
-    if (nomLower.includes('performance') && nomLower.includes('tir')) {
-        return data['performance_tir'] ?? data['tir'];
-    }
-
-    // Performance Donneur (Relais)
-    if (nomLower.includes('performance') && (nomLower.includes('donneur') || nomLower.includes('relayé'))) {
-        return data['performance_donneur'];
-    }
-
-    // Transmission (Relais)
-    if (nomLower.includes('transmission') || nomLower.includes('qualité')) {
-        return data['qualite_de_transmission'] ?? data['transmission'];
-    }
-
-    // Grimpeur bloc (Escalade C4)
-    if (nomLower.includes('grimpeur') && nomLower.includes('bloc')) {
-        return data['grimpeur_bloc']; // souvent null (prof)
-    }
-
-    // Grimpeur voies (Escalade C4)
-    if (nomLower.includes('grimpeur') && (nomLower.includes('voie') || nomLower.includes('2 voies'))) {
-        return data['grimpeur_voies'] ?? data['grimpeur_c4'];
-    }
-
-    // Grimpeur (Escalade C3 ou générique)
-    if (nomLower.includes('grimpeur')) {
-        return data['grimpeur'] ?? data['grimpeur_c3'];
-    }
-
-    // Allure (Demi-fond, Arcathlon)
-    if (nomLower.includes('allure')) {
-        return data['allure'];
-    }
-
-    // Badiste (Badminton)
-    if (nomLower.includes('badiste')) {
-        return data['badiste'];
-    }
-
-    return undefined;
-}
-
 window.grillesRemplirAuto = function(eleveId, critereId) {
     const data = window._grillesAutoData?.[eleveId];
     if (!data) {
@@ -621,9 +557,6 @@ window.grillesRemplirAuto = function(eleveId, critereId) {
     window.grillesSetNote(eleveId, critereId, valeur);
 };
 
-// ============================================================
-// TOUT REMPLIR EN AUTO
-// ============================================================
 window.grillesRemplirAutoGlobal = async function() {
     if (!currentGrille) return;
     if (!window._grillesAutoData || Object.keys(window._grillesAutoData).length === 0) {
@@ -662,7 +595,6 @@ window.grillesRemplirAutoGlobal = async function() {
         };
     }
 
-    // Sauvegarder
     const all = JSON.parse(localStorage.getItem('eps_arena_grilles_evaluations') || '{}');
     if (!all[currentClasse]) all[currentClasse] = {};
     if (!all[currentClasse][currentGrille.id]) all[currentClasse][currentGrille.id] = {};
@@ -673,9 +605,6 @@ window.grillesRemplirAutoGlobal = async function() {
     renderPassation(document.getElementById('viewEvaluations'));
 };
 
-// ============================================================
-// VUE COMPACTE
-// ============================================================
 window.grillesToggleVueCompacte = function() {
     _vueCompacte = !_vueCompacte;
     const label = document.getElementById('grilles-vue-label');
@@ -683,9 +612,6 @@ window.grillesToggleVueCompacte = function() {
     renderPassation(document.getElementById('viewEvaluations'));
 };
 
-// ============================================================
-// SAUVEGARDE / FIGER / EXPORT
-// ============================================================
 window.grillesSauvegarder = function() {
     alert('✅ Notes sauvegardées automatiquement.');
 };
@@ -724,363 +650,18 @@ window.grillesSupprimer = function(id) {
 };
 
 // ============================================================
-// ACTIVATION IPADS
-// ============================================================
-window.grillesActiver = async function() {
-    if (!currentGrille) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { db, ref, set } = await import('../../core/firebase-service.js');
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
-
-    try {
-        await set(ref(db, path), {
-            actif: true,
-            grilleId: currentGrille.id,
-            periode: currentPeriode,
-            timestamp: Date.now()
-        });
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), {
-            activite: 'grilles'
-        });
-        alert(`✅ Auto-évaluation activée pour les iPads.\nGrille : ${currentGrille.titre}\nPériode : ${currentPeriode}`);
-    } catch (err) {
-        console.error(err);
-        alert('❌ Erreur lors de l\'activation.');
-    }
-};
-
-window.grillesDesactiver = async function() {
-    if (!currentClasse) return;
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { db, ref, set } = await import('../../core/firebase-service.js');
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
-
-    try {
-        await set(ref(db, path), { actif: false });
-        alert('✅ Auto-évaluation désactivée.');
-    } catch (err) {
-        console.error(err);
-        alert('❌ Erreur.');
-    }
-};
-
-// ============================================================
-// GÉNÉRATION DONNÉES TEST
-// ============================================================
-window.grillesGenererDonneesTest = async function() {
-    if (!currentClasse) {
-        alert('Sélectionne une classe.');
-        return;
-    }
-
-    const eleves = getExistingEleves(currentClasse);
-    if (eleves.length === 0) {
-        alert('Aucun élève dans cette classe.');
-        return;
-    }
-
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { db, ref, set, push, onValue } = await import('../../core/firebase-service.js');
-
-    const mesures10sPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
-    const mesures2zPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
-    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/config`;
-
-    const configSnap = await new Promise(resolve => {
-        onValue(ref(db, configPath), resolve, { onlyOnce: true });
-    });
-
-    const config = configSnap.val();
-    if (!config || !config.groupes) {
-        alert('⚠️ Aucune configuration Relais trouvée.\nTransmets d\'abord une config Relais (onglet Activités → Relais).');
-        return;
-    }
-
-    if (!confirm(`Générer 3 essais 10s + 3 essais 2 zones par élève ?\n\nClasse : ${currentClasse}\n${eleves.length} élèves\n${Object.keys(config.groupes).length} groupes`)) {
-        return;
-    }
-
-    let nb10s = 0, nb2z = 0;
-
-    for (const [groupeIdx, groupe] of Object.entries(config.groupes)) {
-        for (const membre of groupe.membres) {
-            const lettre = membre.lettre;
-
-            // 3 essais 10s
-            for (let i = 0; i < 3; i++) {
-                const vTheo = 20 + Math.random() * 5;
-                const ecart = (Math.random() - 0.5) * 4;
-                const vReelle = Math.round((vTheo + ecart) * 10) / 10;
-                const score = Math.round((5 + ecart) * 10) / 10;
-                const zoneAtteinte = Math.round(vReelle - 14);
-
-                await push(ref(db, mesures10sPath), {
-                    sousActivite: 'relais10s',
-                    groupeIdx: parseInt(groupeIdx),
-                    groupeNumero: groupe.numero,
-                    pairId: `${lettre}-${lettre}`,
-                    relayeLettre: lettre,
-                    relayeurLettre: lettre,
-                    zoneAtteinte,
-                    vReelle,
-                    vTheorique: Math.round(vTheo * 10) / 10,
-                    score,
-                    ecart: Math.round(ecart * 10) / 10,
-                    timestamp: Date.now() - (3 - i) * 60000
-                });
-                nb10s++;
-            }
-
-            // 3 essais 2 zones
-            for (let i = 0; i < 3; i++) {
-                const vZ1 = 18 + Math.random() * 6;
-                const vZ2 = 18 + Math.random() * 6;
-                const moyenne = (vZ1 + vZ2) / 2;
-                const pct = 60 + Math.random() * 45;
-                const vTrans = moyenne * pct / 100;
-
-                let points = 0;
-                if (pct >= 100) points = 5;
-                else if (pct >= 90) points = 4;
-                else if (pct >= 80) points = 3;
-                else if (pct >= 70) points = 2;
-                else if (pct >= 60) points = 1;
-
-                await push(ref(db, mesures2zPath), {
-                    sousActivite: 'relais2zones',
-                    groupeIdx: parseInt(groupeIdx),
-                    groupeNumero: groupe.numero,
-                    pairId: `${lettre}-${lettre}`,
-                    relayeLettre: lettre,
-                    relayeurLettre: lettre,
-                    distances: { z1: 20, trans: 10, z2: 20 },
-                    temps: {
-                        z1: Math.round(20000 / vZ1 * 3.6),
-                        trans: Math.round(10000 / vTrans * 3.6),
-                        z2: Math.round(20000 / vZ2 * 3.6)
-                    },
-                    vitesses: {
-                        z1: Math.round(vZ1 * 10) / 10,
-                        trans: Math.round(vTrans * 10) / 10,
-                        z2: Math.round(vZ2 * 10) / 10
-                    },
-                    vMoyenne3z: Math.round(moyenne * 10) / 10,
-                    vTheorique: Math.round(moyenne * 10) / 10,
-                    pourcentageTransmission: Math.round(pct),
-                    score: points,
-                    timestamp: Date.now() - (3 - i) * 60000
-                });
-                nb2z++;
-            }
-        }
-    }
-
-    alert(`✅ Données test générées !\n${nb10s} essais 10s\n${nb2z} essais 2 zones\n\nLes boutons 🤖 Auto devraient maintenant fonctionner.`);
-};
-
-// ============================================================
-// AUTO-ÉVALUATIONS REÇUES
-// ============================================================
-// ============================================================
-// AUTO-ÉVALUATIONS REÇUES
-// ============================================================
-window.grillesVoirAutoEvals = function() {
-    if (!currentClasse) {
-        alert('Sélectionne une classe.');
-        return;
-    }
-
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'auto-evals-modal';
-    overlay.className = 'fixed inset-0 bg-black/95 z-50 flex items-start justify-center p-4 overflow-y-auto';
-    overlay.innerHTML = `
-        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-6xl my-8">
-            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
-                <div>
-                    <h2 class="text-2xl font-black text-cyan-400 uppercase">👁️ Auto-évaluations reçues</h2>
-                    <p class="text-xs text-slate-400">Classe ${currentClasse}</p>
-                    <p class="text-[10px] text-amber-400 mt-1">🔒 Données anonymes — codes élèves</p>
-                </div>
-                <button onclick="document.getElementById('auto-evals-modal').remove()"
-                        class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white">
-                    ✖ Fermer
-                </button>
-            </div>
-
-            <div class="mb-3 flex gap-2 flex-wrap">
-                <button onclick="window.grillesFiltrerAutoEvals('toutes')" id="filtrer-toutes" class="bg-blue-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">Toutes</button>
-                <button onclick="window.grillesFiltrerAutoEvals('Début')" id="filtrer-Début" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Début</button>
-                <button onclick="window.grillesFiltrerAutoEvals('Milieu')" id="filtrer-Milieu" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Milieu</button>
-                <button onclick="window.grillesFiltrerAutoEvals('Fin')" id="filtrer-Fin" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Fin</button>
-            </div>
-
-            <div id="auto-evals-content" class="space-y-4">
-                <p class="text-slate-400 text-center py-8">⏳ Chargement...</p>
-            </div>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-
-    import('../../core/firebase-service.js').then(({ db, ref, onValue }) => {
-        onValue(ref(db, path), (snap) => {
-            const data = snap.val() || {};
-            window._grillesAutoEvalsData = data;
-            window.grillesFiltrerAutoEvals('toutes');
-        });
-    });
-};
-
-window.grillesFiltrerAutoEvals = function(periode) {
-    const data = window._grillesAutoEvalsData || {};
-    const container = document.getElementById('auto-evals-content');
-    if (!container) return;
-
-    // Mise à jour des boutons
-    ['toutes', 'Début', 'Milieu', 'Fin'].forEach(p => {
-        const btn = document.getElementById(`filtrer-${p}`);
-        if (btn) {
-            btn.className = p === periode
-                ? 'bg-blue-600 px-3 py-1.5 rounded-xl font-black text-xs text-white'
-                : 'bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white';
-        }
-    });
-
-    // ============================================================
-    // INDEX : { [grilleId]: { [periode]: { [code]: item } } }
-    // (garde la réponse la plus récente par élève)
-    // ============================================================
-    const index = {};
-    Object.values(data).forEach(item => {
-        if (!item.grilleId || !item.periode || item.code === undefined) return;
-        if (!index[item.grilleId]) index[item.grilleId] = {};
-        if (!index[item.grilleId][item.periode]) index[item.grilleId][item.periode] = {};
-        const code = String(item.code);
-        const existing = index[item.grilleId][item.periode][code];
-        if (!existing || (existing.timestamp || 0) < (item.timestamp || 0)) {
-            index[item.grilleId][item.periode][code] = item;
-        }
-    });
-
-    // Liste des élèves triée alphabétiquement
-    const eleves = getExistingEleves(currentClasse);
-    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-
-    // Grilles qui ont au moins une auto-éval
-    const toutesGrilles = getToutesGrilles();
-    const grillesAvecEval = toutesGrilles.filter(g => index[g.id]);
-
-    if (grillesAvecEval.length === 0) {
-        container.innerHTML = '<p class="text-slate-500 text-center py-8">Aucune auto-évaluation enregistrée.</p>';
-        return;
-    }
-
-    // Périodes à afficher
-    const periodesAffichees = periode === 'toutes'
-        ? ['Début', 'Milieu', 'Fin']
-        : [periode];
-
-    let html = '';
-
-    grillesAvecEval.forEach(g => {
-        periodesAffichees.forEach(per => {
-            const evalsPeriode = index[g.id]?.[per] || {};
-            const nbReponses = Object.keys(evalsPeriode).length;
-
-            // Si on filtre par période et qu'il n'y a pas de réponse, on skip
-            if (periode !== 'toutes' && nbReponses === 0) return;
-
-            html += `
-                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
-                    <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
-                        <h3 class="font-black text-white">${g.titre || g.id}</h3>
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs bg-blue-600 px-2 py-0.5 rounded-full text-white font-bold">${per}</span>
-                            <span class="text-xs text-slate-400">${nbReponses}/${eleves.length} réponse(s)</span>
-                        </div>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs">
-                            <thead>
-                                <tr class="text-[10px] text-slate-400 uppercase border-b border-slate-700">
-                                    <th class="p-2 text-left sticky left-0 bg-slate-800 min-w-[130px]">Élève</th>
-                                    ${g.criteres.map(c => `
-                                        <th class="p-1 text-center min-w-[70px]" title="${c.nom}">
-                                            <div class="font-black text-white text-[9px] leading-tight">${c.nom.substring(0, 20)}</div>
-                                        </th>
-                                    `).join('')}
-                                    <th class="p-1 text-center min-w-[50px]">/100</th>
-                                    <th class="p-1 text-center min-w-[50px]">/20</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
-
-            eleves.forEach(e => {
-                const code = String(e.codeAutoEval);
-                const rep = evalsPeriode[code];
-                const notes = rep?.notes || {};
-
-                let note100 = '--';
-                let note20 = '--';
-                if (rep) {
-                    const nf = calculerNoteFinale(notes, g.criteres);
-                    note100 = nf.sur100 !== null ? nf.sur100 : '--';
-                    note20 = nf.sur20 !== null ? nf.sur20 : '--';
-                }
-
-                html += `<tr class="border-b border-slate-800 hover:bg-slate-900/50">`;
-                html += `<td class="p-1.5 sticky left-0 bg-slate-800 font-bold text-white text-[11px]">${e.prenom} ${e.nom}</td>`;
-
-                g.criteres.forEach(c => {
-                    const val = notes[c.id];
-                    if (val === undefined || val === null) {
-                        // Élève n'a rien rempli → on affiche juste une case vide grisée
-                        html += `<td class="p-1 text-center">
-                            <div class="rounded font-black text-sm py-1 bg-slate-900 text-slate-600 border border-slate-700">
-                                —
-                            </div>
-                        </td>`;
-                    } else {
-                        const couleur = getCouleurNiveau(val);
-                        html += `<td class="p-1 text-center">
-                            <div class="rounded font-black text-sm py-1" style="background-color: ${couleur}; color: white;">
-                                ${val}
-                            </div>
-                        </td>`;
-                    }
-                });
-
-                html += `<td class="p-1 text-center font-black text-yellow-400">${note100}</td>`;
-                html += `<td class="p-1 text-center font-black text-emerald-400">${note20}</td>`;
-                html += `</tr>`;
-            });
-
-            html += `</tbody></table></div></div>`;
-        });
-    });
-
-    container.innerHTML = html;
-};
-
-// ============================================================
 // VOIR LE CONTENU D'UNE GRILLE
 // ============================================================
 window.grillesVoirContenu = function(id) {
     const grille = getGrille(id);
     if (!grille) return;
 
-    // Ordre des niveaux : 4 (gauche) → 1 (droite)
     const niveauxOrdre = [...NIVEAUX].sort((a, b) => b.valeur - a.valeur);
 
     const modal = document.createElement('div');
     modal.id = 'grille-content-modal';
     modal.className = 'fixed inset-0 bg-black/95 z-50 flex items-start justify-center p-4 overflow-y-auto';
 
-    // Tableau : lignes = critères, colonnes = niveaux
     let tableHtml = `
         <table class="w-full text-xs" style="table-layout: fixed; border-collapse: collapse;">
             <thead>
@@ -1171,7 +752,6 @@ window.grillesRenommer = function(id) {
     grille.titre = nouveauTitre.trim();
     sauvegarderGrille(grille);
 
-    // Rafraîchir la vue
     if (currentGrille && currentGrille.id === id) {
         currentGrille = getGrille(id);
         renderPassation(document.getElementById('viewEvaluations'));
@@ -1180,6 +760,329 @@ window.grillesRenommer = function(id) {
     }
     console.log(`[Grilles] Renommée : "${nouveauTitre}"`);
 };
+
+// ============================================================
+// ACTIVATION IPADS
+// ============================================================
+window.grillesActiver = async function() {
+    if (!currentGrille) return;
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
+
+    try {
+        const { set } = await import('../../core/firebase-service.js');
+        await set(ref(db, path), {
+            actif: true,
+            grilleId: currentGrille.id,
+            periode: currentPeriode,
+            timestamp: Date.now()
+        });
+        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), {
+            activite: 'grilles'
+        });
+        alert(`✅ Auto-évaluation activée pour les iPads.\nGrille : ${currentGrille.titre}\nPériode : ${currentPeriode}`);
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur lors de l\'activation.');
+    }
+};
+
+window.grillesDesactiver = async function() {
+    if (!currentClasse) return;
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
+
+    try {
+        const { set } = await import('../../core/firebase-service.js');
+        await set(ref(db, path), { actif: false });
+        alert('✅ Auto-évaluation désactivée.');
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur.');
+    }
+};
+
+// ============================================================
+// GÉNÉRATION DONNÉES TEST
+// ============================================================
+window.grillesGenererDonneesTest = async function() {
+    if (!currentClasse) {
+        alert('Sélectionne une classe.');
+        return;
+    }
+
+    const eleves = getExistingEleves(currentClasse);
+    if (eleves.length === 0) {
+        alert('Aucun élève dans cette classe.');
+        return;
+    }
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { push } = await import('../../core/firebase-service.js');
+
+    const mesures10sPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
+    const mesures2zPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
+    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/config`;
+
+    const configSnap = await new Promise(resolve => {
+        onValue(ref(db, configPath), resolve, { onlyOnce: true });
+    });
+
+    const config = configSnap.val();
+    if (!config || !config.groupes) {
+        alert('⚠️ Aucune configuration Relais trouvée.\nTransmets d\'abord une config Relais (onglet Activités → Relais).');
+        return;
+    }
+
+    if (!confirm(`Générer 3 essais 10s + 3 essais 2 zones par élève ?\n\nClasse : ${currentClasse}\n${eleves.length} élèves\n${Object.keys(config.groupes).length} groupes`)) {
+        return;
+    }
+
+    let nb10s = 0, nb2z = 0;
+
+    for (const [groupeIdx, groupe] of Object.entries(config.groupes)) {
+        for (const membre of groupe.membres) {
+            const lettre = membre.lettre;
+
+            for (let i = 0; i < 3; i++) {
+                const vTheo = 20 + Math.random() * 5;
+                const ecart = (Math.random() - 0.5) * 4;
+                const vReelle = Math.round((vTheo + ecart) * 10) / 10;
+                const score = Math.round((5 + ecart) * 10) / 10;
+                const zoneAtteinte = Math.round(vReelle - 14);
+
+                await push(ref(db, mesures10sPath), {
+                    sousActivite: 'relais10s',
+                    groupeIdx: parseInt(groupeIdx),
+                    groupeNumero: groupe.numero,
+                    pairId: `${lettre}-${lettre}`,
+                    relayeLettre: lettre,
+                    relayeurLettre: lettre,
+                    zoneAtteinte,
+                    vReelle,
+                    vTheorique: Math.round(vTheo * 10) / 10,
+                    score,
+                    ecart: Math.round(ecart * 10) / 10,
+                    timestamp: Date.now() - (3 - i) * 60000
+                });
+                nb10s++;
+            }
+
+            for (let i = 0; i < 3; i++) {
+                const vZ1 = 18 + Math.random() * 6;
+                const vZ2 = 18 + Math.random() * 6;
+                const moyenne = (vZ1 + vZ2) / 2;
+                const pct = 60 + Math.random() * 45;
+                const vTrans = moyenne * pct / 100;
+
+                let points = 0;
+                if (pct >= 100) points = 5;
+                else if (pct >= 90) points = 4;
+                else if (pct >= 80) points = 3;
+                else if (pct >= 70) points = 2;
+                else if (pct >= 60) points = 1;
+
+                await push(ref(db, mesures2zPath), {
+                    sousActivite: 'relais2zones',
+                    groupeIdx: parseInt(groupeIdx),
+                    groupeNumero: groupe.numero,
+                    pairId: `${lettre}-${lettre}`,
+                    relayeLettre: lettre,
+                    relayeurLettre: lettre,
+                    distances: { z1: 20, trans: 10, z2: 20 },
+                    temps: {
+                        z1: Math.round(20000 / vZ1 * 3.6),
+                        trans: Math.round(10000 / vTrans * 3.6),
+                        z2: Math.round(20000 / vZ2 * 3.6)
+                    },
+                    vitesses: {
+                        z1: Math.round(vZ1 * 10) / 10,
+                        trans: Math.round(vTrans * 10) / 10,
+                        z2: Math.round(vZ2 * 10) / 10
+                    },
+                    vMoyenne3z: Math.round(moyenne * 10) / 10,
+                    vTheorique: Math.round(moyenne * 10) / 10,
+                    pourcentageTransmission: Math.round(pct),
+                    score: points,
+                    timestamp: Date.now() - (3 - i) * 60000
+                });
+                nb2z++;
+            }
+        }
+    }
+
+    alert(`✅ Données test générées !\n${nb10s} essais 10s\n${nb2z} essais 2 zones`);
+};
+
+// ============================================================
+// AUTO-ÉVALUATIONS REÇUES
+// ============================================================
+window.grillesVoirAutoEvals = function() {
+    if (!currentClasse) {
+        alert('Sélectionne une classe.');
+        return;
+    }
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'auto-evals-modal';
+    overlay.className = 'fixed inset-0 bg-black/95 z-50 flex items-start justify-center p-4 overflow-y-auto';
+    overlay.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-6xl my-8">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-2xl font-black text-cyan-400 uppercase">👁️ Auto-évaluations reçues</h2>
+                    <p class="text-xs text-slate-400">Classe ${currentClasse}</p>
+                    <p class="text-[10px] text-amber-400 mt-1">🔒 Données anonymes — codes élèves</p>
+                </div>
+                <button onclick="document.getElementById('auto-evals-modal').remove()"
+                        class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-sm text-white">
+                    ✖ Fermer
+                </button>
+            </div>
+
+            <div class="mb-3 flex gap-2 flex-wrap">
+                <button onclick="window.grillesFiltrerAutoEvals('toutes')" id="filtrer-toutes" class="bg-blue-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">Toutes</button>
+                <button onclick="window.grillesFiltrerAutoEvals('Début')" id="filtrer-Début" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Début</button>
+                <button onclick="window.grillesFiltrerAutoEvals('Milieu')" id="filtrer-Milieu" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Milieu</button>
+                <button onclick="window.grillesFiltrerAutoEvals('Fin')" id="filtrer-Fin" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">Fin</button>
+            </div>
+
+            <div id="auto-evals-content" class="space-y-4">
+                <p class="text-slate-400 text-center py-8">⏳ Chargement...</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    onValue(ref(db, path), (snap) => {
+        const data = snap.val() || {};
+        window._grillesAutoEvalsData = data;
+        window.grillesFiltrerAutoEvals('toutes');
+    });
+};
+
+window.grillesFiltrerAutoEvals = function(periode) {
+    const data = window._grillesAutoEvalsData || {};
+    const container = document.getElementById('auto-evals-content');
+    if (!container) return;
+
+    ['toutes', 'Début', 'Milieu', 'Fin'].forEach(p => {
+        const btn = document.getElementById(`filtrer-${p}`);
+        if (btn) {
+            btn.className = p === periode
+                ? 'bg-blue-600 px-3 py-1.5 rounded-xl font-black text-xs text-white'
+                : 'bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white';
+        }
+    });
+
+    const index = {};
+    Object.values(data).forEach(item => {
+        if (!item.grilleId || !item.periode || item.code === undefined) return;
+        if (!index[item.grilleId]) index[item.grilleId] = {};
+        if (!index[item.grilleId][item.periode]) index[item.grilleId][item.periode] = {};
+        const code = String(item.code);
+        const existing = index[item.grilleId][item.periode][code];
+        if (!existing || (existing.timestamp || 0) < (item.timestamp || 0)) {
+            index[item.grilleId][item.periode][code] = item;
+        }
+    });
+
+    const eleves = getExistingEleves(currentClasse);
+    eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+
+    const toutesGrilles = getToutesGrilles();
+    const grillesAvecEval = toutesGrilles.filter(g => index[g.id]);
+
+    if (grillesAvecEval.length === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-8">Aucune auto-évaluation enregistrée.</p>';
+        return;
+    }
+
+    const periodesAffichees = periode === 'toutes'
+        ? ['Début', 'Milieu', 'Fin']
+        : [periode];
+
+    let html = '';
+
+    grillesAvecEval.forEach(g => {
+        periodesAffichees.forEach(per => {
+            const evalsPeriode = index[g.id]?.[per] || {};
+            const nbReponses = Object.keys(evalsPeriode).length;
+
+            if (periode !== 'toutes' && nbReponses === 0) return;
+
+            html += `
+                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+                    <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
+                        <h3 class="font-black text-white">${g.titre || g.id}</h3>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs bg-blue-600 px-2 py-0.5 rounded-full text-white font-bold">${per}</span>
+                            <span class="text-xs text-slate-400">${nbReponses}/${eleves.length} réponse(s)</span>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead>
+                                <tr class="text-[10px] text-slate-400 uppercase border-b border-slate-700">
+                                    <th class="p-2 text-left sticky left-0 bg-slate-800 min-w-[130px]">Élève</th>
+                                    ${g.criteres.map(c => `
+                                        <th class="p-1 text-center min-w-[70px]" title="${c.nom}">
+                                            <div class="font-black text-white text-[9px] leading-tight">${c.nom.substring(0, 20)}</div>
+                                        </th>
+                                    `).join('')}
+                                    <th class="p-1 text-center min-w-[50px]">/100</th>
+                                    <th class="p-1 text-center min-w-[50px]">/20</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            eleves.forEach(e => {
+                const code = String(e.codeAutoEval);
+                const rep = evalsPeriode[code];
+                const notes = rep?.notes || {};
+
+                let note100 = '--';
+                let note20 = '--';
+                if (rep) {
+                    const nf = calculerNoteFinale(notes, g.criteres);
+                    note100 = nf.sur100 !== null ? nf.sur100 : '--';
+                    note20 = nf.sur20 !== null ? nf.sur20 : '--';
+                }
+
+                html += `<tr class="border-b border-slate-800 hover:bg-slate-900/50">`;
+                html += `<td class="p-1.5 sticky left-0 bg-slate-800 font-bold text-white text-[11px]">${e.prenom} ${e.nom}</td>`;
+
+                g.criteres.forEach(c => {
+                    const val = notes[c.id];
+                    if (val === undefined || val === null) {
+                        html += `<td class="p-1 text-center">
+                            <div class="rounded font-black text-sm py-1 bg-slate-900 text-slate-600 border border-slate-700">—</div>
+                        </td>`;
+                    } else {
+                        const couleur = getCouleurNiveau(val);
+                        html += `<td class="p-1 text-center">
+                            <div class="rounded font-black text-sm py-1" style="background-color: ${couleur}; color: white;">${val}</div>
+                        </td>`;
+                    }
+                });
+
+                html += `<td class="p-1 text-center font-black text-yellow-400">${note100}</td>`;
+                html += `<td class="p-1 text-center font-black text-emerald-400">${note20}</td>`;
+                html += `</tr>`;
+            });
+
+            html += `</tbody></table></div></div>`;
+        });
+    });
+
+    container.innerHTML = html;
+};
+
 // ============================================================
 // CLEANUP
 // ============================================================
