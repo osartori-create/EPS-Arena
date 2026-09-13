@@ -152,24 +152,33 @@ function createGroupesBlock() {
     div.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700';
     div.innerHTML = `
         <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">👥 Répartition des élèves</h4>
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-4">
+        <p class="text-[10px] text-slate-500 mb-3">💡 Glisse un élève dans Absents ou Inaptes pour définir son statut. Les élèves en réserve basse sont "présents".</p>
+
+        <!-- ZONES ABSENTS / INAPTES (au-dessus) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-red-700/50">
+                <div class="text-xs font-bold text-red-400 uppercase mb-2">🚫 Absents</div>
+                <div id="dmfReserveAbsents" class="dmf-reserve flex flex-col gap-1 min-h-[60px] border border-red-800/30 rounded-lg p-1"></div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-orange-700/50">
+                <div class="text-xs font-bold text-orange-400 uppercase mb-2">⚠️ Inaptes</div>
+                <div id="dmfReserveInaptes" class="dmf-reserve flex flex-col gap-1 min-h-[60px] border border-orange-800/30 rounded-lg p-1"></div>
+            </div>
+        </div>
+
+        <!-- RÉSERVE PRÉSENTS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-blue-700/50">
                 <div class="text-xs font-bold text-blue-400 uppercase mb-2">👦 Présents - Garçons</div>
                 <div id="dmfReserveGarcons" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-blue-800/30 rounded-lg p-1"></div>
             </div>
             <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-rose-700/50">
-                <div class="text-xs font-bold text-rose-400 uppercase mb-2">👩 Présents - Filles</div>
+                <div class="text-xs font-bold text-rose-400 uppercase mb-2">👩 Présentes - Filles</div>
                 <div id="dmfReserveFilles" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-rose-800/30 rounded-lg p-1"></div>
             </div>
-            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-red-700/50">
-                <div class="text-xs font-bold text-red-400 uppercase mb-2">🚫 Absents</div>
-                <div id="dmfReserveAbsents" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-red-800/30 rounded-lg p-1"></div>
-            </div>
-            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-orange-700/50">
-                <div class="text-xs font-bold text-orange-400 uppercase mb-2">⚠️ Inaptes</div>
-                <div id="dmfReserveInaptes" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-orange-800/30 rounded-lg p-1"></div>
-            </div>
         </div>
+
+        <!-- GROUPES -->
         <div id="dmfGroupesGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
     `;
     return div;
@@ -254,14 +263,6 @@ async function createEleveCard(eleve) {
             <span class="font-black text-slate-900 text-xs truncate">${eleve.prenom}</span>
             <span class="text-[10px] font-bold text-slate-600 uppercase truncate">${eleve.nom}</span>
             ${vmaHtml}
-        </div>
-        <div class="flex flex-col gap-0.5">
-            <button onclick="event.stopPropagation(); window.troisCinqMinSetStatut('${eleve.id}', 'present')"
-                    class="text-[9px] leading-none" title="Présent">✅</button>
-            <button onclick="event.stopPropagation(); window.troisCinqMinSetStatut('${eleve.id}', 'absent')"
-                    class="text-[9px] leading-none" title="Absent">🚫</button>
-            <button onclick="event.stopPropagation(); window.troisCinqMinSetStatut('${eleve.id}', 'inapte')"
-                    class="text-[9px] leading-none" title="Inapte">⚠️</button>
         </div>
         <span class="num-badge bg-slate-900 text-white text-[10px] font-black px-1.5 py-0.5 rounded hidden"></span>
     `;
@@ -349,7 +350,6 @@ async function refreshAll() {
 async function renderGroupesEtReserve() {
     const groupes = chargerGroupes();
     const eleves = getExistingEleves(currentClasse);
-    const statuts = getStatuts(currentClasse);
     const nbGroupes = parseInt(document.getElementById('dmfNbGroupes')?.value) || 2;
 
     // ---- GROUPES ----
@@ -385,10 +385,11 @@ async function renderGroupesEtReserve() {
     }
 
     // ---- RÉSERVES ----
-    // Présents non placés
-    const placedIds = new Set();
-    Object.values(groupes).forEach(arr => arr.forEach(id => placedIds.add(id)));
+    // Récupérer tous les ids placés dans les groupes
+    const placedInGroups = new Set();
+    Object.values(groupes).forEach(arr => arr.forEach(id => placedInGroups.add(id)));
 
+    // Vider toutes les zones
     const resGarcons = document.getElementById('dmfReserveGarcons');
     const resFilles = document.getElementById('dmfReserveFilles');
     const resAbsents = document.getElementById('dmfReserveAbsents');
@@ -399,16 +400,24 @@ async function renderGroupesEtReserve() {
     if (resAbsents) resAbsents.innerHTML = '';
     if (resInaptes) resInaptes.innerHTML = '';
 
+    // ✅ Déduire le statut de la position : rien n'est en mémoire, tout est déduit du DOM
+    // → Les élèves dans absents/inaptes sont ceux qui étaient stockés dans "statuts"
+    // → On récupère leur position actuelle depuis le localStorage
+    const statuts = getStatuts(currentClasse);
+
     for (const e of eleves) {
+        const isPlaced = placedInGroups.has(e.id);
+        if (isPlaced) continue;  // déjà dans un groupe
+
+        // Déterminer où le placer dans la réserve selon son statut stocké
         const statut = statuts[e.id] || 'present';
-        const isPlaced = placedIds.has(e.id);
 
         if (statut === 'absent') {
             if (resAbsents) resAbsents.appendChild(await createEleveCard(e));
         } else if (statut === 'inapte') {
             if (resInaptes) resInaptes.appendChild(await createEleveCard(e));
-        } else if (!isPlaced) {
-            // Présent non placé
+        } else {
+            // Présent : réparti par sexe
             if (e.sexe === 'F') {
                 if (resFilles) resFilles.appendChild(await createEleveCard(e));
             } else {
@@ -438,23 +447,31 @@ function initSortable() {
     sortableInstances.forEach(s => { try { s.destroy(); } catch (e) {} });
     sortableInstances = [];
 
-    // Utilise UNIQUEMENT les classes spécifiques au demi-fond
-    const reserves = document.querySelectorAll('.dmf-reserve');
-    reserves.forEach(el => {
+    // Réserves : présents, absents, inaptes
+    document.querySelectorAll('.dmf-reserve').forEach(el => {
         const s = new Sortable(el, {
             group: 'demifond-groups',
             animation: 150,
-            onEnd: () => { saveAffectations(); updateNumBadges(); }
+            onEnd: () => {
+                saveAffectations();
+                updateNumBadges();
+                // Re-render pour réorganiser correctement selon les nouvelles positions
+                setTimeout(() => refreshAll(), 50);
+            }
         });
         sortableInstances.push(s);
     });
 
-    const groupes = document.querySelectorAll('.dmf-groupe-members');
-    groupes.forEach(el => {
+    // Groupes
+    document.querySelectorAll('.dmf-groupe-members').forEach(el => {
         const s = new Sortable(el, {
             group: 'demifond-groups',
             animation: 150,
-            onEnd: () => { saveAffectations(); updateNumBadges(); }
+            onEnd: () => {
+                saveAffectations();
+                updateNumBadges();
+                setTimeout(() => refreshAll(), 50);
+            }
         });
         sortableInstances.push(s);
     });
@@ -479,6 +496,7 @@ function updateNumBadges() {
 // SAUVEGARDE DES AFFECTATIONS
 // ============================================================
 function saveAffectations() {
+    // 1. Sauvegarder les groupes
     const groupes = {};
     COULEURS_GROUPES.forEach(c => { groupes[c.id] = []; });
 
@@ -490,6 +508,18 @@ function saveAffectations() {
     });
 
     sauvegarderGroupes(groupes);
+
+    // 2. Sauvegarder les statuts (déduits de la position)
+    const statuts = {};
+    document.querySelectorAll('#dmfReserveAbsents .dmf-eleve-card').forEach(card => {
+        statuts[card.dataset.id] = 'absent';
+    });
+    document.querySelectorAll('#dmfReserveInaptes .dmf-eleve-card').forEach(card => {
+        statuts[card.dataset.id] = 'inapte';
+    });
+    // Les autres sont "present" par défaut (pas besoin de le stocker)
+
+    localStorage.setItem(getStatutsKey(currentClasse), JSON.stringify(statuts));
 }
 
 async function loadAffectations() {

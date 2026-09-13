@@ -140,13 +140,14 @@ export function evaluerPerformance(vitesseCourse3, vma) {
  * Répartit les élèves en N groupes (max 4) de façon équilibrée.
  * @param {Array} eleves - Liste des élèves
  * @param {number} nbGroupes - 1 à 4
- * @returns {Object} { BLEU: [ids], ROUGE: [ids], NOIR: [ids], JAUNE: [ids] }
+ * @returns {Object} { BLEU: [ids], ROUGE: [ids], VERT: [ids], JAUNE: [ids] }
  */
 export function repartirEnGroupes(eleves, nbGroupes) {
     nbGroupes = Math.max(1, Math.min(4, nbGroupes));
-    const couleurIds = ['BLEU', 'ROUGE', 'NOIR', 'JAUNE'];
+    // ✅ CORRECTION : 'VERT' au lieu de 'NOIR'
+    const couleurIds = ['BLEU', 'ROUGE', 'VERT', 'JAUNE'];
 
-    // Trier par nom (pour un mélange plus équitable ensuite)
+    // Mélanger
     const melanges = [...eleves].sort(() => Math.random() - 0.5);
 
     const groupes = {};
