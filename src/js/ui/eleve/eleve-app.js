@@ -99,10 +99,14 @@ export function initApp() {
                     masquerElementsCO();
                     showLoginRelais();
                 } else if (config.activite === 'grilles') {
-                    console.log('[eleve] Activité Auto-évaluation détectée');
-                    masquerElementsCO();
-                    showLoginGrilles();
-                } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
+    console.log('[eleve] Activité Auto-évaluation détectée');
+    masquerElementsCO();
+    showLoginGrilles();
+} else if (config.activite === 'demi-fond') {
+    console.log('[eleve] Activité 1/2 Fond détectée');
+    masquerElementsCO();
+    showLoginDemiFond();
+} else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
                     currentConfig = config;
                     afficherElementsCO();
                     showLogin();
@@ -154,6 +158,7 @@ function masquerTousLesModules() {
     if (natationModule) natationModule.classList.add('hidden');
     if (relaisModule) relaisModule.classList.add('hidden');
     if (grillesModule) grillesModule.classList.add('hidden');
+    if (demiFondModule) demiFondModule.classList.add('hidden');
 }
 
 // ============================================================
@@ -282,32 +287,7 @@ function showLogin() {
         return;
     }
 
-    // SPÉCIAL 1/2 FOND
-if (config.activite === 'demi-fond') {
-    loginScreen.classList.add('hidden');
-    activityScreen.classList.remove('hidden');
-    waitingScreen.classList.add('hidden');
-    
-    escaladeModule.classList.add('hidden');
-    coModule.classList.add('hidden');
-    multiModule.classList.add('hidden');
-    if (osModule) osModule.classList.add('hidden');
-    badmintonModule.classList.add('hidden');
-    if (natationModule) natationModule.classList.add('hidden');
-    if (relaisModule) relaisModule.classList.add('hidden');
-    if (grillesModule) grillesModule.classList.add('hidden');
-    
-    codeInfo.classList.add('hidden');
-    btnQuit.classList.add('hidden');
-    btnBackTerrain.classList.remove('hidden');
-    
-    if (demiFondModule) {
-        demiFondModule.classList.remove('hidden');
-        demiFondModule.style.display = 'block';
-        initDemiFondKiosk(selectedClass);
-    }
-    return;
-}
+
     // SPÉCIAL ORIENTSHOW
     if (config.activite === 'orientshow') {
         loginScreen.classList.remove('hidden');
@@ -487,7 +467,27 @@ function showLoginGrilles() {
 
     masquerElementsCO();
 }
+// ============================================================
+// SPÉCIAL 1/2 FOND
+// ============================================================
+function showLoginDemiFond() {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
 
+    setContainerWidth(true);
+    masquerTousLesModules();
+
+    if (demiFondModule) {
+        demiFondModule.classList.remove('hidden');
+        demiFondModule.style.display = 'block';
+        initDemiFondKiosk(selectedClass);
+    } else {
+        console.error('[eleve] Conteneur demi-fond-module introuvable !');
+    }
+
+    masquerElementsCO();
+}
 // ============================================================
 // SPÉCIAL ARCATHLON
 // ============================================================
