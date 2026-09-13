@@ -350,7 +350,7 @@ async function chargerDonneesAutoGenerique(eleves) {
     const niveauGrille = currentGrille.niveau;
 
     // Liste des activités avec connecteur
-    const ACTIVITES_AVEC_CONNECTEUR = ['relais', 'arcathlon', 'escalade', 'demi-fond'];
+    const ACTIVITES_AVEC_CONNECTEUR = ['relais', 'arcathlon', 'escalade', 'demi_fond'];
 
     // ✅ Si pas de connecteur, désactiver le bouton et vider les données
     window._grillesAutoData = {};
@@ -382,7 +382,7 @@ async function chargerDonneesAutoGenerique(eleves) {
             connecteur = (await import('./connecteurs/arcathlon.js')).calculerNiveauxArcathlon;
         } else if (activite === 'escalade') {
             connecteur = (await import('./connecteurs/escalade.js')).calculerNiveauxEscalade;
-        } else if (activite === 'demi-fond') {
+        } else if (activite === 'demi_fond') {
             connecteur = (await import('./connecteurs/demi-fond.js')).calculerNiveauxDemiFond;
         }
     } catch (err) {

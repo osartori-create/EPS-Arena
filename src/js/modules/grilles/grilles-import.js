@@ -168,7 +168,7 @@ function parserNomFichier(nom) {
     }
 
     // Détecter le niveau
-    const niveauMatch = n.match(/\b(C[1-5]|[3-6]e|[3-6]ème)\b/i);
+    const niveauMatch = n.match(/(C[1-5]|[3-6]e|[3-6]ème)/i);
     let niveau = 'C4';
     if (niveauMatch) {
         niveau = niveauMatch[1];
