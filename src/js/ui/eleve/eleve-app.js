@@ -13,6 +13,7 @@ import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade
 import { initNatationKiosk } from '../../modules/natation/natation-kiosk.js';
 import { initRelaisKiosk, cleanupRelaisKiosk } from '../../modules/relais/relais-kiosk.js';
 import { initGrillesKiosk, cleanupGrillesKiosk } from '../../modules/grilles/grilles-kiosk.js';
+import { initDemiFondKiosk, cleanupDemiFondKiosk } from '../../modules/demi-fond/demifond-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -38,7 +39,7 @@ const badmintonModule = document.getElementById('badminton-module');
 const natationModule = document.getElementById('natation-module');
 const relaisModule = document.getElementById('relais-module');
 const grillesModule = document.getElementById('grilles-module');
-
+const demiFondModule = document.getElementById('demi-fond-module');
 const codeInfo = document.getElementById('code-info');
 const btnQuit = document.getElementById('btn-quit');
 const btnBackTerrain = document.getElementById('btn-back-terrain');
@@ -281,6 +282,32 @@ function showLogin() {
         return;
     }
 
+    // SPÉCIAL 1/2 FOND
+if (config.activite === 'demi-fond') {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+    
+    escaladeModule.classList.add('hidden');
+    coModule.classList.add('hidden');
+    multiModule.classList.add('hidden');
+    if (osModule) osModule.classList.add('hidden');
+    badmintonModule.classList.add('hidden');
+    if (natationModule) natationModule.classList.add('hidden');
+    if (relaisModule) relaisModule.classList.add('hidden');
+    if (grillesModule) grillesModule.classList.add('hidden');
+    
+    codeInfo.classList.add('hidden');
+    btnQuit.classList.add('hidden');
+    btnBackTerrain.classList.remove('hidden');
+    
+    if (demiFondModule) {
+        demiFondModule.classList.remove('hidden');
+        demiFondModule.style.display = 'block';
+        initDemiFondKiosk(selectedClass);
+    }
+    return;
+}
     // SPÉCIAL ORIENTSHOW
     if (config.activite === 'orientshow') {
         loginScreen.classList.remove('hidden');
@@ -733,7 +760,11 @@ export function resetToLogin() {
         grillesModule.style.display = 'none';
         grillesModule.innerHTML = '';
     }
-
+    if (demiFondModule) {
+    demiFondModule.style.display = 'none';
+    demiFondModule.innerHTML = '';
+}
+if (typeof cleanupDemiFondKiosk === 'function') cleanupDemiFondKiosk();
     if (typeof cleanupGrillesKiosk === 'function') cleanupGrillesKiosk();
     if (typeof cleanupRelaisKiosk === 'function') cleanupRelaisKiosk();
 
