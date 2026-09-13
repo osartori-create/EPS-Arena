@@ -74,6 +74,14 @@ function createHeader() {
                         class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400 active:scale-95">
                     ⬆️ Import JSON
                 </button>
+                <button onclick="window.troisCinqMinGenererTest()"
+        class="bg-pink-600 hover:bg-pink-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-pink-400 active:scale-95">
+    🧪 Test (données bidons)
+</button>
+<button onclick="window.troisCinqMinNettoyerTest()"
+        class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-500 active:scale-95">
+    🗑️ Nettoyer observations
+</button>
                 <input type="file" id="dmfImportJSON" class="hidden" accept=".json" onchange="window.troisCinqMinImportConfig(event)">
             </div>
         </div>
@@ -889,7 +897,186 @@ window.troisCinqMinImportConfig = function(event) {
     reader.readAsText(file);
     event.target.value = '';
 };
+// ============================================================
+// GÉNÉRATION DE DONNÉES TEST
+// ============================================================
+window.troisCinqMinGenererTest = async function() {
+    if (!currentClasse) return alert('Sélectionne une classe.');
 
+    const groupes = chargerGroupes();
+    if (!groupes || Object.values(groupes).every(arr => arr.length === 0)) {
+        return alert('Génère d\'abord les groupes.');
+    }
+
+    if (!confirm('⚠️ Générer des observations bidons pour TOUS les élèves ?\n\nCela va simuler 3 courses complètes avec clics et partiels.\n\nLa configuration actuelle (durée, pause, plots) sera utilisée.')) {
+        return;
+    }
+
+    const config = JSON.parse(localStorage.getItem(getConfigKey(currentClasse, SOUS_MODULE_ID)) || 'null') || DEFAUT_PARAMS;
+    const eleves = getExistingEleves(currentClasse);
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const basePath = getBasePath(currentClasse);
+
+    const duree = config.duree;
+    const tour = config.tour;
+    const plots = config.plots;
+
+    let nbObservations = 0;
+
+    // Pour chaque couleur
+    for (const couleur of Object.keys(groupes)) {
+        const codes = groupes[couleur] || [];
+        if (codes.length === 0) continue;
+
+        for (const code of codes) {
+            // Générer des données réalistes selon le profil de l'élève
+            const eleve = eleves.find(e => e.codeAutoEval === code);
+            const vma = eleve ? getVMAEleve(currentClasse, eleve.id) : null;
+
+            // Profil aléatoire : 20% très bon, 50% moyen, 30% faible
+            const profil = Math.random();
+            let vitesseCible; // en km/h
+            if (profil < 0.2) vitesseCible = (vma || 13) * 0.95;      // très bon
+            else if (profil < 0.7) vitesseCible = (vma || 12) * 0.85; // moyen
+            else vitesseCible = (vma || 11) * 0.75;                   // faible
+
+            // Parfois abandon (5%)
+            const abandon = Math.random() < 0.05 ? (Math.random() < 0.5 ? 'blessure' : 'mental') : null;
+            const abandonCourse = abandon ? (1 + Math.floor(Math.random() * 3)) : null;
+
+            // 3 courses avec une variation d'allure
+            for (let courseNum = 1; courseNum <= 3; courseNum++) {
+                // Variation d'allure
+                let facteur = 1;
+                if (profil >= 0.2 && profil < 0.7) {
+                    // Profil moyen : allure constante
+                    facteur = 1;
+                } else if (profil < 0.2) {
+                    // Bon profil : allure croissante
+                    facteur = 1 + (courseNum - 1) * 0.05;
+                } else {
+                    // Faible profil : allure décroissante
+                    facteur = 1 - (courseNum - 1) * 0.08;
+                }
+
+                const vitesseCourse = vitesseCible * facteur;
+                const distanceTotale = (vitesseCourse / 3.6) * duree;
+
+                if (abandon && courseNum === abandonCourse) {
+                    // Abandon : moitié du temps seulement
+                    const distancePartielle = distanceTotale * (0.3 + Math.random() * 0.4);
+                    await genererObservationCourse(basePath, courseNum, code, {
+                        duree,
+                        tour,
+                        plots,
+                        distance: distancePartielle,
+                        abandon,
+                        regulier: false
+                    });
+                    nbObservations++;
+                } else if (abandon && courseNum > abandonCourse) {
+                    // Après l'abandon, pas de course
+                    continue;
+                } else {
+                    await genererObservationCourse(basePath, courseNum, code, {
+                        duree,
+                        tour,
+                        plots,
+                        distance: distanceTotale,
+                        abandon: null,
+                        regulier: profil >= 0.2 && profil < 0.7
+                    });
+                    nbObservations++;
+                }
+            }
+        }
+    }
+
+    alert(`✅ ${nbObservations} observations générées.\n\nVa sur le kiosque élève, connecte-toi à une couleur, puis passe en mode "séquence terminée" pour tester le bilan.`);
+};
+
+async function genererObservationCourse(basePath, courseNum, code, options) {
+    const { duree, tour, plots, distance, abandon, regulier } = options;
+
+    if (abandon) {
+        // Abandon : quelques tours puis arrêt
+        const nbToursAvantAbandon = Math.max(1, Math.floor((distance / tour)));
+        const timestamps = genererTimestamps(nbToursAvantAbandon, duree, tour, distance / nbToursAvantAbandon, regulier);
+        const partiel = 0;
+
+        await set(ref(db, `${basePath}/observations/course-${courseNum}/${code}`), {
+            timestamps,
+            partiel,
+            abandon,
+            duree,
+            tour,
+            plots,
+            timestamp: Date.now()
+        });
+        return;
+    }
+
+    // Course normale : atteindre la distance cible
+    const nbToursComplets = Math.floor(distance / tour);
+    const distanceRestante = distance - (nbToursComplets * tour);
+    const distanceParPlot = tour / plots;
+    const partiel = Math.min(plots, Math.round(distanceRestante / distanceParPlot));
+
+    // Générer les timestamps (temps de chaque tour)
+    const tempsMoyenParTour = duree / (nbToursComplets + partiel / plots);
+    const timestamps = [];
+    let tempsCumule = 0;
+
+    for (let i = 0; i < nbToursComplets; i++) {
+        // Variation entre -10% et +10% si pas régulier, sinon -3% / +3%
+        const variation = regulier
+            ? (Math.random() - 0.5) * 0.06
+            : (Math.random() - 0.5) * 0.2;
+        const tempsTour = tempsMoyenParTour * (1 + variation);
+        tempsCumule += tempsTour * 1000;
+        if (tempsCumule < duree * 1000) {
+            timestamps.push(Math.round(tempsCumule));
+        }
+    }
+
+    await set(ref(db, `${basePath}/observations/course-${courseNum}/${code}`), {
+        timestamps,
+        partiel,
+        abandon: null,
+        duree,
+        tour,
+        plots,
+        timestamp: Date.now()
+    });
+}
+
+function genererTimestamps(nbTours, duree, tour, distanceParTour, regulier) {
+    const timestamps = [];
+    let tempsCumule = 0;
+    const tempsMoyen = duree / nbTours;
+    for (let i = 0; i < nbTours; i++) {
+        const variation = regulier ? (Math.random() - 0.5) * 0.06 : (Math.random() - 0.5) * 0.2;
+        tempsCumule += tempsMoyen * (1 + variation) * 1000;
+        if (tempsCumule < duree * 1000) timestamps.push(Math.round(tempsCumule));
+    }
+    return timestamps;
+}
+window.troisCinqMinNettoyerTest = async function() {
+    if (!currentClasse) return;
+    if (!confirm('⚠️ Supprimer TOUTES les observations (courses 1, 2, 3) de cette classe ?\n\nCela effacera les données réelles ET les données de test.')) return;
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const basePath = getBasePath(currentClasse);
+
+    try {
+        await set(ref(db, `${basePath}/observations`), null);
+        await set(ref(db, `${basePath}/commandes/sequence`), { etat: 'idle', timestampMaj: Date.now() });
+        alert('✅ Observations nettoyées.');
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur : ' + err.message);
+    }
+};
 // ============================================================
 // CLEANUP
 // ============================================================

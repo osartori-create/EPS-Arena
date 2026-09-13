@@ -164,7 +164,8 @@ function tick() {
     } else if (elapsed < 3 * duree + 2 * pause) {
         phase = 'course'; courseNum = 3;
     } else {
-        phase = 'bilan'; courseNum = 3;
+        // ✅ Fin de la course 3 : on passe en saisie finale (pas directement au bilan)
+        phase = 'saisie_finale'; courseNum = 3;
     }
 
     if (state.phase !== phase || state.courseNum !== courseNum) {
@@ -181,9 +182,9 @@ function tick() {
             preparerNouvelleCourse(courseNum);
         }
 
-        // Course 3 terminée → envoyer résultats puis bilan
-        if (anciennePhase === 'course' && phase === 'bilan') {
-            envoyerResultatsCourse(ancienneCourse);
+                // Course 3 terminée → saisie finale (les résultats seront envoyés après validation)
+        if (anciennePhase === 'course' && phase === 'saisie_finale') {
+            // Rien à envoyer ici, on attend la validation
         }
 
         state.phase = phase;
@@ -277,6 +278,7 @@ function render() {
         case 'attente':         renderAttente(container); break;
         case 'course':          renderCourse(container); break;
         case 'pause':           renderPause(container); break;
+        case 'saisie_finale':   renderSaisieFinale(container); break;
         case 'pause_manuelle':  renderPauseManuelle(container); break;
         case 'bilan':           renderBilan(container); break;
         default:                renderChoixCouleur(container);
@@ -667,6 +669,89 @@ function renderPause(container) {
 
     container.innerHTML = html;
 }
+
+// ============================================================
+// ÉCRAN 4BIS : SAISIE FINALE (après course 3)
+// ============================================================
+function renderSaisieFinale(container) {
+    const couleur = getCouleurGroupe(state.couleur);
+
+    const elevesActifs = state.codes.filter(c => !state.abandonsParEleve[c]);
+
+    let html = `
+        <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
+            <div class="flex justify-between items-center bg-slate-900/90 backdrop-blur p-4 rounded-2xl mb-4 border-2"
+                 style="border-color:${couleur.border};">
+                <div>
+                    <div class="text-[10px] font-bold uppercase text-slate-400">Fin de séquence</div>
+                    <div class="text-xl font-black text-white">Course 3 terminée</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] font-bold uppercase text-slate-400">Étape</div>
+                    <div class="text-lg font-black text-yellow-400">Saisie finale</div>
+                </div>
+            </div>
+
+            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-slate-700 mb-4">
+                <h3 class="font-black text-white text-lg mb-1">📝 Saisie des plots partiels — Course 3</h3>
+                <p class="text-slate-400 text-sm mb-4">
+                    Pour chaque élève, indique combien de plots supplémentaires il a parcourus dans son dernier tour.
+                </p>
+                <div class="space-y-3">
+    `;
+
+    if (elevesActifs.length === 0) {
+        html += `<p class="text-slate-500 text-center text-sm">Aucun élève actif.</p>`;
+    } else {
+        elevesActifs.forEach(code => {
+            const nbTours = (state.timestampsParEleve[code] || []).length;
+            const partiel = state.partielsParEleve[code] || 0;
+
+            html += `
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                    <div class="flex justify-between items-center mb-2">
+                        <div>
+                            <span class="font-black text-2xl" style="color:${couleur.bg};">${code}</span>
+                            <span class="text-xs text-slate-400 ml-2">${nbTours} tour${nbTours > 1 ? 's' : ''} complet${nbTours > 1 ? 's' : ''}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400">Partiel :</span>
+                            <span class="text-xl font-black text-white w-8 text-center">${partiel}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-1">
+                        ${[0,1,2,3,4,5,6,7,8].map(n => `
+                            <button onclick="window.dmfKioskSetPartiel('${code}', ${n})"
+                                    class="flex-1 py-2 rounded-lg font-black text-sm border-2 active:scale-95 ${partiel === n ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-800 text-slate-300 border-slate-700'}">
+                                ${n}
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    html += `
+                </div>
+            </div>
+
+            <button onclick="window.dmfKioskTerminerSequence()"
+                    class="w-full bg-emerald-600 hover:bg-emerald-500 py-5 rounded-2xl font-black text-xl text-white active:scale-95 transition-all shadow-xl">
+                ✅ Voir les bilans
+            </button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+window.dmfKioskTerminerSequence = async function() {
+    // Envoyer les résultats de la course 3
+    await envoyerResultatsCourse(3);
+    state.phase = 'bilan';
+    render();
+};
 
 window.dmfKioskSetPartiel = function(code, valeur) {
     state.partielsParEleve[code] = valeur;
