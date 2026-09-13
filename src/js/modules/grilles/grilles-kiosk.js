@@ -239,8 +239,8 @@ function renderConfirmation() {
     container.innerHTML = `
         <div class="space-y-4 max-w-md mx-auto text-center py-6">
             <div class="text-6xl mb-4">✅</div>
-            <h2 class="text-2xl font-black text-white">Auto-évaluation enregistrée !</h2>
-            <p class="text-slate-400 text-sm">Ton prof verra tes réponses de manière anonyme.</p>
+            <h2 class="text-2xl font-black text-white">Auto-évaluation envoyée !</h2>
+            <p class="text-slate-400 text-sm">Retour automatique à l'écran de saisie dans 2 secondes...</p>
 
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mt-4">
                 <p class="text-sm text-slate-400">Code : <span class="text-yellow-400 font-black text-lg">${currentCode}</span></p>
@@ -248,7 +248,7 @@ function renderConfirmation() {
 
             <button onclick="window.grillesKioskRetourCode()"
                     class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-black text-white text-lg active:scale-95 transition-all mt-4">
-                🔄 Élève suivant
+                🔄 Élève suivant (immédiat)
             </button>
             <button onclick="window.retourMenuGrilles()"
                     class="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-2xl font-black text-sm text-white active:scale-95">
@@ -256,8 +256,17 @@ function renderConfirmation() {
             </button>
         </div>
     `;
-}
 
+    // ✅ Retour automatique après 2s
+    if (window._grillesAutoReturnTimer) clearTimeout(window._grillesAutoReturnTimer);
+    window._grillesAutoReturnTimer = setTimeout(() => {
+        // Vérifier qu'on est toujours sur l'écran de confirmation
+        const containerNow = document.getElementById('grilles-module');
+        if (containerNow && containerNow.innerHTML.includes('Auto-évaluation envoyée')) {
+            window.grillesKioskRetourCode();
+        }
+    }, 2000);
+}
 window.retourMenuGrilles = function() {
     if (configListener) { configListener(); configListener = null; }
     const container = document.getElementById('grilles-module');
@@ -270,6 +279,10 @@ window.retourMenuGrilles = function() {
 
 export function cleanupGrillesKiosk() {
     if (configListener) { configListener(); configListener = null; }
+    if (window._grillesAutoReturnTimer) {
+        clearTimeout(window._grillesAutoReturnTimer);
+        window._grillesAutoReturnTimer = null;
+    }
     currentClasse = '';
     currentGrille = null;
     currentCode = null;

@@ -513,15 +513,26 @@ window.grillesSetNote = function(eleveId, critereId, valeur) {
     if (!evals[currentGrille.id][currentPeriode][eleveId]) {
         evals[currentGrille.id][currentPeriode][eleveId] = { notes: {} };
     }
-    evals[currentGrille.id][currentPeriode][eleveId].notes[critereId] = valeur;
+
+    const notesActuelles = evals[currentGrille.id][currentPeriode][eleveId].notes;
+    const valeurActuelle = notesActuelles[critereId];
+
+    // ✅ Si on clique sur le même niveau déjà sélectionné → on désélectionne
+    if (valeurActuelle === valeur) {
+        delete notesActuelles[critereId];
+        console.log(`[Grilles] Désélection : ${critereId} de ${eleveId}`);
+    } else {
+        notesActuelles[critereId] = valeur;
+    }
+
     evals[currentGrille.id][currentPeriode][eleveId].timestamp = Date.now();
 
     const critere = currentGrille.criteres.find(c => c.id === critereId);
-    if (critere && critere.nom.toLowerCase().includes('élève')) {
+    if (critere && critere.nom.toLowerCase().includes('élève') && valeurActuelle !== valeur) {
         setDernierNiveauEleve(currentClasse, eleveId, valeur, currentGrille.activite);
     }
 
-    sauvegarderEvaluation(currentClasse, currentGrille.id, currentPeriode, eleveId, evals[currentGrille.id][currentPeriode][eleveId].notes);
+    sauvegarderEvaluation(currentClasse, currentGrille.id, currentPeriode, eleveId, notesActuelles);
     const container = document.getElementById('viewEvaluations');
     renderPassation(container);
 };
@@ -810,6 +821,10 @@ window.grillesGenererDonneesTest = async function() {
         alert('Sélectionne une classe.');
         return;
     }
+    if (!currentGrille) {
+        alert('Sélectionne d\'abord une grille.');
+        return;
+    }
 
     const eleves = getExistingEleves(currentClasse);
     if (eleves.length === 0) {
@@ -817,26 +832,45 @@ window.grillesGenererDonneesTest = async function() {
         return;
     }
 
+    const activite = currentGrille.activite;
+
+    if (!confirm(`Générer des données de test pour "${activite}" ?\n\nClasse : ${currentClasse}\n${eleves.length} élèves`)) {
+        return;
+    }
+
+    // Dispatch selon l'activité
+    if (activite === 'relais') {
+        await genererDonneesTestRelais(eleves);
+    } else if (activite === 'arcathlon') {
+        await genererDonneesTestArcathlon(eleves);
+    } else if (activite === 'escalade') {
+        await genererDonneesTestEscalade(eleves);
+    } else if (activite === 'badminton') {
+        await genererDonneesTestBadminton(eleves);
+    } else {
+        alert(`⚠️ Aucun générateur de test pour l'activité "${activite}".`);
+    }
+};
+
+// ============================================================
+// GÉNÉRATEURS SPÉCIFIQUES
+// ============================================================
+async function genererDonneesTestRelais(eleves) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const { push } = await import('../../core/firebase-service.js');
 
-    const mesures10sPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
-    const mesures2zPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
     const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/config`;
-
     const configSnap = await new Promise(resolve => {
         onValue(ref(db, configPath), resolve, { onlyOnce: true });
     });
-
     const config = configSnap.val();
     if (!config || !config.groupes) {
-        alert('⚠️ Aucune configuration Relais trouvée.\nTransmets d\'abord une config Relais (onglet Activités → Relais).');
+        alert('⚠️ Aucune configuration Relais trouvée.\nTransmets d\'abord une config Relais.');
         return;
     }
 
-    if (!confirm(`Générer 3 essais 10s + 3 essais 2 zones par élève ?\n\nClasse : ${currentClasse}\n${eleves.length} élèves\n${Object.keys(config.groupes).length} groupes`)) {
-        return;
-    }
+    const mesures10sPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
+    const mesures2zPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
 
     let nb10s = 0, nb2z = 0;
 
@@ -849,7 +883,6 @@ window.grillesGenererDonneesTest = async function() {
                 const ecart = (Math.random() - 0.5) * 4;
                 const vReelle = Math.round((vTheo + ecart) * 10) / 10;
                 const score = Math.round((5 + ecart) * 10) / 10;
-                const zoneAtteinte = Math.round(vReelle - 14);
 
                 await push(ref(db, mesures10sPath), {
                     sousActivite: 'relais10s',
@@ -858,7 +891,7 @@ window.grillesGenererDonneesTest = async function() {
                     pairId: `${lettre}-${lettre}`,
                     relayeLettre: lettre,
                     relayeurLettre: lettre,
-                    zoneAtteinte,
+                    zoneAtteinte: Math.round(vReelle - 14),
                     vReelle,
                     vTheorique: Math.round(vTheo * 10) / 10,
                     score,
@@ -874,13 +907,7 @@ window.grillesGenererDonneesTest = async function() {
                 const moyenne = (vZ1 + vZ2) / 2;
                 const pct = 60 + Math.random() * 45;
                 const vTrans = moyenne * pct / 100;
-
-                let points = 0;
-                if (pct >= 100) points = 5;
-                else if (pct >= 90) points = 4;
-                else if (pct >= 80) points = 3;
-                else if (pct >= 70) points = 2;
-                else if (pct >= 60) points = 1;
+                let points = pct >= 100 ? 5 : pct >= 90 ? 4 : pct >= 80 ? 3 : pct >= 70 ? 2 : pct >= 60 ? 1 : 0;
 
                 await push(ref(db, mesures2zPath), {
                     sousActivite: 'relais2zones',
@@ -890,11 +917,6 @@ window.grillesGenererDonneesTest = async function() {
                     relayeLettre: lettre,
                     relayeurLettre: lettre,
                     distances: { z1: 20, trans: 10, z2: 20 },
-                    temps: {
-                        z1: Math.round(20000 / vZ1 * 3.6),
-                        trans: Math.round(10000 / vTrans * 3.6),
-                        z2: Math.round(20000 / vZ2 * 3.6)
-                    },
                     vitesses: {
                         z1: Math.round(vZ1 * 10) / 10,
                         trans: Math.round(vTrans * 10) / 10,
@@ -910,9 +932,240 @@ window.grillesGenererDonneesTest = async function() {
             }
         }
     }
+    alert(`✅ ${nb10s} essais 10s + ${nb2z} essais 2 zones générés.`);
+}
 
-    alert(`✅ Données test générées !\n${nb10s} essais 10s\n${nb2z} essais 2 zones`);
-};
+async function genererDonneesTestArcathlon(eleves) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { push } = await import('../../core/firebase-service.js');
+
+    const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/arcathlon`;
+    const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${currentClasse}`) || '[]');
+    if (equipes.length === 0) {
+        alert('⚠️ Aucune équipe Arcathlon configurée.\nGénère d\'abord les équipes dans Activités → Arcathlon.');
+        return;
+    }
+
+    let nb = 0;
+    const modes = ['sprint', 'poursuite'];
+
+    for (const eq of equipes) {
+        for (const m of eq.membres) {
+            const code = `${eq.id}_${m.maillot}`;
+
+            for (const mode of modes) {
+                for (let serie = 1; serie <= 3; serie++) {
+                    const scoreTir = Math.floor(5 + Math.random() * 15);
+                    const vGrande = 12 + Math.random() * 6;
+                    const nbPen = Math.floor(Math.random() * 3);
+                    const tempsPen = [];
+                    for (let p = 0; p < nbPen; p++) tempsPen.push(15000 + Math.random() * 10000);
+
+                    await push(ref(db, `${basePath}/passages/${mode}`), {
+                        code,
+                        equipe: eq.id,
+                        maillot: m.maillot,
+                        serie,
+                        isFinale: false,
+                        mode,
+                        tempsCourse: 30000 + Math.random() * 10000,
+                        tempsTir: 20000 + Math.random() * 15000,
+                        tempsPenalites: tempsPen,
+                        vitesseGrandeBoucle: Math.round(vGrande * 10) / 10,
+                        scoreTir,
+                        penalites: nbPen,
+                        timestamp: Date.now() - serie * 60000
+                    });
+                    nb++;
+                }
+            }
+        }
+    }
+    alert(`✅ ${nb} passages Arcathlon générés.`);
+}
+
+async function genererDonneesTestEscalade(eleves) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { push } = await import('../../core/firebase-service.js');
+
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
+    const groupes = Object.keys(assignments).filter(k => k !== 'reserve' && k !== 'nbGroupes');
+
+    if (groupes.length === 0) {
+        alert('⚠️ Aucun groupe Escalade configuré.\nGénère d\'abord les groupes dans Activités → Escalade.');
+        return;
+    }
+
+    const cotations = ['4a', '4b', '4c', '5a', '5b', '5c', '6a'];
+    const hauteurs = [3, 4, 5, 6, 7, 8, 9];
+    let nb = 0;
+
+    for (const lettre of groupes) {
+        const ids = assignments[lettre] || [];
+        ids.forEach((eleveId, idx) => {
+            const role = idx + 1;
+            for (let i = 0; i < 4; i++) {
+                const hauteur = hauteurs[Math.floor(Math.random() * hauteurs.length)];
+                const cotation = cotations[Math.floor(Math.random() * cotations.length)];
+
+                push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/escalade/montees`), {
+                    groupe: lettre,
+                    role,
+                    voie_num: 1 + Math.floor(Math.random() * 10),
+                    couleur: 'bleue',
+                    cotation,
+                    hauteur,
+                    points: hauteur,
+                    timestamp: Date.now() - i * 60000
+                });
+                nb++;
+            }
+        });
+    }
+    alert(`✅ ${nb} montées Escalade générées.`);
+}
+
+async function genererDonneesTestBadminton(eleves) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { push } = await import('../../core/firebase-service.js');
+
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${currentClasse}`) || '{}');
+    const terrains = Object.keys(assignments).filter(k => !isNaN(parseInt(k)));
+
+    if (terrains.length === 0) {
+        alert('⚠️ Aucun terrain Badminton configuré.\nGénère d\'abord les terrains dans Activités → Badminton.');
+        return;
+    }
+
+    let nb = 0;
+    for (const terrain of terrains) {
+        const nbJoueurs = assignments[terrain]?.length || 0;
+        const lettres = 'ABCDEFGHIJ'.split('').slice(0, nbJoueurs);
+
+        for (let i = 0; i < lettres.length; i++) {
+            for (let j = i + 1; j < lettres.length; j++) {
+                const s1 = Math.floor(5 + Math.random() * 8);
+                const s2 = Math.floor(5 + Math.random() * 8);
+                const avec1 = s1 >= 8;
+                const avec2 = s2 >= 8;
+                const winner = s1 > s2 ? 'p1' : 'p2';
+
+                await push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`), {
+                    terrain: parseInt(terrain),
+                    p1: lettres[i],
+                    p2: lettres[j],
+                    score1: s1,
+                    score2: s2,
+                    pts1: s1 > s2 ? (avec1 ? 5 : 3) : (avec1 ? 2 : 1),
+                    pts2: s2 > s1 ? (avec2 ? 5 : 3) : (avec2 ? 2 : 1),
+                    avecManiere1: avec1,
+                    avecManiere2: avec2,
+                    winner,
+                    timestamp: Date.now()
+                });
+                nb++;
+            }
+        }
+    }
+    alert(`✅ ${nb} matchs Badminton générés.`);
+}
+
+async function genererDonneesTestEscalade(eleves) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { push } = await import('../../core/firebase-service.js');
+
+    // Récupérer la config escalade (groupes A, B, C...)
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
+    const groupes = Object.keys(assignments).filter(k => k !== 'reserve' && k !== 'nbGroupes');
+
+    if (groupes.length === 0) {
+        alert('⚠️ Aucun groupe Escalade configuré.\nGénère d\'abord les groupes dans Activités → Escalade.');
+        return;
+    }
+
+    const cotations = ['4a', '4b', '4c', '5a', '5b', '5c', '6a'];
+    const hauteurs = [3, 4, 5, 6, 7, 8, 9];
+    let nb = 0;
+
+    for (const lettre of groupes) {
+        const ids = assignments[lettre] || [];
+        ids.forEach((eleveId, idx) => {
+            const role = idx + 1; // 1, 2, 3...
+            for (let i = 0; i < 4; i++) {
+                const hauteur = hauteurs[Math.floor(Math.random() * hauteurs.length)];
+                const cotation = cotations[Math.floor(Math.random() * cotations.length)];
+
+                 push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/escalade/montees`), {
+                    groupe: lettre,
+                    role,
+                    voie_num: 1 + Math.floor(Math.random() * 10),
+                    couleur: 'bleue',
+                    cotation,
+                    hauteur,
+                    points: hauteur,
+                    timestamp: Date.now() - i * 60000
+                });
+                nb++;
+            }
+        });
+    }
+    alert(`✅ ${nb} montées Escalade générées.`);
+}
+
+async function genererDonneesTestBadminton(eleves) {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const { push } = await import('../../core/firebase-service.js');
+
+    // Récupérer la config badminton (terrains avec nombre de joueurs)
+    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`;
+    const configSnap = await new Promise(resolve => {
+        onValue(ref(db, configPath), resolve, { onlyOnce: true });
+    });
+    const config = configSnap.val() || {};
+
+    // Récupérer les affectations terrains
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${currentClasse}`) || '{}');
+    const terrains = Object.keys(assignments).filter(k => !isNaN(parseInt(k)));
+
+    if (terrains.length === 0) {
+        alert('⚠️ Aucun terrain Badminton configuré.\nGénère d\'abord les terrains dans Activités → Badminton.');
+        return;
+    }
+
+    let nb = 0;
+    for (const terrain of terrains) {
+        const nbJoueurs = assignments[terrain]?.length || 0;
+        const lettres = 'ABCDEFGHIJ'.split('').slice(0, nbJoueurs);
+
+        // Round Robin simplifié : chaque paire joue une fois
+        for (let i = 0; i < lettres.length; i++) {
+            for (let j = i + 1; j < lettres.length; j++) {
+                const s1 = Math.floor(5 + Math.random() * 8);
+                const s2 = Math.floor(5 + Math.random() * 8);
+                const avec1 = s1 >= 8;
+                const avec2 = s2 >= 8;
+                const winner = s1 > s2 ? 'p1' : 'p2';
+                const matchId = `${terrain}_${i}_${j}`;
+
+                await push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`), {
+                    terrain: parseInt(terrain),
+                    p1: lettres[i],
+                    p2: lettres[j],
+                    score1: s1,
+                    score2: s2,
+                    pts1: s1 > s2 ? (avec1 ? 5 : 3) : (avec1 ? 2 : 1),
+                    pts2: s2 > s1 ? (avec2 ? 5 : 3) : (avec2 ? 2 : 1),
+                    avecManiere1: avec1,
+                    avecManiere2: avec2,
+                    winner,
+                    timestamp: Date.now()
+                });
+                nb++;
+            }
+        }
+    }
+    alert(`✅ ${nb} matchs Badminton générés.`);
+}
 
 // ============================================================
 // AUTO-ÉVALUATIONS REÇUES
