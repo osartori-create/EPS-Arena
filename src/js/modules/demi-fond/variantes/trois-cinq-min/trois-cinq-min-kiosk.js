@@ -71,30 +71,60 @@ export function initTroisCinqMinKiosk(classe) {
     // Écoute séquence
     if (sequenceListener) sequenceListener();
     sequenceListener = onValue(ref(db, `${basePath}/commandes/sequence`), (snap) => {
-        const seq = snap.val();
-        if (!seq) return;
+    const seq = snap.val();
+    if (!seq) return;
 
-        const ancienEtat = state.sequence?.etat;
-        state.sequence = seq;
+    const ancienneAction = state.sequence?.actionTimestamp;
+    state.sequence = seq;
 
-        // GO initial (idle → course1)
-        if (seq.etat === 'course1' && ancienEtat !== 'course1' && state.couleur) {
-            demarrerCourse(1, seq.timestampDebut);
-        }
-        // Stop
-        else if (seq.etat === 'termine') {
+    // Nouvelle action détectée
+    if (seq.actionTimestamp && seq.actionTimestamp !== ancienneAction) {
+        console.log('[DemiFond] Action reçue :', seq.action);
+
+        // Toujours synchroniser le timestampDebut
+        state.timestampDebut = seq.timestampDebut;
+
+        // Terminé
+        if (seq.etat === 'termine') {
             state.phase = 'bilan';
             render();
-        }
-        // Pause manuelle
-        else if (seq.etat === 'pause_manuelle') {
-            if (state.tickInterval) clearInterval(state.tickInterval);
-            state.phase = 'pause_manuelle';
-            render();
+            return;
         }
 
+        // Pause manuelle
+        if (seq.etat === 'pause_manuelle') {
+            state.phase = 'pause_manuelle';
+            render();
+            return;
+        }
+
+        // GO ou SKIP : reset complet
+        if (seq.action === 'go' || seq.action === 'skip') {
+            state.timestampsParEleve = {};
+            state.partielsParEleve = {};
+            state.abandonsParEleve = {};
+            state.lastClickAt = {};
+            state.dernierClic = null;
+            state.derniereCourseEnvoyee = 0;
+            state.codes.forEach(code => { state.timestampsParEleve[code] = []; });
+        }
+
+        // Reprendre ou GO ou SKIP : forcer un tick pour recalculer la phase
+        if (state.couleur) {
+            // Forcer un état "neutre" pour que tick() recalculle
+            state.phase = '__tick__';
+            tick();
+            render();
+        }
+        return;
+    }
+
+    // Aucune action mais état = termine (ex: kiosque connecté après la fin)
+    if (seq.etat === 'termine' && state.phase !== 'bilan') {
+        state.phase = 'bilan';
         render();
-    });
+    }
+});
 
     // Timer global de séquence
     if (state.tickInterval) clearInterval(state.tickInterval);
@@ -114,6 +144,8 @@ export function initTroisCinqMinKiosk(classe) {
 // ============================================================
 function tick() {
     if (!state.timestampDebut || !state.config) return;
+    if (state.phase === 'pause_manuelle') return;
+    if (state.phase === 'bilan') return;
 
     const elapsed = (Date.now() - state.timestampDebut) / 1000;
     const duree = state.config.duree;
@@ -135,20 +167,23 @@ function tick() {
         phase = 'bilan'; courseNum = 3;
     }
 
-    // Détection de transition
     if (state.phase !== phase || state.courseNum !== courseNum) {
         const anciennePhase = state.phase;
         const ancienneCourse = state.courseNum;
 
-        // Course → Pause ou Bilan : on envoie les résultats
-        if (anciennePhase === 'course' && phase !== 'course') {
+        // Transition Course → Pause : envoyer les résultats
+        if (anciennePhase === 'course' && phase === 'pause') {
             envoyerResultatsCourse(ancienneCourse);
         }
 
-        // Pause → Course suivante
+        // Pause → Course suivante : préparer
         if (anciennePhase === 'pause' && phase === 'course' && courseNum !== ancienneCourse) {
             preparerNouvelleCourse(courseNum);
-            // ✅ NE PAS toucher au timestampDebut : il reste fixe depuis le GO initial
+        }
+
+        // Course 3 terminée → envoyer résultats puis bilan
+        if (anciennePhase === 'course' && phase === 'bilan') {
+            envoyerResultatsCourse(ancienneCourse);
         }
 
         state.phase = phase;

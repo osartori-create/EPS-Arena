@@ -1,7 +1,7 @@
 // src/js/modules/demi-fond/variantes/trois-cinq-min/trois-cinq-min-interface.js
 // UI Professeur pour le sous-module 3x5min
 
-import { db, ref, set } from '../../../../core/firebase-service.js';
+import { db, ref, set, onValue } from '../../../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves } from '../../../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../../core/live-engine.js';
 import { COULEURS_GROUPES, getCouleurGroupe, getGroupesKey, getConfigKey, getBasePath, getVMAEleve } from '../../demifond-common.js';
@@ -10,9 +10,11 @@ import { DEFAUT_PARAMS, SOUS_MODULE_ID, TITRE_AFFICHE, repartirEnGroupes } from 
 let currentClasse = '';
 let currentContainer = null;
 let sortableInstances = [];
+let _profChronoInterval = null;
+let _profSequenceListener = null;
 
 // ============================================================
-// STATUTS (Présent / Absent / Inapte)
+// STATUTS (Absent / Inapte stockés par position)
 // ============================================================
 function getStatutsKey(classe) {
     return `eps_arena_demifond_statuts_${classe}`;
@@ -20,12 +22,6 @@ function getStatutsKey(classe) {
 
 function getStatuts(classe) {
     return JSON.parse(localStorage.getItem(getStatutsKey(classe)) || '{}');
-}
-
-function setStatutEleve(classe, eleveId, statut) {
-    const statuts = getStatuts(classe);
-    statuts[eleveId] = statut;
-    localStorage.setItem(getStatutsKey(classe), JSON.stringify(statuts));
 }
 
 // ============================================================
@@ -40,8 +36,8 @@ export function initTroisCinqMinInterface(container) {
 
     container.appendChild(createHeader());
     container.appendChild(createParams());
+    container.appendChild(createSequenceControls());   // ✅ Déplacé avant les groupes
     container.appendChild(createGroupesBlock());
-    container.appendChild(createSequenceControls());
     container.appendChild(createTransmissionButton());
 
     setTimeout(() => {
@@ -145,47 +141,7 @@ function createParams() {
 }
 
 // ============================================================
-// GROUPES (Réserve + Groupes)
-// ============================================================
-function createGroupesBlock() {
-    const div = document.createElement('div');
-    div.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700';
-    div.innerHTML = `
-        <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">👥 Répartition des élèves</h4>
-        <p class="text-[10px] text-slate-500 mb-3">💡 Glisse un élève dans Absents ou Inaptes pour définir son statut. Les élèves en réserve basse sont "présents".</p>
-
-        <!-- ZONES ABSENTS / INAPTES (au-dessus) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-red-700/50">
-                <div class="text-xs font-bold text-red-400 uppercase mb-2">🚫 Absents</div>
-                <div id="dmfReserveAbsents" class="dmf-reserve flex flex-col gap-1 min-h-[60px] border border-red-800/30 rounded-lg p-1"></div>
-            </div>
-            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-orange-700/50">
-                <div class="text-xs font-bold text-orange-400 uppercase mb-2">⚠️ Inaptes</div>
-                <div id="dmfReserveInaptes" class="dmf-reserve flex flex-col gap-1 min-h-[60px] border border-orange-800/30 rounded-lg p-1"></div>
-            </div>
-        </div>
-
-        <!-- RÉSERVE PRÉSENTS -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-blue-700/50">
-                <div class="text-xs font-bold text-blue-400 uppercase mb-2">👦 Présents - Garçons</div>
-                <div id="dmfReserveGarcons" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-blue-800/30 rounded-lg p-1"></div>
-            </div>
-            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-rose-700/50">
-                <div class="text-xs font-bold text-rose-400 uppercase mb-2">👩 Présentes - Filles</div>
-                <div id="dmfReserveFilles" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-rose-800/30 rounded-lg p-1"></div>
-            </div>
-        </div>
-
-        <!-- GROUPES -->
-        <div id="dmfGroupesGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
-    `;
-    return div;
-}
-
-// ============================================================
-// CONTRÔLES DE SÉQUENCE
+// CONTRÔLE DE SÉQUENCE + CHRONO PROF
 // ============================================================
 function createSequenceControls() {
     const div = document.createElement('div');
@@ -240,21 +196,19 @@ function createSequenceControls() {
                 🛑 Stop
             </button>
         </div>
+        <div id="dmfSequenceState" class="mt-3 text-xs text-slate-400 text-center">
+            État : <span class="font-black text-white">idle</span>
+        </div>
     `;
     div.appendChild(btns);
 
-    // ✅ Lancer le listener chrono
     setTimeout(() => initProfChrono(), 100);
-
     return div;
 }
 
 // ============================================================
 // CHRONO PROF (bandeau)
 // ============================================================
-let _profChronoInterval = null;
-let _profSequenceListener = null;
-
 function initProfChrono() {
     if (!currentClasse) return;
 
@@ -268,7 +222,7 @@ function initProfChrono() {
         currentSeq = snap.val();
         if (currentSeq) {
             const seqEl = document.getElementById('dmf-prof-seq');
-            if (seqEl) seqEl.textContent = currentSeq.etat;
+            if (seqEl) seqEl.textContent = currentSeq.etat || '—';
         }
     });
 
@@ -279,8 +233,8 @@ function initProfChrono() {
         if (!phaseEl || !tempsEl) return;
 
         const config = JSON.parse(localStorage.getItem(getConfigKey(currentClasse, SOUS_MODULE_ID)) || 'null');
-        if (!config || !currentSeq || !currentSeq.timestampDebut) {
-            phaseEl.textContent = '—';
+        if (!config || !currentSeq || !currentSeq.timestampDebut || currentSeq.etat === 'idle' || currentSeq.etat === 'termine') {
+            phaseEl.textContent = currentSeq?.etat === 'termine' ? '🏆 TERMINÉ' : '—';
             tempsEl.textContent = '--:--';
             return;
         }
@@ -316,6 +270,46 @@ function initProfChrono() {
         const s = Math.floor(restant % 60);
         tempsEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
     }, 500);
+}
+
+// ============================================================
+// GROUPES (Réserve + Groupes)
+// ============================================================
+function createGroupesBlock() {
+    const div = document.createElement('div');
+    div.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700';
+    div.innerHTML = `
+        <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">👥 Répartition des élèves</h4>
+        <p class="text-[10px] text-slate-500 mb-3">💡 Glisse un élève dans Absents ou Inaptes pour définir son statut.</p>
+
+        <!-- ABSENTS / INAPTES -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-red-700/50">
+                <div class="text-xs font-bold text-red-400 uppercase mb-2">🚫 Absents</div>
+                <div id="dmfReserveAbsents" class="dmf-reserve flex flex-col gap-1 min-h-[60px] border border-red-800/30 rounded-lg p-1"></div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-orange-700/50">
+                <div class="text-xs font-bold text-orange-400 uppercase mb-2">⚠️ Inaptes</div>
+                <div id="dmfReserveInaptes" class="dmf-reserve flex flex-col gap-1 min-h-[60px] border border-orange-800/30 rounded-lg p-1"></div>
+            </div>
+        </div>
+
+        <!-- PRÉSENTS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-blue-700/50">
+                <div class="text-xs font-bold text-blue-400 uppercase mb-2">👦 Présents - Garçons</div>
+                <div id="dmfReserveGarcons" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-blue-800/30 rounded-lg p-1"></div>
+            </div>
+            <div class="bg-slate-900 p-3 rounded-2xl border-2 border-dashed border-rose-700/50">
+                <div class="text-xs font-bold text-rose-400 uppercase mb-2">👩 Présentes - Filles</div>
+                <div id="dmfReserveFilles" class="dmf-reserve flex flex-col gap-1 min-h-[80px] border border-rose-800/30 rounded-lg p-1"></div>
+            </div>
+        </div>
+
+        <!-- GROUPES -->
+        <div id="dmfGroupesGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3"></div>
+    `;
+    return div;
 }
 
 // ============================================================
@@ -366,14 +360,6 @@ async function createEleveCard(eleve) {
 }
 
 // ============================================================
-// GESTION DES STATUTS
-// ============================================================
-window.troisCinqMinSetStatut = function(eleveId, statut) {
-    setStatutEleve(currentClasse, eleveId, statut);
-    refreshAll();
-};
-
-// ============================================================
 // GÉNÉRATION DES GROUPES (aléatoire)
 // ============================================================
 window.troisCinqMinGenererGroupes = async function() {
@@ -384,21 +370,16 @@ window.troisCinqMinGenererGroupes = async function() {
     const nbGroupes = parseInt(document.getElementById('dmfNbGroupes')?.value) || 2;
     const statuts = getStatuts(currentClasse);
 
-    // Filtrer les présents
     const presents = eleves.filter(e => (statuts[e.id] || 'present') === 'present');
-
     if (presents.length === 0) return alert('Aucun élève présent.');
 
-    // Vérifier les VMA
     const sansVMA = presents.filter(e => !getVMAEleve(currentClasse, e.id));
     if (sansVMA.length > 0) {
         if (!confirm(`${sansVMA.length} élève(s) n'ont pas de VMA.\nContinuer quand même ?`)) return;
     }
 
-    // Générer les groupes avec seulement les présents
     const groupes = repartirEnGroupes(presents, nbGroupes);
 
-    // S'assurer que toutes les couleurs présentes sont initialisées
     COULEURS_GROUPES.forEach(c => {
         if (!groupes[c.id]) groupes[c.id] = [];
     });
@@ -415,7 +396,6 @@ window.troisCinqMinViderGroupes = async function() {
 };
 
 window.troisCinqMinChangeNbGroupes = function() {
-    // Re-render la grille avec le nouveau nombre de groupes
     renderGroupesEtReserve();
 };
 
@@ -429,7 +409,6 @@ function sauvegarderGroupes(groupes) {
 function chargerGroupes() {
     const g = JSON.parse(localStorage.getItem(getGroupesKey(currentClasse, SOUS_MODULE_ID)) || 'null');
     if (!g) return {};
-    // S'assurer que toutes les clés existent
     COULEURS_GROUPES.forEach(c => {
         if (!g[c.id]) g[c.id] = [];
     });
@@ -446,6 +425,7 @@ async function refreshAll() {
 async function renderGroupesEtReserve() {
     const groupes = chargerGroupes();
     const eleves = getExistingEleves(currentClasse);
+    const statuts = getStatuts(currentClasse);
     const nbGroupes = parseInt(document.getElementById('dmfNbGroupes')?.value) || 2;
 
     // ---- GROUPES ----
@@ -481,11 +461,9 @@ async function renderGroupesEtReserve() {
     }
 
     // ---- RÉSERVES ----
-    // Récupérer tous les ids placés dans les groupes
     const placedInGroups = new Set();
     Object.values(groupes).forEach(arr => arr.forEach(id => placedInGroups.add(id)));
 
-    // Vider toutes les zones
     const resGarcons = document.getElementById('dmfReserveGarcons');
     const resFilles = document.getElementById('dmfReserveFilles');
     const resAbsents = document.getElementById('dmfReserveAbsents');
@@ -496,16 +474,10 @@ async function renderGroupesEtReserve() {
     if (resAbsents) resAbsents.innerHTML = '';
     if (resInaptes) resInaptes.innerHTML = '';
 
-    // ✅ Déduire le statut de la position : rien n'est en mémoire, tout est déduit du DOM
-    // → Les élèves dans absents/inaptes sont ceux qui étaient stockés dans "statuts"
-    // → On récupère leur position actuelle depuis le localStorage
-    const statuts = getStatuts(currentClasse);
-
     for (const e of eleves) {
         const isPlaced = placedInGroups.has(e.id);
-        if (isPlaced) continue;  // déjà dans un groupe
+        if (isPlaced) continue;
 
-        // Déterminer où le placer dans la réserve selon son statut stocké
         const statut = statuts[e.id] || 'present';
 
         if (statut === 'absent') {
@@ -513,7 +485,6 @@ async function renderGroupesEtReserve() {
         } else if (statut === 'inapte') {
             if (resInaptes) resInaptes.appendChild(await createEleveCard(e));
         } else {
-            // Présent : réparti par sexe
             if (e.sexe === 'F') {
                 if (resFilles) resFilles.appendChild(await createEleveCard(e));
             } else {
@@ -543,7 +514,6 @@ function initSortable() {
     sortableInstances.forEach(s => { try { s.destroy(); } catch (e) {} });
     sortableInstances = [];
 
-    // Réserves : présents, absents, inaptes
     document.querySelectorAll('.dmf-reserve').forEach(el => {
         const s = new Sortable(el, {
             group: 'demifond-groups',
@@ -551,14 +521,12 @@ function initSortable() {
             onEnd: () => {
                 saveAffectations();
                 updateNumBadges();
-                // Re-render pour réorganiser correctement selon les nouvelles positions
                 setTimeout(() => refreshAll(), 50);
             }
         });
         sortableInstances.push(s);
     });
 
-    // Groupes
     document.querySelectorAll('.dmf-groupe-members').forEach(el => {
         const s = new Sortable(el, {
             group: 'demifond-groups',
@@ -592,7 +560,6 @@ function updateNumBadges() {
 // SAUVEGARDE DES AFFECTATIONS
 // ============================================================
 function saveAffectations() {
-    // 1. Sauvegarder les groupes
     const groupes = {};
     COULEURS_GROUPES.forEach(c => { groupes[c.id] = []; });
 
@@ -605,7 +572,6 @@ function saveAffectations() {
 
     sauvegarderGroupes(groupes);
 
-    // 2. Sauvegarder les statuts (déduits de la position)
     const statuts = {};
     document.querySelectorAll('#dmfReserveAbsents .dmf-eleve-card').forEach(card => {
         statuts[card.dataset.id] = 'absent';
@@ -613,7 +579,6 @@ function saveAffectations() {
     document.querySelectorAll('#dmfReserveInaptes .dmf-eleve-card').forEach(card => {
         statuts[card.dataset.id] = 'inapte';
     });
-    // Les autres sont "present" par défaut (pas besoin de le stocker)
 
     localStorage.setItem(getStatutsKey(currentClasse), JSON.stringify(statuts));
 }
@@ -667,17 +632,7 @@ window.troisCinqMinGo = async function() {
 
     const eleves = getExistingEleves(currentClasse);
     const localMapping = {};
-    COULEURS_GROUPES.forEach(c => {
-        (groupes[c.id] || []).forEach(id => {
-            const eleve = eleves.find(e => e.id === id);
-            if (eleve?.codeAutoEval) {
-                localMapping[`${currentClasse}_${c.id}_${eleve.codeAutoEval}`] = id;
-            }
-        });
-    });
-    const existing = getLocalMapping(currentClasse) || {};
-    setLocalMapping(currentClasse, { ...existing, ...localMapping });
-
+    const vmaParCode = {};
     const configData = {
         sousModule: SOUS_MODULE_ID,
         duree: params.duree,
@@ -688,15 +643,28 @@ window.troisCinqMinGo = async function() {
         antiDoubleClic: params.antiDoubleClic,
         cibleVMA: params.cibleVMA,
         enchainementAuto: params.enchainementAuto,
+        vmaParCode: {},
         groupes: {}
     };
 
     COULEURS_GROUPES.forEach(c => {
-        configData.groupes[c.id] = (groupes[c.id] || []).map(id => {
+        const ids = groupes[c.id] || [];
+        const codes = [];
+        ids.forEach(id => {
             const eleve = eleves.find(e => e.id === id);
-            return eleve?.codeAutoEval || null;
-        }).filter(Boolean);
+            if (eleve?.codeAutoEval) {
+                codes.push(eleve.codeAutoEval);
+                localMapping[`${currentClasse}_${c.id}_${eleve.codeAutoEval}`] = id;
+                const vma = getVMAEleve(currentClasse, id);
+                if (vma) vmaParCode[eleve.codeAutoEval] = vma;
+            }
+        });
+        configData.groupes[c.id] = codes;
     });
+    configData.vmaParCode = vmaParCode;
+
+    const existing = getLocalMapping(currentClasse) || {};
+    setLocalMapping(currentClasse, { ...existing, ...localMapping });
 
     try {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -704,10 +672,10 @@ window.troisCinqMinGo = async function() {
         await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
 
         await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
-            etat: 'course1',
-            courseNum: 1,
+            etat: 'actif',
             timestampDebut: Date.now(),
-            timestampMaj: Date.now()
+            action: 'go',
+            actionTimestamp: Date.now()
         });
 
         const stateEl = document.getElementById('dmfSequenceState');
@@ -721,39 +689,88 @@ window.troisCinqMinGo = async function() {
 
 window.troisCinqMinPauseManuelle = async function() {
     if (!currentClasse) return;
-    try {
-        await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
-            etat: 'pause_manuelle', timestampMaj: Date.now()
+    const seqRef = ref(db, `${getBasePath(currentClasse)}/commandes/sequence`);
+    onValue(seqRef, async (snap) => {
+        const seq = snap.val() || {};
+        await set(seqRef, {
+            ...seq,
+            etat: 'pause_manuelle',
+            pauseDebut: Date.now(),
+            action: 'pause',
+            actionTimestamp: Date.now()
         });
         alert('⏸️ Séquence en pause.');
-    } catch (err) { console.error(err); }
+    }, { onlyOnce: true });
 };
 
 window.troisCinqMinReprendre = async function() {
     if (!currentClasse) return;
-    try {
-        await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
-            etat: 'course', timestampMaj: Date.now()
+    const seqRef = ref(db, `${getBasePath(currentClasse)}/commandes/sequence`);
+    onValue(seqRef, async (snap) => {
+        const seq = snap.val() || {};
+        if (seq.etat !== 'pause_manuelle' || !seq.pauseDebut) {
+            alert('Aucune pause manuelle en cours.');
+            return;
+        }
+        const dureePause = Date.now() - seq.pauseDebut;
+        await set(seqRef, {
+            ...seq,
+            etat: 'actif',
+            timestampDebut: (seq.timestampDebut || Date.now()) + dureePause,
+            pauseDebut: null,
+            action: 'reprendre',
+            actionTimestamp: Date.now()
         });
         alert('▶️ Séquence reprise.');
-    } catch (err) { console.error(err); }
+    }, { onlyOnce: true });
 };
 
 window.troisCinqMinSkipCourse = async function() {
     if (!currentClasse) return;
     if (!confirm('Passer à la course suivante ?')) return;
-    alert('⏭️ Skip envoyé.');
+    const seqRef = ref(db, `${getBasePath(currentClasse)}/commandes/sequence`);
+    const config = JSON.parse(localStorage.getItem(getConfigKey(currentClasse, SOUS_MODULE_ID)) || 'null');
+    if (!config) return;
+
+    onValue(seqRef, async (snap) => {
+        const seq = snap.val() || {};
+        const elapsed = seq.timestampDebut ? (Date.now() - seq.timestampDebut) / 1000 : 0;
+        const duree = config.duree;
+        const pause = config.pause;
+
+        let courseActuelle = 1;
+        if (elapsed >= 2 * duree + pause) courseActuelle = 3;
+        else if (elapsed >= duree + pause) courseActuelle = 2;
+
+        const prochainNum = Math.min(courseActuelle + 1, 3);
+        const nouveauDebutSec = (prochainNum - 1) * (duree + pause);
+        const nouveauTimestamp = Date.now() - nouveauDebutSec * 1000;
+
+        await set(seqRef, {
+            ...seq,
+            etat: 'actif',
+            timestampDebut: nouveauTimestamp,
+            action: 'skip',
+            actionTimestamp: Date.now()
+        });
+        alert(`⏭️ Passage à la course ${prochainNum}.`);
+    }, { onlyOnce: true });
 };
 
 window.troisCinqMinStop = async function() {
     if (!currentClasse) return;
     if (!confirm('Arrêter la séquence ?')) return;
-    try {
-        await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
-            etat: 'termine', timestampMaj: Date.now()
+    const seqRef = ref(db, `${getBasePath(currentClasse)}/commandes/sequence`);
+    onValue(seqRef, async (snap) => {
+        const seq = snap.val() || {};
+        await set(seqRef, {
+            ...seq,
+            etat: 'termine',
+            action: 'stop',
+            actionTimestamp: Date.now()
         });
         alert('🛑 Séquence terminée.');
-    } catch (err) { console.error(err); }
+    }, { onlyOnce: true });
 };
 
 // ============================================================
@@ -770,7 +787,7 @@ window.troisCinqMinTransmettre = async function() {
 
     const eleves = getExistingEleves(currentClasse);
     const localMapping = {};
-    const vmaParCode = {};  // ✅ AJOUT : VMA indexée par codeAutoEval
+    const vmaParCode = {};
     const configData = {
         sousModule: SOUS_MODULE_ID,
         duree: params.duree,
@@ -781,7 +798,7 @@ window.troisCinqMinTransmettre = async function() {
         antiDoubleClic: params.antiDoubleClic,
         cibleVMA: params.cibleVMA,
         enchainementAuto: params.enchainementAuto,
-        vmaParCode: {},  // ✅ AJOUT
+        vmaParCode: {},
         groupes: {}
     };
 
@@ -793,15 +810,13 @@ window.troisCinqMinTransmettre = async function() {
             if (eleve?.codeAutoEval) {
                 codes.push(eleve.codeAutoEval);
                 localMapping[`${currentClasse}_${c.id}_${eleve.codeAutoEval}`] = id;
-                // ✅ Récupérer la VMA
                 const vma = getVMAEleve(currentClasse, id);
                 if (vma) vmaParCode[eleve.codeAutoEval] = vma;
             }
         });
         configData.groupes[c.id] = codes;
     });
-
-    configData.vmaParCode = vmaParCode;  // ✅ Assigner
+    configData.vmaParCode = vmaParCode;
 
     const existing = getLocalMapping(currentClasse) || {};
     setLocalMapping(currentClasse, { ...existing, ...localMapping });
@@ -816,7 +831,8 @@ window.troisCinqMinTransmettre = async function() {
         });
 
         const nbEleves = Object.values(configData.groupes).reduce((a, b) => a + b.length, 0);
-        alert(`✅ Configuration transmise.\n${Object.keys(configData.groupes).length} groupes, ${nbEleves} élèves.\n${Object.keys(vmaParCode).length} VMA connues.`);
+        const nbVMA = Object.keys(vmaParCode).length;
+        alert(`✅ Configuration transmise.\n${Object.keys(configData.groupes).length} groupes · ${nbEleves} élèves · ${nbVMA} VMA connues.`);
     } catch (err) {
         console.error(err);
         alert('❌ Erreur : ' + err.message);
@@ -880,5 +896,7 @@ window.troisCinqMinImportConfig = function(event) {
 export function cleanupTroisCinqMinInterface() {
     sortableInstances.forEach(s => { try { s.destroy(); } catch (e) {} });
     sortableInstances = [];
+    if (_profChronoInterval) { clearInterval(_profChronoInterval); _profChronoInterval = null; }
+    if (_profSequenceListener) { _profSequenceListener(); _profSequenceListener = null; }
     currentContainer = null;
 }
