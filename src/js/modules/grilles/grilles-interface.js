@@ -1071,61 +1071,6 @@ async function genererDonneesTestBadminton(eleves) {
 }
 
 
-async function genererDonneesTestBadminton(eleves) {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { push } = await import('../../core/firebase-service.js');
-
-    // Récupérer la config badminton (terrains avec nombre de joueurs)
-    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`;
-    const configSnap = await new Promise(resolve => {
-        onValue(ref(db, configPath), resolve, { onlyOnce: true });
-    });
-    const config = configSnap.val() || {};
-
-    // Récupérer les affectations terrains
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${currentClasse}`) || '{}');
-    const terrains = Object.keys(assignments).filter(k => !isNaN(parseInt(k)));
-
-    if (terrains.length === 0) {
-        alert('⚠️ Aucun terrain Badminton configuré.\nGénère d\'abord les terrains dans Activités → Badminton.');
-        return;
-    }
-
-    let nb = 0;
-    for (const terrain of terrains) {
-        const nbJoueurs = assignments[terrain]?.length || 0;
-        const lettres = 'ABCDEFGHIJ'.split('').slice(0, nbJoueurs);
-
-        // Round Robin simplifié : chaque paire joue une fois
-        for (let i = 0; i < lettres.length; i++) {
-            for (let j = i + 1; j < lettres.length; j++) {
-                const s1 = Math.floor(5 + Math.random() * 8);
-                const s2 = Math.floor(5 + Math.random() * 8);
-                const avec1 = s1 >= 8;
-                const avec2 = s2 >= 8;
-                const winner = s1 > s2 ? 'p1' : 'p2';
-                const matchId = `${terrain}_${i}_${j}`;
-
-                await push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`), {
-                    terrain: parseInt(terrain),
-                    p1: lettres[i],
-                    p2: lettres[j],
-                    score1: s1,
-                    score2: s2,
-                    pts1: s1 > s2 ? (avec1 ? 5 : 3) : (avec1 ? 2 : 1),
-                    pts2: s2 > s1 ? (avec2 ? 5 : 3) : (avec2 ? 2 : 1),
-                    avecManiere1: avec1,
-                    avecManiere2: avec2,
-                    winner,
-                    timestamp: Date.now()
-                });
-                nb++;
-            }
-        }
-    }
-    alert(`✅ ${nb} matchs Badminton générés.`);
-}
-
 // ============================================================
 // AUTO-ÉVALUATIONS REÇUES
 // ============================================================
