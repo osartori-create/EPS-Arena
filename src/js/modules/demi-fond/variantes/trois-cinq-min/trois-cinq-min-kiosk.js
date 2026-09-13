@@ -33,7 +33,8 @@ let state = {
     audioCtx: null,
 
     tickInterval: null,
-    uiRefreshInterval: null
+    uiRefreshInterval: null,
+    bilanCodeActif: null,   // ✅ AJOUT
 };
 
 let configListener = null;
@@ -659,22 +660,104 @@ function renderPauseManuelle(container) {
 // ============================================================
 function renderBilan(container) {
     const couleur = getCouleurGroupe(state.couleur);
-    container.innerHTML = `
-        <div class="min-h-[60vh] flex flex-col items-center justify-center p-8" style="background:${couleur.bg}15;">
-            <div class="text-7xl mb-6">🏆</div>
-            <h2 class="text-3xl font-black text-white mb-3">Séquence terminée !</h2>
-            <p class="text-slate-300 mb-8">Les résultats ont été enregistrés.</p>
-            <div class="bg-slate-800/80 p-6 rounded-3xl border-2 max-w-md text-center" style="border-color:${couleur.border};">
-                <p class="text-slate-300 text-sm">
-                    🏁 La consultation des bilans arrive dans la prochaine mise à jour.
-                </p>
+
+    // Si un code est sélectionné → afficher son bilan
+    if (state.bilanCodeActif) {
+        renderBilanEleve(container, state.bilanCodeActif);
+        return;
+    }
+
+    // Sinon → liste des numéros
+    let html = `
+        <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
+            <div class="text-center py-4 mb-4">
+                <div class="text-6xl mb-2">🏆</div>
+                <h2 class="text-3xl font-black text-white mb-1">Séquence terminée !</h2>
+                <p class="text-slate-300">Clique sur un numéro pour afficher son bilan</p>
             </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-4">
+    `;
+
+    state.codes.forEach(code => {
+        const abandon = state.abandonsParEleve[code];
+        const bgStyle = abandon
+            ? 'background:#7f1d1d; color:#fca5a5; border-color:#991b1b;'
+            : `background:${couleur.bg}; color:${couleur.text}; border-color:${couleur.border};`;
+
+        html += `
+            <button onclick="window.dmfKioskAfficherBilan('${code}')"
+                    class="rounded-2xl font-black border-4 active:scale-95 transition-all"
+                    style="${bgStyle} min-height:100px;">
+                <span class="text-4xl">${code}</span>
+                ${abandon ? '<div class="text-[10px] mt-1">🚫 ABANDON</div>' : ''}
+            </button>
+        `;
+    });
+
+    html += `
+            </div>
+
             <button onclick="window.retourMenuDemiFond()"
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-2xl font-black text-sm uppercase text-white active:scale-95">
+                    class="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-2xl font-black text-sm uppercase text-white active:scale-95">
                 ← Quitter
             </button>
         </div>
     `;
+
+    container.innerHTML = html;
+}
+
+window.dmfKioskAfficherBilan = async function(code) {
+    state.bilanCodeActif = code;
+    render();
+};
+
+window.dmfKioskBilanRetour = function() {
+    state.bilanCodeActif = null;
+    render();
+};
+
+async function renderBilanEleve(container, code) {
+    const couleur = getCouleurGroupe(state.couleur);
+
+    // Afficher un écran de chargement
+    container.innerHTML = `
+        <div class="p-8 text-center" style="background:${couleur.bg}10; min-height:100vh;">
+            <div class="text-4xl animate-pulse mt-20">⏳</div>
+            <p class="text-slate-300 mt-4">Chargement du bilan...</p>
+        </div>
+    `;
+
+    try {
+        const { chargerObservations, calculerBilan, rendreBilanHTML } = await import('./trois-cinq-min-bilan.js');
+        const observations = await chargerObservations(state.classe, code);
+
+        const vma = state.config?.vmaParCode?.[code] || null;
+        const bilan = calculerBilan(observations, state.config, vma);
+        bilan.code = code;
+
+        const html = rendreBilanHTML(bilan, state.couleur);
+
+        container.innerHTML = `
+            <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
+                ${html}
+            </div>
+        `;
+    } catch (err) {
+        console.error('[DemiFond] Erreur bilan:', err);
+        container.innerHTML = `
+            <div class="p-8 text-center" style="background:${couleur.bg}10; min-height:100vh;">
+                <div class="text-4xl mt-20">❌</div>
+                <p class="text-red-400 mt-4">Erreur lors du chargement du bilan</p>
+                <p class="text-slate-500 text-sm mt-2">${err.message}</p>
+                <button onclick="window.dmfKioskBilanRetour()"
+                        class="mt-6 bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-2xl font-black text-sm text-white active:scale-95">
+                    ← Retour
+                </button>
+            </div>
+        `;
+    }
 }
 
 // ============================================================
@@ -801,6 +884,6 @@ export function cleanupTroisCinqMinKiosk() {
         phase: 'choix', courseNum: 1, timestampDebut: null, derniereCourseEnvoyee: 0,
         dernierClic: null, feedbackMsg: null, feedbackTimeout: null,
         modaleAbandon: false, modaleAbandonCode: null, audioCtx: null,
-        tickInterval: null, uiRefreshInterval: null
+        tickInterval: null, uiRefreshInterval: null, bilanCodeActif: null
     };
 }

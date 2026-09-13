@@ -189,8 +189,33 @@ function createGroupesBlock() {
 // ============================================================
 function createSequenceControls() {
     const div = document.createElement('div');
-    div.className = 'bg-slate-800 p-4 rounded-2xl border-2 border-blue-500/40';
-    div.innerHTML = `
+    div.className = 'space-y-3';
+
+    // ✅ BANDEAU CHRONO
+    const chronoDiv = document.createElement('div');
+    chronoDiv.className = 'bg-slate-900 p-4 rounded-2xl border-2 border-blue-500/40';
+    chronoDiv.innerHTML = `
+        <div class="flex justify-between items-center">
+            <div>
+                <div class="text-[10px] uppercase text-slate-400 font-bold">Phase actuelle</div>
+                <div id="dmf-prof-phase" class="text-2xl font-black text-white">—</div>
+            </div>
+            <div class="text-center">
+                <div class="text-[10px] uppercase text-slate-400 font-bold">Séquence</div>
+                <div id="dmf-prof-seq" class="text-lg font-black text-slate-300">idle</div>
+            </div>
+            <div class="text-right">
+                <div class="text-[10px] uppercase text-slate-400 font-bold">Temps restant</div>
+                <div id="dmf-prof-temps" class="text-4xl font-mono font-black text-yellow-400">--:--</div>
+            </div>
+        </div>
+    `;
+    div.appendChild(chronoDiv);
+
+    // ✅ BOUTONS
+    const btns = document.createElement('div');
+    btns.className = 'bg-slate-800 p-4 rounded-2xl border-2 border-blue-500/40';
+    btns.innerHTML = `
         <h4 class="font-black text-blue-400 uppercase text-xs mb-3">🚀 Contrôle de la séquence</h4>
         <p class="text-[11px] text-slate-400 mb-3">Un seul GO lance la séquence complète (3 courses + pauses).</p>
         <div class="flex flex-wrap gap-2">
@@ -215,11 +240,82 @@ function createSequenceControls() {
                 🛑 Stop
             </button>
         </div>
-        <div id="dmfSequenceState" class="mt-3 text-xs text-slate-400 text-center">
-            État : <span class="font-black text-white">idle</span>
-        </div>
     `;
+    div.appendChild(btns);
+
+    // ✅ Lancer le listener chrono
+    setTimeout(() => initProfChrono(), 100);
+
     return div;
+}
+
+// ============================================================
+// CHRONO PROF (bandeau)
+// ============================================================
+let _profChronoInterval = null;
+let _profSequenceListener = null;
+
+function initProfChrono() {
+    if (!currentClasse) return;
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const seqRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/demi-fond/commandes/sequence`);
+
+    let currentSeq = null;
+
+    if (_profSequenceListener) _profSequenceListener();
+    _profSequenceListener = onValue(seqRef, (snap) => {
+        currentSeq = snap.val();
+        if (currentSeq) {
+            const seqEl = document.getElementById('dmf-prof-seq');
+            if (seqEl) seqEl.textContent = currentSeq.etat;
+        }
+    });
+
+    if (_profChronoInterval) clearInterval(_profChronoInterval);
+    _profChronoInterval = setInterval(() => {
+        const phaseEl = document.getElementById('dmf-prof-phase');
+        const tempsEl = document.getElementById('dmf-prof-temps');
+        if (!phaseEl || !tempsEl) return;
+
+        const config = JSON.parse(localStorage.getItem(getConfigKey(currentClasse, SOUS_MODULE_ID)) || 'null');
+        if (!config || !currentSeq || !currentSeq.timestampDebut) {
+            phaseEl.textContent = '—';
+            tempsEl.textContent = '--:--';
+            return;
+        }
+
+        const elapsed = (Date.now() - currentSeq.timestampDebut) / 1000;
+        const duree = config.duree;
+        const pause = config.pause;
+
+        let phaseLabel = '', restant = 0;
+
+        if (elapsed < duree) {
+            phaseLabel = '🏃 COURSE 1';
+            restant = duree - elapsed;
+        } else if (elapsed < duree + pause) {
+            phaseLabel = '⏸️ PAUSE 1';
+            restant = duree + pause - elapsed;
+        } else if (elapsed < 2 * duree + pause) {
+            phaseLabel = '🏃 COURSE 2';
+            restant = 2 * duree + pause - elapsed;
+        } else if (elapsed < 2 * duree + 2 * pause) {
+            phaseLabel = '⏸️ PAUSE 2';
+            restant = 2 * duree + 2 * pause - elapsed;
+        } else if (elapsed < 3 * duree + 2 * pause) {
+            phaseLabel = '🏃 COURSE 3';
+            restant = 3 * duree + 2 * pause - elapsed;
+        } else {
+            phaseLabel = '🏆 TERMINÉ';
+            restant = 0;
+        }
+
+        phaseEl.textContent = phaseLabel;
+        const m = Math.floor(restant / 60);
+        const s = Math.floor(restant % 60);
+        tempsEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    }, 500);
 }
 
 // ============================================================
@@ -674,6 +770,7 @@ window.troisCinqMinTransmettre = async function() {
 
     const eleves = getExistingEleves(currentClasse);
     const localMapping = {};
+    const vmaParCode = {};  // ✅ AJOUT : VMA indexée par codeAutoEval
     const configData = {
         sousModule: SOUS_MODULE_ID,
         duree: params.duree,
@@ -684,6 +781,7 @@ window.troisCinqMinTransmettre = async function() {
         antiDoubleClic: params.antiDoubleClic,
         cibleVMA: params.cibleVMA,
         enchainementAuto: params.enchainementAuto,
+        vmaParCode: {},  // ✅ AJOUT
         groupes: {}
     };
 
@@ -695,10 +793,15 @@ window.troisCinqMinTransmettre = async function() {
             if (eleve?.codeAutoEval) {
                 codes.push(eleve.codeAutoEval);
                 localMapping[`${currentClasse}_${c.id}_${eleve.codeAutoEval}`] = id;
+                // ✅ Récupérer la VMA
+                const vma = getVMAEleve(currentClasse, id);
+                if (vma) vmaParCode[eleve.codeAutoEval] = vma;
             }
         });
         configData.groupes[c.id] = codes;
     });
+
+    configData.vmaParCode = vmaParCode;  // ✅ Assigner
 
     const existing = getLocalMapping(currentClasse) || {};
     setLocalMapping(currentClasse, { ...existing, ...localMapping });
@@ -713,7 +816,7 @@ window.troisCinqMinTransmettre = async function() {
         });
 
         const nbEleves = Object.values(configData.groupes).reduce((a, b) => a + b.length, 0);
-        alert(`✅ Configuration transmise.\n${Object.keys(configData.groupes).length} groupes, ${nbEleves} élèves.`);
+        alert(`✅ Configuration transmise.\n${Object.keys(configData.groupes).length} groupes, ${nbEleves} élèves.\n${Object.keys(vmaParCode).length} VMA connues.`);
     } catch (err) {
         console.error(err);
         alert('❌ Erreur : ' + err.message);
