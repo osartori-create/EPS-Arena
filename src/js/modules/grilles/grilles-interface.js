@@ -1070,47 +1070,6 @@ async function genererDonneesTestBadminton(eleves) {
     alert(`✅ ${nb} matchs Badminton générés.`);
 }
 
-async function genererDonneesTestEscalade(eleves) {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const { push } = await import('../../core/firebase-service.js');
-
-    // Récupérer la config escalade (groupes A, B, C...)
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
-    const groupes = Object.keys(assignments).filter(k => k !== 'reserve' && k !== 'nbGroupes');
-
-    if (groupes.length === 0) {
-        alert('⚠️ Aucun groupe Escalade configuré.\nGénère d\'abord les groupes dans Activités → Escalade.');
-        return;
-    }
-
-    const cotations = ['4a', '4b', '4c', '5a', '5b', '5c', '6a'];
-    const hauteurs = [3, 4, 5, 6, 7, 8, 9];
-    let nb = 0;
-
-    for (const lettre of groupes) {
-        const ids = assignments[lettre] || [];
-        ids.forEach((eleveId, idx) => {
-            const role = idx + 1; // 1, 2, 3...
-            for (let i = 0; i < 4; i++) {
-                const hauteur = hauteurs[Math.floor(Math.random() * hauteurs.length)];
-                const cotation = cotations[Math.floor(Math.random() * cotations.length)];
-
-                 push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/escalade/montees`), {
-                    groupe: lettre,
-                    role,
-                    voie_num: 1 + Math.floor(Math.random() * 10),
-                    couleur: 'bleue',
-                    cotation,
-                    hauteur,
-                    points: hauteur,
-                    timestamp: Date.now() - i * 60000
-                });
-                nb++;
-            }
-        });
-    }
-    alert(`✅ ${nb} montées Escalade générées.`);
-}
 
 async function genererDonneesTestBadminton(eleves) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
