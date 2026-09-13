@@ -41,9 +41,9 @@ export function calculerNiveauxDemiFond(classe, eleveId, config) {
         let cours = { 1: null, 2: null, 3: null };
         let loaded = 0;
 
-        function check() {
+                function check() {
             if (loaded < 3) return;
-            const result = analyser(cours, config, sexe);
+            const result = analyser(cours, config, sexe, code);
             resolve(result);
         }
 
@@ -60,7 +60,7 @@ export function calculerNiveauxDemiFond(classe, eleveId, config) {
 // ============================================================
 // ANALYSE
 // ============================================================
-function analyser(cours, config, sexe) {
+function analyser(cours, config, sexe, code) {
     const result = {};
     const duree = config.duree || 300;
     const tour = config.tour || 200;
