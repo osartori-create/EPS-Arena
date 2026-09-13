@@ -393,15 +393,24 @@ async function chargerDonneesAutoGenerique(eleves) {
         if (!connecteur) return;
 
     // ✅ Récupérer la config Firebase (chemin différent selon l'activité)
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-
-    // L'escalade stocke sa config directement à la racine {classe}/config
-    // (voir escalade-prof.js), contrairement à Relais/Arcathlon qui ont un sous-dossier dédié.
+     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    
+    // ✅ Mapping activité → chemin Firebase réel (tiret vs underscore)
+    const cheminFirebase = {
+        'demi_fond': 'demi-fond',
+        'demi-fond': 'demi-fond',
+        'relais': 'relais',
+        'arcathlon': 'arcathlon',
+        'escalade': null  // escalade est à la racine
+    };
+    
+    const cheminActivite = cheminFirebase[activite] !== undefined ? cheminFirebase[activite] : activite;
+    
     let configPath;
-    if (activite === 'escalade') {
+    if (activite === 'escalade' || cheminActivite === null) {
         configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`;
     } else {
-        configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/${activite}/config`;
+        configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/${cheminActivite}/config`;
     }
 
     const configSnap = await new Promise((resolve) => {
