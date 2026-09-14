@@ -20,112 +20,139 @@ export function renderBadmintonLive() {
 
     currentClasse = classe;
 
-    const mapping = getLocalMapping(classe) || {};
-    const studentsMap = getStudentsMap(classe) || {};
-
-    console.log("📋 [Live] Mapping local :", mapping);
-    console.log("📋 [Live] StudentsMap :", studentsMap);
-
-    // ✅ Fonction corrigée : utilise le terrain et la lettre
-    function getEleveFromCode(terrain, lettre) {
-        // Construire la clé complète : "classe_terrain_lettre"
-        const key = `${classe}_${terrain}_${lettre}`;
-        console.log(`🔍 [Live] Recherche de ${key}`);
-        if (mapping[key]) {
-            const eleveId = mapping[key];
-            const nom = studentsMap[eleveId] || `${lettre}`;
-            return { id: eleveId, nom: nom };
-        }
-
-        // Si on a un tableau (plusieurs joueurs par lettre), on prend le premier
-        for (const [k, v] of Object.entries(mapping)) {
-            if (k.startsWith(`${classe}_${terrain}_${lettre}`)) {
-                if (Array.isArray(v)) {
-                    const eleveId = v[0] || v;
-                    const nom = studentsMap[eleveId] || `${lettre}`;
-                    return { id: eleveId, nom: nom };
-                } else {
-                    const eleveId = v;
-                    const nom = studentsMap[eleveId] || `${lettre}`;
-                    return { id: eleveId, nom: nom };
-                }
-            }
-        }
-
-        return { id: null, nom: `${lettre}` };
-    }
-
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}`;
+
+    const configRef = ref(db, `${basePath}/config`);
+    const resultsRef = ref(db, `${basePath}/badminton/results`);
 
     if (currentUnsub) currentUnsub();
 
-    currentUnsub = onValue(resultsRef, async (snap) => {
-        const data = snap.val() || {};
-        const matchs = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
+    // 1) Lire la config pour connaître le mode (terrain / maniere)
+    let configMode = 'frontback';
+    onValue(configRef, (snap) => {
+        const cfg = snap.val() || {};
+        configMode = cfg.mode || 'frontback';
+        renderBadmintonLiveContent(configMode); // re-render dès que la config change
+    }, { onlyOnce: false });
 
-        if (matchs.length === 0) {
-            container.innerHTML = '<p class="text-slate-500 text-center">Aucun match terminé.</p>';
-            return;
+    function renderBadmintonLiveContent(mode) {
+        if (modeUnsub) modeUnsub();
+        const mapping = getLocalMapping(classe) || {};
+        const studentsMap = getStudentsMap(classe) || {};
+
+        function getEleveFromCode(terrain, lettre) {
+            const key = `${classe}_${terrain}_${lettre}`;
+            if (mapping[key]) {
+                const id = mapping[key];
+                return { id, nom: studentsMap[id] || lettre };
+            }
+            for (const [k, v] of Object.entries(mapping)) {
+                if (k.startsWith(`${classe}_${terrain}_${lettre}`)) {
+                    const id = Array.isArray(v) ? v[0] : v;
+                    return { id, nom: studentsMap[id] || lettre };
+                }
+            }
+            return { id: null, nom: lettre };
         }
 
-        let html = `
-            <div class="space-y-4">
-                <h3 class="font-black text-blue-400 uppercase text-sm">🏸 Derniers matchs</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        `;
+        modeUnsub = onValue(resultsRef, async (snap) => {
+            const data = snap.val() || {};
+            const matchs = Object.values(data).sort((a, b) => b.timestamp - a.timestamp);
 
-        for (const m of matchs.slice(0, 20)) {
-            const terrain = m.terrain || '1';
-            const p1Lettre = m.p1 || '?';
-            const p2Lettre = m.p2 || '?';
-            const score1 = m.score1 || 0;
-            const score2 = m.score2 || 0;
-            const style1 = m.avecManiere1 ? '✅ avec manière' : '❌ sans manière';
-            const style2 = m.avecManiere2 ? '✅ avec manière' : '❌ sans manière';
+            if (matchs.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 text-center">Aucun match terminé.</p>';
+                return;
+            }
 
-            // ✅ Récupérer les infos avec terrain + lettre
-            const joueur1 = getEleveFromCode(terrain, p1Lettre);
-            const joueur2 = getEleveFromCode(terrain, p2Lettre);
+            const isManiere = (mode === 'maniere');
+            const titreLive = isManiere
+                ? '🏸 Derniers matchs — Avec la manière'
+                : `🏸 Derniers matchs — Terrain (${mode})`;
 
-            const photo1 = await getPhotoFromId(joueur1.id);
-            const photo2 = await getPhotoFromId(joueur2.id);
-
-            const winner = m.winner === p1Lettre ? p1Lettre : (m.winner === p2Lettre ? p2Lettre : '?');
-            const couleurGagnant = winner === p1Lettre ? 'text-emerald-400' : (winner === p2Lettre ? 'text-emerald-400' : 'text-yellow-400');
-
-            html += `
-                <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                    <div class="flex justify-between items-center mb-2">
-                        <div class="flex items-center gap-2">
-                            ${photo1}
-                            <span class="font-black text-white">${joueur1.nom}</span>
-                            <span class="text-[10px] text-slate-500">T${terrain}-${p1Lettre}</span>
-                        </div>
-                        <div class="text-center">
-                            <span class="text-3xl font-black text-yellow-400">${score1} - ${score2}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] text-slate-500">T${terrain}-${p2Lettre}</span>
-                            <span class="font-black text-white">${joueur2.nom}</span>
-                            ${photo2}
-                        </div>
-                    </div>
-                    <div class="flex justify-between text-xs">
-                        <span class="${score1 >= (m.bonusManiere || 5) ? 'text-emerald-400' : 'text-red-400'}">${style1}</span>
-                        <span class="text-slate-500">Points : ${m.pts1 || 0} / ${m.pts2 || 0}</span>
-                        <span class="${score2 >= (m.bonusManiere || 5) ? 'text-emerald-400' : 'text-red-400'}">${style2}</span>
-                    </div>
-                    <div class="text-center text-xs text-slate-500 mt-1">
-                        🏆 Gagnant : <span class="font-bold ${couleurGagnant}">${winner}</span>
-                    </div>
-                </div>
+            let html = `
+                <div class="space-y-4">
+                    <h3 class="font-black text-blue-400 uppercase text-sm">${titreLive}</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             `;
-        }
 
-        html += `</div></div>`;
-        container.innerHTML = html;
-    });
+            for (const m of matchs.slice(0, 20)) {
+                const terrain = m.terrain || '1';
+                const p1Lettre = m.p1 || '?';
+                const p2Lettre = m.p2 || '?';
+                const score1 = m.score1 ?? 0;
+                const score2 = m.score2 ?? 0;
+
+                const joueur1 = getEleveFromCode(terrain, p1Lettre);
+                const joueur2 = getEleveFromCode(terrain, p2Lettre);
+
+                const photo1 = await getPhotoFromId(joueur1.id);
+                const photo2 = await getPhotoFromId(joueur2.id);
+
+                const winner = m.winner === p1Lettre ? p1Lettre : (m.winner === p2Lettre ? p2Lettre : '?');
+                const couleurGagnant = (winner === p1Lettre || winner === p2Lettre) ? 'text-emerald-400' : 'text-yellow-400';
+
+                // ─── Ligne "manière" uniquement si mode = maniere ───
+                let footerHtml = '';
+                if (isManiere) {
+                    const style1 = m.avecManiere1 ? '✅ avec manière' : '❌ sans manière';
+                    const style2 = m.avecManiere2 ? '✅ avec manière' : '❌ sans manière';
+                    const seuil = m.seuilManiere || 8;
+                    footerHtml = `
+                        <div class="flex justify-between text-xs">
+                            <span class="${score1 >= seuil ? 'text-emerald-400' : 'text-red-400'}">${style1}</span>
+                            <span class="text-slate-500">Points : ${m.pts1 || 0} / ${m.pts2 || 0}</span>
+                            <span class="${score2 >= seuil ? 'text-emerald-400' : 'text-red-400'}">${style2}</span>
+                        </div>`;
+                } else {
+                    // Mode terrain : on affiche les stats de zone (si présentes)
+                    const statsHtml = (m.stats) ? `
+                        <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <span>Centre : ${m.stats.p1?.center ?? 0}</span>
+                            <span>Extrême : ${m.stats.p1?.extreme ?? 0}</span>
+                            <span>Coin : ${m.stats.p1?.corner ?? 0}</span>
+                            <span>Faute : ${m.stats.p1?.fault ?? 0}</span>
+                        </div>` : '';
+                    footerHtml = `
+                        <div class="text-center text-xs text-slate-500 mt-1">
+                            Points classement : ${m.pts1 || 0} / ${m.pts2 || 0}
+                        </div>
+                        ${statsHtml}`;
+                }
+
+                html += `
+                    <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                        <div class="flex justify-between items-center mb-2">
+                            <div class="flex items-center gap-2">
+                                ${photo1}
+                                <span class="font-black text-white">${joueur1.nom}</span>
+                                <span class="text-[10px] text-slate-500">T${terrain}-${p1Lettre}</span>
+                            </div>
+                            <div class="text-center">
+                                <span class="text-3xl font-black text-yellow-400">${score1} - ${score2}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] text-slate-500">T${terrain}-${p2Lettre}</span>
+                                <span class="font-black text-white">${joueur2.nom}</span>
+                                ${photo2}
+                            </div>
+                        </div>
+                        ${footerHtml}
+                        <div class="text-center text-xs text-slate-500 mt-1">
+                            🏆 Gagnant : <span class="font-bold ${couleurGagnant}">${winner}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `</div></div>`;
+            container.innerHTML = html;
+        });
+    }
+
+    // Écoute config une seule fois pour init
+    let modeUnsub = null;
+    renderBadmintonLiveContent(configMode);
 }
 
 async function getPhotoFromId(id) {

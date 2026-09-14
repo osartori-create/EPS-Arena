@@ -5,6 +5,7 @@ import {
     currentTerrain, matchSchedule, playersList, terrainsConfig,
     renderMatchSetup, renderClassement
 } from './badminton-common.js';
+import { db, ref, update } from '../../core/firebase-service.js';
 
 // ============================================================
 // ÉTAT DU MODE TERRAIN
@@ -123,8 +124,8 @@ const WEBJEJE_CSS = `
 export async function init(classe, config) {
     console.log('🏸 [Terrain] Mode Classique initialisé');
     
-    // Mettre à jour les paramètres
-    badmintonMode = config.terrainType || 'frontback';
+    // Mettre à jour les paramètres depuis la config Firebase
+    badmintonMode = config.mode || config.terrainType || 'frontback';
     badmintonCenterSize = config.centerSize || 33;
     badmintonCenterPoints = config.centerPoints || 1;
     badmintonOtherPoints = config.otherPoints || 3;
@@ -150,7 +151,6 @@ export async function init(classe, config) {
     // Fonction de déchargement
     return () => {
         console.log('🧹 [Terrain] Nettoyage');
-        // Rétablir la fonction par défaut
         window.selectMatchFromList = function(matchId) {
             console.warn('⚠️ selectMatchFromList appelée sans mode actif');
         };
@@ -415,61 +415,74 @@ window.endMatch = function() {
     const s1 = matchPoints.p1;
     const s2 = matchPoints.p2;
 
-    if (confirm(`Valider le score ${s1} - ${s2} ?`)) {
-        const SEUIL_MANIERE = 8;
-        let winner, loser, winnerScore, loserScore;
-        if (s1 > s2) {
-            winner = p1; loser = p2; winnerScore = s1; loserScore = s2;
-        } else if (s2 > s1) {
-            winner = p2; loser = p1; winnerScore = s2; loserScore = s1;
-        } else {
-            // Match nul
-            const pts1 = s1 >= SEUIL_MANIERE ? 2 : 1;
-            const pts2 = s2 >= SEUIL_MANIERE ? 2 : 1;
-            const matchIndex = matchSchedule.findIndex(m => m.id === window.currentMatchId);
-            if (matchIndex !== -1) {
-                matchSchedule[matchIndex].s1 = pts1;
-                matchSchedule[matchIndex].s2 = pts2;
-                matchSchedule[matchIndex].score1 = s1;
-                matchSchedule[matchIndex].score2 = s2;
-            }
-            saveMatchResult(p1, p2, s1, s2, pts1, pts2, s1 >= SEUIL_MANIERE, s2 >= SEUIL_MANIERE);
-            alert(`Match nul ! ${p1} ${s1} pts, ${p2} ${s2} pts`);
-            window.currentMatchId = null;
-            renderMatchSetup();
-            return;
-        }
+    if (!confirm(`Valider le score ${s1} - ${s2} ?`)) return;
 
-        const winnerAvecManiere = winnerScore >= SEUIL_MANIERE;
-        const loserAvecManiere = loserScore >= SEUIL_MANIERE;
+    // ✅ Déclaration UNIQUE de matchIndex + stats, réutilisée dans les deux branches
+    const matchIndex = matchSchedule.findIndex(m => m.id === window.currentMatchId);
+    const statsSnapshot = {
+        p1: { ...ratioData.p1 },
+        p2: { ...ratioData.p2 }
+    };
 
-        let ptsWinner = winnerAvecManiere ? 5 : 3;
-        let ptsLoser = loserAvecManiere ? 2 : 1;
+    const SEUIL_MANIERE = 8;
 
-        const matchIndex = matchSchedule.findIndex(m => m.id === window.currentMatchId);
+    // ---- Cas du match nul ----
+    if (s1 === s2) {
+        const pts1 = s1 >= SEUIL_MANIERE ? 2 : 1;
+        const pts2 = s2 >= SEUIL_MANIERE ? 2 : 1;
+
         if (matchIndex !== -1) {
-            matchSchedule[matchIndex].s1 = (winner === p1) ? ptsWinner : ptsLoser;
-            matchSchedule[matchIndex].s2 = (winner === p2) ? ptsWinner : ptsLoser;
+            matchSchedule[matchIndex].s1 = pts1;
+            matchSchedule[matchIndex].s2 = pts2;
             matchSchedule[matchIndex].score1 = s1;
             matchSchedule[matchIndex].score2 = s2;
+            matchSchedule[matchIndex].stats = statsSnapshot;
         }
 
-        saveMatchResult(p1, p2, s1, s2, ptsWinner, ptsLoser, winnerAvecManiere, loserAvecManiere, winner, loser);
-
-        const message = `
-            🏆 Match terminé !
-            ${p1} : ${s1} pts ${s1 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
-            ${p2} : ${s2} pts ${s2 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
-            Points classement : ${winner} = ${ptsWinner} pts, ${loser} = ${ptsLoser} pts
-        `;
-        alert(message);
-
+        saveMatchResult(p1, p2, s1, s2, pts1, pts2, s1 >= SEUIL_MANIERE, s2 >= SEUIL_MANIERE, statsSnapshot);
+        alert(`Match nul ! ${p1} ${s1} pts, ${p2} ${s2} pts`);
         window.currentMatchId = null;
         renderMatchSetup();
+        return;
     }
+
+    // ---- Cas victoire / défaite ----
+    let winner, loser, winnerScore, loserScore;
+    if (s1 > s2) {
+        winner = p1; loser = p2; winnerScore = s1; loserScore = s2;
+    } else {
+        winner = p2; loser = p1; winnerScore = s2; loserScore = s1;
+    }
+
+    const winnerAvecManiere = winnerScore >= SEUIL_MANIERE;
+    const loserAvecManiere = loserScore >= SEUIL_MANIERE;
+
+    const ptsWinner = winnerAvecManiere ? 5 : 3;
+    const ptsLoser = loserAvecManiere ? 2 : 1;
+
+    if (matchIndex !== -1) {
+        matchSchedule[matchIndex].s1 = (winner === p1) ? ptsWinner : ptsLoser;
+        matchSchedule[matchIndex].s2 = (winner === p2) ? ptsWinner : ptsLoser;
+        matchSchedule[matchIndex].score1 = s1;
+        matchSchedule[matchIndex].score2 = s2;
+        matchSchedule[matchIndex].stats = statsSnapshot;
+    }
+
+    saveMatchResult(p1, p2, s1, s2, ptsWinner, ptsLoser, winnerAvecManiere, loserAvecManiere, statsSnapshot, winner, loser);
+
+    const message = `
+        🏆 Match terminé !
+        ${p1} : ${s1} pts ${s1 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
+        ${p2} : ${s2} pts ${s2 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
+        Points classement : ${winner} = ${ptsWinner} pts, ${loser} = ${ptsLoser} pts
+    `;
+    alert(message);
+
+    window.currentMatchId = null;
+    renderMatchSetup();
 };
 
-function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, winner = null, loser = null) {
+function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, stats, winner = null, loser = null) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const currentClasse = document.querySelector('#class-select')?.value || '';
     const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${window.currentMatchId}`);
@@ -480,6 +493,7 @@ function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecM
         score1, score2,
         pts1, pts2,
         avecManiere1, avecManiere2,
+        stats: stats || null, // ✅ AJOUT : statistiques de zone
         winner: winner || (score1 > score2 ? p1 : p2),
         loser: loser || (score1 > score2 ? p2 : p1),
         timestamp: Date.now()

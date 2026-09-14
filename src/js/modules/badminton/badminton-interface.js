@@ -3,6 +3,7 @@
 // Licence Creative Commons Attribution (CC BY).
 
 import { getPhotoUrl } from '../../services/admin-service.js';
+import { db, ref, set } from '../../core/firebase-service.js';
 
 const MAX_PAR_TERRAIN = 5;
 
