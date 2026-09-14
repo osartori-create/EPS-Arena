@@ -151,12 +151,18 @@ export function initActivities() {
                 if (module.setEscaladeMode) module.setEscaladeMode(mode);
             });
         } else if (disc === 'badminton') {
-            try {
-                initBadmintonInterface();
-                initSortableBadminton();
-                loadBadmintonAssignments();
-            } catch (e) {}
-        } else if (disc === 'arcathlon') {
+    try {
+        initBadmintonInterface();
+        initSortableBadminton();
+        loadBadmintonAssignments();
+        // ✅ Initialise le sélecteur de mode prof
+        import('../../modules/badminton/badminton-ui-prof.js')
+            .then(m => m.initBadmintonModeSelector())
+            .catch(err => console.error('Erreur init sélecteur badminton :', err));
+    } catch (e) {
+        console.error('Erreur Badminton :', e);
+    }
+} else if (disc === 'arcathlon') {
             try { initArcathlonInterface(); } catch (e) {}
         } else if (disc === 'evaluation') {
             try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }

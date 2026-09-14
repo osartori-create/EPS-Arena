@@ -1,20 +1,19 @@
 // src/js/modules/badminton/badminton-terrain.js
-// Mode "Classique" : terrain 3D, impacts, zones
+// Mode "Terrain" : clic sur zones, classement V/D (3/1/0), chrono paramétrable
 
-import { 
+import {
     currentTerrain, matchSchedule, playersList, terrainsConfig,
-    renderMatchSetup, renderClassement
+    renderMatchSetup, renderClassement, renderTerrainSelection
 } from './badminton-common.js';
 import { db, ref, update } from '../../core/firebase-service.js';
 
 // ============================================================
-// ÉTAT DU MODE TERRAIN
+// ÉTAT
 // ============================================================
-
 let matchPoints = { p1: 0, p2: 0 };
-let ratioData = { 
-    p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
-    p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
+let ratioData = {
+    p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 },
+    p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }
 };
 let historyStack = [];
 let redoStack = [];
@@ -26,139 +25,162 @@ let badmintonOtherPoints = 3;
 let badmintonCornerPoints = 5;
 let badmintonFaultPoints = 1;
 let badmintonFaultPenalty = true;
+let badmintonDureeMatch = 180; // secondes
+
+// Chrono
+let matchTimer = { interval: null, tempsRestant: 0, duree: 0, running: false };
+let audioCtx = null;
 
 // ============================================================
-// CSS WEBJÉJÉ (injecté)
+// CSS
 // ============================================================
 const WEBJEJE_CSS = `
-    .court-wrapper {
-        position: relative;
-        width: 100%;
-        max-width: 800px;
-        margin: 0 auto;
-        background-color: #8B4513;
-        padding: 20px;
-        transition: padding 0.3s ease;
-    }
-    .court-wrapper.mode-3zones { background-color: transparent; padding: 0; }
-    .court-wrapper.mode-9zones { background-color: transparent; padding: 0; }
-    .court {
-        width: 100%;
-        aspect-ratio: 2 / 1;
-        background-color: #107C10;
-        position: relative;
-        border: 2px solid #ffffff;
-        display: flex;
-    }
-    .net {
-        width: 4px;
-        height: 100%;
-        background-color: #ffffff;
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10;
-        pointer-events: none;
-    }
-    .player-area {
-        width: 50%;
-        height: 100%;
-        position: relative;
-        display: flex;
-    }
+    .court-wrapper { position: relative; width: 100%; max-width: 800px; margin: 0 auto; background-color: #8B4513; padding: 20px; }
+    .court-wrapper.mode-3zones, .court-wrapper.mode-9zones { background-color: transparent; padding: 0; }
+    .court { width: 100%; aspect-ratio: 2 / 1; background-color: #107C10; position: relative; border: 2px solid #ffffff; display: flex; }
+    .net { width: 4px; height: 100%; background-color: #ffffff; position: absolute; left: 50%; transform: translateX(-50%); z-index: 10; pointer-events: none; }
+    .player-area { width: 50%; height: 100%; position: relative; display: flex; }
     #area-p1 { border-right: 2px solid #fff; }
     #area-p2 { border-left: 2px solid #fff; }
     .layout-col { flex-direction: column; }
     .layout-row { flex-direction: row; }
     .layout-grid { flex-wrap: wrap; }
-    .zone {
-        border: 1px solid rgba(255, 255, 255, 0.4);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 12px;
-        font-weight: 600;
-        color: white;
-        cursor: pointer;
-        position: relative;
-        text-align: center;
-        user-select: none;
-    }
+    .zone { border: 1px solid rgba(255, 255, 255, 0.4); display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: 600; color: white; cursor: pointer; position: relative; text-align: center; user-select: none; }
     .zone-extreme { background-color: rgba(232, 17, 35, 0.3); }
     .zone-center { background-color: rgba(0, 120, 215, 0.4); }
     .zone-corner { background-color: rgba(216, 59, 1, 0.4); }
     .zone-other { background-color: rgba(136, 23, 152, 0.3); }
-    .fault-area {
-        position: absolute;
-        background-color: rgba(232, 17, 35, 0.6);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 10px;
-        color: white;
-        cursor: pointer;
-        font-weight: bold;
-    }
+    .fault-area { position: absolute; background-color: rgba(232, 17, 35, 0.6); display: flex; justify-content: center; align-items: center; font-size: 10px; color: white; cursor: pointer; font-weight: bold; }
     .fault-top, .fault-bottom { width: 45%; height: 20px; }
     .fault-left, .fault-right { width: 20px; height: calc(100% - 40px); top: 20px; }
     .fault-top { top: 0; } .fault-bottom { bottom: 0; }
     .fault-left { left: 0; } .fault-right { right: 0; }
     .fault-p1-top { left: 20px; } .fault-p2-top { right: 20px; }
     .fault-p1-bot { left: 20px; } .fault-p2-bot { right: 20px; }
-    .impact {
-        position: absolute;
-        width: 12px;
-        height: 12px;
-        background-color: #FFB900;
-        border: 2px solid #fff;
-        transform: translate(-50%, -50%);
-        z-index: 5;
-        pointer-events: none;
-    }
+    .impact { position: absolute; width: 12px; height: 12px; background-color: #FFB900; border: 2px solid #fff; transform: translate(-50%, -50%); z-index: 5; pointer-events: none; }
+    .chrono-match { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+    .chrono-match.alerte { color: #facc15; animation: pulse-chrono 1s ease-in-out infinite; }
+    .chrono-match.termine { color: #ef4444; animation: pulse-chrono 0.5s ease-in-out infinite; }
+    @keyframes pulse-chrono { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 `;
 
 // ============================================================
-// INITIALISATION DU MODE
+// AUDIO (bip de fin)
 // ============================================================
+function initAudio() {
+    if (!audioCtx) {
+        try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) {}
+    }
+}
+function playBeep() {
+    if (!audioCtx) return;
+    try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.4);
+    } catch (e) {}
+}
 
+// ============================================================
+// CHRONO
+// ============================================================
+function demarrerChrono() {
+    stopChrono();
+    if (badmintonDureeMatch <= 0) return;
+    matchTimer.duree = badmintonDureeMatch;
+    matchTimer.tempsRestant = badmintonDureeMatch;
+    matchTimer.running = true;
+    initAudio();
+    updateChronoDisplay();
+
+    matchTimer.interval = setInterval(() => {
+        matchTimer.tempsRestant--;
+        if (matchTimer.tempsRestant <= 0) {
+            matchTimer.tempsRestant = 0;
+            updateChronoDisplay();
+            playBeep();
+            setTimeout(playBeep, 250);
+            setTimeout(playBeep, 500);
+            stopChrono();
+            return;
+        }
+        updateChronoDisplay();
+    }, 1000);
+}
+
+function stopChrono() {
+    if (matchTimer.interval) {
+        clearInterval(matchTimer.interval);
+        matchTimer.interval = null;
+    }
+    matchTimer.running = false;
+}
+
+function formatChrono(s) {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+
+function updateChronoDisplay() {
+    const el = document.getElementById('chrono-match-display');
+    if (!el) return;
+    el.textContent = formatChrono(matchTimer.tempsRestant);
+    el.className = 'chrono-match text-3xl font-black text-white';
+    if (matchTimer.tempsRestant <= 10 && matchTimer.tempsRestant > 0) {
+        el.classList.add('alerte');
+    } else if (matchTimer.tempsRestant === 0) {
+        el.classList.add('termine');
+    }
+}
+
+// ============================================================
+// INIT
+// ============================================================
 export async function init(classe, config) {
-    console.log('🏸 [Terrain] Mode Classique initialisé');
-    
-    badmintonMode = config.mode || config.terrainType || 'frontback';
+    console.log('🏸 [Terrain] Mode Terrain initialisé');
+
+    badmintonMode = config.terrainType || 'frontback';
     badmintonCenterSize = config.centerSize || 33;
     badmintonCenterPoints = config.centerPoints || 1;
     badmintonOtherPoints = config.otherPoints || 3;
-    badmintonCornerPoints = config.cornerPoints || 5;
+    badmintonCornerPoints = config.cornerPoints || 3;
     badmintonFaultPoints = config.faultPoints || 1;
     badmintonFaultPenalty = config.faultPenalty !== undefined ? config.faultPenalty : true;
+    badmintonDureeMatch = config.dureeMatch || 180;
 
     window.selectMatchFromList = function(matchId) {
         const match = matchSchedule.find(m => m.id === matchId);
         if (!match || match.s1 !== null) return;
         window.currentMatchId = matchId;
         matchPoints = { p1: 0, p2: 0 };
-        ratioData = { 
-            p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
-            p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
+        ratioData = {
+            p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 },
+            p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }
         };
         historyStack = [];
         redoStack = [];
         renderCourtInterface();
+        demarrerChrono(); // ✅ Démarre le chrono au lancement du match
     };
 
-    // ✅ Force le premier rendu (indépendant de l'ordre d'arrivée de la config)
     setTimeout(() => {
-        if (currentTerrain) {
-            renderMatchSetup();
-        } else {
-            renderTerrainSelection();
-        }
+        if (currentTerrain) renderMatchSetup();
+        else renderTerrainSelection();
     }, 100);
 
     return () => {
         console.log('🧹 [Terrain] Nettoyage');
+        stopChrono();
         window.selectMatchFromList = function(matchId) {
-            console.warn('⚠️ selectMatchFromList appelée sans mode actif');
+            console.warn('⚠️ selectMatchFromList sans mode actif');
         };
     };
 }
@@ -166,7 +188,6 @@ export async function init(classe, config) {
 // ============================================================
 // RENDU DU TERRAIN
 // ============================================================
-
 function renderCourtInterface() {
     const container = document.getElementById('court-zone');
     if (!container) return;
@@ -183,6 +204,19 @@ function renderCourtInterface() {
 
     container.innerHTML = `
         <style>${WEBJEJE_CSS}</style>
+
+        <!-- CHRONO -->
+        <div class="bg-slate-800 p-3 rounded-xl border-2 border-yellow-500/40 mb-3 flex justify-between items-center">
+            <div>
+                <div class="text-[10px] uppercase text-slate-400 font-bold">Match en cours</div>
+                <div class="text-sm font-black text-white">${p1} vs ${p2}</div>
+            </div>
+            <div class="text-center">
+                <div class="text-[10px] uppercase text-slate-400 font-bold">Temps restant</div>
+                <div id="chrono-match-display" class="chrono-match text-3xl font-black text-white">${formatChrono(matchTimer.tempsRestant || badmintonDureeMatch)}</div>
+            </div>
+        </div>
+
         <div class="flex justify-between items-center mb-4">
             <div class="text-center w-1/3">
                 <h3 class="text-3xl font-black text-white">${p1}</h3>
@@ -220,7 +254,7 @@ function renderCourtInterface() {
         <div class="flex flex-wrap justify-center gap-3 mt-3">
             <button onclick="undoImpact()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm">↩ Annuler</button>
             <button onclick="resetCourt()" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-xl font-bold text-sm">Reset</button>
-            <button onclick="endMatch()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-black text-sm">🏁 Terminer</button>
+            <button onclick="endMatch()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-xl font-black text-sm">🏁 Terminer le match</button>
         </div>
     `;
 
@@ -228,9 +262,7 @@ function renderCourtInterface() {
     const slider = document.getElementById('middle-zone-slider');
     const display = document.getElementById('zone-size-display');
     if (slider) {
-        slider.addEventListener('input', function() {
-            display.innerText = this.value + '%';
-        });
+        slider.addEventListener('input', function() { display.innerText = this.value + '%'; });
         slider.addEventListener('change', function() {
             const newVal = parseInt(this.value);
             if (newVal !== badmintonCenterSize) {
@@ -240,7 +272,7 @@ function renderCourtInterface() {
         });
     }
 
-    // Écouteurs du terrain
+    // Écouteurs terrain
     const court = document.getElementById('court');
     if (court) {
         const newCourt = court.cloneNode(true);
@@ -251,9 +283,8 @@ function renderCourtInterface() {
 }
 
 // ============================================================
-// GÉNÉRATION DU TERRAIN (Webjéjé)
+// GÉNÉRATION DU TERRAIN
 // ============================================================
-
 function generateCourtHTML() {
     const m = badmintonMode;
     const is9 = m === '4corners';
@@ -314,7 +345,6 @@ function generateCourtHTML() {
 // ============================================================
 // INTERACTIONS
 // ============================================================
-
 function handleImpact(e) {
     const target = e.target.closest('.zone, .fault-area');
     if (!target) return;
@@ -352,11 +382,12 @@ function applyScore(player, points, zoneType, multiplier) {
 }
 
 function updateDashboard() {
-    document.getElementById('score-display').innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
-    const ratio1 = calcRatio('p1');
-    const ratio2 = calcRatio('p2');
-    document.getElementById('ratio-p1').innerText = `Ratio : ${ratio1}%`;
-    document.getElementById('ratio-p2').innerText = `Ratio : ${ratio2}%`;
+    const el = document.getElementById('score-display');
+    if (el) el.innerText = `${matchPoints.p1} - ${matchPoints.p2}`;
+    const r1 = document.getElementById('ratio-p1');
+    const r2 = document.getElementById('ratio-p2');
+    if (r1) r1.innerText = `Ratio : ${calcRatio('p1')}%`;
+    if (r2) r2.innerText = `Ratio : ${calcRatio('p2')}%`;
 }
 
 function calcRatio(player) {
@@ -378,9 +409,9 @@ function undoImpact() {
 function resetCourt() {
     document.querySelectorAll('.impact').forEach(el => el.remove());
     matchPoints = { p1: 0, p2: 0 };
-    ratioData = { 
-        p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }, 
-        p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 } 
+    ratioData = {
+        p1: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 },
+        p2: { center: 0, extreme: 0, corner: 0, other: 0, fault: 0 }
     };
     historyStack = [];
     redoStack = [];
@@ -409,9 +440,8 @@ window.undoImpact = undoImpact;
 window.resetCourt = resetCourt;
 
 // ============================================================
-// FIN DE MATCH
+// FIN DE MATCH — SIMPLIFIÉ, PAS DE "MANIÈRE"
 // ============================================================
-
 window.endMatch = function() {
     const currentMatch = matchSchedule.find(m => m.id === window.currentMatchId);
     if (!currentMatch) return;
@@ -423,85 +453,61 @@ window.endMatch = function() {
 
     if (!confirm(`Valider le score ${s1} - ${s2} ?`)) return;
 
-    // ✅ Déclaration UNIQUE de matchIndex + stats, réutilisée dans les deux branches
-    const matchIndex = matchSchedule.findIndex(m => m.id === window.currentMatchId);
-    const statsSnapshot = {
-        p1: { ...ratioData.p1 },
-        p2: { ...ratioData.p2 }
-    };
+    stopChrono();
 
-    const SEUIL_MANIERE = 8;
-
-    // ---- Cas du match nul ----
+    // Calcul V/D + points classement (3 victoire / 1 défaite / 0 forfait)
+    let winner, loser, pts1, pts2;
     if (s1 === s2) {
-        const pts1 = s1 >= SEUIL_MANIERE ? 2 : 1;
-        const pts2 = s2 >= SEUIL_MANIERE ? 2 : 1;
-
-        if (matchIndex !== -1) {
-            matchSchedule[matchIndex].s1 = pts1;
-            matchSchedule[matchIndex].s2 = pts2;
-            matchSchedule[matchIndex].score1 = s1;
-            matchSchedule[matchIndex].score2 = s2;
-            matchSchedule[matchIndex].stats = statsSnapshot;
-        }
-
-        saveMatchResult(p1, p2, s1, s2, pts1, pts2, s1 >= SEUIL_MANIERE, s2 >= SEUIL_MANIERE, statsSnapshot);
-        alert(`Match nul ! ${p1} ${s1} pts, ${p2} ${s2} pts`);
-        window.currentMatchId = null;
-        renderMatchSetup();
-        return;
-    }
-
-    // ---- Cas victoire / défaite ----
-    let winner, loser, winnerScore, loserScore;
-    if (s1 > s2) {
-        winner = p1; loser = p2; winnerScore = s1; loserScore = s2;
+        // Match nul : 2 points chacun
+        winner = null; loser = null;
+        pts1 = 2; pts2 = 2;
+    } else if (s1 > s2) {
+        winner = p1; loser = p2;
+        pts1 = 3; pts2 = 1;
     } else {
-        winner = p2; loser = p1; winnerScore = s2; loserScore = s1;
+        winner = p2; loser = p1;
+        pts1 = 1; pts2 = 3;
     }
 
-    const winnerAvecManiere = winnerScore >= SEUIL_MANIERE;
-    const loserAvecManiere = loserScore >= SEUIL_MANIERE;
-
-    const ptsWinner = winnerAvecManiere ? 5 : 3;
-    const ptsLoser = loserAvecManiere ? 2 : 1;
+    const matchIndex = matchSchedule.findIndex(m => m.id === window.currentMatchId);
+    const statsSnapshot = { p1: { ...ratioData.p1 }, p2: { ...ratioData.p2 } };
 
     if (matchIndex !== -1) {
-        matchSchedule[matchIndex].s1 = (winner === p1) ? ptsWinner : ptsLoser;
-        matchSchedule[matchIndex].s2 = (winner === p2) ? ptsWinner : ptsLoser;
+        matchSchedule[matchIndex].s1 = pts1;
+        matchSchedule[matchIndex].s2 = pts2;
         matchSchedule[matchIndex].score1 = s1;
         matchSchedule[matchIndex].score2 = s2;
         matchSchedule[matchIndex].stats = statsSnapshot;
     }
 
-    saveMatchResult(p1, p2, s1, s2, ptsWinner, ptsLoser, winnerAvecManiere, loserAvecManiere, statsSnapshot, winner, loser);
+    saveMatchResult(p1, p2, s1, s2, pts1, pts2, statsSnapshot, winner, loser);
 
-    const message = `
-        🏆 Match terminé !
-        ${p1} : ${s1} pts ${s1 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
-        ${p2} : ${s2} pts ${s2 >= SEUIL_MANIERE ? '✅ avec manière' : '❌ sans manière'}
-        Points classement : ${winner} = ${ptsWinner} pts, ${loser} = ${ptsLoser} pts
-    `;
-    alert(message);
+    let msg = `🏆 Match terminé !\n\n${p1} : ${s1} pts\n${p2} : ${s2} pts\n\n`;
+    if (winner) {
+        msg += `Gagnant : ${winner} (+${winner === p1 ? pts1 : pts2} pts classement)`;
+    } else {
+        msg += `Match nul (+${pts1} pts chacun)`;
+    }
+    alert(msg);
 
     window.currentMatchId = null;
     renderMatchSetup();
 };
 
-function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, stats, winner = null, loser = null) {
+function saveMatchResult(p1, p2, score1, score2, pts1, pts2, stats, winner = null, loser = null) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const currentClasse = document.querySelector('#class-select')?.value || '';
     const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${window.currentMatchId}`);
 
     const data = {
+        mode: 'terrain',
         terrain: currentTerrain,
         p1, p2,
         score1, score2,
         pts1, pts2,
-        avecManiere1, avecManiere2,
-        stats: stats || null, // ✅ AJOUT : statistiques de zone
-        winner: winner || (score1 > score2 ? p1 : p2),
-        loser: loser || (score1 > score2 ? p2 : p1),
+        stats: stats || null,
+        winner: winner || null,
+        loser: loser || null,
         timestamp: Date.now()
     };
 

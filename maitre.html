@@ -223,57 +223,21 @@
 
             <!-- PARAMÈTRES BADMINTON -->
 <div id="viewBadmintonSettings" class="hidden space-y-4">
-    
-    <!-- ════════════════════════════════════════════════════════════ -->
-    <!-- SÉLECTEUR DE MODE DE JEU (ajouté) -->
-    <!-- ════════════════════════════════════════════════════════════ -->
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- SÉLECTEUR DE MODE DE JEU -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
         <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🎯 Mode de jeu</h3>
-        <div id="badminton-mode-selector" class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <!-- Rempli dynamiquement par JavaScript -->
+        <div id="badminton-mode-selector" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <!-- Rempli par badminton-ui-prof.js -->
         </div>
-        <p class="text-xs text-slate-400 mt-3 text-center">Mode actif : <span id="badminton-mode-label" class="text-yellow-400 font-bold">Classique</span></p>
+        <p class="text-xs text-slate-400 mt-3 text-center">Mode actif : <span id="badminton-mode-label" class="text-yellow-400 font-bold">Terrain</span></p>
     </div>
 
-    <div>
-    <label class="block font-bold text-slate-400 uppercase mb-1">Seuil "Avec la manière"</label>
-    <select id="badmintonManiereSeuil" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-        <option value="3">3 pts</option>
-        <option value="4">4 pts</option>
-        <option value="5">5 pts</option>
-        <option value="6" selected>6 pts</option>
-        <option value="7">7 pts</option>
-        <option value="8">8 pts</option>
-    </select>
-</div>
-
-<!-- PARAMÈTRES "AVEC LA MANIÈRE" -->
-<div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 mt-4">
-    <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📊 Paramètres "Avec la manière"</h3>
-    
-    <div class="grid grid-cols-2 gap-4 text-xs">
-        <div>
-            <label class="block font-bold text-slate-400 uppercase mb-1">Bonus "Avec la manière" (pts)</label>
-            <select id="badmintonBonusManiere" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                <option value="3">3 pts</option>
-                <option value="4">4 pts</option>
-                <option value="5" selected>5 pts</option>
-                <option value="6">6 pts</option>
-                <option value="7">7 pts</option>
-                <option value="8">8 pts</option>
-            </select>
-            <p class="text-[10px] text-slate-500 mt-1">Seuil pour déclencher le bonus "Avec la manière" dans la zone dangereuse</p>
-        </div>
-        <div>
-            <label class="block font-bold text-slate-400 uppercase mb-1">Seuil de victoire</label>
-            <input type="number" id="badmintonSeuilVictoire" value="11" min="5" max="21" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
-            <p class="text-[10px] text-slate-500 mt-1">Points à atteindre pour gagner (arrêt automatique)</p>
-        </div>
-    </div>
-</div>
-    <!-- ════════════════════════════════════════════════════════════ -->
-    <!-- GESTION DES TERRAINS (existant) -->
-    <!-- ════════════════════════════════════════════════════════════ -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- RÉPARTITION DES ÉLÈVES (commun aux 2 modes) -->
+    <!-- ════════════════════════════════════════════════════════ -->
     <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-black text-blue-400 uppercase text-sm">Terrains de Badminton (Groupes de niveau)</h3>
@@ -318,18 +282,18 @@
         </div>
     </div>
 
-    <!-- ════════════════════════════════════════════════════════════ -->
-    <!-- PARAMÈTRES AVANCÉS DU TERRAIN (existant) -->
-    <!-- ════════════════════════════════════════════════════════════ -->
-    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- BLOCS TERRAIN UNIQUEMENT -->
+    <!-- ════════════════════════════════════════════════════════ -->
+
+    <div class="badminton-terrain-only bg-slate-800 p-5 rounded-2xl border border-slate-700">
         <h3 class="font-black text-blue-400 uppercase text-sm mb-4">🏸 Paramètres du terrain</h3>
-        
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
             <div>
-                <label class="block font-bold text-slate-400 uppercase mb-1">Mode terrain</label>
+                <label class="block font-bold text-slate-400 uppercase mb-1">Type de terrain</label>
                 <select id="badmintonMode" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
-                    <option value="frontback">Avant / Arrière</option>
-                    <option value="leftright">Gauche / Droite</option>
+                    <option value="frontback">3 zones (Avant / Arrière)</option>
+                    <option value="leftright">3 zones (Gauche / Droite)</option>
                     <option value="4corners">9 zones (Coins + Fautes)</option>
                 </select>
             </div>
@@ -365,6 +329,49 @@
             </div>
         </div>
     </div>
+
+    <div class="badminton-terrain-only bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">⏱️ Chrono de match</h3>
+        <div class="flex items-center gap-4">
+            <div class="flex-1">
+                <label class="block font-bold text-slate-400 uppercase text-xs mb-1">Durée d'un match (secondes)</label>
+                <input type="number" id="badmintonDureeMatch" value="180" min="60" max="900" step="30"
+                       class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center text-lg font-black">
+            </div>
+            <p class="text-xs text-slate-500 flex-1">
+                Le chrono s'affiche côté élève au lancement d'un match et se met à clignoter dans les 10 dernières secondes. 
+                Il est purement indicatif — le prof (ou l'élève) clique "Terminer le match" quand il veut.
+            </p>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- BLOCS MANIERE UNIQUEMENT -->
+    <!-- ════════════════════════════════════════════════════════ -->
+
+    <div class="badminton-maniere-only bg-slate-800 p-5 rounded-2xl border border-slate-700">
+        <h3 class="font-black text-blue-400 uppercase text-sm mb-4">📊 Paramètres "Avec la manière"</h3>
+        <div class="grid grid-cols-2 gap-4 text-xs">
+            <div>
+                <label class="block font-bold text-slate-400 uppercase mb-1">Bonus "Avec la manière" (pts)</label>
+                <select id="badmintonBonusManiere" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                    <option value="3">3 pts</option>
+                    <option value="4">4 pts</option>
+                    <option value="5">5 pts</option>
+                    <option value="6">6 pts</option>
+                    <option value="7">7 pts</option>
+                    <option value="8" selected>8 pts</option>
+                </select>
+                <p class="text-[10px] text-slate-500 mt-1">Nombre de points verts (zone dangereuse) à atteindre pour déclencher le bonus.</p>
+            </div>
+            <div>
+                <label class="block font-bold text-slate-400 uppercase mb-1">Seuil de victoire</label>
+                <input type="number" id="badmintonSeuilVictoire" value="11" min="5" max="21" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white text-center">
+                <p class="text-[10px] text-slate-500 mt-1">Points à atteindre pour gagner (arrêt automatique).</p>
+            </div>
+        </div>
+    </div>
+
 </div>
 
             <!-- NOUVEAU : PARAMÈTRES ÉVALUATION -->

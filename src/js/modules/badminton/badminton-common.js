@@ -33,15 +33,8 @@ export function initBadmintonCommon(classe) {
         const config = snap.val() || {};
         console.log("📡 [Common] Config reçue :", config);
 
-        if (!config || Object.keys(config).length === 0) {
-            console.warn("⚠️ [Common] Config vide");
-            return;
-        }
-
-        if (config.activite !== 'badminton') {
-            console.warn(`⚠️ [Common] Activité "${config.activite}" !== "badminton"`);
-            return;
-        }
+        if (!config || Object.keys(config).length === 0) return;
+        if (config.activite !== 'badminton') return;
 
         terrainsConfig = {};
         for (let key in config) {
@@ -51,17 +44,14 @@ export function initBadmintonCommon(classe) {
         }
         console.log("📋 [Common] TerrainsConfig :", terrainsConfig);
 
-        // ✅ Rendu immédiat (appel direct, pas window.*)
         try {
             if (currentTerrain) {
-                console.log('🎾 [Common] → renderMatchSetup()');
                 renderMatchSetup();
             } else {
-                console.log('🎾 [Common] → renderTerrainSelection()');
                 renderTerrainSelection();
             }
         } catch (e) {
-            console.error('[Common] ❌ Erreur rendu :', e);
+            console.warn('[Common] Rendu reporté :', e.message);
         }
     });
 }
@@ -88,9 +78,9 @@ export function generateRoundRobin() {
             let p1 = roundArr[i];
             let p2 = roundArr[list.length - 1 - i];
             if (p1 !== 'BYE' && p2 !== 'BYE') {
-                matchSchedule.push({ 
-                    id: `${currentTerrain}_${r}_${i}`, 
-                    p1, p2, 
+                matchSchedule.push({
+                    id: `${currentTerrain}_${r}_${i}`,
+                    p1, p2,
                     s1: null, s2: null,
                     score1: null, score2: null,
                     style1: null, style2: null
@@ -99,12 +89,11 @@ export function generateRoundRobin() {
         }
         arr.push(arr.shift());
     }
-    console.log(`📋 [Common] Round Robin : ${matchSchedule.length} matchs`);
     return matchSchedule;
 }
 
 // ============================================================
-// CLASSEMENT
+// CLASSEMENT (neutre : utilise s1/s2 fournis par le module)
 // ============================================================
 export function renderClassement(containerId = 'classement') {
     const container = document.getElementById(containerId);
@@ -115,15 +104,17 @@ export function renderClassement(containerId = 'classement') {
 
     matchSchedule.forEach(m => {
         if (m.s1 === null) return;
+        // Points (5/3/2/1 en manière, 3/1/0 en terrain)
         standings[m.p1].pts += m.s1 || 0;
         standings[m.p2].pts += m.s2 || 0;
-        if (m.score1 !== null && m.score2 !== null) {
+        // V/D basé sur le score réel
+        if (m.score1 !== null && m.score2 !== null && m.score1 !== m.score2) {
             if (m.score1 > m.score2) {
                 standings[m.p1].wins++;
                 standings[m.p2].losses++;
                 standings[m.p1].diff += (m.score1 - m.score2);
                 standings[m.p2].diff -= (m.score1 - m.score2);
-            } else if (m.score2 > m.score1) {
+            } else {
                 standings[m.p2].wins++;
                 standings[m.p1].losses++;
                 standings[m.p2].diff += (m.score2 - m.score1);
@@ -132,7 +123,7 @@ export function renderClassement(containerId = 'classement') {
         }
     });
 
-    const sorted = Object.entries(standings).sort((a, b) => 
+    const sorted = Object.entries(standings).sort((a, b) =>
         b[1].pts - a[1].pts || b[1].diff - a[1].diff
     );
 
@@ -151,21 +142,14 @@ export function renderClassement(containerId = 'classement') {
 // SÉLECTION DU TERRAIN
 // ============================================================
 export function renderTerrainSelection() {
-    console.log('🎾 renderTerrainSelection() EXÉCUTÉE');
     const container = document.getElementById('badminton-content');
-    console.log('🎾 Conteneur #badminton-content :', container);
-    
-    if (!container) {
-        console.error('❌ [Common] Conteneur #badminton-content INTROUVABLE');
-        return;
-    }
+    if (!container) return;
 
     const keys = Object.keys(terrainsConfig);
-    console.log('🎾 Terrains disponibles :', keys);
-
     if (keys.length === 0) {
         container.innerHTML = `<div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
             <p class="text-2xl font-black text-yellow-400">⏳ En attente de la configuration...</p>
+            <p class="text-sm text-slate-400 mt-4">Vérifie que le professeur a transmis la configuration.</p>
         </div>`;
         return;
     }
@@ -176,7 +160,7 @@ export function renderTerrainSelection() {
 
     keys.forEach(terrain => {
         const numTerrain = parseInt(terrain);
-        html += `<button onclick="window.selectBadmintonTerrain(${numTerrain})" 
+        html += `<button onclick="window.selectBadmintonTerrain(${numTerrain})"
                     class="bg-blue-600 p-10 rounded-2xl font-black text-4xl text-white active:scale-95 transition-transform shadow-lg">
                     Terrain ${numTerrain}
                 </button>`;
@@ -184,7 +168,6 @@ export function renderTerrainSelection() {
 
     html += `</div></div>`;
     container.innerHTML = html;
-    console.log('🎾 renderTerrainSelection() TERMINÉE');
 }
 
 // ============================================================
@@ -200,7 +183,7 @@ export function renderMatchSetup() {
 
     if (playersList.length < 2) {
         container.innerHTML = `<div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700 w-full max-w-4xl mx-auto">
-            <p class="text-2xl font-black text-yellow-400">⏳ En attente d'autres joueurs...</p>
+            <p class="text-2xl font-black text-yellow-400">⏳ En attente d'autres joueurs sur ce terrain...</p>
         </div>`;
         return;
     }
@@ -218,7 +201,7 @@ export function renderMatchSetup() {
                 <div class="space-y-2 max-h-64 overflow-y-auto pr-2">
                     ${matchSchedule.map(match => {
                         const isPlayed = match.s1 !== null;
-                        const scoreDisplay = isPlayed ? `${match.s1} - ${match.s2}` : 'À jouer';
+                        const scoreDisplay = isPlayed ? `${match.score1} - ${match.score2}` : 'À jouer';
                         const playedStyle = isPlayed ? 'line-through opacity-60' : '';
                         const clickAction = isPlayed ? '' : `onclick="window.selectMatchFromList('${match.id}')"`;
                         return `<button ${clickAction} class="w-full text-left p-3 rounded-lg border-2 transition-colors ${playedStyle} ${isPlayed ? 'bg-slate-700 border-slate-500 text-slate-300' : 'bg-slate-900 border-blue-500 text-white hover:bg-blue-900'}">
@@ -254,7 +237,6 @@ window.selectMatchFromList = function(matchId) {
     console.warn('⚠️ selectMatchFromList doit être surchargée par le mode actif');
 };
 
-// ✅ Exposer pour les autres modules
 window.renderTerrainSelection = renderTerrainSelection;
 window.renderMatchSetup = renderMatchSetup;
 window.renderClassement = renderClassement;

@@ -1,12 +1,12 @@
 // src/js/modules/badminton/badminton-live.js
-// Live Badminton : affichage des matchs en direct, mode-aware
+// Live Badminton : mode-aware
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse, getStudentsMap } from '../../core/live-engine.js';
 
 let currentUnsub = null;
-let modeUnsub = null;   // ✅ DÉCLARÉ EN HAUT (fix TDZ)
+let modeUnsub = null;
 let currentClasse = '';
 
 export function renderBadmintonLive() {
@@ -20,25 +20,20 @@ export function renderBadmintonLive() {
     }
 
     currentClasse = classe;
-
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}`;
-
-    const configRef = ref(db, `${basePath}/config`);
-    const resultsRef = ref(db, `${basePath}/badminton/results`);
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
 
     if (currentUnsub) { currentUnsub(); currentUnsub = null; }
 
-    // Lire la config pour connaître le mode
-    let configMode = 'frontback';
     currentUnsub = onValue(configRef, (snap) => {
         const cfg = snap.val() || {};
-        configMode = cfg.mode || 'frontback';
-        renderBadmintonLiveContent(configMode);
+        const mode = cfg.mode || 'terrain';
+        const terrainType = cfg.terrainType || 'frontback';
+        renderBadmintonLiveContent(mode, terrainType);
     });
 }
 
-function renderBadmintonLiveContent(mode) {
+function renderBadmintonLiveContent(mode, terrainType) {
     const container = document.getElementById('live-content');
     if (!container) return;
 
@@ -77,7 +72,7 @@ function renderBadmintonLiveContent(mode) {
         const isManiere = (mode === 'maniere');
         const titreLive = isManiere
             ? '🏸 Derniers matchs — Avec la manière'
-            : `🏸 Derniers matchs — Terrain (${mode})`;
+            : `🏸 Derniers matchs — Terrain (${terrainType})`;
 
         let html = `
             <div class="space-y-4">
@@ -161,10 +156,8 @@ async function getPhotoFromId(id) {
     if (!id) return `<div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">👤</div>`;
     try {
         const url = await getPhotoUrl(id);
-        if (url) {
-            return `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">`;
-        }
-    } catch (e) { /* ignore */ }
+        if (url) return `<img src="${url}" class="w-8 h-8 rounded-full object-cover border-2 border-slate-500">`;
+    } catch (e) {}
     return `<div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm">👤</div>`;
 }
 

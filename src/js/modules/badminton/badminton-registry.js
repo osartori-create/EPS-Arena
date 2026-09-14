@@ -1,21 +1,20 @@
 // src/js/modules/badminton/badminton-registry.js
-// Dictionnaire des modes Badminton
+// Dictionnaire des modes de jeu Badminton
 
 export const BADMINTON_MODES = {
     'terrain': {
-        label: 'Classique',
+        label: 'Terrain',
         icon: '🏸',
         module: () => import('./badminton-terrain.js'),
-        description: 'Jouez en cliquant sur les zones du terrain (3D)',
+        description: 'Clique sur les zones du terrain 3D. Classement par points V/D (3/1/0).',
         default: true
     },
     'maniere': {
         label: 'Avec la manière',
         icon: '📊',
         module: () => import('./badminton-maniere.js'),
-        description: 'Saisie des points avec cases à cocher (dangereux/central)'
+        description: 'Cases à cocher (dangereuse/centrale). Bonus manière à 8 pts. Classement 5/3/2/1.'
     }
-    // Ajoute ici tes futurs modes
 };
 
 export function getModeConfig(modeId) {
@@ -47,5 +46,5 @@ export function getModesList() {
     }));
 }
 
-// ✅ Alias pour compatibilité avec le dispatcher
+// Alias pour compatibilité
 export const getBadmintonModes = getModesList;
