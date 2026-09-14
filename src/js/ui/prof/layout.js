@@ -12,6 +12,7 @@ import {
     deletePreset 
 } from '../../modules/commun/timer.js';
 import { initCalculateur } from '../../modules/commun/calculateur.js';
+import '../../services/sync-service.js';
 
 export function initLayout() {
 
@@ -43,7 +44,7 @@ export function initLayout() {
 
     // 1. Gestion des onglets (CORRIGÉ : on n'utilise plus el.style.display pour les vues standard)
     window.switchTab = function(tabName) {
-    ['admin', 'activities', 'live', 'tools', 'evaluations'].forEach(t => {
+    ['admin', 'activities', 'live', 'tools', 'evaluations', 'sync'].forEach(t => {
         const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
         const el = document.getElementById(viewId);
         if (el) el.classList.add('hidden');
@@ -63,7 +64,7 @@ export function initLayout() {
         }
     });
 
-    const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5', 'evaluations': '6' };
+    const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5', 'evaluations': '6', 'sync': '7' };
 
     if (tabName !== 'tv') {
         const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
@@ -81,6 +82,11 @@ export function initLayout() {
             m.initGrillesInterface();
         }).catch(err => console.error('Erreur init Grilles :', err));
     }
+    if (tabName === 'sync') {
+    setTimeout(() => {
+        if (window.syncAfficherResume) window.syncAfficherResume();
+    }, 50);
+}
 };
 
     // 2. Gestion des classes
