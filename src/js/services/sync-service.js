@@ -69,9 +69,9 @@ export function resumerFichierSync(json) {
 }
 
 // ============================================================
-// EXPORT
+// EXPORT (version Web Share API + fallback download)
 // ============================================================
-export function exporterToutesLesDonnees(appareil = 'Appareil') {
+export async function exporterToutesLesDonnees(appareil = 'Appareil') {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const data = lireToutesLesCles();
 
@@ -84,23 +84,51 @@ export function exporterToutesLesDonnees(appareil = 'Appareil') {
     };
 
     const json = JSON.stringify(payload, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
 
-    // Nom : EPS-Arena_sync_MARTIN_iPad_20260414-1830.json
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
     const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
     const safeAppareil = appareil.replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `EPS-Arena_sync_${profCode}_${safeAppareil}_${stamp}.json`;
+    const tailleKo = Math.round(json.length / 1024);
 
+    // ----- Tentative Web Share API (iOS/iPadOS) -----
+    try {
+        const file = new File([json], filename, { type: 'application/json' });
+        const canShareFiles = navigator.canShare && navigator.canShare({ files: [file] });
+
+        if (canShareFiles) {
+            await navigator.share({
+                files: [file],
+                title: 'EPS-Arena - Sauvegarde',
+                text: `Sauvegarde EPS-Arena du ${d.toLocaleDateString('fr-FR')}`
+            });
+            console.log(`📤 Partage natif : ${filename} (${tailleKo} ko)`);
+            return { filename, tailleKo, mode: 'share' };
+        }
+    } catch (err) {
+        // L'utilisateur a annulé la feuille de partage → on n'essaie pas le download en secours
+        if (err && err.name === 'AbortError') {
+            console.log('📤 Partage annulé par l\'utilisateur');
+            return { filename, tailleKo, mode: 'cancelled' };
+        }
+        // Autre erreur → on tombe sur le download classique
+        console.warn('Web Share échoué, fallback download :', err);
+    }
+
+    // ----- Fallback : download classique (PC) -----
+    const blob = new Blob([json], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 
-    console.log(`📤 Export sync : ${filename} (${Math.round(json.length/1024)} ko)`);
-    return { filename, tailleKo: Math.round(json.length / 1024) };
+    console.log(`📤 Download classique : ${filename} (${tailleKo} ko)`);
+    return { filename, tailleKo, mode: 'download' };
 }
 
 // ============================================================
@@ -168,11 +196,21 @@ export function lireFichierSync(file) {
 // ============================================================
 // EXPOSITION GLOBALE
 // ============================================================
-window.syncExporter = () => {
+window.syncExporter = async () => {
     const appareil = document.getElementById('syncAppareil')?.value || 'Appareil';
     try {
-        const res = exporterToutesLesDonnees(appareil);
-        alert(`✅ Sauvegarde téléchargée :\n${res.filename}\n(${res.tailleKo} ko)\n\nDépose-la maintenant dans ton dossier Nextcloud.`);
+        const res = await exporterToutesLesDonnees(appareil);
+
+        if (res.mode === 'share') {
+            // Sur iPad, la feuille de partage a déjà tout fait
+            // Pas d'alerte (ce serait redondant et bloquant)
+            console.log(`✅ Sauvegarde partagée : ${res.filename} (${res.tailleKo} ko)`);
+        } else if (res.mode === 'cancelled') {
+            // L'utilisateur a annulé : on ne dit rien
+        } else {
+            // PC : message classique
+            alert(`✅ Sauvegarde téléchargée :\n${res.filename}\n(${res.tailleKo} ko)\n\nDépose-la maintenant dans ton dossier Nextcloud.`);
+        }
     } catch (err) {
         console.error(err);
         alert('❌ Erreur lors de l\'export : ' + err.message);
