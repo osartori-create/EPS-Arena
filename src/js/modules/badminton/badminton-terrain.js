@@ -132,7 +132,6 @@ export async function init(classe, config) {
     badmintonFaultPoints = config.faultPoints || 1;
     badmintonFaultPenalty = config.faultPenalty !== undefined ? config.faultPenalty : true;
 
-    // Surcharger selectMatchFromList
     window.selectMatchFromList = function(matchId) {
         const match = matchSchedule.find(m => m.id === matchId);
         if (!match || match.s1 !== null) return;
@@ -147,17 +146,15 @@ export async function init(classe, config) {
         renderCourtInterface();
     };
 
-    // ✅ FORCER UN PREMIER RENDU (au cas où la config est déjà arrivée)
-    // On laisse 50ms pour que le DOM du module soit monté
+    // ✅ Force le premier rendu (indépendant de l'ordre d'arrivée de la config)
     setTimeout(() => {
         if (currentTerrain) {
             renderMatchSetup();
         } else {
             renderTerrainSelection();
         }
-    }, 50);
+    }, 100);
 
-    // Fonction de déchargement
     return () => {
         console.log('🧹 [Terrain] Nettoyage');
         window.selectMatchFromList = function(matchId) {

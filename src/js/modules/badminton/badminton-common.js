@@ -13,6 +13,8 @@ export let matchSchedule = [];
 export let terrainsConfig = {};
 export let resultsListenerAttached = false;
 
+let configListener = null;
+
 // ============================================================
 // INITIALISATION COMMUNE
 // ============================================================
@@ -26,7 +28,8 @@ export function initBadmintonCommon(classe) {
 
     console.log(`🔍 [Common] initBadmintonCommon pour la classe : ${classe}`);
 
-    onValue(configRef, (snap) => {
+    if (configListener) configListener();
+    configListener = onValue(configRef, (snap) => {
         const config = snap.val() || {};
         console.log("📡 [Common] Config reçue :", config);
 
@@ -40,29 +43,31 @@ export function initBadmintonCommon(classe) {
             return;
         }
 
-        // Remplir terrainsConfig (clés numériques)
         terrainsConfig = {};
         for (let key in config) {
             if (!isNaN(parseInt(key))) {
-                const numKey = parseInt(key);
-                terrainsConfig[numKey] = config[key];
+                terrainsConfig[parseInt(key)] = config[key];
             }
         }
         console.log("📋 [Common] TerrainsConfig :", terrainsConfig);
 
-        // ✅ On appelle DIRECTEMENT les fonctions locales (pas window.*)
-        // Comme ça, peu importe l'ordre : config arrive avant ou après le chargement du mode,
-        // le rendu se fera toujours.
+        // ✅ Rendu immédiat (appel direct, pas window.*)
         try {
             if (currentTerrain) {
+                console.log('🎾 [Common] → renderMatchSetup()');
                 renderMatchSetup();
             } else {
+                console.log('🎾 [Common] → renderTerrainSelection()');
                 renderTerrainSelection();
             }
         } catch (e) {
-            console.warn('[Common] Rendu impossible pour le moment (le mode n\'est peut-être pas encore chargé) :', e.message);
+            console.error('[Common] ❌ Erreur rendu :', e);
         }
     });
+}
+
+export function cleanupBadmintonCommon() {
+    if (configListener) { configListener(); configListener = null; }
 }
 
 // ============================================================
@@ -143,20 +148,24 @@ export function renderClassement(containerId = 'classement') {
 }
 
 // ============================================================
-// SÉLECTION DU TERRAIN (commun)
+// SÉLECTION DU TERRAIN
 // ============================================================
 export function renderTerrainSelection() {
+    console.log('🎾 renderTerrainSelection() EXÉCUTÉE');
     const container = document.getElementById('badminton-content');
+    console.log('🎾 Conteneur #badminton-content :', container);
+    
     if (!container) {
-        console.warn("⚠️ [Common] Conteneur #badminton-content introuvable");
+        console.error('❌ [Common] Conteneur #badminton-content INTROUVABLE');
         return;
     }
 
     const keys = Object.keys(terrainsConfig);
+    console.log('🎾 Terrains disponibles :', keys);
+
     if (keys.length === 0) {
         container.innerHTML = `<div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700">
             <p class="text-2xl font-black text-yellow-400">⏳ En attente de la configuration...</p>
-            <p class="text-sm text-slate-400 mt-4">Vérifie que le professeur a transmis la configuration.</p>
         </div>`;
         return;
     }
@@ -175,6 +184,7 @@ export function renderTerrainSelection() {
 
     html += `</div></div>`;
     container.innerHTML = html;
+    console.log('🎾 renderTerrainSelection() TERMINÉE');
 }
 
 // ============================================================
@@ -190,8 +200,7 @@ export function renderMatchSetup() {
 
     if (playersList.length < 2) {
         container.innerHTML = `<div class="text-center bg-slate-800 p-10 rounded-3xl border border-slate-700 w-full max-w-4xl mx-auto">
-            <p class="text-2xl font-black text-yellow-400">⏳ En attente d'autres joueurs sur ce terrain...</p>
-            <p class="text-sm text-slate-400 mt-4">(Config : ${JSON.stringify(terrainsConfig)})</p>
+            <p class="text-2xl font-black text-yellow-400">⏳ En attente d'autres joueurs...</p>
         </div>`;
         return;
     }
@@ -229,9 +238,8 @@ export function renderMatchSetup() {
 }
 
 // ============================================================
-// FONCTIONS GLOBALES (exposées sur window)
+// FONCTIONS GLOBALES
 // ============================================================
-
 window.selectBadmintonTerrain = function(terrain) {
     currentTerrain = parseInt(terrain);
     renderMatchSetup();
@@ -242,12 +250,11 @@ window.retourTerrains = function() {
     renderTerrainSelection();
 };
 
-// Placeholder : chaque mode le surchargera
 window.selectMatchFromList = function(matchId) {
     console.warn('⚠️ selectMatchFromList doit être surchargée par le mode actif');
 };
 
-// ✅ EXPOSER LES RENDUS POUR QUE LE MODE TERRAIN PUISSE LES APPELER
+// ✅ Exposer pour les autres modules
 window.renderTerrainSelection = renderTerrainSelection;
 window.renderMatchSetup = renderMatchSetup;
 window.renderClassement = renderClassement;
