@@ -124,7 +124,6 @@ const WEBJEJE_CSS = `
 export async function init(classe, config) {
     console.log('🏸 [Terrain] Mode Classique initialisé');
     
-    // Mettre à jour les paramètres depuis la config Firebase
     badmintonMode = config.mode || config.terrainType || 'frontback';
     badmintonCenterSize = config.centerSize || 33;
     badmintonCenterPoints = config.centerPoints || 1;
@@ -147,6 +146,16 @@ export async function init(classe, config) {
         redoStack = [];
         renderCourtInterface();
     };
+
+    // ✅ FORCER UN PREMIER RENDU (au cas où la config est déjà arrivée)
+    // On laisse 50ms pour que le DOM du module soit monté
+    setTimeout(() => {
+        if (currentTerrain) {
+            renderMatchSetup();
+        } else {
+            renderTerrainSelection();
+        }
+    }, 50);
 
     // Fonction de déchargement
     return () => {

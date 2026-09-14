@@ -1,13 +1,11 @@
 // src/js/modules/badminton/badminton-common.js
 // Code partagé entre tous les modes Badminton
-// Round Robin, classement, Firebase, sélection des terrains
 
-import { db, ref, onValue, update } from '../../core/firebase-service.js';
+import { db, ref, onValue } from '../../core/firebase-service.js';
 
 // ============================================================
-// ÉTAT PARTAGÉ (toutes les variables exportées)
+// ÉTAT PARTAGÉ
 // ============================================================
-
 export let currentClasse = '';
 export let currentTerrain = '';
 export let playersList = [];
@@ -18,7 +16,6 @@ export let resultsListenerAttached = false;
 // ============================================================
 // INITIALISATION COMMUNE
 // ============================================================
-
 export function initBadmintonCommon(classe) {
     currentClasse = classe;
     currentTerrain = '';
@@ -53,16 +50,17 @@ export function initBadmintonCommon(classe) {
         }
         console.log("📋 [Common] TerrainsConfig :", terrainsConfig);
 
-        // Notifier le mode actif du changement de config
-        window.dispatchEvent(new CustomEvent('badminton-config-updated', { 
-            detail: { config, terrainsConfig } 
-        }));
-
-        // Si on a déjà un terrain sélectionné, re-rendu
-        if (currentTerrain) {
-            if (window.renderMatchSetup) window.renderMatchSetup();
-        } else {
-            if (window.renderTerrainSelection) window.renderTerrainSelection();
+        // ✅ On appelle DIRECTEMENT les fonctions locales (pas window.*)
+        // Comme ça, peu importe l'ordre : config arrive avant ou après le chargement du mode,
+        // le rendu se fera toujours.
+        try {
+            if (currentTerrain) {
+                renderMatchSetup();
+            } else {
+                renderTerrainSelection();
+            }
+        } catch (e) {
+            console.warn('[Common] Rendu impossible pour le moment (le mode n\'est peut-être pas encore chargé) :', e.message);
         }
     });
 }
@@ -70,7 +68,6 @@ export function initBadmintonCommon(classe) {
 // ============================================================
 // ROUND ROBIN
 // ============================================================
-
 export function generateRoundRobin() {
     matchSchedule = [];
     const n = playersList.length;
@@ -104,7 +101,6 @@ export function generateRoundRobin() {
 // ============================================================
 // CLASSEMENT
 // ============================================================
-
 export function renderClassement(containerId = 'classement') {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -149,7 +145,6 @@ export function renderClassement(containerId = 'classement') {
 // ============================================================
 // SÉLECTION DU TERRAIN (commun)
 // ============================================================
-
 export function renderTerrainSelection() {
     const container = document.getElementById('badminton-content');
     if (!container) {
@@ -183,9 +178,8 @@ export function renderTerrainSelection() {
 }
 
 // ============================================================
-// AFFICHAGE DES MATCHS (commun)
+// AFFICHAGE DES MATCHS
 // ============================================================
-
 export function renderMatchSetup() {
     const container = document.getElementById('badminton-content');
     if (!container) return;
@@ -241,10 +235,6 @@ export function renderMatchSetup() {
 window.selectBadmintonTerrain = function(terrain) {
     currentTerrain = parseInt(terrain);
     renderMatchSetup();
-    // Notifier le mode actif du changement de terrain
-    window.dispatchEvent(new CustomEvent('badminton-terrain-selected', { 
-        detail: { terrain: currentTerrain } 
-    }));
 };
 
 window.retourTerrains = function() {
@@ -252,37 +242,12 @@ window.retourTerrains = function() {
     renderTerrainSelection();
 };
 
-// La fonction selectMatchFromList est redéfinie dans chaque mode
-// On la définit ici comme placeholder, chaque mode la surchargera
+// Placeholder : chaque mode le surchargera
 window.selectMatchFromList = function(matchId) {
     console.warn('⚠️ selectMatchFromList doit être surchargée par le mode actif');
 };
 
-// ============================================================
-// FIREBASE : ÉCOUTE DES SCORES
-// ============================================================
-
-export function listenForScoreUpdates() {
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
-    
-    onValue(resultsRef, (snap) => {
-        const data = snap.val() || {};
-        matchSchedule.forEach(m => {
-            const result = data[m.id];
-            if (result && result.terrain === currentTerrain) {
-                m.s1 = result.pts1;
-                m.s2 = result.pts2;
-                m.score1 = result.score1;
-                m.score2 = result.score2;
-                m.style1 = result.avecManiere1 ? 'avec' : 'sans';
-                m.style2 = result.avecManiere2 ? 'avec' : 'sans';
-            }
-        });
-        if (document.getElementById('court-zone') && !document.getElementById('court')) {
-            renderMatchSetup();
-        } else {
-            renderClassement();
-        }
-    });
-}
+// ✅ EXPOSER LES RENDUS POUR QUE LE MODE TERRAIN PUISSE LES APPELER
+window.renderTerrainSelection = renderTerrainSelection;
+window.renderMatchSetup = renderMatchSetup;
+window.renderClassement = renderClassement;
