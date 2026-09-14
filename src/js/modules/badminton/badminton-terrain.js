@@ -25,7 +25,7 @@ let badmintonOtherPoints = 3;
 let badmintonCornerPoints = 5;
 let badmintonFaultPoints = 1;
 let badmintonFaultPenalty = true;
-let badmintonDureeMatch = 180; // secondes
+let badmintonDureeMatch = 180;
 
 // Chrono
 let matchTimer = { interval: null, tempsRestant: 0, duree: 0, running: false };
@@ -65,7 +65,7 @@ const WEBJEJE_CSS = `
 `;
 
 // ============================================================
-// AUDIO (bip de fin)
+// AUDIO
 // ============================================================
 function initAudio() {
     if (!audioCtx) {
@@ -168,7 +168,7 @@ export async function init(classe, config) {
         historyStack = [];
         redoStack = [];
         renderCourtInterface();
-        demarrerChrono(); // ✅ Démarre le chrono au lancement du match
+        demarrerChrono();
     };
 
     setTimeout(() => {
@@ -205,7 +205,6 @@ function renderCourtInterface() {
     container.innerHTML = `
         <style>${WEBJEJE_CSS}</style>
 
-        <!-- CHRONO -->
         <div class="bg-slate-800 p-3 rounded-xl border-2 border-yellow-500/40 mb-3 flex justify-between items-center">
             <div>
                 <div class="text-[10px] uppercase text-slate-400 font-bold">Match en cours</div>
@@ -258,7 +257,6 @@ function renderCourtInterface() {
         </div>
     `;
 
-    // Slider
     const slider = document.getElementById('middle-zone-slider');
     const display = document.getElementById('zone-size-display');
     if (slider) {
@@ -272,7 +270,6 @@ function renderCourtInterface() {
         });
     }
 
-    // Écouteurs terrain
     const court = document.getElementById('court');
     if (court) {
         const newCourt = court.cloneNode(true);
@@ -285,14 +282,27 @@ function renderCourtInterface() {
 // ============================================================
 // GÉNÉRATION DU TERRAIN
 // ============================================================
+// ✅ INVERSION APPLIQUÉE :
+//   Avant → "frontback" donnait un empilement HAUT/BAS
+//   Maintenant → "frontback" donne un alignement CÔTE À CÔTE (sens du joueur)
+//   et "leftright" donne un empilement HAUT/BAS.
+//   Si tu veux re-inverser, il suffit d'échanger "frontback" et "leftright"
+//   dans les DEUX lignes marquées ⬇️ ci-dessous.
+// ============================================================
 function generateCourtHTML() {
     const m = badmintonMode;
     const is9 = m === '4corners';
     const cSize = badmintonCenterSize;
     const sideSize = (100 - cSize) / 2;
 
-    let pClass = is9 ? 'layout-grid' : (m === 'leftright' ? 'layout-row' : 'layout-col');
-    const style3Z = (i) => m === 'frontback' ? (i===1 ? `width:100%;height:${cSize}%` : `width:100%;height:${sideSize}%`) : (i===1 ? `width:${cSize}%;height:100%` : `width:${sideSize}%;height:100%`);
+    // ⬇️ LIGNE 1/2 : classe de layout
+    let pClass = is9 ? 'layout-grid' : (m === 'frontback' ? 'layout-row' : 'layout-col');
+
+    // ⬇️ LIGNE 2/2 : styles des zones
+    const style3Z = (i) => m === 'leftright'
+        ? (i===1 ? `width:100%;height:${cSize}%`  : `width:100%;height:${sideSize}%`)   // empilé verticalement
+        : (i===1 ? `width:${cSize}%;height:100%`  : `width:${sideSize}%;height:100%`);  // côte à côte horizontalement
+
     const style9Z = (i) => `width:${(i%3===1) ? cSize : sideSize}%;height:${(Math.floor(i/3)===1) ? cSize : sideSize}%`;
 
     const genZones = (playerCode) => {
@@ -440,7 +450,7 @@ window.undoImpact = undoImpact;
 window.resetCourt = resetCourt;
 
 // ============================================================
-// FIN DE MATCH — SIMPLIFIÉ, PAS DE "MANIÈRE"
+// FIN DE MATCH
 // ============================================================
 window.endMatch = function() {
     const currentMatch = matchSchedule.find(m => m.id === window.currentMatchId);
@@ -455,10 +465,8 @@ window.endMatch = function() {
 
     stopChrono();
 
-    // Calcul V/D + points classement (3 victoire / 1 défaite / 0 forfait)
     let winner, loser, pts1, pts2;
     if (s1 === s2) {
-        // Match nul : 2 points chacun
         winner = null; loser = null;
         pts1 = 2; pts2 = 2;
     } else if (s1 > s2) {

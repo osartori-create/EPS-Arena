@@ -1,5 +1,6 @@
 // src/js/modules/badminton/badminton-common.js
 // Code partagé entre tous les modes Badminton
+// ✅ Reset complet à l'init + listener results (fix cache fantôme)
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
 
@@ -14,21 +15,31 @@ export let terrainsConfig = {};
 export let resultsListenerAttached = false;
 
 let configListener = null;
+let resultsListener = null;
 
 // ============================================================
 // INITIALISATION COMMUNE
 // ============================================================
 export function initBadmintonCommon(classe) {
+    // ✅ Reset complet du state (fix cache fantôme)
     currentClasse = classe;
     currentTerrain = '';
+    playersList = [];
+    matchSchedule = [];
+    terrainsConfig = {};
     resultsListenerAttached = false;
+
+    // Détruit les anciens listeners
+    if (configListener) { configListener(); configListener = null; }
+    if (resultsListener) { resultsListener(); resultsListener = null; }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
+    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
 
     console.log(`🔍 [Common] initBadmintonCommon pour la classe : ${classe}`);
 
-    if (configListener) configListener();
+    // ---------- LISTENER CONFIG ----------
     configListener = onValue(configRef, (snap) => {
         const config = snap.val() || {};
         console.log("📡 [Common] Config reçue :", config);
@@ -45,19 +56,60 @@ export function initBadmintonCommon(classe) {
         console.log("📋 [Common] TerrainsConfig :", terrainsConfig);
 
         try {
-            if (currentTerrain) {
-                renderMatchSetup();
-            } else {
-                renderTerrainSelection();
-            }
+            if (currentTerrain) renderMatchSetup();
+            else renderTerrainSelection();
         } catch (e) {
             console.warn('[Common] Rendu reporté :', e.message);
         }
     });
+
+    // ---------- LISTENER RESULTS (anti-cache fantôme) ----------
+    // Si le prof purge Firebase, ce listener reçoit null → il remet matchSchedule à zéro.
+    resultsListener = onValue(resultsRef, (snap) => {
+        const results = snap.val() || {};
+
+        // 1) Reset tous les matchs qui ne sont plus dans Firebase
+        matchSchedule.forEach(m => {
+            if (!results[m.id]) {
+                m.s1 = null; m.s2 = null;
+                m.score1 = null; m.score2 = null;
+                m.style1 = null; m.style2 = null;
+                m.stats = null;
+            }
+        });
+
+        // 2) Synchronise les matchs existants
+        Object.entries(results).forEach(([matchId, data]) => {
+            const idx = matchSchedule.findIndex(m => m.id === matchId);
+            if (idx !== -1) {
+                matchSchedule[idx].s1 = data.pts1 ?? null;
+                matchSchedule[idx].s2 = data.pts2 ?? null;
+                matchSchedule[idx].score1 = data.score1 ?? null;
+                matchSchedule[idx].score2 = data.score2 ?? null;
+                matchSchedule[idx].style1 = data.avecManiere1 ? 'avec' : 'sans';
+                matchSchedule[idx].style2 = data.avecManiere2 ? 'avec' : 'sans';
+                matchSchedule[idx].stats = data.stats || null;
+            }
+        });
+
+        // 3) Re-render ciblé : seulement si on est sur la grille de matchs (pas en train de jouer)
+        const courtZone = document.getElementById('court-zone');
+        const court = document.getElementById('court');
+        if (courtZone && !court && matchSchedule.length > 0) {
+            // On est sur la grille, on peut re-render sans risque
+            try { renderMatchSetup(); } catch (e) {}
+        } else if (!court) {
+            try { renderClassement(); } catch (e) {}
+        }
+    });
+
+    resultsListenerAttached = true;
 }
 
 export function cleanupBadmintonCommon() {
     if (configListener) { configListener(); configListener = null; }
+    if (resultsListener) { resultsListener(); resultsListener = null; }
+    resultsListenerAttached = false;
 }
 
 // ============================================================
@@ -93,7 +145,7 @@ export function generateRoundRobin() {
 }
 
 // ============================================================
-// CLASSEMENT (neutre : utilise s1/s2 fournis par le module)
+// CLASSEMENT
 // ============================================================
 export function renderClassement(containerId = 'classement') {
     const container = document.getElementById(containerId);
@@ -104,10 +156,8 @@ export function renderClassement(containerId = 'classement') {
 
     matchSchedule.forEach(m => {
         if (m.s1 === null) return;
-        // Points (5/3/2/1 en manière, 3/1/0 en terrain)
         standings[m.p1].pts += m.s1 || 0;
         standings[m.p2].pts += m.s2 || 0;
-        // V/D basé sur le score réel
         if (m.score1 !== null && m.score2 !== null && m.score1 !== m.score2) {
             if (m.score1 > m.score2) {
                 standings[m.p1].wins++;
@@ -225,11 +275,14 @@ export function renderMatchSetup() {
 // ============================================================
 window.selectBadmintonTerrain = function(terrain) {
     currentTerrain = parseInt(terrain);
+    // ✅ Reset de la grille à chaque changement de terrain (les matchs seront resync via listener)
+    matchSchedule = [];
     renderMatchSetup();
 };
 
 window.retourTerrains = function() {
     currentTerrain = '';
+    matchSchedule = [];   // ✅ Reset aussi
     renderTerrainSelection();
 };
 
