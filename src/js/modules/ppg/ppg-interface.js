@@ -118,7 +118,7 @@ function rendre() {
                 <h3 class="font-black text-blue-400 uppercase text-sm">🏋️ Séance PPG du jour</h3>
                 <span class="text-xs text-slate-400">${getTodayDate()}</span>
             </div>
-            <p class="text-xs text-slate-400 mb-3">Choisis 3 ateliers pour la séance. La structure (2×45''/15'') est fixe.</p>
+            <p class="text-xs text-slate-400 mb-3">Choisis 1 à 3 ateliers pour la séance. La structure (2×45''/15'') est fixe.</p>
             <div id="ppg-slots" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3"></div>
             <div class="flex gap-2 flex-wrap">
                 <button onclick="window.ppgAjouterAtelier()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95 border border-slate-600">
@@ -211,7 +211,9 @@ function rendreSlotsAteliers() {
 
         html += `
             <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
-                <label class="text-xs font-bold text-slate-400 uppercase block mb-1">Atelier ${i + 1}</label>
+                <label class="text-xs font-bold text-slate-400 uppercase block mb-1">
+    Atelier ${i + 1}${i > 0 ? ' <span class="text-slate-600">(optionnel)</span>' : ''}
+</label>
                 <select id="ppg-slot-${i}" class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-white text-sm">
                     <option value="">-- Choisir --</option>
                     ${options}
@@ -293,11 +295,14 @@ window.ppgFiltreAtelier = function(id) {
 window.ppgValiderSeance = async function() {
     const slots = [0, 1, 2].map(i => document.getElementById(`ppg-slot-${i}`)?.value).filter(Boolean);
 
-    if (slots.length !== 3) {
-        return alert('Choisis 3 ateliers pour la séance.');
+    if (slots.length === 0) {
+        return alert('Choisis au moins 1 atelier pour la séance.');
     }
-    if (new Set(slots).size !== 3) {
-        return alert('Les 3 ateliers doivent être différents.');
+    if (slots.length > 3) {
+        return alert('Maximum 3 ateliers par séance.');
+    }
+    if (new Set(slots).size !== slots.length) {
+        return alert('Les ateliers doivent être différents.');
     }
 
     const basePath = getPPGBasePath(currentClasse);
