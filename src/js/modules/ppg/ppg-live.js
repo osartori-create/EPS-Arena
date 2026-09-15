@@ -36,8 +36,12 @@ function elevesParCode(eleves) {
 }
 
 export function renderPPGLive() {
+    console.log('[PPG Live] renderPPGLive appelée');
     const container = document.getElementById('live-content');
-    if (!container) return;
+    if (!container) {
+        console.warn('[PPG Live] Conteneur live-content introuvable');
+        return;
+    }
 
     const classe = getCurrentClasse() || document.getElementById('selectClasse')?.value;
     if (!classe) {

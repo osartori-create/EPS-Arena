@@ -424,9 +424,17 @@ export function initActivities() {
                 }
             }
         } else if (subTab === 'live') {
-            if (viewLive) viewLive.classList.remove('hidden');
-            const container = document.getElementById('live-content');
-            container.innerHTML = '<p>Chargement du Live...</p>';
+    // ✅ Force viewLive visible ET viewTV caché
+    if (viewLive) {
+        viewLive.classList.remove('hidden');
+        viewLive.style.display = '';
+    }
+    if (viewTV) {
+        viewTV.classList.add('hidden');
+        viewTV.style.display = 'none';
+    }
+    const container = document.getElementById('live-content');
+    container.innerHTML = '<p class="text-slate-500 text-center">Chargement du Live...</p>';
 
             // --- GESTION DES BOUTONS D'EXPORT ---
             const exportCSVBtn = document.querySelector('#viewLive .bg-indigo-600');
@@ -467,9 +475,9 @@ export function initActivities() {
                 'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
                 'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
                 'relais': () => import('../../modules/relais/relais-live.js').then(m => m.renderRelaisLive()),
-                'demi-fond': () => import('../../modules/demi-fond/demifond-tv.js').then(m => m.renderDemiFondTV()),
-'ppg': () => import('../../modules/ppg/ppg-tv.js').then(m => m.renderPPGTV()),
-'tournoi': () => {
+                'demi-fond': () => import('../../modules/demi-fond/demifond-live.js').then(m => m.renderDemiFondLive()),
+                'ppg': () => import('../../modules/ppg/ppg-live.js').then(m => m.renderPPGLive()),
+                'tournoi': () => {
     // Lit la variante active dans la config puis charge le bon module Live
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const classe = document.getElementById('selectClasse').value;
@@ -503,10 +511,16 @@ export function initActivities() {
             }
 
         } else if (subTab === 'tv') {
-            const tvViewEl = document.getElementById('viewTV');
-            if (tvViewEl) {
-                tvViewEl.style.display = 'block';
-                tvViewEl.style.height = '100vh';
+    // ✅ Force viewTV visible ET viewLive caché
+    if (viewLive) {
+        viewLive.classList.add('hidden');
+        viewLive.style.display = 'none';
+    }
+    const tvViewEl = document.getElementById('viewTV');
+    if (tvViewEl) {
+        tvViewEl.classList.remove('hidden');
+        tvViewEl.style.display = 'block';
+        tvViewEl.style.height = '100vh';
                 setTimeout(() => {
                     const tvModules = {
                         'badminton': () => import('../../modules/badminton/badminton-tv.js').then(m => m.renderBadmintonTV()),
@@ -520,6 +534,7 @@ export function initActivities() {
                         'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
                         'relais': () => import('../../modules/relais/relais-tv.js').then(m => m.renderRelaisTV()),
                         'demi-fond': () => import('../../modules/demi-fond/demifond-tv.js').then(m => m.renderDemiFondTV()),
+                        'ppg': () => import('../../modules/ppg/ppg-tv.js').then(m => m.renderPPGTV()),
                         'tournoi': () => {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const classe = document.getElementById('selectClasse').value;
