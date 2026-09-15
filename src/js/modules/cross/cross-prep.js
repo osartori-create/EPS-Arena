@@ -213,6 +213,6 @@ window.crossPrepReset = () => {
 };
 
 function refreshCross() {
-    const container = document.getElementById('viewCross');
+    const container = document.getElementById('cross-content');
     if (container) render(container);
 }
