@@ -61,6 +61,7 @@ async function renderProf() {
                     <button onclick="window.tournoiReinitialiser()" class="bg-red-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">🔄 Réinitialiser</button>
                     <button onclick="window.tournoiExporter()" class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">⬇️ Export</button>
                     <button onclick="document.getElementById('tournoiImportFile').click()" class="bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">⬆️ Import</button>
+                    <button onclick="exporterTournoiExcel()" class="bg-amber-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">📊 Excel</button>
                     <input type="file" id="tournoiImportFile" class="hidden" accept=".json" onchange="window.tournoiImporter(event)">
                     <label class="flex items-center gap-2 text-xs text-slate-400">
                         <input type="checkbox" id="tournoi-show-exclus" ${showExclus ? 'checked' : ''} onchange="window.tournoiToggleExclus()">

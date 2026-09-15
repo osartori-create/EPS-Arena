@@ -2,6 +2,7 @@
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
+import { colonnesIdentite, col, exporterVersIDoceo as exporterService } from '../../services/export-service.js';
 
 let currentClasse = '';
 let elevesData = [];
@@ -466,47 +467,39 @@ function sauvegarderCoups(numero, nbCoups) {
 // ============================================================
 function exportNatationIDoceo() {
     const classe = currentClasse || getCurrentClasse();
-    if (!classe) {
-        alert('Sélectionnez une classe.');
-        return;
-    }
-    
+    if (!classe) return alert('Sélectionnez une classe.');
+
     const eleves = elevesData.filter(e => e.numero !== undefined);
-    if (eleves.length === 0) {
-        alert('Aucun élève dans cette classe.');
-        return;
-    }
-    
-    const donnees = eleves.map(e => {
-        // ✅ CORRECTION : lecture avec le numéro
+    if (eleves.length === 0) return alert('Aucun élève dans cette classe.');
+
+    const lignes = eleves.map(e => {
         const cle = String(e.numero);
         const temps = tempsData[cle] || null;
         const coups = coupsData[cle] || null;
         const indice = calculIndice(temps, coups);
         const niveau = indice !== null ? getNiveau(indice) : { label: '--' };
-        
+
         return {
-            numero: e.numero,
             nom: e.nom || '',
             prenom: e.prenom || '',
-            temps: temps !== null ? (temps / 1000).toFixed(1) : '',
-            coups: coups !== null ? coups : '',
-            indice: indice !== null ? indice.toFixed(2) : '',
-            niveau: niveau.label
+            donnees: {
+                temps: temps !== null ? (temps / 1000).toFixed(1) : '',
+                coups: coups !== null ? coups : '',
+                indice: indice !== null ? indice.toFixed(2) : '',
+                niveau: niveau.label
+            }
         };
     });
-    
-    const colonnes = [
-        { nom: '!groupe', cle: 'numero' },
-        { nom: '!Nom', cle: 'nom' },
-        { nom: '!Prénom', cle: 'prenom' },
-        { nom: '!Temps (s)', cle: 'temps' },
-        { nom: '!Coups de bras', cle: 'coups' },
-        { nom: '!Indice', cle: 'indice' },
-        { nom: '!Niveau', cle: 'niveau' }
+
+    const colonnesDonnees = [
+        col('Temps (s)', 'temps'),
+        col('Coups de bras', 'coups'),
+        col('Indice', 'indice'),
+        col('Niveau', 'niveau')
     ];
-    
-    exporterVersIDoceo('Natation', classe, colonnes, donnees);
+
+    const donnees = lignes.map(l => ({ nom: l.nom, prenom: l.prenom, ...l.donnees }));
+    exporterService('Natation', classe, [...colonnesIdentite(), ...colonnesDonnees], donnees);
 }
 
 window.exportNatationIDoceo = exportNatationIDoceo;

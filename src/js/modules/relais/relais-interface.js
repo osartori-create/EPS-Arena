@@ -101,6 +101,10 @@ function createHeader() {
                         class="bg-slate-600 hover:bg-slate-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400 active:scale-95">
                     ⬆️ Import JSON
                 </button>
+                <button onclick="exporterRelaisExcel()"
+        class="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-amber-400 active:scale-95">
+    📊 Export Excel
+</button>
                 <input type="file" id="relaisImportJSON" class="hidden" accept=".json" onchange="window.relaisImportConfig(event)">
             </div>
         </div>

@@ -2,6 +2,7 @@
 import { getStudentsMap, getLocalMapping } from '../../core/live-engine.js';
 import { exportIDoceo } from '../../services/export-idocéo.js';
 import { exporterVersIDoceo } from '../../services/export-service.js';
+import { colonnesIdentite, col, exporterVersIDoceo as exporterService } from '../../services/export-service.js';
 
 let currentClasse = "";
 
@@ -87,95 +88,50 @@ export function renderLive(discipline) {
 // ============================================================
 window.exportCOiDoceo = function() {
     const activeClasse = document.getElementById('selectClasse').value;
-    if (!activeClasse) {
-        alert("Sélectionnez une classe.");
-        return;
-    }
+    if (!activeClasse) return alert('Sélectionnez une classe.');
 
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-    if (eleves.length === 0) {
-        alert("Aucun élève dans cette classe.");
-        return;
-    }
+    if (eleves.length === 0) return alert('Aucun élève dans cette classe.');
 
-    // Récupérer les données du Live (passages CO)
     const sessionData = window.lastLiveSnap || {};
-    
-    // 1. Construire les données
-    const donnees = eleves.map(e => {
-        // Ignorer les absents/inaptes
-        if (e.code === 'ABS' || e.code === 'INAPTE') {
+
+    const lignes = eleves
+        .filter(e => e.code !== 'ABS' && e.code !== 'INAPTE')
+        .map(e => {
+            const code = e.code || e.id;
+            let score = 0, objectif = 0, tempsSec = 0;
+
+            const passages = sessionData[code] || {};
+            Object.values(passages).forEach(circ => {
+                score += circ.pts || 0;
+                objectif += circ.total || 0;
+                if (circ.time && circ.time > tempsSec) tempsSec = circ.time;
+            });
+
+            const note = objectif > 0 ? ((score / objectif) * 20).toFixed(1).replace('.', ',') : '';
+            const temps = tempsSec > 0
+                ? `${Math.floor(tempsSec / 60)}:${String(tempsSec % 60).padStart(2, '0')}`
+                : '';
+
             return {
-                nom: `${e.prenom} ${e.nom}`.trim(),
-                score: '',
-                objectif: '',
-                note: '',
-                temps: '',
-                tempsSec: 999999 // Pour le tri
+                nom: e.nom || '',
+                prenom: e.prenom || '',
+                donnees: { score, objectif, note, temps }
             };
-        }
-
-        const code = e.code || e.id;
-        let score = 0;
-        let objectif = 0;
-        let tempsSec = 0;
-
-        // Récupérer les passages de l'élève
-        const passages = sessionData[code] || {};
-        Object.values(passages).forEach(circ => {
-            score += circ.pts || 0;
-            objectif += circ.total || 0;
-            if (circ.time && circ.time > tempsSec) tempsSec = circ.time;
         });
 
-        let note = "";
-        if (objectif > 0) {
-            note = ((score / objectif) * 20).toFixed(1).replace('.', ',');
-        }
+    // Tri par score décroissant pour que le classement soit lisible
+    lignes.sort((a, b) => (b.donnees.score || 0) - (a.donnees.score || 0));
 
-        let temps = "";
-        if (tempsSec > 0) {
-            const min = Math.floor(tempsSec / 60);
-            const sec = tempsSec % 60;
-            temps = `${min}:${sec < 10 ? '0' : ''}${sec}`;
-        }
-
-        return {
-            nom: `${e.prenom} ${e.nom}`.trim(),
-            score: score,
-            objectif: objectif,
-            note: note,
-            temps: temps,
-            tempsSec: tempsSec
-        };
-    });
-
-    // 2. Trier : Score desc, puis Temps asc (les absents à la fin)
-    donnees.sort((a, b) => {
-        if (a.score === "" && b.score === "") return 0;
-        if (a.score === "") return 1;
-        if (b.score === "") return -1;
-        if (b.score !== a.score) return b.score - a.score;
-        return a.tempsSec - b.tempsSec;
-    });
-
-    // 3. Définir les colonnes (avec ! devant toutes les colonnes)
-    const colonnes = [
-        { nom: '!groupe', cle: 'rang' },
-        { nom: '!Nom', cle: 'nom' },
-        { nom: '!Score', cle: 'score' },
-        { nom: '!Objectif', cle: 'objectif' },
-        { nom: '!Note /20', cle: 'note' },
-        { nom: '!Temps', cle: 'temps' }
+    const colonnesDonnees = [
+        col('Score', 'score'),
+        col('Objectif', 'objectif'),
+        col('Note /20', 'note'),
+        col('Temps total', 'temps')
     ];
 
-    // 4. Ajouter le rang à chaque ligne
-    donnees.forEach((ligne, index) => {
-        ligne.rang = ligne.score !== "" ? (index + 1) : "";
-    });
-
-    // 5. Exporter via le service centralisé
-    exporterVersIDoceo('CO', activeClasse, colonnes, donnees);
+    const donnees = lignes.map(l => ({ nom: l.nom, prenom: l.prenom, ...l.donnees }));
+    exporterService('CO', activeClasse, [...colonnesIdentite(), ...colonnesDonnees], donnees);
 };
 
 window.exportResultsLive = function() {

@@ -628,6 +628,30 @@ Clé	Contenu
 eps_arena_grilles_bibliotheque	Liste des grilles
 eps_arena_grilles_evaluations	Évaluations prof (classe/grille/période/élève)
 eps_arena_grilles_dernier_eleve	Dernier niveau "Élève" par classe/élève
+
+## 9bis. Conventions d'export (iDoceo & Excel)
+
+### Règle d'or : qui préfixe quoi ?
+
+| Type de colonne | Préfixe | Exemple |
+|---|---|---|
+| Identité (Nom) | `!` | `!Nom` |
+| Identité (Prénom) | `!` | `!Prénom` |
+| **Toute donnée** (note, mesure, libellé) | **aucun** | `Endurance (palier)`, `VMA (km/h)`, `Force (groupe)` |
+
+**Ne JAMAIS préfixer une colonne de données avec `!`** : iDoceo attend alors un nombre et rejette silencieusement le texte → colonnes vides.
+
+### API de `services/export-service.js`
+
+```js
+import {
+    colonnesIdentite,   // → [{ nom: '!Nom', cle: 'nom' }, { nom: '!Prénom', cle: 'prenom' }]
+    col,                // col('VMA (km/h)', 'vma') → { nom, cle } sans préfixe
+    exporterVersIDoceo, // CSV iDoceo, BOM UTF-8, séparateur ;
+    exporterVersExcel,  // XLSX multi-feuilles (SheetJS)
+    exporterNotesEleves // Helper tout-en-un
+} from '../../services/export-service.js';
+
 10. 1/2 Fond — Bonnes pratiques
 10.1. Chemins et noms
 Élément	Valeur

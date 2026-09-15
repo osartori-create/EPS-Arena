@@ -2,6 +2,7 @@
 // Export iDoeceo (2 formats : notes + rubrique)
 
 import { getExistingEleves } from '../../services/admin-service.js';
+import { colonnesIdentite, col, exporterVersIDoceo as exporterService } from '../../services/export-service.js';
 
 const XLSX = window.XLSX;
 
@@ -14,36 +15,30 @@ export function exporterNotesIDoceo(grille, evaluations, classe, periode) {
 
     const eleveData = evaluations[periode] || {};
 
-    // En-têtes
-    const headers = ['!groupe', '!Nom', '!Prénom'];
-    grille.criteres.forEach(c => headers.push(c.nom));
-    headers.push('Note /100');
-    headers.push('Note /20');
-
-    const rows = [headers];
-
-    eleves.forEach((e, idx) => {
+    const lignes = eleves.map(e => {
         const notes = eleveData[e.id]?.notes || {};
-        const row = [idx + 1, e.nom, e.prenom];
-
-        grille.criteres.forEach(c => {
-            row.push(notes[c.id] !== undefined ? notes[c.id] : '');
-        });
-
         const noteFinale = calculerNotePourEleve(notes, grille.criteres);
-        row.push(noteFinale.sur100 !== null ? noteFinale.sur100 : '');
-        row.push(noteFinale.sur20 !== null ? noteFinale.sur20 : '');
 
-        rows.push(row);
+        const donnees = {};
+        grille.criteres.forEach(c => {
+            const cle = `crit_${c.id}`;
+            donnees[cle] = notes[c.id] !== undefined ? notes[c.id] : '';
+        });
+        donnees.noteSur100 = noteFinale.sur100 !== null ? noteFinale.sur100 : '';
+        donnees.noteSur20 = noteFinale.sur20 !== null ? noteFinale.sur20 : '';
+
+        return { nom: e.nom, prenom: e.prenom, donnees };
     });
 
-    // Créer le fichier XLS
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Notes');
+    const colonnesDonnees = [
+        ...grille.criteres.map(c => col(c.nom, `crit_${c.id}`)),
+        col('Note /100', 'noteSur100'),
+        col('Note /20', 'noteSur20')
+    ];
 
-    const filename = `IDoceo_${grille.activite}_${grille.niveau}_${periode}_${classe}.xlsx`;
-    XLSX.writeFile(wb, filename);
+    const donnees = lignes.map(l => ({ nom: l.nom, prenom: l.prenom, ...l.donnees }));
+    const nomModule = `Grille_${grille.activite}_${grille.niveau}`;
+    exporterService(nomModule, classe, [...colonnesIdentite(), ...colonnesDonnees], donnees);
 }
 
 /**

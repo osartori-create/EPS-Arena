@@ -259,6 +259,9 @@
             <button onclick="document.getElementById('importBadmintonFile').click()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-400 active:scale-95 transition-transform">
                 ⬆️ Import JSON
             </button>
+            <button onclick="exporterBadmintonExcel()" class="bg-amber-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-amber-400 active:scale-95 transition-transform">
+    📊 Export Excel
+</button>
             <input type="file" id="importBadmintonFile" class="hidden" accept=".json" onchange="importBadmintonConfig(event)">
         </div>
         <p class="text-xs text-slate-400 mb-4">Glissez les élèves. Les lettres (A, B, C...) s'attribuent automatiquement.</p>
