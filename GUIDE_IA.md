@@ -1,16 +1,10 @@
-# GUIDE_IA.md — EPS-Arena
+1. Description du projet
+Application web EPS (Éducation Physique et Sportive) pour gérer des activités sportives en classe via des iPads. Deux interfaces principales : le Professeur (maitre.html) et l'Élève (eleve.html). L'application est 100% RGPD : aucun nom ou photo d'élève ne doit être présent dans Firebase.
 
----
+Architecture : modules ES6, dispatch par activité, Firebase Realtime Database pour les échanges iPad ↔ PC, localStorage + IndexedDB pour les données nominatives.
 
-## 1. Description du projet
-
-Application web EPS (Éducation Physique et Sportive) pour gérer des activités sportives en classe via des iPads. Deux interfaces principales : le Professeur (`maitre.html`) et l'Élève (`eleve.html`). L'application est **100% RGPD** : aucun nom ou photo d'élève ne doit être présent dans Firebase.
-
-**Architecture** : modules ES6, dispatch par activité, Firebase Realtime Database pour les échanges iPad ↔ PC, localStorage + IndexedDB pour les données nominatives.
-
----
-
-## 2. Architecture des dossiers (exhaustive)
+2. Architecture des dossiers (exhaustive)
+text
 EPS-Arena/
 │ eleve.html
 │ GUIDE_IA.md
@@ -20,7 +14,7 @@ EPS-Arena/
 │ manifest.json
 │
 ├───libs/
-│ xlsx.full.min.js # SheetJS (import/export XLSX)
+│ xlsx.full.min.js                # SheetJS (import/export XLSX)
 │
 └───src/
 │ index.html
@@ -33,28 +27,29 @@ EPS-Arena/
 │ app.js
 │
 ├───config/
-│ constants.js # BAREME_ESCALADE, PALIER_VMA
-│ firebase-config.js # FIREBASE_CONFIG, DB_PATHS
+│ constants.js                    # BAREME_ESCALADE, PALIER_VMA
+│ firebase-config.js              # FIREBASE_CONFIG, DB_PATHS
 │ index.js
 │ orientshow-default-codes.js
 │
 ├───core/
-│ firebase-service.js # Chemins Firebase, listeners
+│ firebase-service.js             # Chemins Firebase, listeners
 │ index.js
-│ live-engine.js # Mapping codes → élèves (RGPD)
+│ live-engine.js                  # Mapping codes → élèves (RGPD)
 │ state.js
 │
 ├───modules/
 │ │ index.js
-│ │ registry.js # Registre des modules
+│ │ registry.js                   # Registre des modules
 │ │
-│ ├───arcathlon/ # Course → Tir → Pénalités
-│ ├───badminton/ # 2 modes : terrain + manière
+│ ├───arcathlon/                  # Course → Tir → Pénalités
+│ ├───badminton/                  # 2 modes : terrain + manière
 │ │ badminton-charts.js
 │ │ badminton-common.js
 │ │ badminton-core.js
 │ │ badminton-dispatcher.js
 │ │ badminton-events.js
+│ │ badminton-export.js           # Export Excel
 │ │ badminton-firebase.js
 │ │ badminton-interface.js
 │ │ badminton-kiosk.js
@@ -67,10 +62,9 @@ EPS-Arena/
 │ │ badminton-ui-prof.js
 │ │ badminton-ui.js
 │ │ badminton-utils.js
-│ │ badminton-export.js # Export Excel
 │ │ index.js
 │ │
-│ ├───co/ # CO classique + OrientShow
+│ ├───co/                         # CO classique + OrientShow
 │ │ circuit-manager.js
 │ │ co-detail.js
 │ │ co-interface.js
@@ -81,9 +75,9 @@ EPS-Arena/
 │ │ classique/
 │ │ orientshow/
 │ │
-│ ├───commun/ # Timer, calculateur, tir
+│ ├───commun/                     # Timer, calculateur, tir
 │ │
-│ ├───demi-fond/ # 3×5min R=3'
+│ ├───demi-fond/                  # 3×5min R=3'
 │ │ demifond-common.js
 │ │ demifond-interface.js
 │ │ demifond-kiosk.js
@@ -92,18 +86,18 @@ EPS-Arena/
 │ │ index.js
 │ │ variantes/trois-cinq-min/
 │ │
-│ ├───eleve/ # Kiosques élèves transverses
+│ ├───eleve/                      # Kiosques élèves transverses
 │ │
-│ ├───escalade/ # Grimpe + Bloc Contest
+│ ├───escalade/                   # Grimpe + Bloc Contest
 │ │
-│ ├───evaluation/ # Évaluation des aptitudes
+│ ├───evaluation/                 # Évaluation des aptitudes
 │ │
-│ ├───grilles/ # Grilles critériées
-│ │ connecteurs/ # Relais, Arcathlon, Escalade, Demi-fond
+│ ├───grilles/                    # Grilles critériées
+│ │ connecteurs/                  # Relais, Arcathlon, Escalade, Demi-fond
 │ │
-│ ├───multi/ # Multi-activités (équipes)
+│ ├───multi/                      # Multi-activités (équipes)
 │ │
-│ ├───natation/ # Indice de nage + Organisation
+│ ├───natation/                   # Indice de nage + Organisation + Relais
 │ │ natation-interface.js
 │ │ natation-kiosk.js
 │ │ natation-live.js
@@ -111,11 +105,20 @@ EPS-Arena/
 │ │ natation-relais.js
 │ │ natation-tv.js
 │ │
-│ ├───orientshow/ # Sous-module CO (ré-exports)
+│ ├───orientshow/                 # Sous-module CO (ré-exports)
+│ │
+│ ├───ppg/                        # PPG / Échauffement
+│ │ index.js                      # Registre du module
+│ │ ppg-core.js                   # Bibliothèque, calcul points, tri
+│ │ ppg-interface.js              # Config séance prof + aperçu
+│ │ ppg-kiosk.js                  # Saisie élève
+│ │ ppg-live.js                   # Live prof (classement + dates)
+│ │ ppg-tv.js                     # TV podium + top 20
+│ │ ppg-export.js                 # Excel (séance + historique)
 │ │
 │ ├───poursuite/
 │ │
-│ ├───relais/ # Relais 10s / 2 zones
+│ ├───relais/                     # Relais 10s / 2 zones
 │ │ relais-core.js
 │ │ relais-interface.js
 │ │ relais-kiosk.js
@@ -123,113 +126,109 @@ EPS-Arena/
 │ │ relais-tv.js
 │ │ relais-export.js
 │ │
-│ ├───teams/ # Générateur d'équipes
+│ ├───teams/                      # Générateur d'équipes
 │ │
-│ └───tournoi/ # Élimination
-│ tournoi-core.js
-│ tournoi-dispatcher.js
-│ tournoi-registry.js
-│ tournoi-export.js
-│ variantes/elimination/
+│ └───tournoi/                    # Élimination + ATP
+│ tournoi-core.js                 # Core partagé, variant-aware
+│ tournoi-dispatcher.js           # Charge la bonne variante
+│ tournoi-export.js               # Export Excel (élimination)
+│ tournoi-prof.js                 # Sélecteur de variante (prof)
+│ tournoi-registry.js             # Registre des variantes
+│ variantes/
+│ elimination/
+│ atp/
+│ index.js
+│ atp-core.js
+│ atp-prof.js
+│ atp-kiosk.js
+│ atp-live.js
+│ atp-tv.js
 │
 ├───services/
-│ admin-service.js # Gestion élèves + photos
-│ export-service.js # ⭐ Service centralisé d'export
+│ admin-service.js                # Gestion élèves + photos + codes
+│ export-service.js               # ⭐ Service centralisé d'export
 │ export-idocéo.js
 │ import-service.js
 │ photo-service.js
-│ sync-service.js # ⭐ Sync entre appareils
+│ sync-service.js                 # ⭐ Sync entre appareils
 │ toast-service.js
 │ index.js
 │
 ├───ui/
 │ │ action-ui.js
-│ │ dashboard-ui.js # Onglet Admin
+│ │ dashboard-ui.js              # Onglet Admin
 │ │ index.js
 │ │ login-ui.js
 │ │
 │ ├───eleve/
 │ │ eleve-actions.js
-│ │ eleve-app.js # Point d'entrée élève
+│ │ eleve-app.js                 # Point d'entrée élève
 │ │
 │ └───prof/
-│ activities.js # ⭐ Switch disciplines + imports
-│ layout.js # Navigation onglets
-│ live.js # Live + exports CO
+│ activities.js                  # ⭐ Switch disciplines + imports
+│ layout.js                      # Navigation onglets
+│ live.js                        # Live + exports CO
 │
 └───utils/
 format.js
 index.js
 validation.js
-
+3. Structure Firebase (TRÈS IMPORTANT - RGPD)
+3.1. Chemin hiérarchique de base
 text
-
----
-
-## 3. Structure Firebase (TRÈS IMPORTANT - RGPD)
-
-### 3.1. Chemin hiérarchique de base
 etablissements/0680013V/profs/{codeProf}/{classe}/{activite}/...
+CodeProf : localStorage.getItem('eps_arena_profCode') (défaut : DEFAULT)
 
+Classe : ex. "504", "305", "506"
+
+Activite : ex. escalade, co, multi, arcathlon, relais, demi-fond, grilles, badminton, natation, tournoi, ppg
+
+3.2. Config racine
 text
-
-- **CodeProf** : `localStorage.getItem('eps_arena_profCode')` (défaut : `DEFAULT`)
-- **Classe** : ex. "504", "305", "506"
-- **Activite** : ex. `escalade`, `co`, `multi`, `arcathlon`, `relais`, `demi-fond`, `grilles`, `badminton`, `natation`, `tournoi`
-
-### 3.2. Config racine
 etablissements/0680013V/profs/{codeProf}/{classe}/config
 Contenu : { activite: "badminton", ... }
+⚠️ Exception escalade : la config escalade est stockée à la racine {classe}/config (pas dans escalade/config).
 
+3.3. Classes actives
 text
-
-⚠️ **Exception escalade** : la config escalade est stockée à la **racine** `{classe}/config` (pas dans `escalade/config`).
-
-### 3.3. Classes actives
 etablissements/0680013V/profs/{codeProf}/active_classes
 Contenu : { 504: true, 305: true }
+3.4. Chemins spécifiques par activité
+Arcathlon :
 
 text
-
-### 3.4. Chemins spécifiques par activité
-
-**Arcathlon** :
 {classe}/arcathlon/config/
 {classe}/arcathlon/passages/sprint/{pushId}
 {classe}/arcathlon/passages/poursuite/{pushId}
 {classe}/arcathlon/commandes/depart
+Badminton :
 
 text
-
-**Badminton** :
-{classe}/config # { activite: 'badminton', mode: 'terrain'|'maniere', ... }
+{classe}/config                          # { activite: 'badminton', mode: 'terrain'|'maniere', ... }
 {classe}/badminton/results/{matchId}
+Le champ mode est soit 'terrain', soit 'maniere' — c'est le mode de jeu, pas le type de terrain. Le type de terrain (frontback / leftright / 4corners) est dans config.terrainType.
+
+Relais :
 
 text
-Le champ `mode` est **soit `'terrain'`, soit `'maniere'`** — c'est le **mode de jeu**, pas le type de terrain. Le type de terrain (`frontback` / `leftright` / `4corners`) est dans `config.terrainType`.
-
-**Relais** :
-{classe}/relais/config # { sousActivite, mode, distances2zones, groupes }
-{classe}/relais/vitesses # { "0_a": { arret, lance } }
+{classe}/relais/config                   # { sousActivite, mode, distances2zones, groupes }
+{classe}/relais/vitesses                 # { "0_a": { arret, lance } }
 {classe}/relais/mesures-10s/{pushId}
 {classe}/relais/mesures-2zones/{pushId}
+Grilles (évaluation) :
 
 text
-
-**Grilles (évaluation)** :
-{classe}/grilles/config # { actif, grilleId, periode }
+{classe}/grilles/config                  # { actif, grilleId, periode }
 {classe}/grilles/auto_evaluations/{pushId}
+Demi-fond (⚠️ TIRET, pas underscore) :
 
 text
-
-**Demi-fond (⚠️ TIRET, pas underscore)** :
-{classe}/demi-fond/config # ⚠️ tiret
+{classe}/demi-fond/config                # ⚠️ tiret
 {classe}/demi-fond/commandes/sequence
 {classe}/demi-fond/observations/course-{1,2,3}/{code}
+Natation :
 
 text
-
-**Natation** :
 {classe}/natation/config
 {classe}/natation/temps/{numero}
 {classe}/natation/coups/{numero}
@@ -237,122 +236,148 @@ text
 {classe}/natation/organisation/reference/{numero}
 {classe}/natation/organisation/equipes
 {classe}/natation/organisation/courses/{timestamp}
+Tournoi (2 variantes) :
 
 text
+{classe}/tournoi/config                  # { mode: "elimination" | "atp" }
+{classe}/tournoi/elimination/joueurs/{code}
+{classe}/tournoi/elimination/historique
+{classe}/tournoi/atp/joueurs/{code}
+{classe}/tournoi/atp/matchs/{pushId}
+{classe}/tournoi/atp/archives/{pushId}
+{classe}/tournoi/atp/config              # Barème éditable
+⚠️ Compatibilité rétroactive : les anciennes données elimination stockées à la racine (tournoi/joueurs) ne sont pas migrées automatiquement. Migration manuelle possible.
 
-**Tournoi** :
-{classe}/tournoi/config
-{classe}/tournoi/joueurs/{codeAutoEval}
-{classe}/tournoi/historique/{pushId}
-{classe}/tournoi/exclus/{codeAutoEval}
+PPG :
 
 text
+{classe}/ppg/config                      # { ateliers: [...] } (bibliothèque)
+{classe}/ppg/seance/{date}               # { ateliers: [...], timestamp }
+{classe}/ppg/observations/{date}/{code}
+    → {
+        _meta: { code, timestamp, source },
+        corde:  { p1, p2, best, niveau: null },
+        pompes: { p1, p2, best, niveau: 1-4 }
+      }
+⚠️ Format Firebase à plat (post-refacto) : perfs à la racine, pas de wrapper .perfs. Le lecteur agregerSeance tolère les 2 formats (rétrocompat).
 
-### 3.5. Règle RGPD stricte
+3.5. Règle RGPD stricte
+Uniquement des codes et des nombres transitent sur Firebase.
 
-**Uniquement des codes et des nombres transitent sur Firebase.**
+Aucun nom, prénom, ID pseudonymisé (ex. BASTID_A) ne doit y figurer. Les clés des observations sont les codeAutoEval (1, 2, 3...) ou des codes de position (0_a, 1_b).
 
-Aucun nom, prénom, ID pseudonymisé (ex. `BASTID_A`) ne doit y figurer. Les clés des observations sont les `codeAutoEval` (1, 2, 3...) ou des codes de position (`0_a`, `1_b`).
+4. Mapping Local (RGPD)
+Les noms et photos sont liés aux codes uniquement via le localStorage du navigateur du Professeur.
 
----
+Format : objet plat, ex. {"504_A1": "BASTID_A", "504_BLEU_1": "id-eleve"}.
 
-## 4. Mapping Local (RGPD)
+Fichier clé : src/js/core/live-engine.js (getEleveIdFromCode, getNomFromCode, getPhotoHtml, getLocalMapping, setLocalMapping).
 
-Les noms et photos sont liés aux codes uniquement via le **localStorage du navigateur du Professeur**.
+Clé de stockage : eps_arena_local_mapping_{classe}.
 
-**Format** : objet plat, ex. `{"504_A1": "BASTID_A", "504_BLEU_1": "id-eleve"}`.
+4.1. Codes élèves stables (codeAutoEval)
+Chaque élève possède un codeAutoEval unique et permanent (1, 2, 3...) stocké dans eps_arena_eleves_{classe} sous .codeAutoEval.
 
-**Fichier clé** : `src/js/core/live-engine.js` (`getEleveIdFromCode`, `getNomFromCode`, `getPhotoHtml`, `getLocalMapping`, `setLocalMapping`).
+Jamais réutilisé, même si l'élève change de groupe ou est absent
 
-**Clé de stockage** : `eps_arena_local_mapping_{classe}`.
+Attribué automatiquement à l'import (ZIP ou CSV) selon l'ordre alphabétique
 
-### 4.1. Codes élèves stables (codeAutoEval)
+Utilisé pour : auto-évaluations des grilles, tournoi élimination, tournoi ATP, module 1/2 Fond, module PPG, module Cross (à venir)
 
-Chaque élève possède un **`codeAutoEval`** unique et permanent (1, 2, 3...) stocké dans `eps_arena_eleves_{classe}` sous `.codeAutoEval`.
+Communiqué à l'élève par le prof (liste imprimable dans Administration → 🔢 Codes élèves)
 
-- **Jamais réutilisé**, même si l'élève change de groupe ou est absent
-- **Attribué automatiquement** à l'import (ZIP ou CSV) selon l'ordre alphabétique
-- **Utilisé pour** : auto-évaluations des grilles, tournoi élimination, module 1/2 Fond
-- **Communiqué à l'élève** par le prof (liste imprimable dans Administration → 🔢 Codes élèves)
+Fonctions clés dans admin-service.js :
 
-**Fonctions clés** dans `admin-service.js` :
-- `migrerCodesAutoEval(classe)` : attribue les codes manquants
-- `getCodeAutoEval(classe, eleveId)` : récupère le code d'un élève
-- `getEleveFromCodeAutoEval(classe, code)` : récupère l'élève d'un code
+migrerCodesAutoEval(classe) : attribue les codes manquants
 
-⚠️ **Ne pas confondre** avec les codes de groupe (`G1a`, `A1`, `BLEU_1`) qui servent pour les activités collectives.
+getCodeAutoEval(classe, eleveId) : récupère le code d'un élève
 
----
+getEleveFromCodeAutoEval(classe, code) : récupère l'élève d'un code
 
-## 5. Conventions de code
+⚠️ Ne pas confondre avec les codes de groupe (G1a, A1, BLEU_1) qui servent pour les activités collectives.
 
-### 5.1. Structure des modules
+5. Conventions de code
+5.1. Structure des modules
+Modulaire ES6 : import / export
 
-- **Modulaire ES6** : `import` / `export`
-- **Fonctions globales** : les fonctions appelées par les boutons HTML (`onclick`) sont exposées sur `window`
-- **Imports dynamiques** : les modules Live et TV sont chargés via `import('...')` pour éviter de faire planter l'app en cas d'erreur
+Fonctions globales : les fonctions appelées par les boutons HTML (onclick) sont exposées sur window
 
-### 5.2. Règles de masquage des vues
+Imports dynamiques : les modules Live et TV sont chargés via import('...') pour éviter de faire planter l'app en cas d'erreur
 
-**NE JAMAIS utiliser `el.style.display = 'none'`** pour cacher les vues standard (écrase la classe `hidden` de Tailwind). Utiliser `classList.add('hidden')`.
+5.2. Règles de masquage des vues
+NE JAMAIS utiliser el.style.display = 'none' pour cacher les vues standard (écrase la classe hidden de Tailwind). Utiliser classList.add('hidden').
 
-⚠️ Exception : `viewTV` utilise encore `style.display` car c'est une zone spéciale 100vh.
+⚠️ Exception : viewTV utilise encore style.display car c'est une zone spéciale 100vh.
 
-### 5.3. Gestion des données
+Nouvelle règle : toujours déclarer les conteneurs de discipline dans maitre.html (pattern view{Activité}Settings avec class="hidden space-y-4"). Éviter la création dynamique qui peut générer des conflits avec Tailwind.
 
-**Comparaison de données Firebase** : toujours utiliser `String(...)` ou `parseInt(...)` (types peuvent différer).
+5.3. Gestion des données
+Comparaison de données Firebase : toujours utiliser String(...) ou parseInt(...) (types peuvent différer).
 
-### 5.4. Flux et transitions (RÈGLE D'OR)
+Format d'écriture : privilégier un format "à plat" avec _meta pour les métadonnées (voir PPG). Éviter les wrappers inutiles (perfs, data…) qui obligent chaque lecteur à déballer.
 
-- **Transitions automatiques** : ne jamais laisser l'utilisateur cliquer pour démarrer une phase automatique
-- **Démarrage auto** : après la première course, toutes les suivantes démarrent automatiquement (délai 100-300ms)
-- **Fin** : l'utilisateur clique sur « Arrivée » / « Terminer »
+5.4. Flux et transitions (RÈGLE D'OR)
+Transitions automatiques : ne jamais laisser l'utilisateur cliquer pour démarrer une phase automatique
 
-### 5.5. Boutons
+Démarrage auto : après la première course, toutes les suivantes démarrent automatiquement (délai 100-300ms)
 
-- **Présence constante** : le bouton principal doit être toujours présent
-- **Mise à jour dynamique** du texte et de l'état `disabled`
-- **`onclick` direct** dans le HTML (pas `addEventListener` sur des éléments recréés)
+Fin : l'utilisateur clique sur « Arrivée » / « Terminer »
 
-### 5.6. Interdits JavaScript
+5.5. Boutons
+Présence constante : le bouton principal doit être toujours présent
 
-- ❌ `await` dans un `forEach` → utiliser `for...of`
-- ❌ Doublons de déclaration de fonctions → vérifier avant copier-coller
-- ❌ `style.display = 'none'` sur vues Tailwind → `classList.add('hidden')`
-- ❌ Variables non déclarées dans une fonction → vérifier tous les paramètres
-- ⚠️ **Tiret vs underscore** : `demi_fond` (code) ≠ `demi-fond` (Firebase). Mapping obligatoire dans `grilles-interface.js`
+Mise à jour dynamique du texte et de l'état disabled
 
----
+onclick direct dans le HTML (pas addEventListener sur des éléments recréés)
 
-## 6. Modules existants
+5.6. Interdits JavaScript
+❌ await dans un forEach → utiliser for...of
 
-### Badminton — 2 modes de jeu séparés
+❌ Doublons de déclaration de fonctions → vérifier avant copier-coller
 
-Badminton possède **deux jeux pédagogiquement distincts**, sélectionnables dans l'interface prof via un **sélecteur de mode**.
+❌ style.display = 'none' sur vues Tailwind → classList.add('hidden')
 
-| Mode | Kiosque | Classement | Bonus manière | Type terrain |
-|---|---|---|---|---|
-| **Terrain** | Clic sur zones 3D | V/D (3/1/0 pts) | ❌ | ✅ (`frontback`/`leftright`/`4corners`) |
-| **Avec la manière** | Cases à cocher | 5/3/2/1 pts | ✅ (≥ 8 pts zone dangereuse) | ❌ |
+❌ Variables non déclarées dans une fonction → vérifier tous les paramètres
 
-**Fichiers clés** :
-- `badminton-registry.js` : registre `terrain` / `maniere`
-- `badminton-dispatcher.js` : charge le bon module selon `config.mode`
-- `badminton-terrain.js` : mode terrain (clic, chrono, V/D)
-- `badminton-maniere.js` : mode manière (cases à cocher, bonus)
-- `badminton-common.js` : rendu commun (terrains, round-robin, classement)
-- `badminton-ui-prof.js` : sélecteur de mode prof + masquage conditionnel
-- `badminton-live.js` : Live mode-aware (titre selon `config.mode`)
+⚠️ Tiret vs underscore : demi_fond (code) ≠ demi-fond (Firebase). Mapping obligatoire dans grilles-interface.js
 
-**Chrono en mode Terrain** : la durée (`config.dureeMatch`, en secondes) est paramétrable côté prof, visible côté élève, avec bip + pulsation dans les 10 dernières secondes. Le chrono n'arrête pas le match automatiquement — c'est le prof (ou l'élève) qui clique "Terminer".
+❌ Chemins Firebase avec .., #, $, [, ] : interdits. Construire les chemins absolus depuis la racine du profCode
 
-**Sélecteur de mode prof** : 2 gros boutons dans `viewBadmintonSettings`, gérés par `badminton-ui-prof.js`. Les blocs conditionnels `.badminton-terrain-only` et `.badminton-maniere-only` sont automatiquement masqués/affichés selon le mode.
+❌ Exports inexistants dans un index.js : vérifier avant d'écrire export { X } from './sub.js'
 
-**Config Firebase** :
-```js
+6. Modules existants
+Badminton — 2 modes de jeu séparés
+Badminton possède deux jeux pédagogiquement distincts, sélectionnables dans l'interface prof via un sélecteur de mode.
+
+Mode	Kiosque	Classement	Bonus manière	Type terrain
+Terrain	Clic sur zones 3D	V/D (3/1/0 pts)	❌	✅ (frontback/leftright/4corners)
+Avec la manière	Cases à cocher	5/3/2/1 pts	✅ (≥ 8 pts zone dangereuse)	❌
+Fichiers clés :
+
+badminton-registry.js : registre terrain / maniere
+
+badminton-dispatcher.js : charge le bon module selon config.mode
+
+badminton-terrain.js : mode terrain (clic, chrono, V/D)
+
+badminton-maniere.js : mode manière (cases à cocher, bonus)
+
+badminton-common.js : rendu commun (terrains, round-robin, classement)
+
+badminton-ui-prof.js : sélecteur de mode prof + masquage conditionnel
+
+badminton-live.js : Live mode-aware (titre selon config.mode)
+
+Chrono en mode Terrain : la durée (config.dureeMatch, en secondes) est paramétrable côté prof, visible côté élève, avec bip + pulsation dans les 10 dernières secondes. Le chrono n'arrête pas le match automatiquement — c'est le prof (ou l'élève) qui clique "Terminer".
+
+Sélecteur de mode prof : 2 gros boutons dans viewBadmintonSettings, gérés par badminton-ui-prof.js. Les blocs conditionnels .badminton-terrain-only et .badminton-maniere-only sont automatiquement masqués/affichés selon le mode.
+
+Config Firebase :
+
+js
 {
   activite: 'badminton',
-  mode: 'terrain' | 'maniere',        // le mode de jeu
+  mode: 'terrain' | 'maniere',                          // le mode de jeu
   terrainType: 'frontback' | 'leftright' | '4corners',  // si mode=terrain
   centerSize, centerPoints, otherPoints, cornerPoints, faultPoints, faultPenalty,
   dureeMatch,                          // si mode=terrain (secondes)
@@ -361,7 +386,6 @@ Badminton possède **deux jeux pédagogiquement distincts**, sélectionnables da
 }
 Escalade
 Classique : grille A, B, C... + hauteur + cotation + couleur
-
 Bloc Contest : nouveau mode, validations drag & drop
 
 Arcathlon
@@ -379,18 +403,138 @@ Voir section 9.
 1/2 Fond
 Voir section 10.
 
-Tournoi
-Variante élimination : chaque élève compte ses éliminations, TV affiche un classement visuel.
+Tournoi — 2 variantes
+Le module tournoi propose deux variantes pédagogiques sélectionnables côté prof via un sélecteur de variante (dans tournoi-prof.js, inséré dynamiquement dans viewTournoiSettings).
 
-Sync entre appareils
-Voir section 13.
+Variante	Logique	Kiosque	Classement
+Élimination	Comptage des éliminations	Élève clique "je suis éliminé"	Nb éliminations croissant
+ATP	Classement continu par points (badminton, ping)	Élève saisit un match (code V, code P, scores)	Points décroissants + tie-breaks
+Fichiers clés :
+
+tournoi-registry.js : registre elimination / atp
+
+tournoi-dispatcher.js : lit config.mode dans Firebase et charge la bonne variante
+
+tournoi-core.js : core partagé, prend un variant optionnel en paramètre
+
+tournoi-prof.js : sélecteur UI + délégation à la variante active
+
+variantes/elimination/ : module existant
+
+variantes/atp/ : nouveau module (voir ci-dessous)
+
+Sélecteur prof : 2 gros boutons dans viewTournoiSettings. Le changement écrit {classe}/tournoi/config/mode → le listener recharge la variante automatiquement.
+
+Chemins Firebase : tournoi/config à la racine (partagé), données dans tournoi/atp/* ou tournoi/elimination/* selon la variante active.
+
+Variante ATP — détails
+Logique du classement continu type ATP/tennis de table :
+
+Chaque joueur démarre à 100 points (paramétrable dans le barème)
+
+À chaque match V/D, on calcule l'écart de classement avant match (pts_v − pts_p)
+
+On applique un barème (éditable dans l'interface prof)
+
+Le vainqueur gagne des points, le perdant en perd (points négatifs autorisés)
+
+Le classement est recalculé entièrement à chaque modification de match (rejouer l'historique)
+
+Barème par défaut (6 paliers) :
+
+Écart (V − P)	Pts V	Pts P
+−50 à −11	1	−1
+−10 à −5	2	−2
+−4 à −1	3	−3
+0 à 4	4	−4
+5 à 10	5	−5
+11 à 50	6	−6
+Tie-breaks du classement (dans l'ordre) :
+
+Points décroissants
+
+Victoires décroissantes
+
+Différentiel points marqués/encaissés
+
+Ordre alphabétique (nom prénom)
+
+Saisie kiosk : code élève + code adversaire + score (2 nombres : mes points / ses points). Match sec (pas de sets).
+
+Anti-triche : cooldown 3 minutes par code (localStorage côté iPad).
+
+Archives : bouton "Archiver le classement du jour" → snapshot stocké dans tournoi/atp/archives/{pushId}.
+
+Modification prof : liste des matchs avec bouton ✏️ pour éditer (recalcule les points à partir des matchs restants) et 🗑️ pour supprimer (recalcul automatique du classement).
+
+PPG / Échauffement
+Module dédié au moment de préparation physique en début de cours (échauffement structuré). Objectif : garder trace des performances et permettre un suivi de progression.
+
+Structure temporelle : 3 ateliers simultanés, 2 passages par atelier, rotation à chaque bip, 45" travail / 15" repos. Durée totale : 5'45". Le timer reste externe (téléphone du prof, module commun/timer.js).
+
+Ateliers : bibliothèque figée + possibilité d'ajouter des ateliers personnalisés via bouton ➕.
+
+Atelier	Type	Unité	Points
+🪢 Corde à sauter	quantitatif	sauts	1 pt/saut
+💪 Pompes	niveaux (N1-N4)	reps	1×N pts/rep
+🧘 Gainage	quantitatif	secondes	1 pt/s
+🔥 Burpees	quantitatif	reps	1 pt/rep
+🦵 Squats	quantitatif	reps	1 pt/rep
+🦿 Fentes bulgares	quantitatif	reps	1 pt/rep
+Niveaux pompes : N1 (rambarde) = ×1, N2 (banc) = ×2, N3 (genoux) = ×3, N4 (pieds) = ×4. L'élève choisit librement son niveau à chaque séance — recommandation prof orale mais libre arbitre.
+
+Mesure : meilleur des 2 passages par atelier.
+
+Flux :
+
+Prof → onglet PPG → choisit 1 à 3 ateliers → "Enregistrer la séance"
+
+Prof → "📡 Transmettre aux iPads" (publie {activite: 'ppg'})
+
+Élèves → 3 iPads en kiosk, saisie après les 6 passages
+
+L'élève saisit son codeAutoEval, ses perfs, valide → écran de confirmation 3s
+
+Suivi :
+
+Live prof : classement du jour + navigation par date + liste des manquants
+
+TV : podium top 3 + liste 4-20e en temps réel
+
+Score global : affichage séparé par atelier, pas d'agrégat global (contrainte pédagogique)
+
+Progression : à terme, courbe par élève × atelier
+
+Fichiers clés :
+
+ppg-core.js : bibliothèque d'ateliers, calcul des points, tri classement
+
+ppg-interface.js : config séance prof (slots 1-3) + aperçu résultats
+
+ppg-kiosk.js : saisie élève + anti-triche 30s
+
+ppg-live.js : Live prof + navigation date
+
+ppg-tv.js : podium + barres
+
+ppg-export.js : Excel 2 feuilles (Séance du jour + Historique complet)
+
+Format Firebase à plat :
+
+js
+{
+  _meta: { code, timestamp, source },
+  corde:  { p1: 58, p2: 65, best: 65, niveau: null },
+  pompes: { p1: 5, p2: 6, best: 6, niveau: 3 }
+}
+Remplacement d'atelier d'une séance à l'autre : naturel, chaque séance a sa propre config ppg/seance/{date}.
 
 7. Fichiers critiques à NE PAS casser
 core/live-engine.js : écoute des données + mapping local
 
 core/firebase-service.js : chemins hiérarchiques
 
-ui/prof/activities.js : switch disciplines + switchActivitySubTab + transmettreConfig
+ui/prof/activities.js : switch disciplines + switchActivitySubTab + transmettreConfig + maps liveModules et tvModules
 
 ui/prof/layout.js : navigation entre onglets
 
@@ -409,6 +553,18 @@ modules/grilles/connecteurs/*.js : chaque connecteur lit un chemin Firebase spé
 services/export-service.js : conventions d'export centralisées
 
 services/sync-service.js : sync local ↔ fichier (Web Share sur iPad)
+
+modules/tournoi/tournoi-registry.js : ajout variantes
+
+modules/tournoi/tournoi-core.js : signature initTournoiCore(classe, variant) obligatoire pour ATP
+
+modules/tournoi/tournoi-prof.js : sélecteur de variante + délégation
+
+modules/tournoi/variantes/atp/atp-core.js : logique ATP (barème, recalcul, tri)
+
+modules/ppg/ppg-core.js : agregerSeance tolérant 2 formats
+
+modules/ppg/ppg-kiosk.js : écriture à plat (pas de wrapper)
 
 8. Leçons apprises (Arcathlon)
 Problème	Cause	Solution
@@ -562,12 +718,6 @@ json
   "plots": 8,
   "timestamp": 1789315752337
 }
-timestamps : temps écoulés (ms depuis le départ) à chaque clic observateur
-
-partiel : plots supplémentaires dans le dernier tour (0-8)
-
-abandon : null | "blessure" | "mental"
-
 10.6. Points d'attention
 Timer prof : utilise sequence.timestampDebut (fixe depuis le GO initial). Ne JAMAIS recalculer pendant la séquence.
 
@@ -592,7 +742,7 @@ Terrain → V/D simple, clic sur zones
 Manière → bonus 8 pts, cases à cocher
 
 11.2. Sélecteur de mode prof
-Le sélecteur est généré par initBadmintonModeSelector() de badminton-ui-prof.js. Il est appelé depuis activities.js dans la branche disc === 'badminton'.
+Le sélecteur est généré par initBadmintonModeSelector() de badminton-ui-prof.js. Appelé depuis activities.js dans la branche disc === 'badminton'.
 
 Les blocs conditionnels dans maitre.html doivent porter les classes :
 
@@ -607,12 +757,12 @@ Se met en alerte (jaune pulsé) à 10s restantes
 
 Se met en termine (rouge pulsé) à 0s
 
-Joue 3 bips à 0s (via Web Audio API)
+Joue 3 bips à 0s (Web Audio API)
 
 Ne force PAS la fin du match — c'est purement indicatif
 
 11.4. Cache fantôme
-badminton-common.js fait un reset complet du state à initBadmintonCommon() + pose un listener Firebase sur les results qui resynchronise matchSchedule en temps réel. Cela évite que les anciens scores persistent après une purge Firebase.
+badminton-common.js fait un reset complet du state à initBadmintonCommon() + pose un listener Firebase sur les results qui resynchronise matchSchedule en temps réel.
 
 11.5. Axe Avant/Arrière vs Gauche/Droite
 Dans generateCourtHTML() :
@@ -621,11 +771,9 @@ frontback → layout-row (côte à côte)
 
 leftright → layout-col (empilé)
 
-Si un jour tu veux re-inverser, échange 'frontback' et 'leftright' dans les 2 lignes marquées ⬇️.
-
 12. Sync entre appareils (iPad ↔ PC)
 12.1. Principe
-Un fichier JSON unique contient toutes les clés eps_arena_* du localStorage (sauf profCode). Il est exporté/importé manuellement via Nextcloud.
+Un fichier JSON unique contient toutes les clés eps_arena_* du localStorage (sauf profCode). Exporté/importé manuellement via Nextcloud.
 
 Pas de WebDAV automatique : Nextcloud EN bloque le CORS. Le serveur ne sert pas de HTML non plus.
 
@@ -637,7 +785,7 @@ PC (le soir) → le client Nextcloud synchronise → onglet 🔁 Sync → 📂 C
 12.3. Fichier clé
 src/js/services/sync-service.js :
 
-exporterToutesLesDonnees(appareil) : utilise Web Share API si disponible (iPad), sinon fallback download (PC)
+exporterToutesLesDonnees(appareil) : Web Share API sur iPad, download sur PC
 
 importerFichierSync(file) : restaure tout, avec confirmation
 
@@ -721,6 +869,7 @@ Grilles	iDoceo (CSV)	exporterNotesIDoceo
 Badminton	Excel (XLSX)	exporterBadmintonExcel
 Relais	Excel (XLSX)	exporterRelaisExcel
 Tournoi	Excel (XLSX)	exporterTournoiExcel
+PPG	Excel (XLSX)	exporterPPGExcel
 13.7. Ajouter un nouveau module d'export
 Créer src/js/modules/{module}/{module}-export.js
 
@@ -730,7 +879,7 @@ Construire lignes (avec nom + prenom + donnees) puis appeler exporterVersIDoceo 
 
 Exposer window.exporterXxxExcel = exporterXxxExcel
 
-Ajouter la ligne import '../../modules/{module}/{module}-export.js'; dans ui/prof/activities.js
+Ajouter import '../../modules/{module}/{module}-export.js'; dans ui/prof/activities.js
 
 Ajouter un bouton dans l'UI prof du module
 
@@ -744,7 +893,7 @@ Page blanche	style.display = 'none' sur vues principales	Utiliser classList.add(
 </div> en trop	Structure HTML cassée	Vérifier
 matcherCritere has already been declared	Doublon	Écraser le fichier entier
 "Config X non transmise"	Chemin Firebase erroné	escalade = racine, relais/arcathlon/demi-fond = sous-dossier
-Kiosque élève "En attente"	Activité absente de config.activite reconnues dans eleve-app.js	Vérifier la liste
+Kiosque élève "En attente"	Activité absente de config.activite reconnues	Vérifier la liste dans eleve-app.js
 await dans forEach	Interdit	for...of
 ReferenceError: code is not defined	Paramètre manquant	Vérifier signature de analyser()
 Tiret vs underscore	demi_fond (code) ≠ demi-fond (Firebase)	Mapping dans grilles-interface.js
@@ -754,11 +903,20 @@ Vue Live/TV s'affiche sous le paramétrage	switchActivitySubTab ne cache pas	Cac
 Bouton 🤖 Auto grisé	Activité sans connecteur	Vérifier ACTIVITES_AVEC_CONNECTEUR
 Firebase écrit trop de noms	Données nominatives envoyées	Vérifier RGPD absolu
 Identifier 'X' has already been declared	Doublon de fonction	Ctrl+F pour trouver les 2, supprimer
-X is not defined sur un bouton	Module non importé	Vérifier import '.../X-export.js' dans activities.js
+X is not defined sur un bouton	Module non importé	Vérifier import dans activities.js
 Cannot access 'X' before initialization	let déclaré après utilisation	Déplacer en haut du fichier (fix TDZ)
 Fichier non téléchargé sur iPad	PWA bloque a.click()	Utiliser Web Share API
 CORS bloqué Nextcloud	nuage.app bloque Access-Control-Allow-Origin	Solution fichier manuel uniquement
 Badminton reste sur "manière"	Live pas mode-aware	badminton-live.js doit lire config.mode
+does not provide an export named 'cleanup'	index.js importe un export qui n'existe pas	Vérifier que l'index n'importe que ce qui est réellement exporté. Cas type : atp/index.js importait cleanup depuis atp-kiosk.js qui n'en expose pas
+Variable ref not defined dans un module kiosk	Import ref retiré par erreur lors d'un "nettoyage"	Vérifier que import { db, ref, onValue, push } from '...firebase-service.js' est bien complet
+Chemin Firebase atp/../config interdit	.. et # sont interdits dans les chemins Firebase	Construire les chemins absolus depuis la racine du profCode, jamais avec ..
+Live affiche « Chargement... » figé	Inversion entre liveModules et tvModules dans activities.js	Vérifier que 'ppg': () => import('.../ppg-live.js').then(m => m.renderPPGLive()) est dans liveModules, pas ppg-tv.js
+Live et TV visibles en même temps	Reset incomplet des style.display	Forcer viewTV.style.display = 'none' dans le bloc subTab === 'live' et inversement
+Score PPG à 0 malgré saisie kiosk	Lecture du mauvais format (wrapper perfs vs à plat)	Utiliser agregerSeance qui est tolérant, ou lire obs[atelierId] avec fallback obs.perfs[atelierId]
+Conflit viewPPGSettings caché	Conteneur non déclaré dans maitre.html → création dynamique avec classe hidden	Déclarer tous les conteneurs de discipline dans maitre.html
+Choix forcé de 3 ateliers PPG	Validation trop stricte dans ppgValiderSeance	Autoriser 1 à 3 ateliers (filtrer les slots vides)
+Module ATP ne s'affiche pas	Format init as default dans variantes/atp/index.js	Le dispatcher cherche module.default?.init || module.init — vérifier l'export
 15. Glossaire
 Arcathlon
 Série : Course → Tir → Pénalités
@@ -827,6 +985,37 @@ Bonus manière : ≥ 8 pts en zone dangereuse
 
 Chrono match : indicateur visuel, purement informatif
 
+Tournoi — variante ATP
+Classement continu : chaque joueur a un nombre de points persistant d'un cycle à l'autre
+
+Barème : table de correspondance écart → pts V / pts P, éditable en config
+
+Écart de classement : points_vainqueur − points_perdant, évalué avant le match
+
+Recalcul complet : à chaque modif de l'historique, on rejoue tous les matchs dans l'ordre chronologique
+
+Archive : snapshot manuel du classement à un instant T
+
+Tie-breaks : points > victoires > diff points > alphabétique
+
+PPG / Échauffement
+Séance : configuration du jour, liste d'1 à 3 ateliers
+
+Passage : 45" de travail sur un atelier. Il y a 6 passages par séance (3 ateliers × 2 tours)
+
+Meilleur (best) : max(p1, p2) sur les 2 passages d'un même atelier
+
+Niveau : pour les ateliers à niveaux (pompes), multiplicateur de points (N1=×1 → N4=×4)
+
+Bibliothèque : liste figée d'ateliers standards + possibilité d'en ajouter
+
+Format à plat : perfs écrites à la racine de l'observation (pas de wrapper)
+
+Score séparé par atelier : pas d'agrégat global, choix pédagogique
+
+Cross établissement (à venir)
+Événement annuel, 4 courses séparées (F/G × 6-5 / 4-3), 2 composantes de note (contrat temps + classement), saisie des arrivées par douchette code-barres, iPads podiums/classements en direct.
+
 Sync
 Fichier sync : JSON contenant toutes les clés eps_arena_*
 
@@ -840,7 +1029,6 @@ Environnement	Origine	profCode	Usage
 Production iPad	https://osartori.github.io/...	Vrai code prof	Prise de mesures en classe
 Test PC	http://127.0.0.1:5500 (VS Code)	TEST	Développement
 ⚠️ Le localStorage est lié à l'origine : c'est deux bases totalement séparées.
-
 ⚠️ Firebase est partagé : si tu utilises le même profCode sur les deux environnements, une purge sur PC efface tout côté iPad.
 
 Solution : mettre TEST comme code prof sur VS Code, tu as un Firebase parallèle isolé.
@@ -859,38 +1047,47 @@ Local : onglet 🔁 Sync → exporter avant, réimporter si besoin
 
 Firebase : pas de rollback automatique. Utiliser la purge sélective dans Administration.
 
-17. Récapitulatif des mises à jour
+17. Roadmap / Chantiers en cours
+En production
+✅ Toutes les activités historiques (Arcathlon, Badminton 2 modes, CO/OrientShow, Escalade, Grilles, Multi, Natation, Relais, 1/2 Fond, Tournoi élimination)
+
+✅ Tournoi ATP (batch complet : core, prof, kiosk, live, tv)
+
+✅ PPG / Échauffement (batch complet : core, prof, kiosk, live, tv, export Excel)
+
+Chantiers ouverts (non planifiés)
+Tournoi ATP — export Excel (Matchs + Classement) à ajouter
+
+Tournoi ATP — import CSV initial de classement (basé sur le fichier atptournoi_pc.xls)
+
+PPG — courbe de progression par élève × atelier (inspirée de Tracker Sportif Pro)
+
+PPG — édition/suppression d'observations côté prof
+
+PPG — bouton Export Excel dans l'interface prof (actuellement seulement window.exporterPPGExcel())
+
+Cross établissement — module complet à concevoir (prochaine grande feature)
+
+Décisions techniques actées
+Séparation des données tournoi par variante : tournoi/atp/* et tournoi/elimination/* (pas de mélange à la racine)
+
+Format Firebase PPG à plat (pas de wrapper perfs) avec rétrocompat sur lecture
+
+Sélecteur de variante tournoi dans tournoi-prof.js, rien dans maitre.html
+
+Timer PPG externe (téléphone du prof), pas de timer intégré
+
+Conteneurs de discipline déclarés dans maitre.html (pattern systématique view{Activité}Settings)
+
+18. Récapitulatif des mises à jour
 Section	Modif
-2. Architecture	Ajout badminton-export.js, relais-export.js, tournoi-export.js, sync-service.js
-3.4 Firebase	Ajout chemins natation, tournoi, badminton (2 modes)
-6. Modules	Section Badminton détaillée (2 modes séparés)
-11. Badminton	NOUVELLE SECTION : séparation modes, chrono, cache fantôme, axe
-12. Sync	NOUVELLE SECTION : workflow iPad ↔ PC via Nextcloud
-13. Export	NOUVELLE SECTION : conventions iDoceo + Excel
-14. Débogage	8 nouvelles astuces (TDZ, boutons non définis, CORS, PWA…)
-16. Workflow	NOUVELLE SECTION : environnements prod/test
-Dernière mise à jour : refonte Badminton (2 modes séparés), conventions d'export centralisées, sync Nextcloud fichier, nouvelles astuces de débogage.
-
-text
-
----
-
-## 🎯 Ce qui a changé par rapport à ton guide actuel
-
-**Sections ajoutées** :
-- **11. Badminton** (nouvelle section complète)
-- **12. Sync** (nouvelle section complète)
-- **13. Export** (nouvelle section complète)
-- **16. Workflow** (nouvelle section complète)
-
-**Sections mises à jour** :
-- **2. Architecture** : ajout des 4 nouveaux fichiers
-- **3.4 Firebase** : ajout natation, tournoi, badminton
-- **6. Modules** : Badminton détaillé
-- **7. Fichiers critiques** : ajout `export-service.js` et `sync-service.js`
-- **14. Débogage** : 8 nouvelles lignes (TDZ, import manquant, CORS, PWA…)
-
-**Sections inchangées** :
-- 1, 4, 5, 8, 9, 10, 15 (structurellement identiques, juste quelques ajustements)
-
----
+2. Architecture	Ajout modules/ppg/* et modules/tournoi/variantes/atp/*, tournoi-prof.js
+3.4 Firebase	Ajout chemins tournoi/atp/*, refonte tournoi/*, ajout ppg/*
+5. Conventions	Ajout règles format à plat + chemins Firebase interdits + exports index
+6. Modules	Ajout détaillé Tournoi (2 variantes) + PPG
+7. Fichiers critiques	Ajout tournoi-registry, tournoi-core (variant), tournoi-prof, atp-core, ppg-core, ppg-kiosk, activities.js
+14. Débogage	11 nouvelles lignes (import cassé, ref manquant, chemin interdit, inversion Live/TV, format de données PPG, etc.)
+15. Glossaire	Ajout ATP + PPG + Cross (placeholder)
+17. Roadmap	NOUVELLE SECTION : ce qui est fait, chantiers ouverts, décisions techniques
+18. Récap	NOUVELLE SECTION
+Dernière mise à jour : refonte Tournoi (variante ATP ajoutée), nouveau module PPG / Échauffement complet, préparation du chantier Cross établissement.
