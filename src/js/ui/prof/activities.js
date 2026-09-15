@@ -1,25 +1,46 @@
 // src/js/ui/prof/activities.js
+// ─── Modules CO ─────────────────────────────────────────────
 import { populateReserveWithStudents, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
-import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
+
+// ─── Modules Escalade ───────────────────────────────────────
+import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
+import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
+
+// ─── Modules Badminton ──────────────────────────────────────
+import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig, transmettreBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
+
+// ─── Modules Arcathlon ──────────────────────────────────────
+import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
+
+// ─── Modules Évaluation ─────────────────────────────────────
+import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
+
+// ─── Modules Tournoi ────────────────────────────────────────
+import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
+
+// ─── Modules Natation ───────────────────────────────────────
+import { initNatationInterface, transmettreNatationConfig } from '../../modules/natation/index.js';
+
+// ─── Modules Demi-fond ──────────────────────────────────────
+import '../../modules/demi-fond/index.js';
+
+// ─── Services / Core ────────────────────────────────────────
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove, onValue } from '../../core/firebase-service.js';
-import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig, transmettreBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
-import { initArcathlonInterface, generateArcathlonTeams, transmettreArcathlonConfig } from '../../modules/arcathlon/arcathlon-interface.js';
-import { initEvaluationInterface } from '../../modules/evaluation/evaluation-interface.js';
-import { loadTournoiVariant } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { getModule, getAllModules } from '../../modules/registry.js';
-import { initNatationInterface, transmettreNatationConfig } from '../../modules/natation/index.js';
-import '../../modules/demi-fond/index.js';
 
-// Imports nécessaires pour l’enregistrement des modules
-import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
+// ─── Modules "prof" (enregistrement + side effects) ─────────
 import '../../modules/escalade/escalade-prof.js';
 import '../../modules/multi/multi-prof.js';
 import '../../modules/co/co-prof.js';
 import '../../modules/relais/index.js';
+
+// ─── Exports Excel (exposent window.exporter*Excel) ────────
 import '../../modules/badminton/badminton-export.js';
+import '../../modules/relais/relais-export.js';
+import '../../modules/tournoi/tournoi-export.js';
 
 let currentDiscipline = 'multi';
 
