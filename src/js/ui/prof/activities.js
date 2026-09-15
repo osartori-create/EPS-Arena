@@ -25,6 +25,9 @@ import { initNatationInterface, transmettreNatationConfig } from '../../modules/
 // ─── Modules Demi-fond ──────────────────────────────────────
 import '../../modules/demi-fond/index.js';
 
+// ─── Modules PPG ────────────────────────────────────────────
+import '../../modules/ppg/index.js';
+
 // ─── Services / Core ────────────────────────────────────────
 import { generateTeams as generateClassicTeams } from '../../modules/teams/team-generator.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
@@ -90,7 +93,8 @@ export function initActivities() {
             'viewTournoiSettings',
             'viewNatationSettings',
             'viewRelaisSettings' ,
-            'viewDemiFondSettings'
+            'viewDemiFondSettings' ,
+            'viewPPGSettings'
         ];
 
         // --- Masquer TOUTES les vues de manière FORCÉE ---
@@ -125,7 +129,8 @@ export function initActivities() {
             'tournoi': 'viewTournoiSettings',
             'natation': 'viewNatationSettings',
             'relais': 'viewRelaisSettings' ,
-            'demi-fond': 'viewDemiFondSettings'
+            'demi-fond': 'viewDemiFondSettings' ,
+            'ppg': 'viewPPGSettings'
         };
 
         const targetId = viewMap[disc];
@@ -188,7 +193,7 @@ export function initActivities() {
             try { initArcathlonInterface(); } catch (e) {}
         } else if (disc === 'evaluation') {
             try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
-        } else if (disc === 'tournoi') {
+                } else if (disc === 'tournoi') {
     try {
         const container = document.getElementById('tournoi-prof-container');
         if (container) {
@@ -205,10 +210,26 @@ export function initActivities() {
     } catch (e) {
         console.error("Erreur init Tournoi :", e);
     }
+} else if (disc === 'ppg') {
+    try {
+        const container = document.getElementById('viewPPGSettings');
+        if (container) {
+            const classe = document.getElementById('selectClasse').value;
+            if (classe) {
+                import('../../modules/ppg/ppg-interface.js')
+                    .then(m => m.initPPGInterface())
+                    .catch(err => console.error('Erreur init PPG :', err));
+            } else {
+                container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+            }
+        }
+    } catch (e) {
+        console.error("Erreur init PPG :", e);
+    }
 }
 
         // Mise à jour des boutons de discipline
-        const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais', 'demi-fond'];
+        const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais', 'demi-fond', 'ppg'];
         btnIds.forEach(id => {
             const btn = document.getElementById(`btnDisc-${id}`);
             if (btn) {
@@ -335,10 +356,11 @@ export function initActivities() {
 
         // Cacher toutes les vues de paramètres
         const settingsViews = [
-            'viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
-            'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings',
-            'viewTournoiSettings', 'viewNatationSettings', 'viewRelaisSettings'
-        ];
+    'viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
+    'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings',
+    'viewTournoiSettings', 'viewNatationSettings', 'viewRelaisSettings',
+    'viewPPGSettings'
+];
         settingsViews.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.add('hidden');
@@ -353,17 +375,19 @@ export function initActivities() {
         if (subTab === 'settings') {
             // Afficher la vue de réglages de la discipline courante
             const map = {
-                'multi': 'viewMultiSettings',
-                'co': 'viewCOSettings',
-                'escalade': 'viewEscaladeSettings',
-                'badminton': 'viewBadmintonSettings',
-                'arcathlon': 'viewArcathlonSettings',
-                'evaluation': 'viewEvaluationSettings',
-                'tournoi': 'viewTournoiSettings',
-                'natation': 'viewNatationSettings',
-                'bloccontest': 'viewEscaladeSettings',
-                'relais': 'viewRelaisSettings'
-            };
+    'multi': 'viewMultiSettings',
+    'co': 'viewCOSettings',
+    'escalade': 'viewEscaladeSettings',
+    'badminton': 'viewBadmintonSettings',
+    'arcathlon': 'viewArcathlonSettings',
+    'evaluation': 'viewEvaluationSettings',
+    'tournoi': 'viewTournoiSettings',
+    'natation': 'viewNatationSettings',
+    'bloccontest': 'viewEscaladeSettings',
+    'relais': 'viewRelaisSettings',
+    'demi-fond': 'viewDemiFondSettings',
+    'ppg': 'viewPPGSettings'
+};
             const targetId = map[disc];
             if (targetId) {
                 const target = document.getElementById(targetId);
