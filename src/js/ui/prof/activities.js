@@ -189,36 +189,23 @@ export function initActivities() {
         } else if (disc === 'evaluation') {
             try { setTimeout(() => initEvaluationInterface(), 50); } catch (e) { console.error("Erreur init Évaluation :", e); }
         } else if (disc === 'tournoi') {
-            try {
-                const container = document.getElementById('tournoi-prof-container');
-                if (container) {
-                    const classe = document.getElementById('selectClasse').value;
-                    if (classe) {
-                        loadTournoiVariant(classe, 'elimination');
-                        import('../../modules/tournoi/variantes/elimination/elimination-prof.js')
-                            .then(module => {
-                                if (module.initProf) module.initProf(classe);
-                                else console.error('❌ initProf non trouvé');
-                            })
-                            .catch(err => console.error("Erreur chargement tournoi prof :", err));
-                    } else {
-                        container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
-                    }
-                }
-            } catch (e) {
-                console.error("Erreur init Tournoi :", e);
+    try {
+        const container = document.getElementById('tournoi-prof-container');
+        if (container) {
+            const classe = document.getElementById('selectClasse').value;
+            if (classe) {
+                // Point d'entrée unifié : sélecteur de variante + chargement auto
+                import('../../modules/tournoi/tournoi-prof.js')
+                    .then(m => m.initTournoiProf(classe))
+                    .catch(err => console.error("Erreur init Tournoi Prof :", err));
+            } else {
+                container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
             }
-        } else if (disc === 'natation') {
-            initNatationInterface();
-        } else if (disc === 'relais') {
-            import('../../modules/relais/relais-interface.js')
-                .then(m => m.initRelaisInterface())
-                .catch(err => console.error('Erreur init Relais :', err));
-        } else if (disc === 'demi-fond') {
-    import('../../modules/demi-fond/demifond-interface.js')
-        .then(m => m.initDemiFondInterface())
-        .catch(err => console.error('Erreur init DemiFond :', err));
         }
+    } catch (e) {
+        console.error("Erreur init Tournoi :", e);
+    }
+}
 
         // Mise à jour des boutons de discipline
         const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais', 'demi-fond'];
@@ -458,13 +445,30 @@ export function initActivities() {
                 'relais': () => import('../../modules/relais/relais-live.js').then(m => m.renderRelaisLive()),
                 'demi-fond': () => import('../../modules/demi-fond/demifond-live.js').then(m => m.renderDemiFondLive()),
                 'tournoi': () => {
-                    return import('../../modules/tournoi/variantes/elimination/elimination-live.js')
-                        .then(module => module.renderEliminationLive())
-                        .catch(err => {
-                            console.error('Erreur Live Tournoi :', err);
-                            container.innerHTML = '<p class="text-red-400">Erreur de chargement du Live.</p>';
-                        });
-                }
+    // Lit la variante active dans la config puis charge le bon module Live
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const classe = document.getElementById('selectClasse').value;
+    if (!classe) return Promise.resolve();
+
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/config`);
+    return new Promise(resolve => {
+        onValue(configRef, snap => {
+            const cfg = snap.val() || {};
+            const mode = cfg.mode || 'elimination';
+            const modulePath = mode === 'atp'
+                ? '../../modules/tournoi/variantes/atp/atp-live.js'
+                : '../../modules/tournoi/variantes/elimination/elimination-live.js';
+            const fnName = mode === 'atp' ? 'renderLive' : 'renderEliminationLive';
+            import(modulePath)
+                .then(m => m[fnName]())
+                .catch(err => {
+                    console.error('Erreur Live Tournoi :', err);
+                    container.innerHTML = '<p class="text-red-400">Erreur de chargement du Live.</p>';
+                })
+                .finally(resolve);
+        }, { onlyOnce: true });
+    });
+}
             };
             if (liveModules[disc]) {
                 const result = liveModules[disc]();
@@ -492,13 +496,29 @@ export function initActivities() {
                         'relais': () => import('../../modules/relais/relais-tv.js').then(m => m.renderRelaisTV()),
                         'demi-fond': () => import('../../modules/demi-fond/demifond-tv.js').then(m => m.renderDemiFondTV()),
                         'tournoi': () => {
-                            return import('../../modules/tournoi/variantes/elimination/elimination-tv.js')
-                                .then(module => module.renderEliminationTV())
-                                .catch(err => {
-                                    console.error('Erreur TV Tournoi :', err);
-                                    document.getElementById('tvGlobe').innerHTML = '<p class="text-red-400">Erreur de chargement de la TV.</p>';
-                                });
-                        }
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const classe = document.getElementById('selectClasse').value;
+    if (!classe) return Promise.resolve();
+
+    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/config`);
+    return new Promise(resolve => {
+        onValue(configRef, snap => {
+            const cfg = snap.val() || {};
+            const mode = cfg.mode || 'elimination';
+            const modulePath = mode === 'atp'
+                ? '../../modules/tournoi/variantes/atp/atp-tv.js'
+                : '../../modules/tournoi/variantes/elimination/elimination-tv.js';
+            const fnName = mode === 'atp' ? 'renderTV' : 'renderEliminationTV';
+            import(modulePath)
+                .then(m => m[fnName]())
+                .catch(err => {
+                    console.error('Erreur TV Tournoi :', err);
+                    document.getElementById('tvGlobe').innerHTML = '<p class="text-red-400">Erreur de chargement de la TV.</p>';
+                })
+                .finally(resolve);
+        }, { onlyOnce: true });
+    });
+}
                     };
                     if (tvModules[disc]) {
                         tvModules[disc]().catch(err => console.error(`Erreur TV ${disc} :`, err));
@@ -587,11 +607,16 @@ export function initActivities() {
                 await transmettreNatationConfig();
             },
             'tournoi': async () => {
-                const configData = { activite: 'tournoi', mode: window.tournoiMode || 'elimination' };
-                await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
-                await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
-                alert("✅ Module Tournoi activé pour les iPads !");
-            },
+    // Lecture de la variante active dans la config tournoi
+    const tournoiConfigRef = ref(db, `${baseProf}/${activeClasse}/tournoi/config`);
+    const snap = await new Promise(resolve => onValue(tournoiConfigRef, resolve, { onlyOnce: true }));
+    const mode = snap.val()?.mode || 'elimination';
+
+    const configData = { activite: 'tournoi', mode };
+    await set(ref(db, `${baseProf}/${activeClasse}/config`), configData);
+    await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+    alert(`✅ Module Tournoi (variante "${mode}") activé pour les iPads !`);
+},
             'demi-fond': async () => {
     const m = await import('../../modules/demi-fond/variantes/trois-cinq-min/trois-cinq-min-interface.js');
     // La transmission est gérée par le bouton dédié dans l'interface

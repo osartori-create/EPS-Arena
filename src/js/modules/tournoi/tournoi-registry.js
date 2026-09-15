@@ -4,9 +4,16 @@ export const TOURNOI_VARIANTS = {
         id: 'elimination',
         label: 'Élimination',
         icon: '🏆',
-        description: 'Comptage des éliminations',
+        description: 'Comptage des éliminations (kiosque élève)',
         module: () => import('./variantes/elimination/index.js'),
         default: true
+    },
+    'atp': {
+        id: 'atp',
+        label: 'ATP',
+        icon: '🎾',
+        description: 'Classement continu par points (badminton, ping-pong)',
+        module: () => import('./variantes/atp/index.js')
     }
 };
 

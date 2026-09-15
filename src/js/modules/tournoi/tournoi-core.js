@@ -2,57 +2,128 @@
 import { db, ref, onValue, set, update, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
+let currentVariant = null;          // null = racine (legacy élimination), 'atp' = sous-dossier
 let joueurs = {};
 let historique = [];
 let config = {};
 
-function getBasePath(classe) {
+let unsubJoueurs = null;
+let unsubHistorique = null;
+let unsubConfig = null;
+
+// ============================================================
+// CHEMINS
+// ============================================================
+function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi`;
+    return `etablissements/0680013V/profs/${profCode}`;
 }
 
-// ✅ Ces fonctions sont exportées et utilisées par les variantes
-export function getJoueursPath(classe) { return `${getBasePath(classe)}/joueurs`; }
-export function getHistoriquePath(classe) { return `${getBasePath(classe)}/historique`; }
-export function getConfigPath(classe) { return `${getBasePath(classe)}/config`; }
+/**
+ * Chemin racine du tournoi.
+ * @param {string} classe
+ * @param {string|null} variant - 'atp', 'elimination', ou null (racine)
+ */
+export function getBasePath(classe, variant = null) {
+    const root = `${getProfBasePath()}/${classe}/tournoi`;
+    return variant ? `${root}/${variant}` : root;
+}
 
-export function initTournoiCore(classe) {
+export function getJoueursPath(classe, variant = null) {
+    return `${getBasePath(classe, variant)}/joueurs`;
+}
+
+export function getHistoriquePath(classe, variant = null) {
+    return `${getBasePath(classe, variant)}/historique`;
+}
+
+export function getConfigPath(classe, variant = null) {
+    return `${getBasePath(classe, variant)}/config`;
+}
+
+// ============================================================
+// INITIALISATION
+// ============================================================
+/**
+ * @param {string} classe
+ * @param {string|null} variant - Nom de la variante ('atp', etc.). Null = racine.
+ */
+export function initTournoiCore(classe, variant = null) {
     currentClasse = classe;
+    currentVariant = variant;
     joueurs = {};
     historique = [];
     config = {};
 
-    onValue(ref(db, getJoueursPath(classe)), snap => {
+    if (unsubJoueurs) { unsubJoueurs(); unsubJoueurs = null; }
+    if (unsubHistorique) { unsubHistorique(); unsubHistorique = null; }
+    if (unsubConfig) { unsubConfig(); unsubConfig = null; }
+
+    unsubJoueurs = onValue(ref(db, getJoueursPath(classe, variant)), snap => {
         joueurs = snap.val() || {};
         window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
-    onValue(ref(db, getHistoriquePath(classe)), snap => {
+    unsubHistorique = onValue(ref(db, getHistoriquePath(classe, variant)), snap => {
         historique = snap.val() || [];
         window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
-    onValue(ref(db, getConfigPath(classe)), snap => {
+    unsubConfig = onValue(ref(db, getConfigPath(classe, variant)), snap => {
         config = snap.val() || {};
         window.dispatchEvent(new CustomEvent('tournoi-updated'));
     });
 }
 
+export function cleanupTournoiCore() {
+    if (unsubJoueurs) { unsubJoueurs(); unsubJoueurs = null; }
+    if (unsubHistorique) { unsubHistorique(); unsubHistorique = null; }
+    if (unsubConfig) { unsubConfig(); unsubConfig = null; }
+}
+
+// ============================================================
+// ACCESSEURS
+// ============================================================
 export function getJoueurs() { return joueurs; }
 export function getHistorique() { return historique; }
 export function getConfig() { return config; }
 export function getCurrentClasse() { return currentClasse; }
-export { currentClasse };
+export function getCurrentVariant() { return currentVariant; }
 
-export function setJoueurs(data) { set(ref(db, getJoueursPath(currentClasse)), data); }
-export function setHistorique(data) { set(ref(db, getHistoriquePath(currentClasse)), data); }
-export function setConfig(data) { set(ref(db, getConfigPath(currentClasse)), data); }
-export function updateJoueur(code, data) { update(ref(db, getJoueursPath(currentClasse)), { [code]: data }); }
-export function ajouterHistorique(entry) { push(ref(db, getHistoriquePath(currentClasse)), entry); }
+// ============================================================
+// MUTATEURS
+// ============================================================
+export function setJoueurs(data, variant = currentVariant) {
+    set(ref(db, getJoueursPath(currentClasse, variant)), data);
+}
 
+export function setHistorique(data, variant = currentVariant) {
+    set(ref(db, getHistoriquePath(currentClasse, variant)), data);
+}
+
+export function setConfig(data, variant = currentVariant) {
+    set(ref(db, getConfigPath(currentClasse, variant)), data);
+}
+
+export function updateJoueur(code, data, variant = currentVariant) {
+    update(ref(db, getJoueursPath(currentClasse, variant)), { [code]: data });
+}
+
+export function ajouterHistorique(entry, variant = currentVariant) {
+    push(ref(db, getHistoriquePath(currentClasse, variant)), entry);
+}
+
+export function supprimerHistorique(key, variant = currentVariant) {
+    set(ref(db, `${getHistoriquePath(currentClasse, variant)}/${key}`), null);
+}
+
+// ============================================================
+// EXPORT / IMPORT JSON
+// ============================================================
 export function exportTournoiData() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     const data = {
-        version: 1,
+        version: 2,
         classe: currentClasse,
+        variant: currentVariant,
         date: new Date().toISOString().slice(0,10).replace(/-/g,''),
         joueurs,
         historique,
@@ -61,7 +132,7 @@ export function exportTournoiData() {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `tournoi_${currentClasse}_${data.date}.json`;
+    a.download = `tournoi_${currentVariant || 'root'}_${currentClasse}_${data.date}.json`;
     a.click();
 }
 
@@ -72,7 +143,7 @@ export function importTournoiData(file) {
             const data = JSON.parse(e.target.result);
             if (!data.classe) throw new Error('Format invalide.');
             setJoueurs(data.joueurs || {});
-            setHistorique(data.historique || []);
+            setHistorique(data.historique || {});
             setConfig(data.config || {});
             alert('✅ Tournoi importé avec succès !');
         } catch (err) {
