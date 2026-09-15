@@ -1,6 +1,6 @@
 // src/js/modules/tournoi/variantes/atp/atp-kiosk.js
 // Kiosk élève : saisie d'un match ATP (code V, code P, scores)
-import { onValue } from '../../../../core/firebase-service.js';
+import { db, ref, push, onValue } from '../../../../core/firebase-service.js';
 import { getCurrentClasse } from '../../tournoi-core.js';
 
 let currentClasse = '';
@@ -123,7 +123,7 @@ window.atpKValider = async function() {
     const scoreV = Math.max(scoreEleve, scoreAdversaire);
     const scoreP = Math.min(scoreEleve, scoreAdversaire);
 
-    // Anti-triche : cooldown local par code (source ET cible)
+    // Anti-triche : cooldown local
     const cooldowns = JSON.parse(localStorage.getItem(COOLDOWN_KEY) || '{}');
     const now = Date.now();
     for (const c of [String(eleveCode), String(eleveAdversaire)]) {
@@ -134,11 +134,10 @@ window.atpKValider = async function() {
         }
     }
 
-    // Calcul ecart/points : on lit le classement courant puis on calcule
+    // ✅ Lecture Firebase — c'est ICI que ref/db/onValue sont utilisés
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const baseATP = `etablissements/0680013V/profs/${profCode}/${currentClasse}/tournoi/atp`;
 
-    // On a besoin du classement actuel → on relit les matchs
     const { recalculerTout, calculerMatch, BAREME_DEFAUT, POINTS_INITIAUX } = await import('./atp-core.js');
 
     const matchsSnap = await new Promise(resolve => {
