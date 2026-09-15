@@ -25,12 +25,8 @@ let arriveesActuelles = {};
 export function initCrossCourse(container) {
     if (!container) return;
 
-    // Charge le mapping dossard → élève
     chargerMappingEleves();
-
-    // Détermine la course active (localStorage ou course1)
     currentCourseId = localStorage.getItem(KEYS.COURSE_ACTIVE) || 'course1';
-
     render(container);
 }
 
@@ -40,9 +36,7 @@ function chargerMappingEleves() {
     const classes = getClassesParticipantes();
     const dossards = JSON.parse(localStorage.getItem(KEYS.DOSSARDS) || '{}');
 
-    // Pour chaque dossard → récupère l'élève
     Object.entries(dossards).forEach(([dossard, eleveId]) => {
-        // Trouve la classe de cet élève
         for (const classe of classes) {
             const eleves = getExistingEleves(classe);
             const e = eleves.find(x => x.id === eleveId);
@@ -60,6 +54,16 @@ function chargerMappingEleves() {
             }
         }
     });
+}
+
+// ============================================================
+// VÉRIFICATION D'APPARTENANCE À LA COURSE
+// ============================================================
+function estDansLaCourse(eleve, course) {
+    if (!eleve || !course) return false;
+    if (eleve.sexe !== course.sexe) return false;
+    const niveau = getNiveauFromClasse(eleve.classe);
+    return course.niveaux.includes(niveau);
 }
 
 // ============================================================
@@ -112,9 +116,9 @@ function render(container) {
 
             <!-- Liste des arrivées en direct -->
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <div class="flex justify-between items-center mb-3">
+                <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
                     <h3 class="font-black text-blue-400 uppercase text-sm">📋 Arrivées en direct</h3>
-                    <div class="flex gap-2">
+                    <div class="flex items-center gap-2">
                         <span id="cross-course-count" class="text-xs text-slate-400 font-bold">0 arrivant</span>
                         <button onclick="window.crossCourseExportCSV()" class="bg-indigo-600 px-3 py-1 rounded-lg text-xs font-black text-white">📥 CSV</button>
                     </div>
@@ -211,19 +215,34 @@ function afficherArrivees() {
         .map(([id, a]) => ({ id, ...a }))
         .sort((a, b) => a.timestamp - b.timestamp);
 
-    if (countEl) countEl.textContent = `${arriveesTriees.length} arrivant${arriveesTriees.length > 1 ? 's' : ''}`;
+    // Comptage par niveau
+    const nbParNiveau = {};
+    const course = COURSES_DEFAUT.find(c => c.id === currentCourseId);
+    course?.niveaux.forEach(n => nbParNiveau[n] = 0);
+
+    if (countEl) {
+        arriveesTriees.forEach(arr => {
+            const eleve = tousLesEleves[String(arr.dossard)];
+            if (!eleve) return;
+            const niveau = getNiveauFromClasse(eleve.classe);
+            if (niveau && nbParNiveau[niveau] !== undefined) nbParNiveau[niveau]++;
+        });
+        const details = Object.entries(nbParNiveau)
+            .map(([n, c]) => `${n}e : ${c}`)
+            .join(' · ');
+        countEl.textContent = `${arriveesTriees.length} arrivant${arriveesTriees.length > 1 ? 's' : ''} — ${details}`;
+    }
 
     if (arriveesTriees.length === 0) {
         container.innerHTML = '<p class="text-slate-500 text-center py-6">Aucune arrivée pour l\'instant.</p>';
         return;
     }
 
-    // Détermine les rangs par niveau
-    const parNiveau = {};
-    const course = COURSES_DEFAUT.find(c => c.id === currentCourseId);
-    course?.niveaux.forEach(n => parNiveau[n] = 0);
+    // Reconstruction du rang par niveau (dans l'ordre du tri)
+    const compteurNiveau = {};
+    course?.niveaux.forEach(n => compteurNiveau[n] = 0);
 
-    container.innerHTML = arriveesTriees.map((arr, idx) => {
+    container.innerHTML = arriveesTriees.map((arr) => {
         const eleve = tousLesEleves[String(arr.dossard)];
         if (!eleve) {
             return `
@@ -235,8 +254,8 @@ function afficherArrivees() {
         }
 
         const niveau = getNiveauFromClasse(eleve.classe);
-        if (niveau && parNiveau[niveau] !== undefined) parNiveau[niveau]++;
-        const rangNiveau = parNiveau[niveau] || 0;
+        if (niveau && compteurNiveau[niveau] !== undefined) compteurNiveau[niveau]++;
+        const rangNiveau = compteurNiveau[niveau] || 0;
 
         return `
             <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 flex items-center gap-3">
@@ -244,7 +263,7 @@ function afficherArrivees() {
                 <span class="text-xs font-black text-slate-500 bg-slate-800 px-2 py-1 rounded">#${arr.dossard}</span>
                 <div class="flex-1">
                     <div class="font-bold text-white">${eleve.prenom} ${eleve.nom}</div>
-                    <div class="text-xs text-slate-400">${eleve.classe} · ${eleve.sexe}</div>
+                    <div class="text-xs text-slate-400">${eleve.classe} · ${eleve.sexe} · ${niveau}e</div>
                 </div>
                 <button onclick="window.crossCourseSupprimer('${arr.id}')" class="bg-red-900/50 hover:bg-red-800 px-2 py-1 rounded text-xs font-black text-red-300">🗑️</button>
             </div>
@@ -258,48 +277,52 @@ function afficherArrivees() {
 function demarrerEcouteScan() {
     startScanListener((brut) => {
         const candidats = normaliserScan(brut);
-        // On prend le premier candidat qui matche un élève connu
         for (const dossard of candidats) {
             if (tousLesEleves[dossard]) {
                 enregistrerArrivee(dossard);
                 return;
             }
         }
-        // Aucun match : on affiche une alerte visuelle
-        afficherErreurScan(brut);
+        afficherToast(`⚠️ Dossard "${brut}" inconnu`, 'red');
     });
-}
-
-function afficherErreurScan(brut) {
-    const container = document.getElementById('cross-course-controls');
-    if (!container) return;
-    const ancien = document.getElementById('cross-scan-error');
-    if (ancien) ancien.remove();
-    const div = document.createElement('div');
-    div.id = 'cross-scan-error';
-    div.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-2xl font-black shadow-2xl z-50';
-    div.textContent = `⚠️ Dossard "${brut}" inconnu`;
-    document.body.appendChild(div);
-    setTimeout(() => div.remove(), 2000);
 }
 
 // ============================================================
 // ENREGISTREMENT D'UNE ARRIVÉE
 // ============================================================
 async function enregistrerArrivee(dossard) {
-    // Anti-doublon : déjà scanné ?
+    const course = COURSES_DEFAUT.find(c => c.id === currentCourseId);
+    const eleve = tousLesEleves[String(dossard)];
+
+    // 1. Dossard inconnu
+    if (!eleve) {
+        afficherToast(`⚠️ Dossard ${dossard} inconnu`, 'red');
+        return;
+    }
+
+    // 2. Élève absent / inapte
+    if (eleve.statut !== 'present') {
+        afficherToast(`⚠️ ${eleve.prenom} est ${eleve.statut}`, 'amber');
+        return;
+    }
+
+    // 3. Vérification course (sexe + niveau)
+    if (!estDansLaCourse(eleve, course)) {
+        const raison = eleve.sexe !== course.sexe
+            ? `c'est un dossard ${eleve.sexe === 'F' ? 'fille' : 'garçon'}`
+            : `la classe ${eleve.classe} n'est pas dans cette course`;
+        afficherToast(`❌ ${eleve.prenom} ${eleve.nom} : ${raison}`, 'red');
+        return;
+    }
+
+    // 4. Anti-doublon
     const deja = Object.values(arriveesActuelles).find(a => String(a.dossard) === String(dossard));
     if (deja) {
         afficherToast(`⚠️ Dossard ${dossard} déjà enregistré`, 'amber');
         return;
     }
 
-    const eleve = tousLesEleves[String(dossard)];
-    if (eleve.statut !== 'present') {
-        afficherToast(`⚠️ ${eleve.prenom} est ${eleve.statut}`, 'amber');
-        return;
-    }
-
+    // 5. Enregistrement
     const basePath = getCrossBasePath();
     const arriveesRef = ref(db, `${basePath}/courses/${currentCourseId}/arrivees`);
     await push(arriveesRef, {
@@ -313,11 +336,16 @@ async function enregistrerArrivee(dossard) {
 }
 
 function afficherToast(msg, couleur = 'emerald') {
+    const bgMap = {
+        emerald: 'bg-emerald-600',
+        amber: 'bg-amber-600',
+        red: 'bg-red-600'
+    };
     const div = document.createElement('div');
-    div.className = `fixed top-4 right-4 bg-${couleur}-600 text-white px-6 py-3 rounded-2xl font-black shadow-2xl z-50`;
+    div.className = `fixed top-4 right-4 ${bgMap[couleur] || bgMap.emerald} text-white px-6 py-3 rounded-2xl font-black shadow-2xl z-50 max-w-md`;
     div.textContent = msg;
     document.body.appendChild(div);
-    setTimeout(() => div.remove(), 1500);
+    setTimeout(() => div.remove(), 2500);
 }
 
 // ============================================================
@@ -326,7 +354,7 @@ function afficherToast(msg, couleur = 'emerald') {
 window.crossCourseSelect = (courseId) => {
     currentCourseId = courseId;
     localStorage.setItem(KEYS.COURSE_ACTIVE, courseId);
-    const container = document.getElementById('viewCross');
+    const container = document.getElementById('cross-content');
     if (container) initCrossCourse(container);
 };
 
@@ -361,7 +389,7 @@ window.crossCourseManualScan = (val) => {
     const dossard = String(val).replace(/\D/g, '');
     if (!dossard) return;
     if (!tousLesEleves[dossard]) {
-        alert(`Dossard "${dossard}" inconnu.`);
+        afficherToast(`⚠️ Dossard "${dossard}" inconnu`, 'red');
         return;
     }
     enregistrerArrivee(dossard);
