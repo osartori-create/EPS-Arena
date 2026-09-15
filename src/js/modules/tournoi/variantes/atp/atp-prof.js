@@ -137,9 +137,11 @@ async function rendreProf() {
                     <p class="text-xs text-slate-400">Classe : ${currentClasse} · ${currentEleves.length} élèves · ${Object.keys(currentMatchs).length} match(s)</p>
                 </div>
                 <div class="flex gap-2 flex-wrap">
-                    <button onclick="window.atpOpenSaisieManuelle()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">
-                        ➕ Saisir un match
-                    </button>
+                    <button onclick="window.atpOpenSaisieManuelle()" 
+        class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-xs text-slate-300 active:scale-95 border border-slate-600"
+        title="Dépannage : saisir un match manuellement">
+    🛠️ Saisie manuelle
+</button>
                     <button onclick="window.atpOuvrirBareme()" class="bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">
                         ⚙️ Barème
                     </button>

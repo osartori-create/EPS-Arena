@@ -1,6 +1,6 @@
 // src/js/modules/tournoi/variantes/atp/atp-kiosk.js
 // Kiosk élève : saisie d'un match ATP (code V, code P, scores)
-import { db, ref, push, onValue } from '../../../../core/firebase-service.js';
+import { onValue } from '../../../../core/firebase-service.js';
 import { getCurrentClasse } from '../../tournoi-core.js';
 
 let currentClasse = '';
@@ -8,8 +8,6 @@ let eleveCode = null;
 let eleveAdversaire = null;
 let scoreEleve = null;
 let scoreAdversaire = null;
-let unsubAdversaires = null;
-let adversairesPossibles = [];
 
 const COOLDOWN_MS = 3 * 60 * 1000; // 3 minutes
 const COOLDOWN_KEY = 'eps_arena_atp_last_send';
@@ -27,20 +25,10 @@ export function init(classe) {
     const container = document.getElementById('tournoi-module');
     if (!container) return;
 
-    // Écoute des élèves (adversaires possibles)
-    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseATP = `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/atp`;
-
-    if (unsubAdversaires) unsubAdversaires();
-    unsubAdversaires = onValue(ref(db, `${baseATP}/../config`), () => {
-        // On charge la liste des élèves depuis localStorage (côté iPad, on n'a pas le mapping !)
-        // → On va plutôt demander au prof de transmettre la liste des codes
-    });
-
-    renderSaisie();
+        renderSaisie();
 
     return () => {
-        if (unsubAdversaires) { unsubAdversaires(); unsubAdversaires = null; }
+        // Pas de listener à nettoyer pour l'instant
     };
 }
 
