@@ -646,6 +646,20 @@ export function initActivities() {
     // La transmission est gérée par le bouton dédié dans l'interface
     // (on passe par window.troisCinqMinTransmettre)
     if (window.troisCinqMinTransmettre) window.troisCinqMinTransmettre();
+},
+'ppg': async () => {
+    // Le PPG n'a pas besoin de transmission complexe : la séance du jour est déjà dans Firebase.
+    // On publie juste l'activité en cours pour que le kiosk élève route correctement.
+    const today = new Date().toISOString().split('T')[0];
+    const seanceRef = ref(db, `${baseProf}/${activeClasse}/ppg/seance/${today}`);
+    const snap = await new Promise(resolve => onValue(seanceRef, resolve, { onlyOnce: true }));
+    const seance = snap.val();
+    if (!seance || !seance.ateliers || seance.ateliers.length === 0) {
+        return alert('⚠️ Aucune séance configurée pour aujourd\'hui.\nConfigure d\'abord les ateliers dans l\'onglet PPG (Réglages).');
+    }
+    await set(ref(db, `${baseProf}/${activeClasse}/config`), { activite: 'ppg' });
+    await set(ref(db, `${baseProf}/active_classes/${activeClasse}`), true);
+    alert(`✅ PPG activé pour les iPads (${seance.ateliers.length} atelier${seance.ateliers.length > 1 ? 's' : ''}).`);
 }
         };
 

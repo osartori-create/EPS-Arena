@@ -106,6 +106,10 @@ export function initApp() {
     console.log('[eleve] Activité 1/2 Fond détectée');
     masquerElementsCO();
     showLoginDemiFond();
+} else if (config.activite === 'ppg') {
+    console.log('[eleve] Activité PPG détectée');
+    masquerElementsCO();
+    showLoginPPG();
 } else if (['escalade', 'co', 'orientshow', 'badminton', 'multi', 'tournoi', 'bloccontest'].includes(config.activite)) {
                     currentConfig = config;
                     afficherElementsCO();
@@ -159,6 +163,11 @@ function masquerTousLesModules() {
     if (relaisModule) relaisModule.classList.add('hidden');
     if (grillesModule) grillesModule.classList.add('hidden');
     if (demiFondModule) demiFondModule.classList.add('hidden');
+    const ppgEl = document.getElementById('ppg-module');
+    if (ppgEl) {
+        ppgEl.classList.add('hidden');
+        ppgEl.style.display = 'none';
+    }
 }
 
 // ============================================================
@@ -488,6 +497,38 @@ function showLoginDemiFond() {
 
     masquerElementsCO();
 }
+
+// ============================================================
+// SPÉCIAL PPG
+// ============================================================
+function showLoginPPG() {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+
+    setContainerWidth(true);
+    masquerTousLesModules();
+
+    let ppgModule = document.getElementById('ppg-module');
+    if (!ppgModule) {
+        ppgModule = document.createElement('div');
+        ppgModule.id = 'ppg-module';
+        ppgModule.className = 'space-y-4 module';
+        activityScreen.appendChild(ppgModule);
+    }
+    ppgModule.classList.remove('hidden');
+    ppgModule.style.display = 'block';
+
+    import('../../modules/ppg/ppg-kiosk.js')
+        .then(m => m.initPPGKiosk(selectedClass))
+        .catch(err => {
+            console.error('Erreur chargement PPG Kiosk :', err);
+            ppgModule.innerHTML = '<p class="text-red-400 text-center py-10">❌ Erreur de chargement du module PPG.</p>';
+        });
+
+    masquerElementsCO();
+}
+
 // ============================================================
 // SPÉCIAL ARCATHLON
 // ============================================================
@@ -761,20 +802,26 @@ export function resetToLogin() {
         grillesModule.innerHTML = '';
     }
     if (demiFondModule) {
-    demiFondModule.style.display = 'none';
-    demiFondModule.innerHTML = '';
-}
-if (typeof cleanupDemiFondKiosk === 'function') cleanupDemiFondKiosk();
+        demiFondModule.style.display = 'none';
+        demiFondModule.innerHTML = '';
+    }
+
+    const ppgModuleEl = document.getElementById('ppg-module');
+    if (ppgModuleEl) {
+        ppgModuleEl.style.display = 'none';
+        ppgModuleEl.innerHTML = '';
+    }
+
+    if (typeof cleanupDemiFondKiosk === 'function') cleanupDemiFondKiosk();
     if (typeof cleanupGrillesKiosk === 'function') cleanupGrillesKiosk();
     if (typeof cleanupRelaisKiosk === 'function') cleanupRelaisKiosk();
 
-        import('../../modules/eleve/orientshow-kiosk.js').then(module => {
+    import('../../modules/eleve/orientshow-kiosk.js').then(module => {
         if (module.cleanupOrientShowKiosk) module.cleanupOrientShowKiosk();
     }).catch(() => {});
 
     afficherElementsCO();
 
-    // ✅ Si on est en auto-évaluation, on rappelle l'écran dédié
     if (currentConfig && currentConfig.activite === 'grilles') {
         showLoginGrilles();
         return;
