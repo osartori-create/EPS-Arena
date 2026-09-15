@@ -114,10 +114,17 @@ export function calculerProgression(ptsActuel, ptsPrecedent) {
  * @returns {Object} { totalPts, parAtelier: { id: { pts, best, niveau } } }
  */
 export function agregerSeance(observationsDuJour, ateliersActifs) {
+    if (!observationsDuJour) return { totalPts: 0, parAtelier: {} };
+
+    // Supporte 2 formats :
+    // 1. { corde: {...}, pompes: {...} }                     ← format "à plat"
+    // 2. { code, timestamp, perfs: { corde: {...}, ... } }   ← format kiosk
+    const source = observationsDuJour.perfs || observationsDuJour;
+
     const parAtelier = {};
     let totalPts = 0;
     ateliersActifs.forEach(atelier => {
-        const obs = observationsDuJour[atelier.id];
+        const obs = source[atelier.id];
         if (!obs) return;
         const pts = calculerPoints(atelier, obs);
         parAtelier[atelier.id] = {
