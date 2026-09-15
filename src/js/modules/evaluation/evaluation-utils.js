@@ -186,11 +186,6 @@ export function exporterVersIDoceo(data, classe) {
     exporterService('Evaluation', classe, [...colonnesIdentite(), ...colonnesDonnees], lignes.map(l => ({ nom: l.nom, prenom: l.prenom, ...l.donnees })));
 }
 
-function libelleGroupe(groupe) {
-    if (!groupe) return '';
-    const map = { 'satisfaisant': 'Satisfaisant', 'fragile': 'Fragile', 'a_besoins': 'À besoins' };
-    return map[groupe] || groupe;
-}
 
 // Helper : libellé lisible du groupe de maîtrise
 function libelleGroupe(groupe) {
