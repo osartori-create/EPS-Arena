@@ -1,5 +1,6 @@
 // src/js/modules/ppg/index.js
 import { registerModule } from '../registry.js';
+import './ppg-export.js';
 
 function initProf(classe) {
     import('./ppg-interface.js').then(m => m.initPPGInterface());
@@ -17,13 +18,11 @@ function transmettre(classe) {
 }
 
 function renderLive(classe) {
-    // Batch 2
-    return Promise.resolve();
+    return import('./ppg-live.js').then(m => m.renderPPGLive());
 }
 
 function renderTV(classe) {
-    // Batch 3
-    return Promise.resolve();
+    return import('./ppg-tv.js').then(m => m.renderPPGTV());
 }
 
 registerModule({

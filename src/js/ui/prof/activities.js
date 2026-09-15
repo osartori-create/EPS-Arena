@@ -433,10 +433,10 @@ export function initActivities() {
             const exportIDoceoBtn = document.querySelector('#viewLive .bg-green-600');
 
             // Par défaut, on les masque pour les disciplines où ils ne sont pas utiles
-            if (disc === 'escalade' || disc === 'bloccontest' || disc === 'natation' || disc === 'relais') {
-                if (exportCSVBtn) exportCSVBtn.style.display = 'none';
-                if (exportIDoceoBtn) exportIDoceoBtn.style.display = 'none';
-            } else {
+            if (disc === 'escalade' || disc === 'bloccontest' || disc === 'natation' || disc === 'relais' || disc === 'ppg') {
+    if (exportCSVBtn) exportCSVBtn.style.display = 'none';
+    if (exportIDoceoBtn) exportIDoceoBtn.style.display = 'none';
+} else {
                 // Pour les autres disciplines, on les restaure
                 if (exportCSVBtn) exportCSVBtn.style.display = '';
                 // Pour CO, on restaure le bouton iDoceo
@@ -467,8 +467,9 @@ export function initActivities() {
                 'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
                 'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
                 'relais': () => import('../../modules/relais/relais-live.js').then(m => m.renderRelaisLive()),
-                'demi-fond': () => import('../../modules/demi-fond/demifond-live.js').then(m => m.renderDemiFondLive()),
-                'tournoi': () => {
+                'demi-fond': () => import('../../modules/demi-fond/demifond-tv.js').then(m => m.renderDemiFondTV()),
+'ppg': () => import('../../modules/ppg/ppg-tv.js').then(m => m.renderPPGTV()),
+'tournoi': () => {
     // Lit la variante active dans la config puis charge le bon module Live
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const classe = document.getElementById('selectClasse').value;
