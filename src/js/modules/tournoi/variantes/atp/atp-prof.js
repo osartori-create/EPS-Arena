@@ -51,12 +51,18 @@ function elevesParCode(eleves) {
 export function initProf(classe) {
     currentClasse = classe;
     currentEleves = getExistingEleves(classe);
+     // ✅ Nouveau : on vide le conteneur tout de suite
+    const container = document.getElementById('tournoi-prof-container');
+    if (container) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-8">⏳ Chargement du tournoi ATP...</p>';
+    }
 
     // Le core est initialisé par le dispatcher (avec variant 'atp')
     // Mais on s'assure qu'il l'est :
     if (getCurrentClasse() !== classe || getCurrentVariant() !== 'atp') {
         initTournoiCore(classe, 'atp');
     }
+
 
     // Écoute des changements de matchs + config
     unsubs.forEach(u => { try { u(); } catch(e) {} });

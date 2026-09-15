@@ -210,4 +210,4 @@ window.atpKValider = async function() {
 };
 
 window.atpInitKiosk = init;
-export { init as default } from './atp-kiosk.js';
+export default init;
