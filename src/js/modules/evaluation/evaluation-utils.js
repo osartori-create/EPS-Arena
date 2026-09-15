@@ -118,26 +118,30 @@ export const UNITES_TESTS = {
 // ============================================================
 // EXPORT iDoceo (via service centralisé)
 // ============================================================
+// ============================================================
+// EXPORT iDoceo (via service centralisé) — v4
+// Format validé : identité avec préfixe "!", données SANS préfixe.
+// iDoceo fait le matching élèves via !Nom/!Prénom et détecte
+// automatiquement le type des colonnes de données.
+// ============================================================
 export function exporterVersIDoceo(data, classe) {
     if (!classe) {
         alert('Sélectionnez une classe.');
         return;
     }
 
-    // 1. Récupérer les élèves et les trier par nom/prénom
-    const eleves = Object.values(data.eleves).sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+    const eleves = Object.values(data.eleves).sort((a, b) =>
+        a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
+    );
 
     if (eleves.length === 0) {
         alert('Aucun élève dans cette classe.');
         return;
     }
 
-    // 2. Construire les données
     const donnees = eleves.map((e, index) => {
         const r = e.resultats || {};
-        const numero = index + 1;
 
-        // VMA à partir du palier d'endurance
         let vmaValue = '';
         if (r.endurance && r.endurance.palier !== undefined && r.endurance.palier !== null) {
             const vma = getVMAFromPalier(r.endurance.palier);
@@ -145,53 +149,78 @@ export function exporterVersIDoceo(data, classe) {
         }
 
         return {
-            numero: numero,
+            numero: index + 1,
             nom: e.nom || '',
             prenom: e.prenom || '',
             sexe: e.sexe || '',
             statut: e.statut || 'present',
+
             endurancePalier: r.endurance ? r.endurance.palier ?? '' : '',
-            enduranceGroupe: r.endurance ? LIBELLES_GROUPES[r.endurance.groupe] || '' : '',
+            enduranceGroupe: libelleGroupe(r.endurance?.groupe),
             vma: vmaValue,
+
             forceCm: r.force ? r.force.meilleur ?? '' : '',
-            forceGroupe: r.force ? LIBELLES_GROUPES[r.force.groupe] || '' : '',
+            forceGroupe: libelleGroupe(r.force?.groupe),
+
             vitesseSec: r.vitesse ? r.vitesse.meilleur ?? '' : '',
-            vitesseGroupe: r.vitesse ? LIBELLES_GROUPES[r.vitesse.groupe] || '' : '',
+            vitesseGroupe: libelleGroupe(r.vitesse?.groupe),
+
             equilibreSec: r.equilibre ? r.equilibre.temps ?? '' : '',
-            equilibreGroupe: r.equilibre ? LIBELLES_GROUPES[r.equilibre.groupe] || '' : '',
+            equilibreGroupe: libelleGroupe(r.equilibre?.groupe),
+
             coordinationNb: r.coordination ? r.coordination.nb_lancers ?? '' : '',
-            coordinationGroupe: r.coordination ? LIBELLES_GROUPES[r.coordination.groupe] || '' : '',
+            coordinationGroupe: libelleGroupe(r.coordination?.groupe),
+
             souplesseCm: r.souplesse ? r.souplesse.meilleur ?? '' : '',
-            souplesseGroupe: r.souplesse ? LIBELLES_GROUPES[r.souplesse.groupe] || '' : '',
+            souplesseGroupe: libelleGroupe(r.souplesse?.groupe),
+
             enduranceMusculaireSec: r.endurance_musculaire ? r.endurance_musculaire.temps ?? '' : '',
-            enduranceMusculaireGroupe: r.endurance_musculaire ? LIBELLES_GROUPES[r.endurance_musculaire.groupe] || '' : ''
+            enduranceMusculaireGroupe: libelleGroupe(r.endurance_musculaire?.groupe)
         };
     });
 
-    // 3. Définir les colonnes (avec ! devant toutes les colonnes)
+    // ✅ Identité : préfixe "!" (iDoceo fait le matching élève)
+    // ✅ Données   : aucun préfixe (iDoceo détecte nombre vs texte)
     const colonnes = [
-        { nom: '!groupe', cle: 'numero' },
-        { nom: '!Nom', cle: 'nom' },
-        { nom: '!Prénom', cle: 'prenom' },
-        { nom: '!Sexe', cle: 'sexe' },
-        { nom: '!Statut', cle: 'statut' },
-        { nom: '!Endurance (palier)', cle: 'endurancePalier' },
-        { nom: '!Endurance (groupe)', cle: 'enduranceGroupe' },
-        { nom: '!VMA (km/h)', cle: 'vma' },
-        { nom: '!Force (cm)', cle: 'forceCm' },
-        { nom: '!Force (groupe)', cle: 'forceGroupe' },
-        { nom: '!Vitesse (s)', cle: 'vitesseSec' },
-        { nom: '!Vitesse (groupe)', cle: 'vitesseGroupe' },
-        { nom: '!Équilibre (s)', cle: 'equilibreSec' },
-        { nom: '!Équilibre (groupe)', cle: 'equilibreGroupe' },
-        { nom: '!Coordination (nb)', cle: 'coordinationNb' },
-        { nom: '!Coordination (groupe)', cle: 'coordinationGroupe' },
-        { nom: '!Souplesse (cm)', cle: 'souplesseCm' },
-        { nom: '!Souplesse (groupe)', cle: 'souplesseGroupe' },
-        { nom: '!Endurance musculaire (s)', cle: 'enduranceMusculaireSec' },
-        { nom: '!Endurance musculaire (groupe)', cle: 'enduranceMusculaireGroupe' }
+        { nom: '!groupe',                        cle: 'numero' },
+        { nom: '!Nom',                           cle: 'nom' },
+        { nom: '!Prénom',                        cle: 'prenom' },
+        { nom: '!Sexe',                          cle: 'sexe' },
+        { nom: '!Statut',                        cle: 'statut' },
+
+        { nom: 'Endurance (palier)',             cle: 'endurancePalier' },
+        { nom: 'Endurance (groupe)',             cle: 'enduranceGroupe' },
+        { nom: 'VMA (km/h)',                     cle: 'vma' },
+
+        { nom: 'Force (cm)',                     cle: 'forceCm' },
+        { nom: 'Force (groupe)',                 cle: 'forceGroupe' },
+
+        { nom: 'Vitesse (s)',                    cle: 'vitesseSec' },
+        { nom: 'Vitesse (groupe)',               cle: 'vitesseGroupe' },
+
+        { nom: 'Équilibre (s)',                  cle: 'equilibreSec' },
+        { nom: 'Équilibre (groupe)',             cle: 'equilibreGroupe' },
+
+        { nom: 'Coordination (nb)',              cle: 'coordinationNb' },
+        { nom: 'Coordination (groupe)',          cle: 'coordinationGroupe' },
+
+        { nom: 'Souplesse (cm)',                 cle: 'souplesseCm' },
+        { nom: 'Souplesse (groupe)',             cle: 'souplesseGroupe' },
+
+        { nom: 'Endurance musculaire (s)',       cle: 'enduranceMusculaireSec' },
+        { nom: 'Endurance musculaire (groupe)',  cle: 'enduranceMusculaireGroupe' }
     ];
 
-    // 4. Exporter via le service centralisé
     exporterVersIDoceoService('Evaluation', classe, colonnes, donnees);
+}
+
+// Helper : libellé lisible du groupe de maîtrise
+function libelleGroupe(groupe) {
+    if (!groupe) return '';
+    const map = {
+        'satisfaisant': 'Satisfaisant',
+        'fragile': 'Fragile',
+        'a_besoins': 'À besoins'
+    };
+    return map[groupe] || groupe;
 }
