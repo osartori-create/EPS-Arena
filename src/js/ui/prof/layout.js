@@ -56,7 +56,7 @@ export function initLayout() {
         else tvView.style.display = 'none';
     }
 
-    ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5', 'btnTab6'].forEach(id => {
+    ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5', 'btnTab6', 'btnTab7', 'btnTab8'].forEach(id => {
         const btn = document.getElementById(id);
         if (btn) {
             btn.classList.remove('tab-active', 'text-blue-500');
