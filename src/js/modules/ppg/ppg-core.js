@@ -116,14 +116,18 @@ export function calculerProgression(ptsActuel, ptsPrecedent) {
 export function agregerSeance(observationsDuJour, ateliersActifs) {
     if (!observationsDuJour) return { totalPts: 0, parAtelier: {} };
 
-    // Supporte 2 formats :
-    // 1. { corde: {...}, pompes: {...} }                     ← format "à plat"
-    // 2. { code, timestamp, perfs: { corde: {...}, ... } }   ← format kiosk
+    // Supporte 3 formats (rétrocompat) :
+    // 1. { corde: {...}, pompes: {...} }                            ← format à plat (nouveau)
+    // 2. { _meta: {...}, corde: {...}, pompes: {...} }              ← format à plat avec méta (nouveau)
+    // 3. { code, timestamp, perfs: { corde: {...}, ... } }          ← legacy wrapper
     const source = observationsDuJour.perfs || observationsDuJour;
 
     const parAtelier = {};
     let totalPts = 0;
     ateliersActifs.forEach(atelier => {
+        // Sécurité : on ignore toute clé méta (_meta, _xxx)
+        if (atelier.id.startsWith('_')) return;
+
         const obs = source[atelier.id];
         if (!obs) return;
         const pts = calculerPoints(atelier, obs);

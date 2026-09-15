@@ -164,9 +164,17 @@ function rendreSaisie(container) {
         .filter(Boolean);
 
     // Init des valeurs par défaut
+        // Init des valeurs par défaut (tolérant ancien/nouveau format)
+    const getExistObs = (atelierId) => {
+        if (!observationsExistantes) return null;
+        if (observationsExistantes[atelierId]) return observationsExistantes[atelierId];       // nouveau format
+        if (observationsExistantes.perfs?.[atelierId]) return observationsExistantes.perfs[atelierId]; // legacy
+        return null;
+    };
+
     ateliersActifs.forEach(a => {
         if (!saisie[a.id]) {
-            const exist = observationsExistantes?.[a.id];
+            const exist = getExistObs(a.id);
             saisie[a.id] = {
                 p1: exist?.p1 ?? '',
                 p2: exist?.p2 ?? '',
@@ -355,10 +363,13 @@ window.ppgKValider = async function() {
     }
 
     // Construction du payload
+        // Construction du payload — format à plat
     const payload = {
-        code: String(currentCode),
-        timestamp: now,
-        perfs: {}
+        _meta: {
+            code: String(currentCode),
+            timestamp: now,
+            source: 'kiosk'
+        }
     };
 
     ateliersActifs.forEach(a => {
@@ -370,7 +381,7 @@ window.ppgKValider = async function() {
         const vals = [p1Final, p2Final].filter(v => v !== null);
         const best = vals.length > 0 ? Math.max(...vals) : 0;
 
-        payload.perfs[a.id] = {
+        payload[a.id] = {
             p1: p1Final,
             p2: p2Final,
             best,
