@@ -18,6 +18,8 @@ let arriveesListener = null;
 let goListener = null;
 let tousLesEleves = {}; // { dossard: { eleveId, nom, prenom, classe, sexe, vma, statut } }
 let arriveesActuelles = {};
+let chronoInterval = null;
+let currentGoTimestamp = null;
 
 // ============================================================
 // INITIALISATION
@@ -140,6 +142,7 @@ function render(container) {
 function attacherListenersFirebase() {
     if (arriveesListener) { arriveesListener(); arriveesListener = null; }
     if (goListener) { goListener(); goListener = null; }
+    if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
 
     const basePath = getCrossBasePath();
     const arriveesRef = ref(db, `${basePath}/courses/${currentCourseId}/arrivees`);
@@ -159,6 +162,9 @@ function attacherListenersFirebase() {
 // ============================================================
 // CONTRÔLES GO / ARRÊT
 // ============================================================
+// ============================================================
+// CONTRÔLES GO / ARRÊT
+// ============================================================
 function afficherControles(go) {
     const container = document.getElementById('cross-course-controls');
     if (!container) return;
@@ -167,7 +173,10 @@ function afficherControles(go) {
     const enCours = go && go.timestamp;
     const nbArrivees = Object.keys(arriveesActuelles).length;
 
-    const elapsed = enCours ? Math.floor((Date.now() - go.timestamp) / 1000) : 0;
+    currentGoTimestamp = enCours ? go.timestamp : null;
+
+    // Nettoyage ancien interval
+    if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
 
     container.innerHTML = `
         <div class="text-center mb-4">
@@ -179,8 +188,8 @@ function afficherControles(go) {
         ${enCours ? `
             <div class="text-center py-3 mb-4 bg-emerald-900/30 rounded-2xl border-2 border-emerald-500">
                 <div class="text-xs font-bold text-emerald-400 uppercase">⏱️ Course en cours</div>
-                <div class="text-4xl font-mono font-black text-emerald-300 mt-1">${formatTemps(elapsed)}</div>
-                <div class="text-xs text-slate-400 mt-1">${nbArrivees} arrivant${nbArrivees > 1 ? 's' : ''}</div>
+                <div id="cross-course-chrono" class="text-4xl font-mono font-black text-emerald-300 mt-1">${formatTemps(0)}</div>
+                <div id="cross-course-live-count" class="text-xs text-slate-400 mt-1">${nbArrivees} arrivant${nbArrivees > 1 ? 's' : ''}</div>
             </div>
             <div class="flex gap-2">
                 <button onclick="window.crossCourseArreter()" class="flex-1 bg-red-600 hover:bg-red-500 py-4 rounded-2xl font-black text-white text-lg">
@@ -201,6 +210,27 @@ function afficherControles(go) {
             ` : ''}
         `}
     `;
+
+    // Lance le chrono live si la course est en cours
+    if (enCours) {
+        demarrerChronoLive();
+    }
+}
+
+// ============================================================
+// CHRONO LIVE (mise à jour du DOM sans re-render)
+// ============================================================
+function demarrerChronoLive() {
+    if (chronoInterval) clearInterval(chronoInterval);
+    const update = () => {
+        if (!currentGoTimestamp) return;
+        const el = document.getElementById('cross-course-chrono');
+        if (!el) return;
+        const elapsed = Math.floor((Date.now() - currentGoTimestamp) / 1000);
+        el.textContent = formatTemps(elapsed);
+    };
+    update();
+    chronoInterval = setInterval(update, 500);
 }
 
 // ============================================================
@@ -231,6 +261,12 @@ function afficherArrivees() {
             .map(([n, c]) => `${n}e : ${c}`)
             .join(' · ');
         countEl.textContent = `${arriveesTriees.length} arrivant${arriveesTriees.length > 1 ? 's' : ''} — ${details}`;
+    }
+
+    // ✅ Mise à jour du compteur dans le bandeau chrono (live)
+    const liveCountEl = document.getElementById('cross-course-live-count');
+    if (liveCountEl) {
+        liveCountEl.textContent = `${arriveesTriees.length} arrivant${arriveesTriees.length > 1 ? 's' : ''}`;
     }
 
     if (arriveesTriees.length === 0) {
@@ -370,6 +406,7 @@ window.crossCourseGo = async () => {
 
 window.crossCourseArreter = () => {
     if (!confirm('Arrêter la course en cours ?')) return;
+    if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
     stopScanListener();
     afficherControles(null);
     alert('Course arrêtée. Tu peux consulter les résultats.');
@@ -378,6 +415,7 @@ window.crossCourseArreter = () => {
 window.crossCourseReset = async () => {
     if (!confirm('⚠️ Effacer TOUTES les arrivées de cette course ?')) return;
     if (!confirm('✅ Dernière confirmation ?')) return;
+    if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
     const basePath = getCrossBasePath();
     await remove(ref(db, `${basePath}/courses/${currentCourseId}/arrivees`));
     await remove(ref(db, `${basePath}/courses/${currentCourseId}/go`));
