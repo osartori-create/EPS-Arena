@@ -93,26 +93,27 @@ function render(container) {
                 </div>
             </div>
 
-            <!-- Transmission + URLs -->
-<div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-    <h3 class="font-black text-blue-400 uppercase text-sm mb-3">📡 Diffusion</h3>
-    <div class="flex flex-wrap gap-2 mb-3">
-        <button onclick="window.crossCourseTransmettre()" 
-                class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl font-black text-xs text-white">
-            📡 Transmettre aux iPads
-        </button>
-    </div>
-        <details class="text-xs">
-        <summary class="text-slate-400 cursor-pointer font-bold uppercase">URLs des iPads</summary>
-        <div class="mt-2 space-y-1 font-mono text-[10px] text-slate-300 bg-slate-900 p-3 rounded-lg overflow-x-auto">
-            <div class="break-all">🏆 Podium : <code class="text-yellow-400">eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}</code></div>
-            <div class="break-all">📋 Classement : <code class="text-yellow-400">eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}</code></div>
-            <div class="break-all">🏫 Par classe : <code class="text-yellow-400">eleve.html?mode=cross-classe&prof=${profCode}</code></div>
-            <div class="break-all">🎫 Consultation : <code class="text-yellow-400">eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}</code></div>
-            <div class="break-all">⏱️ Clic backup : <code class="text-yellow-400">eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}</code></div>
-        </div>
-    </details>
-</div>
+                        <!-- Diffusion + URLs + QR codes -->
+            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500/40">
+                <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
+                    <h3 class="font-black text-blue-400 uppercase text-sm">📡 Diffusion aux iPads</h3>
+                    <button onclick="window.crossCourseTransmettre()"
+                            class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-blue-400">
+                        📡 Transmettre la config Cross
+                    </button>
+                </div>
+                <p class="text-xs text-slate-400 mb-4">
+                    Scanne le QR code avec l'iPad, ou clique sur "Copier" et envoie l'URL par message.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                    ${renderCarteKiosk('🏆 Podium', `eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}`, 'podium')}
+                    ${renderCarteKiosk('📋 Classement', `eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}`, 'classement')}
+                    ${renderCarteKiosk('🏫 Par classe', `eleve.html?mode=cross-classe&prof=${profCode}`, 'classe')}
+                    ${renderCarteKiosk('🎫 Consultation', `eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}`, 'consult')}
+                    ${renderCarteKiosk('⏱️ Clic backup', `eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}`, 'clic')}
+                </div>
+            </div>
 
             <!-- Contrôles GO / Arrivée -->
             <div id="cross-course-controls" class="bg-slate-800 p-5 rounded-2xl border-2 border-emerald-500/40">
@@ -156,6 +157,8 @@ function render(container) {
 
     attacherListenersFirebase();
     demarrerEcouteScan();
+        // Génère les QR codes après que le DOM soit prêt
+    setTimeout(() => genererQRCodes(), 100);
 }
 
 // ============================================================
@@ -414,6 +417,8 @@ window.crossCourseSelect = (courseId) => {
     localStorage.setItem(KEYS.COURSE_ACTIVE, courseId);
     const container = document.getElementById('cross-content');
     if (container) initCrossCourse(container);
+    // Génère les QR codes après que le DOM soit prêt
+    setTimeout(() => genererQRCodes(), 100);
 };
 
 window.crossCourseGo = async () => {
@@ -484,6 +489,73 @@ window.crossCourseExportCSV = () => {
     a.download = `Cross_${currentCourseId}_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
 };
+
+// ============================================================
+// CARTE KIOSK avec QR CODE
+// ============================================================
+function renderCarteKiosk(label, url, id) {
+    const urlComplete = new URL(url, window.location.href).href;
+    return `
+        <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex flex-col items-center">
+            <div class="text-xs font-black text-white mb-2 text-center">${label}</div>
+            <div id="qr-${id}" class="bg-white p-2 rounded-lg mb-2" style="width: 140px; height: 140px; display: flex; align-items: center; justify-content: center;">
+                <!-- QR généré par JS -->
+            </div>
+            <div class="text-[9px] font-mono text-slate-500 break-all text-center mb-2 min-h-[40px] leading-tight">
+                ${url}
+            </div>
+            <button onclick="window.crossCopyURL('${urlComplete.replace(/'/g, "\\'")}')"
+                    class="w-full bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg text-[10px] font-black text-white uppercase">
+                📋 Copier l'URL
+            </button>
+        </div>
+    `;
+}
+
+window.crossCopyURL = (url) => {
+    navigator.clipboard.writeText(url).then(() => {
+        afficherToast('✅ URL copiée', 'emerald');
+    }).catch(() => {
+        // Fallback : prompt pour copie manuelle
+        prompt('Copie cette URL :', url);
+    });
+};
+
+// ============================================================
+// GÉNÉRATION DES QR CODES (après le rendu)
+// ============================================================
+function genererQRCodes() {
+    if (typeof QRCode === 'undefined') {
+        console.warn('[Cross] QRCode lib non chargée');
+        return;
+    }
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const urls = {
+        podium:     new URL(`eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
+        classement: new URL(`eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
+        classe:     new URL(`eleve.html?mode=cross-classe&prof=${profCode}`, window.location.href).href,
+        consult:    new URL(`eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
+        clic:       new URL(`eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}`, window.location.href).href
+    };
+
+    Object.entries(urls).forEach(([id, url]) => {
+        const container = document.getElementById(`qr-${id}`);
+        if (!container) return;
+        container.innerHTML = ''; // vide avant régénération
+        try {
+            new QRCode(container, {
+                text: url,
+                width: 124,
+                height: 124,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        } catch (e) {
+            console.error('Erreur QR', id, e);
+        }
+    });
+}
 
 window.crossCourseTransmettre = async () => {
     try {
