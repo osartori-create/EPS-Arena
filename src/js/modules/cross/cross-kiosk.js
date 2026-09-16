@@ -70,8 +70,8 @@ function masquerChromeEleve() {
     });
 
     // Header (code prof, sélecteur classe)
-    const header = document.querySelector('body > div.flex.justify-between');
-    if (header) header.style.display = 'none';
+    const header = document.getElementById('eleve-header');
+if (header) header.style.display = 'none';
 
     // Autres éléments à cacher (au cas où)
     ['code-info', 'btn-quit', 'btn-back-terrain'].forEach(id => {
