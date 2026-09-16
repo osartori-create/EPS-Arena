@@ -35,15 +35,12 @@ export function initCrossKiosk(mode, params) {
 
     console.log('[Cross Kiosk] Init', { mode, course: currentCourseId, prof: currentProfCode });
 
-    // Cache le login/attente par défaut
-    const waiting = document.getElementById('waiting-screen');
-    if (waiting) waiting.classList.add('hidden');
-    const login = document.getElementById('login-screen');
-    if (login) login.classList.add('hidden');
+    // ✅ Masquer TOUT le chrome de l'app élève (header, sélecteurs, boutons)
+    masquerChromeEleve();
+
     const activity = document.getElementById('activity-screen');
     if (activity) activity.classList.remove('hidden');
 
-    // Conteneur principal
     let container = document.getElementById('cross-kiosk-container');
     if (!container) {
         container = document.createElement('div');
@@ -52,40 +49,46 @@ export function initCrossKiosk(mode, params) {
         activity.appendChild(container);
     }
 
-    // Charge la config Firebase
     chargerConfig();
 
-    // Dispatch selon le mode
     switch (currentMode) {
-        case 'cross-podium':    initPodium(container); break;
-        // les autres modes viendront plus tard
+        case 'cross-podium': initPodium(container); break;
+        case 'cross-classement': initClassement(container); break;
         default:
             container.innerHTML = `<p class="text-red-400 p-8">Mode inconnu : ${currentMode}</p>`;
     }
 }
 
 // ============================================================
-// CHARGEMENT CONFIG
+// MASQUAGE DU CHROME ÉLÈVE
 // ============================================================
-function chargerConfig() {
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
-
-    if (unsubCourses) unsubCourses();
-    unsubCourses = onValue(ref(db, `${basePath}/config/courses`), snap => {
-        const data = snap.val();
-        coursesMap = {};
-        if (data) {
-            // Si c'est un tableau
-            if (Array.isArray(data)) data.forEach(c => { coursesMap[c.id] = c; });
-            else coursesMap = data;
-        }
-        render();
+function masquerChromeEleve() {
+    // Écrans de login/attente
+    ['waiting-screen', 'login-screen'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
     });
 
-    if (unsubConfig) unsubConfig();
-    unsubConfig = onValue(ref(db, `${basePath}/config/eleves`), snap => {
-        elevesMap = snap.val() || {};
-        render();
+    // Header (code prof, sélecteur classe)
+    const header = document.querySelector('body > div.flex.justify-between');
+    if (header) header.style.display = 'none';
+
+    // Autres éléments à cacher (au cas où)
+    ['code-info', 'btn-quit', 'btn-back-terrain'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    // Masquer tous les modules connus
+    ['escalade-module', 'co-module', 'multi-module', 'orientshow-module',
+     'badminton-module', 'natation-module', 'relais-module', 'grilles-module',
+     'demi-fond-module', 'ppg-module', 'tournoi-module', 'arcathlon-module',
+     'bloc-kiosk-container'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.add('hidden');
+            el.style.display = 'none';
+        }
     });
 }
 
