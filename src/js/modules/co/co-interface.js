@@ -5,9 +5,49 @@ import { getPhotoUrl } from '../../services/admin-service.js';
 // INITIALISATION DE L'INTERFACE CO
 // --------------------------------------------------------------
 export function initCOInterface() {
-    const postesContainer = document.getElementById('postesGrid');
-    if (!postesContainer) return;
+    // ✅ Si la structure n'existe pas, on la crée dans co-classique-container
+    let postesContainer = document.getElementById('postesGrid');
 
+    if (!postesContainer) {
+        const parent = document.getElementById('co-classique-container');
+        if (!parent) {
+            console.warn('[CO] co-classique-container introuvable — abandon initCOInterface');
+            return;
+        }
+
+        // Éviter les doublons : on ne crée le wrapper qu'une seule fois
+        if (!document.getElementById('co-reserves-wrapper')) {
+            const wrapper = document.createElement('div');
+            wrapper.id = 'co-reserves-wrapper';
+            wrapper.className = 'grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4';
+            wrapper.innerHTML = `
+                <div class="bg-slate-900 p-4 rounded-2xl border-2 border-dashed border-slate-600">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Réserve</h4>
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-blue-400 uppercase mb-1">👦 Garçons</div>
+                            <div id="reserveCOGarcons" class="flex flex-col gap-1 min-h-[100px] border border-blue-800/30 rounded-lg p-1"></div>
+                        </div>
+                        <div class="flex-1">
+                            <div class="text-xs font-bold text-rose-400 uppercase mb-1">👩 Filles</div>
+                            <div id="reserveCOFilles" class="flex flex-col gap-1 min-h-[100px] border border-rose-800/30 rounded-lg p-1"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:col-span-2">
+                    <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Postes</h4>
+                    <div id="postesGrid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+                </div>
+            `;
+            parent.appendChild(wrapper);
+            console.log('[CO] Structure #postesGrid + réserves créée dynamiquement');
+        }
+
+        postesContainer = document.getElementById('postesGrid');
+        if (!postesContainer) return;  // sécurité
+    }
+
+    // ---- Suite inchangée : génération des colonnes postes ----
     const headers = Object.keys(MATRICE['31'] || {});
     let html = '';
     headers.forEach(poste => {
@@ -20,7 +60,6 @@ export function initCOInterface() {
     });
     postesContainer.innerHTML = html;
 
-    // Réinitialiser Sortable après création du DOM
     setTimeout(() => initSortableCO(), 100);
 }
 
