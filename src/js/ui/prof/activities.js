@@ -78,44 +78,54 @@ export function initActivities() {
     // ============================================================
     // CHANGEMENT DE DISCIPLINE
     // ============================================================
-    window.switchDiscipline = async function(disc) {
+    // Token global pour invalider les appels obsolètes
+let __switchDisciplineToken = 0;
+
+window.switchDiscipline = async function(disc) {
+    // ✅ Cleanup du module précédent (surtout Tournoi, mais utile pour tous)
+    if (window.__currentVariantUnload) {
+        try { await window.__currentVariantUnload(); } catch (e) {}
+        window.__currentVariantUnload = null;
+    }
+    const myToken = ++__switchDisciplineToken;
     currentDiscipline = disc;
     localStorage.setItem('eps_arena_current_discipline', disc);
+    console.log(`[switchDiscipline] → ${disc} (token ${myToken})`);
 
-    // ✅ ÉTAPE 1 : S'assurer que le conteneur existe AVANT de le cacher/afficher.
-    //    Les modules "auto-créateurs" (natation, relais, demi-fond, ppg) créent
-    //    leur div s'il n'existe pas.
+    // ✅ Si un autre appel démarre, celui-ci s'arrête à chaque await
+    const checkAlive = () => myToken === __switchDisciplineToken;
+
+    // ✅ ÉTAPE 1 : créer les conteneurs dynamiques si nécessaire
     try {
         if (disc === 'natation') {
             const m = await import('../../modules/natation/natation-interface.js');
+            if (!checkAlive()) return;
             m.initNatationInterface();
         } else if (disc === 'relais') {
             const m = await import('../../modules/relais/relais-interface.js');
+            if (!checkAlive()) return;
             m.initRelaisInterface();
         } else if (disc === 'demi-fond') {
             const m = await import('../../modules/demi-fond/demifond-interface.js');
+            if (!checkAlive()) return;
             m.initDemiFondInterface();
         } else if (disc === 'ppg') {
             const m = await import('../../modules/ppg/ppg-interface.js');
+            if (!checkAlive()) return;
             m.initPPGInterface();
         }
     } catch (err) {
         console.error(`[switchDiscipline] Erreur init ${disc} :`, err);
     }
 
-    // ✅ ÉTAPE 2 : Masquer toutes les vues (maintenant qu'elles existent toutes)
+    if (!checkAlive()) return;
+
+    // ✅ ÉTAPE 2 : masquer TOUTES les vues
     const allViews = [
-        'viewMultiSettings',
-        'viewCOSettings',
-        'viewEscaladeSettings',
-        'viewBadmintonSettings',
-        'viewArcathlonSettings',
-        'viewEvaluationSettings',
-        'viewTournoiSettings',
-        'viewNatationSettings',
-        'viewRelaisSettings',
-        'viewDemiFondSettings',
-        'viewPPGSettings'
+        'viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
+        'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings',
+        'viewTournoiSettings', 'viewNatationSettings', 'viewRelaisSettings',
+        'viewDemiFondSettings', 'viewPPGSettings'
     ];
     allViews.forEach(id => {
         const el = document.getElementById(id);
@@ -125,19 +135,18 @@ export function initActivities() {
         }
     });
 
-    // --- Cacher spécifiquement les conteneurs internes de CO ---
-    const coClassique = document.getElementById('co-classique-container');
-    const coOrientShow = document.getElementById('co-orientshow-container');
-    if (coClassique) {
-        coClassique.style.display = 'none';
-        coClassique.innerHTML = '';
-    }
-    if (coOrientShow) {
-        coOrientShow.style.display = 'none';
-        coOrientShow.innerHTML = '';
-    }
+    // Cacher les conteneurs internes de CO
+    ['co-classique-container', 'co-orientshow-container'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.style.display = 'none';
+            el.innerHTML = '';
+        }
+    });
 
-    // --- Afficher la vue demandée ---
+    if (!checkAlive()) return;
+
+    // ✅ ÉTAPE 3 : afficher la bonne vue
     const viewMap = {
         'multi': 'viewMultiSettings',
         'co': 'viewCOSettings',
@@ -151,7 +160,6 @@ export function initActivities() {
         'demi-fond': 'viewDemiFondSettings',
         'ppg': 'viewPPGSettings'
     };
-
     const targetId = viewMap[disc];
     if (targetId) {
         const targetView = document.getElementById(targetId);
@@ -159,20 +167,20 @@ export function initActivities() {
             targetView.classList.remove('hidden');
             targetView.style.display = '';
         } else {
-            console.warn(`[switchDiscipline] Conteneur "${targetId}" introuvable après init.`);
+            console.warn(`[switchDiscipline] Conteneur "${targetId}" introuvable.`);
         }
     }
 
-    // --- Init spécifiques (déjà appelées plus haut pour natation/relais/demi-fond/ppg) ---
+    if (!checkAlive()) return;
+
+    // ✅ ÉTAPE 4 : init spécifiques
     if (disc === 'co') {
         const coModule = getModule('co');
-        if (coModule && coModule.initProf) {
+        if (coModule?.initProf) {
             const activeClasse = document.getElementById('selectClasse').value;
-            setTimeout(() => coModule.initProf(activeClasse), 50);
+            setTimeout(() => { if (checkAlive()) coModule.initProf(activeClasse); }, 50);
         }
-    }
-
-    if (disc === 'multi') {
+    } else if (disc === 'multi') {
         const multiModule = getModule('multi');
         if (multiModule?.initProf) {
             const classe = document.getElementById('selectClasse').value;
@@ -189,12 +197,8 @@ export function initActivities() {
             loadEscaladeAssignments();
         }
         const mode = disc === 'bloccontest' ? 'bloc' : 'classic';
-        import('../../modules/escalade/escalade-live.js').then(module => {
-            if (module.setEscaladeMode) module.setEscaladeMode(mode);
-        });
-        import('../../modules/escalade/escalade-tv-ui.js').then(module => {
-            if (module.setEscaladeMode) module.setEscaladeMode(mode);
-        });
+        import('../../modules/escalade/escalade-live.js').then(m => { if (m.setEscaladeMode) m.setEscaladeMode(mode); });
+        import('../../modules/escalade/escalade-tv-ui.js').then(m => { if (m.setEscaladeMode) m.setEscaladeMode(mode); });
     } else if (disc === 'badminton') {
         try {
             initBadmintonInterface();
@@ -203,33 +207,24 @@ export function initActivities() {
             import('../../modules/badminton/badminton-ui-prof.js')
                 .then(m => m.initBadmintonModeSelector())
                 .catch(err => console.error('Erreur init sélecteur badminton :', err));
-        } catch (e) {
-            console.error('Erreur Badminton :', e);
-        }
+        } catch (e) { console.error('Erreur Badminton :', e); }
     } else if (disc === 'arcathlon') {
         try { initArcathlonInterface(); } catch (e) {}
     } else if (disc === 'evaluation') {
-        setTimeout(() => initEvaluationInterface(), 50);
-    } else if (disc === 'tournoi') {
-        try {
-            const container = document.getElementById('tournoi-prof-container');
-            if (container) {
-                const classe = document.getElementById('selectClasse').value;
-                if (classe) {
-                    import('../../modules/tournoi/tournoi-prof.js')
-                        .then(m => m.initTournoiProf(classe))
-                        .catch(err => console.error("Erreur init Tournoi Prof :", err));
-                } else {
-                    container.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
-                }
+        setTimeout(() => { if (checkAlive()) initEvaluationInterface(); }, 50);
+        } else if (disc === 'tournoi') {
+        const container = document.getElementById('tournoi-prof-container');
+        if (container) {
+            const classe = document.getElementById('selectClasse').value;
+            if (classe) {
+                const m = await import('../../modules/tournoi/tournoi-prof.js');
+                if (!checkAlive()) return;
+                window.__currentVariantUnload = await m.initTournoiProf(classe);
             }
-        } catch (e) {
-            console.error("Erreur init Tournoi :", e);
         }
     }
-    // ✅ natation, relais, demi-fond, ppg : déjà initialisés en ÉTAPE 1
 
-    // Mise à jour des boutons de discipline
+    // ✅ ÉTAPE 5 : mettre à jour les boutons de discipline
     const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais', 'demi-fond', 'ppg'];
     btnIds.forEach(id => {
         const btn = document.getElementById(`btnDisc-${id}`);
@@ -1028,6 +1023,18 @@ export function initActivities() {
     // INITIALISATION SORTABLE (fallback)
     // ============================================================
     try { initSortableEscalade(); } catch (e) {}
+
+        // ✅ Écoute globale du changement de classe :
+    // re-dispatche vers la discipline courante pour recharger les équipes/élèves
+    const selectClasseEl = document.getElementById('selectClasse');
+    if (selectClasseEl && !selectClasseEl.__multiDispatchListener) {
+        selectClasseEl.addEventListener('change', () => {
+            const disc = currentDiscipline || 'multi';
+            console.log(`[activities] Classe changée → re-dispatch ${disc}`);
+            window.switchDiscipline(disc);
+        });
+        selectClasseEl.__multiDispatchListener = true;
+    }
 
     // ============================================================
     // LANCEMENT DE LA DISCIPLINE PAR DÉFAUT
