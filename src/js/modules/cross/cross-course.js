@@ -92,6 +92,27 @@ function render(container) {
                 </div>
             </div>
 
+            <!-- Transmission + URLs -->
+<div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+    <h3 class="font-black text-blue-400 uppercase text-sm mb-3">📡 Diffusion</h3>
+    <div class="flex flex-wrap gap-2 mb-3">
+        <button onclick="window.crossCourseTransmettre()" 
+                class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-xl font-black text-xs text-white">
+            📡 Transmettre aux iPads
+        </button>
+    </div>
+    <details class="text-xs">
+        <summary class="text-slate-400 cursor-pointer font-bold uppercase">URLs des iPads</summary>
+        <div class="mt-2 space-y-1 font-mono text-[10px] text-slate-300 bg-slate-900 p-3 rounded-lg overflow-x-auto">
+            <div>🏆 Podium : <code>eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
+            <div>📋 Classement : <code>eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
+            <div>🏫 Par classe : <code>eleve.html?mode=cross-classe&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
+            <div>👤 Consultation : <code>eleve.html?mode=cross-consult&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
+            <div>⏱️ Clic backup : <code>eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
+        </div>
+    </details>
+</div>
+
             <!-- Contrôles GO / Arrivée -->
             <div id="cross-course-controls" class="bg-slate-800 p-5 rounded-2xl border-2 border-emerald-500/40">
                 <div id="cross-course-status" class="text-center mb-4">
@@ -461,4 +482,15 @@ window.crossCourseExportCSV = () => {
     a.href = URL.createObjectURL(blob);
     a.download = `Cross_${currentCourseId}_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
+};
+
+window.crossCourseTransmettre = async () => {
+    try {
+        const { transmettreCrossConfig } = await import('./cross-transmit.js');
+        const res = await transmettreCrossConfig();
+        afficherToast(`✅ Config transmise (${res.nbEleves} élèves, ${res.nbClasses} classes)`, 'emerald');
+    } catch (err) {
+        console.error(err);
+        afficherToast(`❌ Erreur transmission : ${err.message}`, 'red');
+    }
 };
