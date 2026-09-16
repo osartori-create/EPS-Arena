@@ -1,10 +1,5 @@
 <!DOCTYPE html>
 <html lang="fr">
-    <style>
-    body { overflow-x: hidden; }
-    /* On enlève la hauteur forcée pour que l'écran s'adapte au contenu */
-    #activity-screen { min-height: auto; }
-</style>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
@@ -12,23 +7,29 @@
     <link rel="icon" href="hub-icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="hub-icon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { overflow-x: hidden; }
+        #activity-screen { min-height: auto; }
+    </style>
     <script type="module">
         import { initApp } from './src/js/ui/eleve/eleve-app.js';
         initApp();
     </script>
 </head>
 <body class="bg-slate-900 text-white min-h-screen p-6 font-sans">
-    <div class="flex justify-between items-center mb-6">
-        <div id="eleve-header" class="flex justify-between items-center mb-6"></div>
-    <h1 class="text-2xl font-black text-blue-500 italic">EPS-Arena</h1>
-    <div class="flex items-center gap-2">
-        <input type="text" id="profCodeInput" placeholder="Code Prof"
-               class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs font-bold text-white w-24">
-        <select id="class-select" class="bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs font-bold text-blue-400 outline-none">
-            <option value="">-- Choisir la classe --</option>
-        </select>
+
+    <!-- ✅ Header élève (avec id pour pouvoir le masquer en mode kiosk cross) -->
+    <div id="eleve-header" class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-black text-blue-500 italic">EPS-Arena</h1>
+        <div class="flex items-center gap-2">
+            <input type="text" id="profCodeInput" placeholder="Code Prof"
+                   class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs font-bold text-white w-24">
+            <select id="class-select" class="bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs font-bold text-blue-400 outline-none">
+                <option value="">-- Choisir la classe --</option>
+            </select>
+        </div>
     </div>
-</div>
+
     <div id="main-container" class="max-w-md mx-auto">
         <div id="waiting-screen" class="text-center py-20">
             <div class="text-6xl mb-6">⏳</div>
@@ -40,40 +41,40 @@
         </div>
         <div id="activity-screen" class="hidden">
             <div class="flex justify-between items-center mb-6 bg-slate-800 p-4 rounded-2xl border border-slate-700">
-    <div id="code-info">
-        <h2 class="text-xs uppercase text-slate-400 font-bold">Code sélectionné</h2>
-        <span id="selected-code" class="text-3xl font-black text-blue-400">--</span>
-    </div>
-    <button onclick="location.reload()" id="btn-quit" class="bg-red-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">✖ Quitter</button>
-    <button onclick="window.retourTerrains()" id="btn-back-terrain" class="hidden bg-slate-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">← Retour Terrains</button>
-</div>
+                <div id="code-info">
+                    <h2 class="text-xs uppercase text-slate-400 font-bold">Code sélectionné</h2>
+                    <span id="selected-code" class="text-3xl font-black text-blue-400">--</span>
+                </div>
+                <button onclick="location.reload()" id="btn-quit" class="bg-red-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">✖ Quitter</button>
+                <button onclick="window.retourTerrains()" id="btn-back-terrain" class="hidden bg-slate-600 px-4 py-2 rounded-xl font-bold text-xs text-white active:scale-95">← Retour Terrains</button>
+            </div>
+
             <!-- MODULE ORIENTSHOW -->
-<div id="orientshow-module" class="hidden space-y-4">
-    <div id="os-identity-selector" class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-        <!-- Rempli par le script -->
-    </div>
-    <div id="os-circuit-grid" class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-        <!-- Rempli par le script -->
-    </div>
-    <div id="os-letters-input" class="hidden bg-slate-800 p-4 rounded-2xl border border-slate-700">
-        <div class="flex justify-center gap-4">
-            <input type="text" id="os-l1" class="input-box w-16 h-16 text-center text-3xl font-black uppercase" maxlength="1" oninput="this.value=this.value.toUpperCase(); if(this.value) document.getElementById('os-l2').focus()">
-            <input type="text" id="os-l2" class="input-box w-16 h-16 text-center text-3xl font-black uppercase" maxlength="1" oninput="this.value=this.value.toUpperCase()">
-        </div>
-        <button onclick="window.validateOSPassage()" class="w-full mt-4 py-4 bg-blue-600 rounded-xl font-black text-xl uppercase">✅ Valider</button>
-    </div>
-</div>
-<!-- MODULE RELAIS -->
-<div id="relais-module" class="hidden space-y-4"></div>
-<!-- MODULE 1/2 FOND -->
-<div id="demi-fond-module" class="hidden space-y-4"></div>
-<!-- MODULE GRILLES (auto-évaluation) -->
-<div id="grilles-module" class="hidden space-y-4"></div>
-<!-- MODULE NATATION -->
-<div id="natation-module" class="hidden space-y-4">
-    <!-- Rempli dynamiquement -->
-</div>
-<!-- MODULE ESCALADE -->
+            <div id="orientshow-module" class="hidden space-y-4">
+                <div id="os-identity-selector" class="bg-slate-800 p-4 rounded-2xl border border-slate-700"></div>
+                <div id="os-circuit-grid" class="bg-slate-800 p-4 rounded-2xl border border-slate-700"></div>
+                <div id="os-letters-input" class="hidden bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                    <div class="flex justify-center gap-4">
+                        <input type="text" id="os-l1" class="input-box w-16 h-16 text-center text-3xl font-black uppercase" maxlength="1" oninput="this.value=this.value.toUpperCase(); if(this.value) document.getElementById('os-l2').focus()">
+                        <input type="text" id="os-l2" class="input-box w-16 h-16 text-center text-3xl font-black uppercase" maxlength="1" oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                    <button onclick="window.validateOSPassage()" class="w-full mt-4 py-4 bg-blue-600 rounded-xl font-black text-xl uppercase">✅ Valider</button>
+                </div>
+            </div>
+
+            <!-- MODULE RELAIS -->
+            <div id="relais-module" class="hidden space-y-4"></div>
+
+            <!-- MODULE 1/2 FOND -->
+            <div id="demi-fond-module" class="hidden space-y-4"></div>
+
+            <!-- MODULE GRILLES (auto-évaluation) -->
+            <div id="grilles-module" class="hidden space-y-4"></div>
+
+            <!-- MODULE NATATION -->
+            <div id="natation-module" class="hidden space-y-4"></div>
+
+            <!-- MODULE ESCALADE -->
             <div id="escalade-module" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <label class="text-xs font-bold text-slate-400 uppercase">N° Voie (1 à 21)</label>
@@ -93,6 +94,7 @@
                     <button onclick="window.sendEscalade()" class="w-full bg-emerald-600 py-5 rounded-3xl text-xl font-black uppercase shadow-xl active:scale-95 transition-all">📤 Envoyer la montée</button>
                 </div>
             </div>
+
             <!-- MODULE CO -->
             <div id="co-module" class="hidden space-y-4">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
@@ -101,7 +103,8 @@
                     <button onclick="window.sendBalise()" class="w-full bg-blue-600 py-5 rounded-3xl text-xl font-black uppercase shadow-xl active:scale-95 transition-all">✅ Valider</button>
                 </div>
             </div>
-                        <!-- MODULE MULTI -->
+
+            <!-- MODULE MULTI -->
             <div id="multi-module" class="hidden space-y-4">
                 <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
                     <div id="chrono-display" class="text-8xl font-black tabular-nums text-yellow-400 mb-8">00:00</div>
@@ -110,21 +113,22 @@
                 </div>
             </div>
 
-            <!-- MODULE BADMINTON (Déplacé ICI, à l'intérieur de activity-screen) -->
+            <!-- MODULE BADMINTON -->
             <div id="badminton-module" class="hidden space-y-4">
                 <div id="badminton-content" class="space-y-4"></div>
             </div>
 
         </div> <!-- Fin de activity-screen -->
     </div> <!-- Fin du conteneur principal -->
-    <!-- Zone de débogage (visible uniquement en développement) -->
-<div id="debug-console" style="position: fixed; bottom: 0; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.9); color: #0f0; font-size: 12px; padding: 8px; z-index: 9999; display: none; pointer-events: none; font-family: monospace; border-top: 2px solid #333;">
-    <div style="display: flex; justify-content: space-between; pointer-events: auto;">
-        <span style="font-weight: bold;">🔍 Logs de débogage</span>
-        <button onclick="this.parentElement.parentElement.style.display='none'" style="background: #444; color: #fff; border: none; border-radius: 4px; padding: 2px 8px;">✕</button>
+
+    <!-- Zone de débogage -->
+    <div id="debug-console" style="position: fixed; bottom: 0; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.9); color: #0f0; font-size: 12px; padding: 8px; z-index: 9999; display: none; pointer-events: none; font-family: monospace; border-top: 2px solid #333;">
+        <div style="display: flex; justify-content: space-between; pointer-events: auto;">
+            <span style="font-weight: bold;">🔍 Logs de débogage</span>
+            <button onclick="this.parentElement.parentElement.style.display='none'" style="background: #444; color: #fff; border: none; border-radius: 4px; padding: 2px 8px;">✕</button>
+        </div>
+        <div id="debug-logs" style="white-space: pre-wrap; word-break: break-all;"></div>
     </div>
-    <div id="debug-logs" style="white-space: pre-wrap; word-break: break-all;"></div>
-</div>
-<button onclick="document.getElementById('debug-console').style.display='block'" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background: #333; color: #fff; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 20px; cursor: pointer;">🐞</button>
+    <button onclick="document.getElementById('debug-console').style.display='block'" style="position: fixed; bottom: 10px; right: 10px; z-index: 9999; background: #333; color: #fff; border: none; border-radius: 50%; width: 44px; height: 44px; font-size: 20px; cursor: pointer;">🐞</button>
 </body>
 </html>
