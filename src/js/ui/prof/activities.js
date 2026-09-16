@@ -1029,18 +1029,6 @@ export function initActivities() {
     // ============================================================
     try { initSortableEscalade(); } catch (e) {}
 
-        // ✅ Écoute globale du changement de classe :
-    // re-dispatche vers la discipline courante pour recharger les équipes/élèves
-    const selectClasseEl = document.getElementById('selectClasse');
-    if (selectClasseEl && !selectClasseEl.__multiDispatchListener) {
-        selectClasseEl.addEventListener('change', () => {
-            const disc = currentDiscipline || 'multi';
-            console.log(`[activities] Classe changée → re-dispatch ${disc}`);
-            window.switchDiscipline(disc);
-        });
-        selectClasseEl.__multiDispatchListener = true;
-    }
-
     // ============================================================
     // LANCEMENT DE LA DISCIPLINE PAR DÉFAUT
     // ============================================================
