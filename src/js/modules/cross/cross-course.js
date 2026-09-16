@@ -74,6 +74,7 @@ function estDansLaCourse(eleve, course) {
 function render(container) {
     const config = getCrossConfig();
     const course = COURSES_DEFAUT.find(c => c.id === currentCourseId);
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
 
     container.innerHTML = `
         <div class="space-y-4">
@@ -101,14 +102,14 @@ function render(container) {
             📡 Transmettre aux iPads
         </button>
     </div>
-    <details class="text-xs">
+        <details class="text-xs">
         <summary class="text-slate-400 cursor-pointer font-bold uppercase">URLs des iPads</summary>
         <div class="mt-2 space-y-1 font-mono text-[10px] text-slate-300 bg-slate-900 p-3 rounded-lg overflow-x-auto">
-            <div>🏆 Podium : <code>eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
-            <div>📋 Classement : <code>eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
-            <div>🏫 Par classe : <code>eleve.html?mode=cross-classe&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
-            <div>👤 Consultation : <code>eleve.html?mode=cross-consult&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
-            <div>⏱️ Clic backup : <code>eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${localStorage.getItem('eps_arena_profCode')||'DEFAULT'}</code></div>
+            <div class="break-all">🏆 Podium : <code class="text-yellow-400">eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}</code></div>
+            <div class="break-all">📋 Classement : <code class="text-yellow-400">eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}</code></div>
+            <div class="break-all">🏫 Par classe : <code class="text-yellow-400">eleve.html?mode=cross-classe&prof=${profCode}</code></div>
+            <div class="break-all">🎫 Consultation : <code class="text-yellow-400">eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}</code></div>
+            <div class="break-all">⏱️ Clic backup : <code class="text-yellow-400">eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}</code></div>
         </div>
     </details>
 </div>
