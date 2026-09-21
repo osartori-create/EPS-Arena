@@ -1,6 +1,7 @@
 // src/js/modules/cross/cross-interface.js
 import { initCrossPrep } from './cross-prep.js';
 import { initCrossCourse } from './cross-course.js';
+import { initCrossDossards } from './cross-dossards.js';
 
 let currentTab = 'prep';
 
@@ -15,15 +16,19 @@ export function initCrossInterface() {
         nav.id = 'cross-tabs';
         nav.className = 'flex gap-2 bg-slate-800 p-3 rounded-2xl border border-slate-700 mb-4';
         nav.innerHTML = `
-            <button id="cross-tab-prep" onclick="window.crossSetTab('prep')"
-                    class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white">
-                ⚙️ Préparation
-            </button>
-            <button id="cross-tab-course" onclick="window.crossSetTab('course')"
-                    class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">
-                🏃 Course
-            </button>
-        `;
+    <button id="cross-tab-prep" onclick="window.crossSetTab('prep')"
+            class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white">
+        ⚙️ Préparation
+    </button>
+    <button id="cross-tab-course" onclick="window.crossSetTab('course')"
+            class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">
+        🏃 Course
+    </button>
+    <button id="cross-tab-dossards" onclick="window.crossSetTab('dossards')"
+            class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">
+        🎫 Dossards
+    </button>
+`;
         container.appendChild(nav);
     }
 
@@ -43,19 +48,22 @@ function renderCurrentTab(content) {
     content.innerHTML = '';
     if (currentTab === 'prep') {
         initCrossPrep(content);
-    } else {
+    } else if (currentTab === 'course') {
         initCrossCourse(content);
+    } else if (currentTab === 'dossards') {
+        initCrossDossards(content);
     }
 }
 
 window.crossSetTab = (tab) => {
     currentTab = tab;
-    document.getElementById('cross-tab-prep').className = tab === 'prep'
-        ? 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white'
-        : 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-    document.getElementById('cross-tab-course').className = tab === 'course'
-        ? 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white'
-        : 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
+    const actifs = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
+    const inactifs = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
+
+    ['prep', 'course', 'dossards'].forEach(t => {
+        const el = document.getElementById(`cross-tab-${t}`);
+        if (el) el.className = (t === tab) ? actifs : inactifs;
+    });
 
     const content = document.getElementById('cross-content');
     if (content) renderCurrentTab(content);
