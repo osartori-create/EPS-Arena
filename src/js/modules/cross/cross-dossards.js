@@ -52,6 +52,10 @@ export function initCrossDossards(container) {
                             class="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-amber-400 active:scale-95">
                         🧪 Données bidons
                     </button>
+                    <button onclick="window.crossSimulerCrossComplet()"
+        class="bg-rose-600 hover:bg-rose-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-rose-400 active:scale-95">
+    🌊 Simuler un cross complet
+</button>
                     <input type="file" id="crossDossardsCSVInput" class="hidden" accept=".csv" onchange="window.crossDossardsTraiterCSV(event)">
                 </div>
             </div>
@@ -632,3 +636,248 @@ function normaliserNom(str) {
     if (!str) return '';
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
 }
+// ============================================================
+// GÉNÉRATION D'UN CROSS COMPLET (élèves + dossards + arrivées)
+// ============================================================
+const NOMS_SIMULATION = [
+    'MARTIN', 'BERNARD', 'DUBOIS', 'THOMAS', 'ROBERT', 'RICHARD', 'PETIT', 'DURAND',
+    'LEROY', 'MOREAU', 'SIMON', 'LAURENT', 'LEFEBVRE', 'MICHEL', 'GARCIA', 'DAVID',
+    'BERTRAND', 'ROUX', 'VINCENT', 'FOURNIER', 'MOREL', 'GIRARD', 'ANDRE', 'LEFEVRE',
+    'MERCIER', 'DUPONT', 'LAMBERT', 'BONNET', 'FRANCOIS', 'MARTINEZ', 'LEGRAND', 'GARNIER',
+    'FAURE', 'ROUSSEAU', 'BLANC', 'GUERIN', 'MULLER', 'HENRY', 'ROUSSEL', 'NICOLAS',
+    'PERRIN', 'MORIN', 'MATHIEU', 'CLEMENT', 'GAUTHIER', 'DUMONT', 'LOPEZ', 'FONTAINE',
+    'CHEVALIER', 'ROBIN', 'MASSON', 'SANCHEZ', 'GERARD', 'NGUYEN', 'BOYER', 'DENIS',
+    'LEMAIRE', 'DUVAL', 'JULIEN', 'GAUTIER', 'ROGER', 'ROCHE', 'ROY', 'NOEL',
+    'MEYER', 'LUCAS', 'MEUNIER', 'JEAN', 'PEREZ', 'MARCHAND', 'DUFOUR', 'BLANCHARD',
+    'MARIE', 'BARBIER', 'BRUN', 'DUMAS', 'BRUNET', 'SCHMITT', 'REY', 'BLANCHET',
+    'THIBAULT', 'CARON', 'COLIN', 'VIDAL', 'CARPENTIER', 'PICARD', 'RENAUD', 'LACROIX'
+];
+
+const PRENOMS_M_SIMULATION = [
+    'Lucas', 'Hugo', 'Léo', 'Nathan', 'Théo', 'Enzo', 'Mathis', 'Tom', 'Louis', 'Gabriel',
+    'Adam', 'Raphaël', 'Arthur', 'Jules', 'Paul', 'Maxime', 'Antoine', 'Alexandre', 'Ethan', 'Baptiste',
+    'Clément', 'Quentin', 'Romain', 'Timéo', 'Noah', 'Sacha', 'Maël', 'Aaron', 'Eliott', 'Rayan',
+    'Yanis', 'Marius', 'Titouan', 'Evan', 'Mathéo', 'Noé', 'Thomas', 'Nolan', 'Ayden', 'Ilan'
+];
+
+const PRENOMS_F_SIMULATION = [
+    'Emma', 'Léa', 'Chloé', 'Manon', 'Camille', 'Sarah', 'Louise', 'Jade', 'Alice', 'Lina',
+    'Rose', 'Anna', 'Inès', 'Zoé', 'Mila', 'Léna', 'Juliette', 'Ambre', 'Lou', 'Mya',
+    'Nina', 'Clara', 'Maëlys', 'Éva', 'Charlotte', 'Romane', 'Lola', 'Capucine', 'Océane', 'Yasmine',
+    'Alicia', 'Assia', 'Léana', 'Solène', 'Victoire', 'Apolline', 'Faustine', 'Adèle', 'Anouk', 'Élise'
+];
+
+function _genererEleveSimule(usedIds) {
+    const sexe = Math.random() < 0.5 ? 'M' : 'F';
+    const prenom = sexe === 'M'
+        ? PRENOMS_M_SIMULATION[Math.floor(Math.random() * PRENOMS_M_SIMULATION.length)]
+        : PRENOMS_F_SIMULATION[Math.floor(Math.random() * PRENOMS_F_SIMULATION.length)];
+    const nom = NOMS_SIMULATION[Math.floor(Math.random() * NOMS_SIMULATION.length)];
+
+    let baseId = `${nom}_${prenom.charAt(0)}`;
+    let id = baseId;
+    let suffixe = 0;
+    while (usedIds.has(id)) {
+        suffixe++;
+        id = `${baseId}${suffixe}`;
+    }
+    usedIds.add(id);
+
+    // VMA : distribution normale centrée sur 12, écart-type ~2, bornée 8-18
+    const gauss = (Math.random() + Math.random() + Math.random() - 1.5) * 2.5;
+    const vma = Math.max(8, Math.min(18, Math.round((12 + gauss) * 10) / 10));
+
+    return {
+        id,
+        nom,
+        prenom,
+        sexe,
+        dateNaissance: '',
+        vma,
+        palier: 0,
+        longueur: null,
+        sprint30: null,
+        force: 0,
+        commentaire: '',
+        codeAutoEval: 0
+    };
+}
+
+window.crossSimulerCrossComplet = async function() {
+    if (!confirm('🌊 GÉNÉRATION D\'UN CROSS COMPLET\n\nCela va :\n- Générer des élèves fictifs dans plusieurs classes\n- Attribuer des dossards\n- Simuler des arrivées sur les 4 courses\n\n⚠️ Les données cross actuelles seront REMPLACÉES.\n\nContinuer ?')) return;
+
+    const nbClassesParNiveau = Math.min(10, parseInt(prompt('Nombre de classes PAR NIVEAU (max 10) ?\n\n→ 8 = configuration réaliste d\'un collège\n→ Total = 4 × ce nombre', '8')) || 8);
+    const nbParClasse = Math.min(30, parseInt(prompt('Élèves par classe (max 30) ?', '25')) || 25);
+
+    const nbTotalClasses = nbClassesParNiveau * 4;
+    const nbTotalEleves = nbTotalClasses * nbParClasse;
+
+    console.log(`🌊 Simulation : ${nbTotalClasses} classes × ${nbParClasse} élèves = ${nbTotalEleves} élèves`);
+
+    // --- Construction des classes : 601 à 60X, puis 501 à 50X, etc. ---
+    const niveaux = ['6', '5', '4', '3'];
+    const classes = [];
+    for (const niveau of niveaux) {
+        for (let i = 1; i <= nbClassesParNiveau; i++) {
+            classes.push(`${niveau}0${i}`);   // 601, 602, ... puis 501, 502...
+        }
+    }
+    console.log(`Classes : ${classes.join(', ')}`);
+
+    // --- Nettoyage des données cross ---
+    localStorage.removeItem('eps_arena_cross_dossards');
+    localStorage.removeItem('eps_arena_cross_dossards_inv');
+    localStorage.removeItem('eps_arena_cross_statuts');
+    localStorage.removeItem('eps_arena_cross_classes');
+
+    // --- Génération des élèves + dossards ---
+    const usedIds = new Set();
+    const elevesParClasse = {};
+    const dossards = {};
+    const invDossards = {};
+    let dossardCourant = 1;
+
+    // Attribution des dossards par ordre alphabétique global (classe puis nom)
+    for (const classe of classes) {
+        const eleves = [];
+        for (let i = 0; i < nbParClasse; i++) {
+            const e = _genererEleveSimule(usedIds);
+            e.codeAutoEval = i + 1;
+            eleves.push(e);
+        }
+        // Tri alphabétique interne
+        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+        eleves.forEach((e, idx) => { e.codeAutoEval = idx + 1; });
+        elevesParClasse[classe] = eleves;
+    }
+
+    // Attribution des dossards (ordre : classe puis nom)
+    for (const classe of classes) {
+        for (const e of elevesParClasse[classe]) {
+            dossards[String(dossardCourant)] = e.id;
+            invDossards[e.id] = String(dossardCourant);
+            dossardCourant++;
+        }
+    }
+
+    // --- Sauvegarde locale ---
+    for (const [classe, eleves] of Object.entries(elevesParClasse)) {
+        saveEleves(classe, eleves);
+    }
+    localStorage.setItem('eps_arena_cross_dossards', JSON.stringify(dossards));
+    localStorage.setItem('eps_arena_cross_dossards_inv', JSON.stringify(invDossards));
+    localStorage.setItem('eps_arena_cross_classes', JSON.stringify(classes));
+    localStorage.setItem('eps_arena_cross_statuts', JSON.stringify({}));
+
+    console.log(`✅ ${nbTotalEleves} élèves et ${dossardCourant - 1} dossards sauvegardés`);
+
+    // --- Simulation Firebase ---
+    const COURSES_SIM = [
+        { id: 'course1', sexe: 'F', niveaux: ['6', '5'], label: '6e+5e Filles' },
+        { id: 'course2', sexe: 'M', niveaux: ['6', '5'], label: '6e+5e Garçons' },
+        { id: 'course3', sexe: 'F', niveaux: ['4', '3'], label: '4e+3e Filles' },
+        { id: 'course4', sexe: 'M', niveaux: ['4', '3'], label: '4e+3e Garçons' }
+    ];
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const basePath = `etablissements/0680013V/profs/${profCode}/cross`;
+
+    const { db: fdb, ref: fref, set: fset } = await import('../../core/firebase-service.js');
+
+    // Reset des 4 courses
+    for (const c of COURSES_SIM) {
+        try {
+            await fset(fref(fdb, `${basePath}/courses/${c.id}/go`), null);
+            await fset(fref(fdb, `${basePath}/courses/${c.id}/arrivees`), null);
+        } catch (e) {
+            console.warn(`[Simu] Erreur reset ${c.id} :`, e);
+        }
+    }
+
+    let totalArrivees = 0;
+    const statsCourses = [];
+
+    for (const course of COURSES_SIM) {
+        // Sélection des élèves de cette course
+        const elevesCourse = [];
+        for (const [classe, eleves] of Object.entries(elevesParClasse)) {
+            const niveau = classe.charAt(0);
+            if (!course.niveaux.includes(niveau)) continue;
+            for (const e of eleves) {
+                if (e.sexe !== course.sexe) continue;
+                const dossard = invDossards[e.id];
+                elevesCourse.push({ ...e, dossard, niveau });
+            }
+        }
+
+        if (elevesCourse.length === 0) continue;
+
+        // Calcul des temps (corrélés à la VMA avec bruit réaliste)
+        elevesCourse.forEach(e => {
+            const baseFactor = 0.78 + (e.vma - 10) / 40;
+            const bruit = (Math.random() - 0.5) * 0.15;
+            const facteur = Math.max(0.68, Math.min(0.95, baseFactor + bruit));
+            const vCible = e.vma * facteur;
+            const tempsSec = (2500 / 1000) / vCible * 3600;
+            e.tempsMs = Math.round(tempsSec * 1000);
+        });
+
+        // Tri par temps
+        elevesCourse.sort((a, b) => a.tempsMs - b.tempsMs);
+
+        // GO : il y a 20 minutes
+        const goTimestamp = Date.now() - 20 * 60 * 1000;
+
+        // Construction de l'objet arrivées
+        const arrivees = {};
+        elevesCourse.forEach((e, idx) => {
+            const arriveeTs = goTimestamp + e.tempsMs;
+            arrivees[`sim_${goTimestamp}_${idx}`] = {
+                dossard: String(e.dossard),
+                timestamp: arriveeTs,
+                source: 'simulation'
+            };
+        });
+
+        try {
+            await fset(fref(fdb, `${basePath}/courses/${course.id}/go`), {
+                timestamp: goTimestamp,
+                profCode,
+                simule: true
+            });
+            await fset(fref(fdb, `${basePath}/courses/${course.id}/arrivees`), arrivees);
+            totalArrivees += elevesCourse.length;
+
+            // Compter par niveau
+            const nb6 = elevesCourse.filter(e => e.niveau === '6').length;
+            const nb5 = elevesCourse.filter(e => e.niveau === '5').length;
+            const nb4 = elevesCourse.filter(e => e.niveau === '4').length;
+            const nb3 = elevesCourse.filter(e => e.niveau === '3').length;
+            let detail = [];
+            if (nb6) detail.push(`6e: ${nb6}`);
+            if (nb5) detail.push(`5e: ${nb5}`);
+            if (nb4) detail.push(`4e: ${nb4}`);
+            if (nb3) detail.push(`3e: ${nb3}`);
+
+            statsCourses.push(`${course.label} : ${elevesCourse.length} arrivées (${detail.join(' · ')})`);
+            console.log(`✅ ${course.id} : ${elevesCourse.length} arrivées — ${detail.join(' · ')}`);
+        } catch (err) {
+            console.error(`❌ Erreur ${course.id} :`, err);
+        }
+    }
+
+    // Transmission Firebase (config courses + élèves)
+    try {
+        const { transmettreCrossConfig } = await import('./cross-transmit.js');
+        const res = await transmettreCrossConfig();
+        console.log('✅ Config transmise aux iPads :', res);
+    } catch (err) {
+        console.warn('⚠️ Transmission config échouée :', err);
+    }
+
+    alert(`🌊 Simulation terminée !\n\n📊 Bilan :\n- ${nbTotalClasses} classes (${nbClassesParNiveau} par niveau)\n- ${nbTotalEleves} élèves\n- ${dossardCourant - 1} dossards attribués\n- ${totalArrivees} arrivées simulées\n\n${statsCourses.join('\n')}\n\nVa dans Cross → Course pour voir le résultat.`);
+
+    // Rafraîchir l'interface
+    const c = document.getElementById('cross-content');
+    if (c) initCrossDossards(c);
+};
