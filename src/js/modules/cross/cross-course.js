@@ -429,25 +429,41 @@ function demarrerEcouteScan() {
 // ENREGISTREMENT D'UNE ARRIVÉE
 // ============================================================
 async function enregistrerArrivee(dossard) {
+    console.log(`🚨 [ARRIVEE] Début pour dossard="${dossard}"`);
     const course = COURSES_DEFAUT.find(c => c.id === currentCourseId);
     const eleve = tousLesEleves[String(dossard)];
 
+    console.log(`🚨 [ARRIVEE] Course active :`, course);
+    console.log(`🚨 [ARRIVEE] Élève :`, eleve);
+
     // 1. Dossard inconnu
     if (!eleve) {
+        console.log(`🚨 [ARRIVEE] REJET 1 : dossard inconnu`);
         sonDossardInconnu();
         afficherToast(`⚠️ Dossard ${dossard} inconnu`, 'red');
         return;
     }
 
     // 2. Élève absent / inapte
+    console.log(`🚨 [ARRIVEE] Test statut : "${eleve.statut}" (doit être "present")`);
     if (eleve.statut !== 'present') {
+        console.log(`🚨 [ARRIVEE] REJET 2 : statut ${eleve.statut}`);
         sonDossardInconnu();
         afficherToast(`⚠️ ${eleve.prenom} est ${eleve.statut}`, 'amber');
         return;
     }
 
-    // 3. Vérification course (sexe + niveau) — DÉCLENCHE L'ALARME FORTE
-    if (!estDansLaCourse(eleve, course)) {
+    // 3. Vérification course
+    const dansCourse = estDansLaCourse(eleve, course);
+    console.log(`🚨 [ARRIVEE] Test catégorie :`, {
+        sexeEleve: eleve.sexe,
+        sexeCourse: course?.sexe,
+        niveauEleve: getNiveauFromClasse(eleve.classe),
+        niveauxCourse: course?.niveaux,
+        resultat: dansCourse
+    });
+    if (!dansCourse) {
+        console.log(`🚨 [ARRIVEE] REJET 3 : mauvais sexe ou niveau`);
         sonErreurCategorie();
         const raison = eleve.sexe !== course.sexe
             ? `dossard ${eleve.sexe === 'F' ? 'fille' : 'garçon'} dans une course ${course.sexe === 'F' ? 'filles' : 'garçons'}`
@@ -458,13 +474,16 @@ async function enregistrerArrivee(dossard) {
 
     // 4. Anti-doublon
     const deja = Object.values(arriveesActuelles).find(a => String(a.dossard) === String(dossard));
+    console.log(`🚨 [ARRIVEE] Test anti-doublon :`, { deja: !!deja, nbArrivees: Object.keys(arriveesActuelles).length });
     if (deja) {
+        console.log(`🚨 [ARRIVEE] REJET 4 : déjà scanné`);
         sonDossardInconnu();
         afficherToast(`⚠️ Dossard ${dossard} déjà enregistré`, 'amber');
         return;
     }
 
-    // 5. Enregistrement — SCAN VALIDE
+    // 5. Enregistrement
+    console.log(`🚨 [ARRIVEE] ✅ ENREGISTREMENT`);
     sonScanValide();
     const basePath = getCrossBasePath();
     const arriveesRef = ref(db, `${basePath}/courses/${currentCourseId}/arrivees`);
