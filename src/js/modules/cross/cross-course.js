@@ -22,10 +22,88 @@ let chronoInterval = null;
 let currentGoTimestamp = null;
 
 // ============================================================
+// SIGNALÉTIQUE SONORE (Web Audio API)
+// ============================================================
+let _audioCtx = null;
+
+function initAudioCtx() {
+    if (!_audioCtx) {
+        try {
+            _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (e) {
+            console.warn('[Cross] AudioContext non disponible');
+        }
+    }
+    if (_audioCtx && _audioCtx.state === 'suspended') {
+        _audioCtx.resume();
+    }
+    return _audioCtx;
+}
+
+/**
+ * Joue une séquence de bips.
+ * @param {Array} sequence - [{ freq, duration, waveform?, delay? }, ...]
+ * @param {number} volume - 0 à 1
+ */
+function jouerSequence(sequence, volume = 0.5) {
+    const ctx = initAudioCtx();
+    if (!ctx) return;
+
+    let startTime = ctx.currentTime;
+    sequence.forEach(note => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = note.waveform || 'sine';
+        osc.frequency.value = note.freq;
+
+        const dur = note.duration / 1000;
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(volume, startTime + 0.005);
+        gain.gain.setValueAtTime(volume, startTime + dur - 0.01);
+        gain.gain.linearRampToValueAtTime(0, startTime + dur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + dur);
+
+        startTime += (note.duration + (note.delay || 30)) / 1000;
+    });
+}
+
+// Son de validation : bip court aigu et discret
+function sonScanValide() {
+    jouerSequence([
+        { freq: 1400, duration: 70, waveform: 'sine' }
+    ], 0.3);
+}
+
+// Alarme forte pour erreur de catégorie (fille dans course garçons, etc.)
+function sonErreurCategorie() {
+    const seq = [];
+    for (let i = 0; i < 3; i++) {
+        seq.push({ freq: 880, duration: 160, waveform: 'square', delay: 0 });
+        seq.push({ freq: 500, duration: 160, waveform: 'square', delay: 20 });
+    }
+    jouerSequence(seq, 0.55);
+}
+
+// Bip grave court pour dossard inconnu / déjà scanné / statut non présent
+function sonDossardInconnu() {
+    jouerSequence([
+        { freq: 220, duration: 220, waveform: 'square' }
+    ], 0.4);
+}
+
+// ============================================================
 // INITIALISATION
 // ============================================================
 export function initCrossCourse(container) {
     if (!container) return;
+
+    // Déverrouillage audio au premier clic / touche (nécessaire pour Chrome)
+    document.addEventListener('click', () => initAudioCtx(), { once: true });
+    document.addEventListener('keydown', () => initAudioCtx(), { once: true });
 
     chargerMappingEleves();
     currentCourseId = localStorage.getItem(KEYS.COURSE_ACTIVE) || 'course1';
@@ -93,7 +171,7 @@ function render(container) {
                 </div>
             </div>
 
-                        <!-- Diffusion + URLs + QR codes -->
+            <!-- Diffusion + URLs + QR codes -->
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-blue-500/40">
                 <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
                     <h3 class="font-black text-blue-400 uppercase text-sm">📡 Diffusion aux iPads</h3>
@@ -157,7 +235,6 @@ function render(container) {
 
     attacherListenersFirebase();
     demarrerEcouteScan();
-        // Génère les QR codes après que le DOM soit prêt
     setTimeout(() => genererQRCodes(), 100);
 }
 
@@ -187,9 +264,6 @@ function attacherListenersFirebase() {
 // ============================================================
 // CONTRÔLES GO / ARRÊT
 // ============================================================
-// ============================================================
-// CONTRÔLES GO / ARRÊT
-// ============================================================
 function afficherControles(go) {
     const container = document.getElementById('cross-course-controls');
     if (!container) return;
@@ -200,7 +274,6 @@ function afficherControles(go) {
 
     currentGoTimestamp = enCours ? go.timestamp : null;
 
-    // Nettoyage ancien interval
     if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
 
     container.innerHTML = `
@@ -236,14 +309,13 @@ function afficherControles(go) {
         `}
     `;
 
-    // Lance le chrono live si la course est en cours
     if (enCours) {
         demarrerChronoLive();
     }
 }
 
 // ============================================================
-// CHRONO LIVE (mise à jour du DOM sans re-render)
+// CHRONO LIVE
 // ============================================================
 function demarrerChronoLive() {
     if (chronoInterval) clearInterval(chronoInterval);
@@ -270,7 +342,6 @@ function afficherArrivees() {
         .map(([id, a]) => ({ id, ...a }))
         .sort((a, b) => a.timestamp - b.timestamp);
 
-    // Comptage par niveau
     const nbParNiveau = {};
     const course = COURSES_DEFAUT.find(c => c.id === currentCourseId);
     course?.niveaux.forEach(n => nbParNiveau[n] = 0);
@@ -288,7 +359,6 @@ function afficherArrivees() {
         countEl.textContent = `${arriveesTriees.length} arrivant${arriveesTriees.length > 1 ? 's' : ''} — ${details}`;
     }
 
-    // ✅ Mise à jour du compteur dans le bandeau chrono (live)
     const liveCountEl = document.getElementById('cross-course-live-count');
     if (liveCountEl) {
         liveCountEl.textContent = `${arriveesTriees.length} arrivant${arriveesTriees.length > 1 ? 's' : ''}`;
@@ -299,7 +369,6 @@ function afficherArrivees() {
         return;
     }
 
-    // Reconstruction du rang par niveau (dans l'ordre du tri)
     const compteurNiveau = {};
     course?.niveaux.forEach(n => compteurNiveau[n] = 0);
 
@@ -344,6 +413,7 @@ function demarrerEcouteScan() {
                 return;
             }
         }
+        sonDossardInconnu();
         afficherToast(`⚠️ Dossard "${brut}" inconnu`, 'red');
     });
 }
@@ -357,21 +427,24 @@ async function enregistrerArrivee(dossard) {
 
     // 1. Dossard inconnu
     if (!eleve) {
+        sonDossardInconnu();
         afficherToast(`⚠️ Dossard ${dossard} inconnu`, 'red');
         return;
     }
 
     // 2. Élève absent / inapte
     if (eleve.statut !== 'present') {
+        sonDossardInconnu();
         afficherToast(`⚠️ ${eleve.prenom} est ${eleve.statut}`, 'amber');
         return;
     }
 
-    // 3. Vérification course (sexe + niveau)
+    // 3. Vérification course (sexe + niveau) — DÉCLENCHE L'ALARME FORTE
     if (!estDansLaCourse(eleve, course)) {
+        sonErreurCategorie();
         const raison = eleve.sexe !== course.sexe
-            ? `c'est un dossard ${eleve.sexe === 'F' ? 'fille' : 'garçon'}`
-            : `la classe ${eleve.classe} n'est pas dans cette course`;
+            ? `dossard ${eleve.sexe === 'F' ? 'fille' : 'garçon'} dans une course ${course.sexe === 'F' ? 'filles' : 'garçons'}`
+            : `classe ${eleve.classe} non prévue dans cette course`;
         afficherToast(`❌ ${eleve.prenom} ${eleve.nom} : ${raison}`, 'red');
         return;
     }
@@ -379,11 +452,13 @@ async function enregistrerArrivee(dossard) {
     // 4. Anti-doublon
     const deja = Object.values(arriveesActuelles).find(a => String(a.dossard) === String(dossard));
     if (deja) {
+        sonDossardInconnu();
         afficherToast(`⚠️ Dossard ${dossard} déjà enregistré`, 'amber');
         return;
     }
 
-    // 5. Enregistrement
+    // 5. Enregistrement — SCAN VALIDE
+    sonScanValide();
     const basePath = getCrossBasePath();
     const arriveesRef = ref(db, `${basePath}/courses/${currentCourseId}/arrivees`);
     await push(arriveesRef, {
@@ -396,6 +471,9 @@ async function enregistrerArrivee(dossard) {
     refocusScanInput();
 }
 
+// ============================================================
+// TOASTS
+// ============================================================
 function afficherToast(msg, couleur = 'emerald') {
     const bgMap = {
         emerald: 'bg-emerald-600',
@@ -417,11 +495,13 @@ window.crossCourseSelect = (courseId) => {
     localStorage.setItem(KEYS.COURSE_ACTIVE, courseId);
     const container = document.getElementById('cross-content');
     if (container) initCrossCourse(container);
-    // Génère les QR codes après que le DOM soit prêt
     setTimeout(() => genererQRCodes(), 100);
 };
 
 window.crossCourseGo = async () => {
+    // Déverrouillage audio (geste utilisateur)
+    initAudioCtx();
+
     const basePath = getCrossBasePath();
     const goRef = ref(db, `${basePath}/courses/${currentCourseId}/go`);
     await set(goRef, {
@@ -434,11 +514,9 @@ window.crossCourseGo = async () => {
 window.crossCourseArreter = async () => {
     if (!confirm('Arrêter la course en cours ?\n\nLes arrivées sont conservées. Les kiosks élèves basculeront en mode "En attente".')) return;
 
-    // Nettoyage local prof
     if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
     stopScanListener();
 
-    // ✅ Supprime le nœud "go" sur Firebase pour arrêter les kiosks
     const basePath = getCrossBasePath();
     try {
         await remove(ref(db, `${basePath}/courses/${currentCourseId}/go`));
@@ -448,7 +526,6 @@ window.crossCourseArreter = async () => {
         afficherToast('❌ Erreur lors de l\'arrêt', 'red');
     }
 
-    // Le listener Firebase onValue va automatiquement rafraîchir l'affichage
     refocusScanInput();
 };
 
@@ -467,6 +544,7 @@ window.crossCourseManualScan = (val) => {
     const dossard = String(val).replace(/\D/g, '');
     if (!dossard) return;
     if (!tousLesEleves[dossard]) {
+        sonDossardInconnu();
         afficherToast(`⚠️ Dossard "${dossard}" inconnu`, 'red');
         return;
     }
@@ -529,13 +607,12 @@ window.crossCopyURL = (url) => {
     navigator.clipboard.writeText(url).then(() => {
         afficherToast('✅ URL copiée', 'emerald');
     }).catch(() => {
-        // Fallback : prompt pour copie manuelle
         prompt('Copie cette URL :', url);
     });
 };
 
 // ============================================================
-// GÉNÉRATION DES QR CODES (après le rendu)
+// GÉNÉRATION DES QR CODES
 // ============================================================
 function genererQRCodes() {
     if (typeof QRCode === 'undefined') {
@@ -554,7 +631,7 @@ function genererQRCodes() {
     Object.entries(urls).forEach(([id, url]) => {
         const container = document.getElementById(`qr-${id}`);
         if (!container) return;
-        container.innerHTML = ''; // vide avant régénération
+        container.innerHTML = '';
         try {
             new QRCode(container, {
                 text: url,
