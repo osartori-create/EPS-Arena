@@ -108,6 +108,8 @@ export function initCrossCourse(container) {
     chargerMappingEleves();
     currentCourseId = localStorage.getItem(KEYS.COURSE_ACTIVE) || 'course1';
     render(container);
+    // ✅ Redonner le focus au scanner après le rendu
+    setTimeout(() => refocusScanInput(), 200);
 }
 
 function chargerMappingEleves() {
@@ -207,9 +209,10 @@ function render(container) {
                 </label>
                 <div class="flex gap-2">
                     <input type="number" id="cross-manual-input"
-                           placeholder="N° dossard"
-                           class="flex-1 bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-2xl font-black text-center"
-                           onkeydown="if(event.key==='Enter'){window.crossCourseManualScan(this.value);this.value='';}">
+       placeholder="N° dossard"
+       class="flex-1 bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-2xl font-black text-center"
+       onkeydown="if(event.key==='Enter'){window.crossCourseManualScan(this.value);this.value='';}"
+       onblur="setTimeout(() => window.crossRefocusScan?.(), 200)">
                     <button onclick="window.crossCourseManualScan(document.getElementById('cross-manual-input').value);document.getElementById('cross-manual-input').value='';"
                             class="bg-emerald-600 hover:bg-emerald-500 px-6 rounded-xl font-black text-white">
                         ✅ Ajouter
@@ -529,7 +532,6 @@ window.crossCourseSelect = (courseId) => {
 };
 
 window.crossCourseGo = async () => {
-    // Déverrouillage audio (geste utilisateur)
     initAudioCtx();
 
     const basePath = getCrossBasePath();
@@ -538,7 +540,8 @@ window.crossCourseGo = async () => {
         timestamp: Date.now(),
         profCode: localStorage.getItem('eps_arena_profCode') || 'DEFAULT'
     });
-    refocusScanInput();
+    // ✅ Redonner le focus au scanner
+    setTimeout(() => refocusScanInput(), 100);
 };
 
 window.crossCourseArreter = async () => {
@@ -687,3 +690,4 @@ window.crossCourseTransmettre = async () => {
         afficherToast(`❌ Erreur transmission : ${err.message}`, 'red');
     }
 };
+window.crossRefocusScan = refocusScanInput;
