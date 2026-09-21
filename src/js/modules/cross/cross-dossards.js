@@ -204,14 +204,15 @@ window.crossDossardsGenererPDF = async function() {
 // ============================================================
 async function dessinerDossard(doc, eleve, x0, y0) {
     const ean = generateEan13(eleve.dossard);
-    const eanSansCle = ean.slice(0, -1);   // 12 chiffres sans clé
+    const eanSansCle = ean.slice(0, -1);
+    const vma = parseFloat(eleve.vma) || 0;
 
     // Cadre de coupe fin gris
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.2);
     doc.rect(x0, y0, DOS_W, DOS_H);
 
-    // ---- Code-barres vertical à GAUCHE (12 mm de large) ----
+    // ---- Code-barres vertical à GAUCHE ----
     const barCodeLatW = 14;
     try {
         const eanImg = await genererImageCodeBarres(ean, true);
@@ -220,93 +221,107 @@ async function dessinerDossard(doc, eleve, x0, y0) {
         console.warn('[Dossards] Erreur code-barres latéral :', err);
     }
 
-    // Zone utile (à droite du code-barres latéral)
+    // Zone utile
     const zoneX = x0 + barCodeLatW + 4;
     const zoneW = DOS_W - barCodeLatW - 8;
     const centreX = zoneX + zoneW / 2;
 
-    // ---- Pictogramme coureur si VMA >= 12 ----
-    const vma = parseFloat(eleve.vma) || 0;
     let cursorY = y0 + 4;
+
+    // ---- Pictogramme coureur si VMA >= 12 (20 mm, centré) ----
     if (vma >= VMA_SEUIL_COUREUR) {
-        try {
-            const imgCoureur = await genererImageCoureur();
-            if (imgCoureur) {
-                const imgSize = 22;
-                doc.addImage(imgCoureur, 'PNG', centreX - imgSize / 2, cursorY, imgSize, imgSize);
-                cursorY += imgSize + 2;
-            }
-        } catch (err) {
-            console.warn('[Dossards] Erreur pictogramme coureur :', err);
+        const img = await genererImageCoureur();
+        if (img) {
+            const imgSize = 20;
+            doc.addImage(img, 'PNG', centreX - imgSize / 2, cursorY, imgSize, imgSize);
         }
     }
+    // Espace réservé même sans picto pour garder un alignement identique
+    cursorY += 21;
 
     // ---- Numéro géant ----
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(118);
+    doc.setFontSize(110);
     doc.setTextColor(0, 0, 0);
-    doc.text(`#${eleve.dossard}`, centreX, cursorY + 48, { align: 'center' });
-    cursorY += 52;
+    doc.text(`#${eleve.dossard}`, centreX, cursorY + 42, { align: 'center' });
+    cursorY += 46;
 
     // ---- Nom Prénom ----
     doc.setFontSize(20);
     doc.setTextColor(20, 20, 20);
-    doc.text(`${eleve.prenom} ${eleve.nom}`, centreX, cursorY + 6, { align: 'center' });
-    cursorY += 12;
+    doc.text(`${eleve.prenom} ${eleve.nom}`, centreX, cursorY + 5, { align: 'center' });
+    cursorY += 10;
+
+    // ---- Code-barres horizontal JUSTE SOUS LE NOM ----
+    const barH = 22;
+    const barW = Math.min(zoneW - 40, 120);
+    const barX = centreX - barW / 2;
+
+    try {
+        const eanImg = await genererImageCodeBarres(ean, false);
+        doc.addImage(eanImg, 'PNG', barX, cursorY, barW, barH);
+    } catch (err) {
+        console.warn('[Dossards] Erreur code-barres bas :', err);
+    }
+    cursorY += barH + 1;
+
+    // ---- Numéro humain SOUS le code-barres (12 chiffres sans la clé) ----
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(0, 0, 0);
+    doc.text(eanSansCle, centreX, cursorY + 3, { align: 'center' });
+    cursorY += 9;
 
     // ---- Classe + Catégorie ----
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(80, 80, 80);
     const cat = getCategorieCourse(eleve);
     doc.text(`Classe ${eleve.classe}  ·  ${cat.label}`, centreX, cursorY + 4, { align: 'center' });
-    cursorY += 10;
+    cursorY += 9;
 
-    // ---- Contrat avec temps cible ----
-    const contratStr = getContratString(vma);
-    doc.setFontSize(11);
+    // ---- Contrat (2 lignes) ----
+    const contrat = getContratLignes(vma);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
     doc.setTextColor(90, 90, 90);
-    doc.text(contratStr, centreX, cursorY + 4, { align: 'center' });
-
-    // ---- Code-barres horizontal en BAS ----
-    const barH = 28;
-    const barW = Math.min(zoneW - 30, 130);
-    const barX = centreX - barW / 2;
-    const barY = y0 + DOS_H - barH - 12;
-
-    try {
-        const eanImg = await genererImageCodeBarres(ean, false);
-        doc.addImage(eanImg, 'PNG', barX, barY, barW, barH);
-    } catch (err) {
-        console.warn('[Dossards] Erreur code-barres bas :', err);
-    }
-
-    // ---- Numéro humain SOUS le code-barres (SANS la clé) ----
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0);
-    doc.text(eanSansCle, centreX, y0 + DOS_H - 3, { align: 'center' });
+    doc.text(contrat.ligne1, centreX, cursorY + 4, { align: 'center' });
+    doc.text(contrat.ligne2, centreX, cursorY + 11, { align: 'center' });
 }
 
 // ============================================================
-// TEXTE DU CONTRAT AVEC TEMPS CIBLE CALCULÉ
+// TEXTE DU CONTRAT (2 LIGNES) AVEC TEMPS CIBLE
 // ============================================================
-function getContratString(vma) {
+function getContratLignes(vma) {
     const distanceM = DISTANCE_CONTRAT_M;  // 2500 m
+
     if (!vma || vma <= 0) {
-        return `CONTRAT : ${distanceM} m · 80 % VMA · adapte ton allure`;
+        return {
+            ligne1: 'En gérant ton effort (80% VMA), adapte ton allure sur le parcours',
+            ligne2: `Distance contrat : ${distanceM} m`
+        };
     }
+
+    // Vitesse cible à 80% VMA (km/h)
     const v80 = vma * 0.8;
-    const tempsHeures = (distanceM / 1000) / v80;
-    const tempsMinutes = tempsHeures * 60;
-    const min = Math.floor(tempsMinutes);
-    const sec = Math.round((tempsMinutes - min) * 60);
 
-    // Gestion du cas où sec arrondit à 60
-    let m = min, s = sec;
-    if (s >= 60) { m += 1; s -= 60; }
+    // Temps total = distance / vitesse (converti en minutes)
+    const tempsMinTotal = (distanceM / 1000) / v80 * 60;
+    // Mi-parcours (1250 m)
+    const tempsMinMi = tempsMinTotal / 2;
 
-    const secStr = String(s).padStart(2, '0');
-    return `CONTRAT : ${distanceM} m en moins de ${m}'${secStr}'' (80 % VMA)`;
+    const fmt = (minutes) => {
+        const m = Math.floor(minutes);
+        const s = Math.round((minutes - m) * 60);
+        // Cas où les secondes arrondissent à 60
+        if (s >= 60) return `${m + 1}mn00`;
+        return `${m}mn${s}`;
+    };
+
+    return {
+        ligne1: `En gérant ton effort (80% VMA), tu es capable de réaliser le parcours en moins de ${fmt(tempsMinTotal)}`,
+        ligne2: `Temps estimé à mi-parcours : ${fmt(tempsMinMi)}`
+    };
 }
 
 // ============================================================
