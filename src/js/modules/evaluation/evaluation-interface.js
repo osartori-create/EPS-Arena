@@ -45,14 +45,24 @@ export function initEvaluationInterface() {
     function chargerDonneesClasse() {
         const classe = select.value;
         if (!classe) {
+            currentData = null;
+            currentClasse = '';
+            currentEleves = [];
+            currentIndex = 0;
+            currentMode = 'menu';
             container.innerHTML = '<p class="text-slate-500 text-center py-10">Veuillez sélectionner une classe.</p>';
             return;
         }
 
+        // Réinitialise l'état avant de charger la nouvelle classe, pour éviter
+        // tout résidu de la classe précédente.
+        currentData = null;
         currentClasse = classe;
+        currentEleves = [];
+        currentIndex = 0;
+
         const elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
         currentData = loadOrCreateData(classe, elevesData);
-        currentData.classe = classe;
 
         if (currentMode === 'passation') {
             currentMode = 'menu';

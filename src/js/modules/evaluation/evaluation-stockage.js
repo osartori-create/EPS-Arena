@@ -33,6 +33,7 @@ export function sauvegarderDonnees(classe, data) {
 
 export function creerStructureVide(classe, eleves) {
     const data = {
+        classe: classe,
         eleves: {},
         config: {
             tests_actifs: {
@@ -75,43 +76,69 @@ export function creerStructureVide(classe, eleves) {
     return data;
 }
 
+function creerEleve(e) {
+    return {
+        id: e.id,
+        nom: e.nom || '',
+        prenom: e.prenom || '',
+        sexe: e.sexe || '',
+        statut: 'present',
+        resultats: {
+            endurance: null,
+            force: null,
+            vitesse: null,
+            equilibre: null,
+            coordination: null,
+            souplesse: null,
+            endurance_musculaire: null
+        }
+    };
+}
+
 export function loadOrCreateData(classe, eleves) {
     let data = chargerDonnees(classe);
     if (!data) {
         data = creerStructureVide(classe, eleves);
-    } else {
-        let modifie = false;
-        eleves.forEach(e => {
-            if (!data.eleves[e.id]) {
-                data.eleves[e.id] = {
-                    id: e.id,
-                    nom: e.nom || '',
-                    prenom: e.prenom || '',
-                    sexe: e.sexe || '',
-                    statut: 'present',
-                    resultats: {
-                        endurance: null,
-                        force: null,
-                        vitesse: null,
-                        equilibre: null,
-                        coordination: null,
-                        souplesse: null,
-                        endurance_musculaire: null
-                    }
-                };
+        data.classe = classe;
+        return data;
+    }
+
+    data.classe = classe;
+
+    let modifie = false;
+
+    // Réconciliation : la liste admin (eps_arena_eleves_${classe}) est la source
+    // de vérité. On ajoute/maj les élèves présents, et on SUPPRIME ceux qui n'y
+    // sont plus, afin d'éviter le cumul entre classes (élèves fantômes).
+    const idsAdmin = new Set();
+    eleves.forEach(e => {
+        idsAdmin.add(e.id);
+        if (!data.eleves[e.id]) {
+            data.eleves[e.id] = creerEleve(e);
+            modifie = true;
+        } else {
+            const el = data.eleves[e.id];
+            if (el.nom !== e.nom || el.prenom !== e.prenom || el.sexe !== e.sexe) {
+                el.nom = e.nom || el.nom;
+                el.prenom = e.prenom || el.prenom;
+                el.sexe = e.sexe || el.sexe;
                 modifie = true;
-            } else {
-                const el = data.eleves[e.id];
-                if (el.nom !== e.nom || el.prenom !== e.prenom || el.sexe !== e.sexe) {
-                    el.nom = e.nom || el.nom;
-                    el.prenom = e.prenom || el.prenom;
-                    el.sexe = e.sexe || el.sexe;
-                    modifie = true;
-                }
+            }
+        }
+    });
+
+    // Garde-fou : on ne supprime pas si la liste admin est vide, pour ne pas
+    // effacer des résultats si l'admin n'est pas (encore) chargée.
+    if (idsAdmin.size > 0) {
+        Object.keys(data.eleves).forEach(id => {
+            if (!idsAdmin.has(id)) {
+                delete data.eleves[id];
+                modifie = true;
             }
         });
-        if (modifie) sauvegarderDonnees(classe, data);
     }
+
+    if (modifie) sauvegarderDonnees(classe, data);
     return data;
 }
 
