@@ -44,7 +44,7 @@ export function initLayout() {
 
     // 1. Gestion des onglets (CORRIGÉ : on n'utilise plus el.style.display pour les vues standard)
     window.switchTab = function(tabName) {
-    ['admin', 'activities', 'live', 'tools', 'evaluations', 'sync'].forEach(t => {
+    ['admin', 'activities', 'live', 'tools', 'evaluations', 'sync', 'cross'].forEach(t => {
         const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
         const el = document.getElementById(viewId);
         if (el) el.classList.add('hidden');
@@ -64,7 +64,7 @@ export function initLayout() {
         }
     });
 
-    const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5', 'evaluations': '6', 'sync': '7' };
+    const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5', 'evaluations': '6', 'sync': '7', 'cross': '8' };
 
     if (tabName !== 'tv') {
         const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
@@ -78,11 +78,14 @@ export function initLayout() {
     if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
     if (tabName === 'evaluations') {
-        import('../../modules/grilles/grilles-interface.js').then(m => {
-            m.initGrillesInterface();
-        }).catch(err => console.error('Erreur init Grilles :', err));
-    }
-    if (tabName === 'sync') {
+    import('../../modules/grilles/grilles-interface.js').then(m => {
+        m.initGrillesInterface();
+    }).catch(err => console.error('Erreur init Grilles :', err));
+}
+if (tabName === 'cross') {
+    import('../../modules/cross/cross-interface.js').then(m => m.initCrossInterface());
+}
+if (tabName === 'sync') {
     setTimeout(() => {
         if (window.syncAfficherResume) window.syncAfficherResume();
     }, 50);
