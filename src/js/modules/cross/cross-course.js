@@ -406,15 +406,22 @@ function afficherArrivees() {
 // ============================================================
 function demarrerEcouteScan() {
     startScanListener((brut) => {
+        console.log('🔍 [SCAN] Brut reçu :', JSON.stringify(brut));
         const candidats = normaliserScan(brut);
+        console.log('🔍 [SCAN] Candidats :', candidats);
+        console.log('🔍 [SCAN] Clés tousLesEleves (début) :', Object.keys(tousLesEleves).slice(0, 20));
+        console.log('🔍 [SCAN] tousLesEleves["18"] :', tousLesEleves['18']);
         for (const dossard of candidats) {
+            console.log(`🔍 [SCAN] Test candidat "${dossard}" :`, tousLesEleves[dossard] ? '✅ trouvé' : '❌ absent');
             if (tousLesEleves[dossard]) {
+                console.log(`🔍 [SCAN] → enregistrerArrivee(${dossard})`);
                 enregistrerArrivee(dossard);
                 return;
             }
         }
         sonDossardInconnu();
         afficherToast(`⚠️ Dossard "${brut}" inconnu`, 'red');
+        console.log('🔍 [SCAN] Aucun candidat trouvé — abandon');
     });
 }
 
