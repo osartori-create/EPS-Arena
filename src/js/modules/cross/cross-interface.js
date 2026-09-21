@@ -2,6 +2,7 @@
 import { initCrossPrep } from './cross-prep.js';
 import { initCrossCourse } from './cross-course.js';
 import { initCrossDossards } from './cross-dossards.js';
+import { initCrossResults } from './cross-results.js';
 
 let currentTab = 'prep';
 
@@ -28,6 +29,10 @@ export function initCrossInterface() {
             class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">
         🎫 Dossards
     </button>
+    <button id="cross-tab-results" onclick="window.crossSetTab('results')"
+        class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">
+    📊 Résultats
+</button>
 `;
         container.appendChild(nav);
     }
@@ -52,6 +57,8 @@ function renderCurrentTab(content) {
         initCrossCourse(content);
     } else if (currentTab === 'dossards') {
         initCrossDossards(content);
+    } else if (currentTab === 'results') {
+        initCrossResults(content);
     }
 }
 
@@ -60,7 +67,7 @@ window.crossSetTab = (tab) => {
     const actifs = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
     const inactifs = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
 
-    ['prep', 'course', 'dossards'].forEach(t => {
+    ['prep', 'course', 'dossards', 'results'].forEach(t => {
         const el = document.getElementById(`cross-tab-${t}`);
         if (el) el.className = (t === tab) ? actifs : inactifs;
     });
