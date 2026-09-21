@@ -150,7 +150,9 @@ function renderTableau() {
         vus.add(arr.dossard);
         const eleve = tousLesEleves[String(arr.dossard)];
         if (!eleve) return;
-        const tempsBrut = goTimestamp ? (arr.timestamp - goTimestamp) : null;
+        let tempsBrut = goTimestamp ? (arr.timestamp - goTimestamp) : null;
+        // Détection temps négatif (GO relancé après les arrivées)
+        if (tempsBrut !== null && tempsBrut < 0) tempsBrut = -1;
         elevesArrives.push({
             dossard: String(arr.dossard),
             eleve,
@@ -187,7 +189,6 @@ function renderTableau() {
     // Attribution des rangs (les exclus ne sont pas classés)
     course.niveaux.forEach(niveau => {
         const liste = parNiveau[niveau] || [];
-        // Trier : non-exclus d'abord par temps effectif, exclus à la fin
         liste.sort((a, b) => {
             if (a.exclu && !b.exclu) return 1;
             if (!a.exclu && b.exclu) return -1;
@@ -197,15 +198,27 @@ function renderTableau() {
             return a.tempsEffectif - b.tempsEffectif;
         });
 
-        const nbClassables = liste.filter(x => !x.exclu && x.tempsEffectif !== null).length;
+        const nbClassables = liste.filter(x => !x.exclu && x.tempsEffectif !== null && x.tempsEffectif !== -1).length;
         let rang = 0;
         liste.forEach(item => {
+            // ⚠️ Si temps incohérent (-1), on ne classe pas et on ne calcule rien
+            if (item.tempsEffectif === -1) {
+                item.rangNiveau = null;
+                item.nbArrivants = nbClassables;
+                item.pourcentageVMA = null;
+                item.ptsMotricite = 0;
+                item.ptsPerformance = 0;
+                item.noteBrute = 0;
+                item.noteFinale = 0;
+                item.incoherent = true;
+                return;
+            }
+
             if (!item.exclu && item.tempsEffectif !== null) {
                 rang++;
                 item.rangNiveau = rang;
                 item.nbArrivants = nbClassables;
 
-                // Calcul de la note
                 if (item.eleve.vma) {
                     const note = calculerNoteEleve({
                         tempsSec: Math.round(item.tempsEffectif / 1000),
@@ -236,16 +249,33 @@ function renderTableau() {
         });
     });
 
+    // Compter les incohérents
+    const tousLesItems = Object.values(parNiveau).flat();
+    const nbIncoherents = tousLesItems.filter(i => i.incoherent).length;
+
+    // Bandeau d'avertissement si besoin
+    let bandeauAlerte = '';
+    if (nbIncoherents > 0) {
+        bandeauAlerte = `
+            <div class="bg-red-900/40 border-2 border-red-500 p-3 rounded-xl mb-4 text-center">
+                <p class="text-red-300 font-bold">⚠️ ${nbIncoherents} temps incohérent(s) détecté(s)</p>
+                <p class="text-xs text-red-400 mt-1">
+                    Le GO a probablement été relancé après l'enregistrement des arrivées.
+                    Fais un <strong>Reset</strong> de la course concernée, ou relance une simulation.
+                </p>
+            </div>
+        `;
+    }
+
     // Afficher
     const niveauxTries = [...course.niveaux].sort((a, b) => parseInt(b) - parseInt(a));
 
-    let html = `
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    `;
+    let html = bandeauAlerte;
+    html += `<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">`;
 
     niveauxTries.forEach(niveau => {
         const liste = parNiveau[niveau] || [];
-        const nbClassables = liste.filter(x => !x.exclu && x.tempsEffectif !== null).length;
+        const nbClassables = liste.filter(x => !x.exclu && x.tempsEffectif !== null && x.tempsEffectif !== -1).length;
 
         html += `
             <div>
@@ -281,7 +311,15 @@ function renderTableau() {
             liste.forEach(item => {
                 const statut = STATUTS[item.statutVisuel] || STATUTS.normal;
                 const rowStyle = `border-left: 3px solid ${statut.couleur}; background: ${statut.bg};`;
-                const tempsAffiche = item.tempsEffectif !== null ? formatTemps(Math.round(item.tempsEffectif / 1000)) : '--';
+
+                // Affichage du temps avec gestion de l'incohérence
+                let tempsAffiche = '--';
+                if (item.incoherent) {
+                    tempsAffiche = '⚠️ Incohérent';
+                } else if (item.tempsEffectif !== null) {
+                    tempsAffiche = formatTemps(Math.round(item.tempsEffectif / 1000));
+                }
+
                 const medaille = item.rangNiveau === 1 ? '🥇' : item.rangNiveau === 2 ? '🥈' : item.rangNiveau === 3 ? '🥉' : '';
 
                 html += `
@@ -293,7 +331,7 @@ function renderTableau() {
                             ${item.commentaire ? `<div class="text-[10px] text-slate-400 italic">💬 ${item.commentaire}</div>` : ''}
                         </td>
                         <td class="p-1.5 text-slate-400">${item.eleve.classe}</td>
-                        <td class="p-1.5 text-right font-mono text-emerald-400">${tempsAffiche}</td>
+                        <td class="p-1.5 text-right font-mono ${item.incoherent ? 'text-red-400' : 'text-emerald-400'}">${tempsAffiche}</td>
                         <td class="p-1.5 text-right font-mono">${item.pourcentageVMA !== null ? item.pourcentageVMA.toFixed(1) + '%' : '—'}</td>
                         <td class="p-1.5 text-center font-black">${item.ptsMotricite}</td>
                         <td class="p-1.5 text-center font-black">${item.ptsPerformance}</td>
@@ -630,7 +668,10 @@ async function construireLignesCourse(courseId) {
         const niveau = getNiveauFromClasse(eleve.classe);
         if (!course.niveaux.includes(niveau)) return;
 
-        const tempsBrut = goTs ? (a.timestamp - goTs) : null;
+        let tempsBrut = goTs ? (a.timestamp - goTs) : null;
+        // ✅ Détection temps négatif : GO relancé après les arrivées
+        if (tempsBrut !== null && tempsBrut < 0) tempsBrut = -1;
+
         const modif = modifs[a.dossard] || null;
         const applique = appliquerModif(tempsBrut, modif);
         const statutVisuel = getStatutVisuel(modif);
@@ -662,19 +703,27 @@ async function construireLignesCourse(courseId) {
         liste.sort((a, b) => {
             if (a.exclu && !b.exclu) return 1;
             if (!a.exclu && b.exclu) return -1;
+            if (a.tempsEffectif === null && b.tempsEffectif === null) return 0;
             if (a.tempsEffectif === null) return 1;
             if (b.tempsEffectif === null) return -1;
             return a.tempsEffectif - b.tempsEffectif;
         });
 
-        const nbClassables = liste.filter(x => !x.exclu && x.tempsEffectif !== null).length;
+        // ✅ On ne compte que les élèves réellement classables
+        const nbClassables = liste.filter(x =>
+            !x.exclu && x.tempsEffectif !== null && x.tempsEffectif !== -1
+        ).length;
         let rang = 0;
 
         liste.forEach(item => {
             let noteBrute = 0, ptsMot = 0, ptsPerf = 0, pctVMA = null;
             let rangNiveau = null;
+            let incoherent = false;
 
-            if (!item.exclu && item.tempsEffectif !== null) {
+            // ✅ Cas temps incohérent (-1) : pas de classement, pas de calcul
+            if (item.tempsEffectif === -1) {
+                incoherent = true;
+            } else if (!item.exclu && item.tempsEffectif !== null) {
                 rang++;
                 rangNiveau = rang;
                 if (item.eleve.vma) {
@@ -700,26 +749,34 @@ async function construireLignesCourse(courseId) {
                 niveau: item.niveau + 'e',
                 sexe: item.eleve.sexe,
                 vma: item.eleve.vma,
-                temps: item.tempsEffectif !== null ? formatTemps(Math.round(item.tempsEffectif / 1000)) : '--',
+                temps: incoherent
+                    ? '⚠️ Incohérent'
+                    : (item.tempsEffectif !== null ? formatTemps(Math.round(item.tempsEffectif / 1000)) : '--'),
                 pctVMA,
                 ptsMot,
                 ptsPerf,
                 noteBrute,
                 penalitePts: item.penalitePts,
                 noteFinale: Math.max(0, noteBrute - item.penalitePts),
-                statutLabel: item.statutLabel,
+                statutLabel: incoherent ? 'Incohérent' : item.statutLabel,
                 commentaire: item.commentaire,
                 penaliteSecondes: item.penaliteSecondes,
-                tempsModifie: item.modifTemps
+                tempsModifie: item.modifTemps,
+                incoherent
             });
         });
     });
 
-    // Tri final : niveau décroissant puis rang croissant
+    // Tri final : niveau décroissant puis rang croissant (incohérents à la fin)
     result.sort((a, b) => {
         const na = parseInt(a.niveau), nb = parseInt(b.niveau);
         if (na !== nb) return nb - na;
-        if (a.rang === null && b.rang === null) return 0;
+        if (a.rang === null && b.rang === null) {
+            // Les deux sont non classés : incohérents en dernier
+            if (a.incoherent && !b.incoherent) return 1;
+            if (!a.incoherent && b.incoherent) return -1;
+            return a.nom.localeCompare(b.nom);
+        }
         if (a.rang === null) return 1;
         if (b.rang === null) return -1;
         return a.rang - b.rang;

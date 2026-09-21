@@ -534,13 +534,20 @@ window.crossCourseSelect = (courseId) => {
 window.crossCourseGo = async () => {
     initAudioCtx();
 
+    // ✅ Vérifier s'il y a déjà des arrivées
+    const nbArrivees = Object.keys(arriveesActuelles).length;
+    if (nbArrivees > 0) {
+        if (!confirm(`⚠️ Il y a déjà ${nbArrivees} arrivée(s) enregistrée(s) sur cette course.\n\nRelancer un GO va REINITIALISER le chrono, mais les arrivées déjà présentes auront des temps INCOHÉRENTS.\n\nVeux-tu vraiment relancer le GO ?\n\n(Dans le doute : clique ANNULER, puis fais "Reset" si tu veux repartir de zéro.)`)) {
+            return;
+        }
+    }
+
     const basePath = getCrossBasePath();
     const goRef = ref(db, `${basePath}/courses/${currentCourseId}/go`);
     await set(goRef, {
         timestamp: Date.now(),
         profCode: localStorage.getItem('eps_arena_profCode') || 'DEFAULT'
     });
-    // ✅ Redonner le focus au scanner
     setTimeout(() => refocusScanInput(), 100);
 };
 
