@@ -55,7 +55,7 @@ window.exportNatationLiveCSV = function() {
     }
     const container = document.getElementById('live-content');
     const rows = container.querySelectorAll('.natation-live-row');
-    let csv = '\uFEFF"!groupe";"Nom";"Prénom";"Temps (s)";"Coups";"Indice";"Niveau"\n';
+    let csv = '\uFEFF"N°";"Nom de famille";"Prénom";"Temps (s)";"Coups";"Indice";"Niveau"\n';
     rows.forEach(row => {
         csv += `"${row.dataset.numero || ''}";"${row.dataset.nom || ''}";"${row.dataset.prenom || ''}";"${row.dataset.temps || ''}";"${row.dataset.coups || ''}";"${row.dataset.indice || ''}";"${row.dataset.niveau || ''}"\n`;
     });

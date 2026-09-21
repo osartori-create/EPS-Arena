@@ -804,17 +804,17 @@ Sur iPad, si le fichier ne se télécharge pas via a.click(), c'est normal en mo
 13. Conventions d'export (iDoceo & Excel)
 13.1. Règle d'or
 Type de colonne	Préfixe	Exemple
-Identité (Nom)	!	!Nom
-Identité (Prénom)	!	!Prénom
+Identité (Nom)	aucun	Nom de famille
+Identité (Prénom)	aucun	Prénom
 Toute donnée	aucun	Endurance (palier), VMA (km/h)
-⚠️ Ne JAMAIS préfixer une colonne de données avec ! : iDoceo attend un nombre et rejette le texte → colonnes vides.
+⚠️ Ne JAMAIS préfixer une colonne (identité ou donnée) avec "!" : iDoceo rejette ces en-têtes lors de l'import guidé. Utiliser des en-têtes sans signe distinctif. Pour le nom, privilégier "Nom de famille" (reconnu nativement par iDoceo).
 
-⚠️ !groupe, !Sexe, !Statut sont inutiles dans EPS-Arena (identité = Nom + Prénom seuls).
+⚠️ !groupe, !Sexe, !Statut sont inutiles dans EPS-Arena (identité = Nom de famille + Prénom seuls).
 
 13.2. API services/export-service.js
 js
 import {
-    colonnesIdentite,   // → [{ nom: '!Nom', cle: 'nom' }, { nom: '!Prénom', cle: 'prenom' }]
+    colonnesIdentite,   // → [{ nom: 'Nom de famille', cle: 'nom' }, { nom: 'Prénom', cle: 'prenom' }]
     col,                // col('VMA (km/h)', 'vma') → { nom, cle } sans préfixe
     exporterVersIDoceo, // CSV iDoceo, BOM UTF-8, séparateur ;
     exporterVersExcel,  // XLSX multi-feuilles (SheetJS)

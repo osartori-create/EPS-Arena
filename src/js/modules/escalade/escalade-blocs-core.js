@@ -137,7 +137,7 @@ export function genererClassement(dataAgregees) {
 // ============================================================
 export function genererCSVBlocContest(dataAgregees, blocs) {
     const eleves = Object.values(dataAgregees.eleves).filter(e => e.statut === 'present');
-    const entete = ['"!groupe"', '"Nom"', '"Prénom"', '"Code"', ...blocs.map(b => `"${b.label}"`), '"Total Points"'];
+    const entete = ['"Groupe"', '"Nom de famille"', '"Prénom"', '"Code"', ...blocs.map(b => `"${b.label}"`), '"Total Points"'];
     const lignes = [entete.join(';')];
 
     eleves.forEach(e => {

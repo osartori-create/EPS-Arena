@@ -121,8 +121,8 @@ export const UNITES_TESTS = {
 // ============================================================
 // ============================================================
 // EXPORT iDoceo (via service centralisé) — v4
-// Format validé : identité avec préfixe "!", données SANS préfixe.
-// iDoceo fait le matching élèves via !Nom/!Prénom et détecte
+// Format validé : identité sans préfixe ("Nom de famille" / "Prénom"),
+// données SANS préfixe. iDoceo fait le matching élèves et détecte
 // automatiquement le type des colonnes de données.
 // ============================================================
 export function exporterVersIDoceo(data, classe) {

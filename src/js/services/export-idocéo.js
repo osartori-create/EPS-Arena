@@ -56,7 +56,7 @@ export function exportIDoceo({ students, results, className, activityName }) {
 
     // 3. Générer le CSV (avec BOM UTF-8 et guillemets)
     // IMPORTANT : On préfixe les colonnes d'identité avec "!" pour qu'iDoceo les garde groupées
-    let csv = "\uFEFF\"!groupe\",\"Nom\",\"Score\",\"Objectif\",\"Note /20\",\"Temps\"\n";
+    let csv = "\uFEFF\"Groupe\",\"Nom de famille\",\"Score\",\"Objectif\",\"Note /20\",\"Temps\"\n";
     exportData.forEach((r, idx) => {
         let rang = (r.score !== "") ? (idx + 1) : "";
         csv += `"${r.groupe}","${r.nomComplet}","${r.score}","${r.max}","${r.note}","${r.temps}"\n`;

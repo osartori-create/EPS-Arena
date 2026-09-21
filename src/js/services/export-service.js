@@ -6,7 +6,8 @@
 // ════════════════════════════════════════════════════════════
 //
 //  Export iDoceo (CSV) :
-//   • Identité : !Nom ; !Prénom  (préfixe "!" OBLIGATOIRE pour le matching)
+//   • Identité : "Nom de famille" ; "Prénom"  (SANS préfixe : iDoceo
+//     rejette les en-têtes contenant "!" ou tout autre signe distinctif).
 //   • Données  : AUCUN préfixe (iDoceo détecte nombre vs texte)
 //   • Séparateur : ";"  |  BOM UTF-8 obligatoire
 //
@@ -22,8 +23,8 @@ const XLSX = window.XLSX;
 // CONVENTIONS
 // ============================================================
 export const IDENTITE = {
-    nom: '!Nom',
-    prenom: '!Prénom'
+    nom: 'Nom de famille',
+    prenom: 'Prénom'
 };
 
 // ============================================================
@@ -32,7 +33,7 @@ export const IDENTITE = {
 
 /**
  * Renvoie les colonnes d'identité standard (à placer en tête)
- * → [{ nom: '!Nom', cle: 'nom' }, { nom: '!Prénom', cle: 'prenom' }]
+ * → [{ nom: 'Nom de famille', cle: 'nom' }, { nom: 'Prénom', cle: 'prenom' }]
  */
 export function colonnesIdentite() {
     return [
