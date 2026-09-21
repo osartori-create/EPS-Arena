@@ -431,12 +431,25 @@ window.crossCourseGo = async () => {
     refocusScanInput();
 };
 
-window.crossCourseArreter = () => {
-    if (!confirm('Arrêter la course en cours ?')) return;
+window.crossCourseArreter = async () => {
+    if (!confirm('Arrêter la course en cours ?\n\nLes arrivées sont conservées. Les kiosks élèves basculeront en mode "En attente".')) return;
+
+    // Nettoyage local prof
     if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
     stopScanListener();
-    afficherControles(null);
-    alert('Course arrêtée. Tu peux consulter les résultats.');
+
+    // ✅ Supprime le nœud "go" sur Firebase pour arrêter les kiosks
+    const basePath = getCrossBasePath();
+    try {
+        await remove(ref(db, `${basePath}/courses/${currentCourseId}/go`));
+        afficherToast('⏹ Course arrêtée', 'emerald');
+    } catch (err) {
+        console.error('[Cross] Erreur arrêt :', err);
+        afficherToast('❌ Erreur lors de l\'arrêt', 'red');
+    }
+
+    // Le listener Firebase onValue va automatiquement rafraîchir l'affichage
+    refocusScanInput();
 };
 
 window.crossCourseReset = async () => {
