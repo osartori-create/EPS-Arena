@@ -590,14 +590,13 @@ function renderClassement() {
         });
     });
 
-    const tousLesArrivants = [];
+    // Calcul des notes pour chaque niveau
     course.niveaux.forEach(niveau => {
         const liste = parNiveau[niveau] || [];
         const nbArrivants = liste.length;
         liste.forEach((item, idx) => {
             item.rangNiveau = idx + 1;
             item.nbArrivants = nbArrivants;
-
             if (item.tempsSec && item.vma) {
                 const note = calculerNoteEleve({
                     tempsSec: item.tempsSec,
@@ -605,43 +604,39 @@ function renderClassement() {
                     rang: item.rangNiveau,
                     nbArrivants: nbArrivants
                 });
-                item.pourcentageVMA  = note.pourcentageVMA;
-                item.ptsMotricite    = note.ptsMotricite;
-                item.ptsPerformance  = note.ptsPerformance;
-                item.noteTotale      = note.total;
+                item.pourcentageVMA = note.pourcentageVMA;
+                item.ptsMotricite   = note.ptsMotricite;
+                item.ptsPerformance = note.ptsPerformance;
+                item.noteTotale     = note.total;
             } else {
-                item.pourcentageVMA  = null;
-                item.ptsMotricite    = 0;
-                item.ptsPerformance  = 0;
-                item.noteTotale      = 0;
+                item.pourcentageVMA = null;
+                item.ptsMotricite = 0;
+                item.ptsPerformance = 0;
+                item.noteTotale = 0;
             }
-            tousLesArrivants.push(item);
         });
-    });
-
-    // Tri affichage : niveau décroissant (6e avant 5e) puis rang croissant
-    tousLesArrivants.sort((a, b) => {
-        const nA = parseInt(a.niveau), nB = parseInt(b.niveau);
-        if (nA !== nB) return nB - nA;
-        return a.rangNiveau - b.rangNiveau;
     });
 
     const niveauxLabel = course.niveaux.map(n => `${n}e`).join(' + ');
     const sexeLabel = course.sexe === 'F' ? 'Filles' : 'Garçons';
+
+    // Niveaux triés en ordre décroissant : 6e avant 5e, ou 4e avant 3e
+    const niveauxTries = [...course.niveaux].sort((a, b) => parseInt(b) - parseInt(a));
 
     container.innerHTML = `
         <style>
             .cl-body { background: #0f172a; min-height: 100vh; width: 100%; }
             .cl-row {
                 display: grid;
-                grid-template-columns: 80px 90px 55px 90px 90px 100px 70px 70px 80px;
+                grid-template-columns: 60px 75px 70px 80px 70px 55px 55px 65px;
                 align-items: center;
-                gap: 10px;
-                padding: 10px 16px;
+                gap: 6px;
+                padding: 8px 12px;
                 background: #1e293b;
-                border-radius: 10px;
-                margin-bottom: 6px;
+                border-radius: 8px;
+                margin-bottom: 4px;
                 border-left: 4px solid #334155;
+                font-size: 0.85rem;
             }
             .cl-row--top { border-left-color: #facc15; background: linear-gradient(90deg, #78350f20 0%, #1e293b 60%); }
             .cl-row--header {
@@ -650,10 +645,13 @@ function renderClassement() {
                 color: #64748b;
                 font-weight: 900;
                 text-transform: uppercase;
-                font-size: 0.7rem;
-                letter-spacing: 0.05em;
+                font-size: 0.62rem;
+                letter-spacing: 0.03em;
             }
             .cl-num { font-family: ui-monospace, monospace; font-weight: 900; }
+            @media (max-width: 900px) {
+                .cl-row { grid-template-columns: 40px 60px 45px 60px 60px 45px 45px 55px; gap: 4px; padding: 6px 8px; font-size: 0.72rem; }
+            }
         </style>
 
         <div class="cl-body flex flex-col">
@@ -669,70 +667,89 @@ function renderClassement() {
             </div>
 
             <div class="p-4 flex-1 overflow-y-auto">
-                ${tousLesArrivants.length === 0 ? `<div class="text-center py-20 text-slate-500 text-2xl">⏳ En attente des premiers arrivés...</div>` : `
-                    <div class="w-full max-w-6xl mx-auto">
-                        <div class="cl-row cl-row--header">
-                            <span>Place</span>
-                            <span>Dossard</span>
-                            <span class="text-center">Cat.</span>
-                            <span>Classe</span>
-                            <span class="text-right">Temps</span>
-                            <span class="text-right">% VMA</span>
-                            <span class="text-center">Mot.</span>
-                            <span class="text-center">Perf.</span>
-                            <span class="text-center">/20</span>
-                        </div>
-                        ${tousLesArrivants.map(item => {
-                            const isTop = item.rangNiveau <= 3;
-                            const rowCls = isTop ? 'cl-row--top' : '';
+                ${Object.values(parNiveau).every(l => l.length === 0) ? `
+                    <div class="text-center py-20 text-slate-500 text-2xl">⏳ En attente des premiers arrivés...</div>
+                ` : `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
 
-                            const pctColor = item.pourcentageVMA === null ? 'text-slate-500'
-                                : item.pourcentageVMA >= 75 ? 'text-emerald-400'
-                                : item.pourcentageVMA >= 70 ? 'text-lime-400'
-                                : item.pourcentageVMA >= 60 ? 'text-yellow-400'
-                                : item.pourcentageVMA >= 50 ? 'text-orange-400'
-                                : 'text-red-400';
-
-                            const motColor = item.ptsMotricite >= 13 ? 'text-emerald-400'
-                                : item.ptsMotricite >= 10 ? 'text-lime-400'
-                                : item.ptsMotricite >= 6  ? 'text-yellow-400'
-                                : item.ptsMotricite >= 3  ? 'text-orange-400'
-                                : 'text-red-400';
-
-                            const perfColor = item.ptsPerformance >= 5 ? 'text-emerald-400'
-                                : item.ptsPerformance >= 3 ? 'text-yellow-400'
-                                : 'text-orange-400';
-
-                            const noteColor = item.noteTotale >= 16 ? 'text-emerald-400'
-                                : item.noteTotale >= 12 ? 'text-lime-400'
-                                : item.noteTotale >= 8  ? 'text-yellow-400'
-                                : item.noteTotale >= 4  ? 'text-orange-400'
-                                : 'text-red-400';
-
-                            const medaille = item.rangNiveau === 1 ? '🥇'
-                                           : item.rangNiveau === 2 ? '🥈'
-                                           : item.rangNiveau === 3 ? '🥉' : '';
-
+                        ${niveauxTries.map(niveau => {
+                            const liste = parNiveau[niveau] || [];
                             return `
-                                <div class="cl-row ${rowCls}">
-                                    <span class="text-xl font-black text-yellow-400 flex items-center gap-1">
-                                        ${medaille}${medaille ? '' : item.rangNiveau}
-                                    </span>
-                                    <span class="cl-num text-lg text-white">#${item.dossard}</span>
-                                    <span class="text-center text-sm font-bold text-slate-400">${item.niveau}e</span>
-                                    <span class="text-sm font-bold text-slate-300">${item.classe}</span>
-                                    <span class="cl-num text-base text-emerald-400 text-right">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--'}</span>
-                                    <span class="cl-num text-base ${pctColor} text-right">${item.pourcentageVMA !== null ? item.pourcentageVMA.toFixed(1) + ' %' : '—'}</span>
-                                    <span class="text-center font-black ${motColor}">${item.ptsMotricite}</span>
-                                    <span class="text-center font-black ${perfColor}">${item.ptsPerformance}</span>
-                                    <span class="text-center font-black text-xl ${noteColor}">${item.noteTotale}</span>
+                                <div>
+                                    <div class="text-center mb-3">
+                                        <div class="text-4xl font-black text-white">${niveau}e</div>
+                                        <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">
+                                            ${liste.length} arrivant${liste.length > 1 ? 's' : ''}
+                                        </div>
+                                    </div>
+
+                                    <div class="cl-row cl-row--header">
+                                        <span>Place</span>
+                                        <span>Dossard</span>
+                                        <span>Classe</span>
+                                        <span class="text-right">Temps</span>
+                                        <span class="text-right">%VMA</span>
+                                        <span class="text-center">Mot.</span>
+                                        <span class="text-center">Perf.</span>
+                                        <span class="text-center">/20</span>
+                                    </div>
+
+                                    ${liste.length === 0 ? `
+                                        <div class="text-center py-8 text-slate-500 text-sm">En attente...</div>
+                                    ` : liste.map(item => {
+                                        const isTop = item.rangNiveau <= 3;
+                                        const rowCls = isTop ? 'cl-row--top' : '';
+
+                                        const pctColor = item.pourcentageVMA === null ? 'text-slate-500'
+                                            : item.pourcentageVMA >= 75 ? 'text-emerald-400'
+                                            : item.pourcentageVMA >= 70 ? 'text-lime-400'
+                                            : item.pourcentageVMA >= 60 ? 'text-yellow-400'
+                                            : item.pourcentageVMA >= 50 ? 'text-orange-400'
+                                            : 'text-red-400';
+
+                                        const motColor = item.ptsMotricite >= 13 ? 'text-emerald-400'
+                                            : item.ptsMotricite >= 10 ? 'text-lime-400'
+                                            : item.ptsMotricite >= 6  ? 'text-yellow-400'
+                                            : item.ptsMotricite >= 3  ? 'text-orange-400'
+                                            : 'text-red-400';
+
+                                        const perfColor = item.ptsPerformance >= 5 ? 'text-emerald-400'
+                                            : item.ptsPerformance >= 3 ? 'text-yellow-400'
+                                            : 'text-orange-400';
+
+                                        const noteColor = item.noteTotale >= 16 ? 'text-emerald-400'
+                                            : item.noteTotale >= 12 ? 'text-lime-400'
+                                            : item.noteTotale >= 8  ? 'text-yellow-400'
+                                            : item.noteTotale >= 4  ? 'text-orange-400'
+                                            : 'text-red-400';
+
+                                        const medaille = item.rangNiveau === 1 ? '🥇'
+                                                       : item.rangNiveau === 2 ? '🥈'
+                                                       : item.rangNiveau === 3 ? '🥉' : '';
+
+                                        return `
+                                            <div class="cl-row ${rowCls}">
+                                                <span class="text-base font-black text-yellow-400 flex items-center gap-1">
+                                                    ${medaille}${medaille ? '' : item.rangNiveau}
+                                                </span>
+                                                <span class="cl-num text-base text-white">#${item.dossard}</span>
+                                                <span class="font-bold text-slate-300">${item.classe}</span>
+                                                <span class="cl-num text-sm text-emerald-400 text-right">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--'}</span>
+                                                <span class="cl-num text-sm ${pctColor} text-right">${item.pourcentageVMA !== null ? item.pourcentageVMA.toFixed(1) + '%' : '—'}</span>
+                                                <span class="text-center font-black ${motColor}">${item.ptsMotricite}</span>
+                                                <span class="text-center font-black ${perfColor}">${item.ptsPerformance}</span>
+                                                <span class="text-center font-black text-base ${noteColor}">${item.noteTotale}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
                                 </div>
                             `;
                         }).join('')}
+
                     </div>
                     <p class="text-center text-xs text-slate-500 mt-6 max-w-3xl mx-auto">
-                        <strong class="text-slate-400">Mot.</strong> = points motricité /13 (contrat 2500 m, %VMA tenu) ·
-                        <strong class="text-slate-400">Perf.</strong> = points performance /7 (rang catégorie) ·
+                        <strong class="text-slate-400">Mot.</strong> = points motricité /13 ·
+                        <strong class="text-slate-400">Perf.</strong> = points performance /7 ·
                         <strong class="text-slate-400">/20</strong> = motricité + performance
                     </p>
                 `}
