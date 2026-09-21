@@ -1,23 +1,26 @@
 // src/js/modules/cross/cross-dossards.js
 // Génération PDF des dossards + import CSV + données bidons
-// A4 paysage, 2 dossards A5 (141 × 200 mm) côte à côte
+// A4 portrait · 2 dossards paysage empilés (200 × 141 mm)
 
 import {
     getTousLesElevesCross, setDossardPourEleve, getProchainDossardLibre,
-    getStatutsCross, setStatutsCross, getClassesParticipantes,
-    setClassesParticipantes, getDossards, setDossards
+    getStatutsCross, getClassesParticipantes,
+    setClassesParticipantes
 } from './cross-config.js';
-import { COURSES_DEFAUT, getNiveauFromClasse, generateEan13 } from './cross-core.js';
-import { getExistingEleves, saveEleves, migrerCodesAutoEval } from '../../services/admin-service.js';
+import { COURSES_DEFAUT, getNiveauFromClasse, generateEan13, DISTANCE_CONTRAT_M } from './cross-core.js';
+import { getExistingEleves, saveEleves } from '../../services/admin-service.js';
 
 const Papa = window.Papa;
 
-// Dimensions (mm)
-const A4_W = 297, A4_H = 210;
+// Dimensions (mm) — A4 portrait 210 × 297
+const A4_W = 210, A4_H = 297;
 const MARGE = 5;
 const ECART = 5;
-const DOS_W = (A4_W - 2 * MARGE - ECART) / 2;   // = 141 mm
-const DOS_H = A4_H - 2 * MARGE;                  // = 200 mm
+const DOS_W = A4_W - 2 * MARGE;      // = 200 mm
+const DOS_H = (A4_H - 2 * MARGE - ECART) / 2;  // = 141 mm
+
+// Seuil d'affichage du pictogramme coureur
+const VMA_SEUIL_COUREUR = 12;
 
 // ============================================================
 // POINT D'ENTRÉE
@@ -35,7 +38,6 @@ export function initCrossDossards(container) {
     container.innerHTML = `
         <div class="space-y-4">
 
-            <!-- Bandeau titre -->
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 flex justify-between items-center flex-wrap gap-3">
                 <div>
                     <h3 class="font-black text-blue-400 uppercase text-sm">🎫 Dossards Cross</h3>
@@ -54,7 +56,6 @@ export function initCrossDossards(container) {
                 </div>
             </div>
 
-            <!-- Stats -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
                     <div class="text-[10px] uppercase text-slate-400 font-bold">Présents</div>
@@ -74,11 +75,10 @@ export function initCrossDossards(container) {
                 </div>
             </div>
 
-            <!-- Filtre & génération -->
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Générer le PDF</h4>
                 <p class="text-xs text-slate-500 mb-3">
-                    Format : A4 paysage · 2 dossards A5 par page (141 × 200 mm) · EAN-13 · impression sur papier de couleur au choix.
+                    Format : A4 portrait · 2 dossards paysage par page (200 × 141 mm) · EAN-13 · impression sur papier de couleur au choix.
                 </p>
 
                 <label class="flex items-center gap-2 mb-3 text-xs text-slate-300">
@@ -109,11 +109,11 @@ export function initCrossDossards(container) {
                 </div>
             </div>
 
-            <!-- Note technique -->
             <div class="bg-slate-800 p-3 rounded-xl border border-slate-700">
                 <p class="text-xs text-slate-400">
                     💡 Le code-barres utilise le format <strong class="text-slate-200">EAN-13</strong> (12 chiffres + clé de contrôle).
-                    Ta douchette enverra le numéro suivi d'un Entrée — parfaitement géré par le module Course.
+                    Le numéro imprimé sous le code-barres n'affiche que les 12 chiffres utiles.
+                    Ta douchette enverra le numéro suivi d'un Entrée.
                 </p>
             </div>
 
@@ -176,16 +176,15 @@ window.crossDossardsGenererPDF = async function() {
         return;
     }
 
-    // Tri : par classe puis par dossard
     liste.sort((a, b) => {
         if (a.classe !== b.classe) return a.classe.localeCompare(b.classe);
         return a.dossard - b.dossard;
     });
 
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    // A4 portrait
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-    // Pour chaque paire de dossards → une page
     for (let i = 0; i < liste.length; i += 2) {
         const d1 = liste[i];
         const d2 = liste[i + 1] || null;
@@ -193,7 +192,7 @@ window.crossDossardsGenererPDF = async function() {
         if (i > 0) doc.addPage();
 
         await dessinerDossard(doc, d1, MARGE, MARGE);
-        if (d2) await dessinerDossard(doc, d2, MARGE + DOS_W + ECART, MARGE);
+        if (d2) await dessinerDossard(doc, d2, MARGE, MARGE + DOS_H + ECART);
     }
 
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -201,64 +200,76 @@ window.crossDossardsGenererPDF = async function() {
 };
 
 // ============================================================
-// DESSIN D'UN DOSSARD
+// DESSIN D'UN DOSSARD (paysage 200 × 141)
 // ============================================================
 async function dessinerDossard(doc, eleve, x0, y0) {
     const ean = generateEan13(eleve.dossard);
+    const eanSansCle = ean.slice(0, -1);   // 12 chiffres sans clé
 
-    // Cadre de coupe (fin, gris clair)
+    // Cadre de coupe fin gris
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.2);
     doc.rect(x0, y0, DOS_W, DOS_H);
 
-    // --- Bande verticale code-barres à gauche (12 mm de large) ---
-    const barCodeW = 12;
+    // ---- Code-barres vertical à GAUCHE (12 mm de large) ----
+    const barCodeLatW = 14;
     try {
         const eanImg = await genererImageCodeBarres(ean, true);
-        doc.addImage(eanImg, 'PNG', x0 + 1, y0 + 1, barCodeW - 2, DOS_H - 2);
+        doc.addImage(eanImg, 'PNG', x0 + 2, y0 + 4, barCodeLatW - 4, DOS_H - 8);
     } catch (err) {
-        console.warn('[Dossards] Impossible de générer le code-barres latéral :', err);
+        console.warn('[Dossards] Erreur code-barres latéral :', err);
     }
 
     // Zone utile (à droite du code-barres latéral)
-    const zoneX = x0 + barCodeW + 3;
-    const zoneW = DOS_W - barCodeW - 6;
+    const zoneX = x0 + barCodeLatW + 4;
+    const zoneW = DOS_W - barCodeLatW - 8;
     const centreX = zoneX + zoneW / 2;
 
-    // --- En-tête ---
+    // ---- Pictogramme coureur si VMA >= 12 ----
+    const vma = parseFloat(eleve.vma) || 0;
+    let cursorY = y0 + 4;
+    if (vma >= VMA_SEUIL_COUREUR) {
+        try {
+            const imgCoureur = await genererImageCoureur();
+            if (imgCoureur) {
+                const imgSize = 22;
+                doc.addImage(imgCoureur, 'PNG', centreX - imgSize / 2, cursorY, imgSize, imgSize);
+                cursorY += imgSize + 2;
+            }
+        } catch (err) {
+            console.warn('[Dossards] Erreur pictogramme coureur :', err);
+        }
+    }
+
+    // ---- Numéro géant ----
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(120, 120, 120);
-    doc.text('EPS-ARENA CROSS', centreX, y0 + 10, { align: 'center' });
-
-    // --- Numéro géant ---
-    doc.setFontSize(130);
+    doc.setFontSize(118);
     doc.setTextColor(0, 0, 0);
-    doc.text(`#${eleve.dossard}`, centreX, y0 + 90, { align: 'center' });
+    doc.text(`#${eleve.dossard}`, centreX, cursorY + 48, { align: 'center' });
+    cursorY += 52;
 
-    // --- Nom Prénom ---
-    doc.setFontSize(22);
+    // ---- Nom Prénom ----
+    doc.setFontSize(20);
     doc.setTextColor(20, 20, 20);
-    const nomPrenom = `${eleve.prenom} ${eleve.nom}`;
-    doc.text(nomPrenom, centreX, y0 + 115, { align: 'center' });
+    doc.text(`${eleve.prenom} ${eleve.nom}`, centreX, cursorY + 6, { align: 'center' });
+    cursorY += 12;
 
-    // --- Classe + Catégorie ---
-    const catInfo = getCategorieCourse(eleve);
-    doc.setFontSize(16);
+    // ---- Classe + Catégorie ----
+    doc.setFontSize(13);
     doc.setTextColor(80, 80, 80);
-    doc.text(`Classe ${eleve.classe}`, centreX, y0 + 128, { align: 'center' });
+    const cat = getCategorieCourse(eleve);
+    doc.text(`Classe ${eleve.classe}  ·  ${cat.label}`, centreX, cursorY + 4, { align: 'center' });
+    cursorY += 10;
 
-    doc.setFontSize(14);
-    doc.text(catInfo.label, centreX, y0 + 138, { align: 'center' });
-
-    // --- Contrat ---
+    // ---- Contrat avec temps cible ----
+    const contratStr = getContratString(vma);
     doc.setFontSize(11);
-    doc.setTextColor(120, 120, 120);
-    doc.text('CONTRAT : 2500 m · 2400 m annoncés · %VMA', centreX, y0 + 150, { align: 'center' });
+    doc.setTextColor(90, 90, 90);
+    doc.text(contratStr, centreX, cursorY + 4, { align: 'center' });
 
-    // --- Code-barres horizontal en bas ---
-    const barH = 30;
-    const barW = zoneW - 20;
+    // ---- Code-barres horizontal en BAS ----
+    const barH = 28;
+    const barW = Math.min(zoneW - 30, 130);
     const barX = centreX - barW / 2;
     const barY = y0 + DOS_H - barH - 12;
 
@@ -266,14 +277,36 @@ async function dessinerDossard(doc, eleve, x0, y0) {
         const eanImg = await genererImageCodeBarres(ean, false);
         doc.addImage(eanImg, 'PNG', barX, barY, barW, barH);
     } catch (err) {
-        console.warn('[Dossards] Impossible de générer le code-barres bas :', err);
+        console.warn('[Dossards] Erreur code-barres bas :', err);
     }
 
-    // Numéro humain sous le code-barres
-    doc.setFontSize(13);
-    doc.setFont('helvetica', 'bold');
+    // ---- Numéro humain SOUS le code-barres (SANS la clé) ----
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);
-    doc.text(ean, centreX, y0 + DOS_H - 3, { align: 'center' });
+    doc.text(eanSansCle, centreX, y0 + DOS_H - 3, { align: 'center' });
+}
+
+// ============================================================
+// TEXTE DU CONTRAT AVEC TEMPS CIBLE CALCULÉ
+// ============================================================
+function getContratString(vma) {
+    const distanceM = DISTANCE_CONTRAT_M;  // 2500 m
+    if (!vma || vma <= 0) {
+        return `CONTRAT : ${distanceM} m · 80 % VMA · adapte ton allure`;
+    }
+    const v80 = vma * 0.8;
+    const tempsHeures = (distanceM / 1000) / v80;
+    const tempsMinutes = tempsHeures * 60;
+    const min = Math.floor(tempsMinutes);
+    const sec = Math.round((tempsMinutes - min) * 60);
+
+    // Gestion du cas où sec arrondit à 60
+    let m = min, s = sec;
+    if (s >= 60) { m += 1; s -= 60; }
+
+    const secStr = String(s).padStart(2, '0');
+    return `CONTRAT : ${distanceM} m en moins de ${m}'${secStr}'' (80 % VMA)`;
 }
 
 // ============================================================
@@ -302,7 +335,7 @@ function genererImageCodeBarres(valeur, rotation) {
             return;
         }
 
-        // Rotation 90° : on tourne le canvas
+        // Rotation 90°
         const w = canvas.width;
         const h = canvas.height;
         const rot = document.createElement('canvas');
@@ -319,7 +352,34 @@ function genererImageCodeBarres(valeur, rotation) {
 }
 
 // ============================================================
-// CATÉGORIE DE COURSE D'UN ÉLÈVE
+// PICTOGRAMME COUREUR (emoji rendu via canvas)
+// ============================================================
+let _cacheCoureur = null;
+function genererImageCoureur() {
+    if (_cacheCoureur) return Promise.resolve(_cacheCoureur);
+
+    return new Promise((resolve) => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 256, 256);
+            ctx.font = '220px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🏃', 128, 138);
+            _cacheCoureur = canvas.toDataURL('image/png');
+            resolve(_cacheCoureur);
+        } catch (err) {
+            console.warn('[Dossards] Emoji coureur non disponible :', err);
+            resolve(null);
+        }
+    });
+}
+
+// ============================================================
+// CATÉGORIE DE COURSE
 // ============================================================
 function getCategorieCourse(eleve) {
     const niveau = getNiveauFromClasse(eleve.classe);
@@ -327,14 +387,11 @@ function getCategorieCourse(eleve) {
         c.sexe === eleve.sexe && c.niveaux.includes(niveau)
     );
     if (!course) return { label: '—', course };
-    return {
-        label: course.label,
-        course
-    };
+    return { label: course.label, course };
 }
 
 // ============================================================
-// IMPORT CSV (collègues)
+// IMPORT CSV
 // ============================================================
 window.crossDossardsImportCSV = function() {
     document.getElementById('crossDossardsCSVInput').click();
@@ -368,7 +425,6 @@ window.crossDossardsTraiterCSV = function(event) {
 };
 
 function traiterDonneesCSV(rows, headers) {
-    // Détection automatique des colonnes
     const findCol = (...aliases) => {
         for (const a of aliases) {
             const h = headers.find(x => x === a || x.includes(a));
@@ -451,7 +507,6 @@ function traiterDonneesCSV(rows, headers) {
             }
         });
 
-        // Attribution des codes auto-éval manquants
         existants.forEach(el => {
             if (el.codeAutoEval === undefined || el.codeAutoEval === null) {
                 let code = 1;
@@ -463,23 +518,20 @@ function traiterDonneesCSV(rows, headers) {
         saveEleves(classe, existants);
     });
 
-    // Mise à jour des classes participantes
     const actuelles = getClassesParticipantes();
     const nouvelles = Array.from(new Set([...actuelles, ...Object.keys(parClasse)]));
     setClassesParticipantes(nouvelles);
 
-    // Attribution automatique des dossards pour les nouveaux
     attribuerDossardsManquants();
 
     alert(`✅ Import terminé !\n\n${nbCrees} élève(s) créé(s)\n${nbModifies} élève(s) mis à jour\n${Object.keys(parClasse).length} classe(s)\n\nDossards attribués automatiquement.`);
 
-    // Rafraîchir l'onglet
     const c = document.getElementById('cross-content');
     if (c) initCrossDossards(c);
 }
 
 // ============================================================
-// ATTRIBUTION AUTOMATIQUE DES DOSSARDS MANQUANTS
+// ATTRIBUTION AUTO DES DOSSARDS MANQUANTS
 // ============================================================
 function attribuerDossardsManquants() {
     const eleves = getTousLesElevesCross();
@@ -535,7 +587,6 @@ window.crossDossardsDonneesBidons = function() {
         });
     }
 
-    // Attribution codes auto-éval
     const tous = [...elevesExistants, ...nouveaux];
     tous.forEach(el => {
         if (el.codeAutoEval === undefined || el.codeAutoEval === null) {
@@ -547,13 +598,11 @@ window.crossDossardsDonneesBidons = function() {
 
     saveEleves(classe, tous);
 
-    // Ajout à la liste des classes participantes
     const actuelles = getClassesParticipantes();
     if (!actuelles.includes(classe)) {
         setClassesParticipantes([...actuelles, classe]);
     }
 
-    // Attribution des dossards
     attribuerDossardsManquants();
 
     alert(`✅ ${nb} élèves fictifs ajoutés à la classe ${classe}.\nDossards attribués automatiquement.`);
