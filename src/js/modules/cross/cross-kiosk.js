@@ -38,6 +38,18 @@ export function initCrossKiosk(mode, params) {
     // ✅ Masquer TOUT le chrome de l'app élève (header, sélecteurs, boutons)
     masquerChromeEleve();
 
+        // ✅ Élargir le container principal pour les modes kiosk cross
+    const mainContainer = document.getElementById('main-container');
+    if (mainContainer) {
+        mainContainer.classList.remove('max-w-md');
+        mainContainer.classList.add('max-w-full', 'w-full');
+    }
+    const activityScreen = document.getElementById('activity-screen');
+    if (activityScreen) {
+        activityScreen.classList.remove('max-w-md');
+        activityScreen.classList.add('max-w-full', 'w-full', 'p-0');
+    }
+
     const activity = document.getElementById('activity-screen');
     if (activity) activity.classList.remove('hidden');
 
@@ -682,8 +694,11 @@ function renderClasse(arriveesParCourse) {
         ? Object.values(coursesMap)
         : COURSES_DEFAUT;
 
-    // Calcul du classement par classe
-    const rangsParClasse = {};
+    // ============================================================
+    // Agrégation : rangs par classe, global ET par sexe
+    // ============================================================
+    const rangsParClasse = {};       // { "607": [rangs...] }
+    const rangsParClasseSexe = {};   // { "607": { F: [rangs...], M: [rangs...] } }
     const statsParClasse = {};
 
     courses.forEach(course => {
@@ -706,15 +721,26 @@ function renderClasse(arriveesParCourse) {
             if (!parNiveau[niveau]) return;
             parNiveau[niveau].push({
                 dossard: arr.dossard,
-                classe: eleve.classe
+                classe: eleve.classe,
+                sexe: eleve.sexe || null
             });
         });
 
-        // Attribution des rangs + agrégation par classe
+        // Attribution des rangs + agrégation
         Object.entries(parNiveau).forEach(([niveau, liste]) => {
             liste.forEach((item, idx) => {
+                const rang = idx + 1;
+
+                // Rang global (tous sexes confondus, dans la catégorie du niveau)
                 if (!rangsParClasse[item.classe]) rangsParClasse[item.classe] = [];
-                rangsParClasse[item.classe].push(idx + 1);
+                rangsParClasse[item.classe].push(rang);
+
+                // Rang par sexe
+                if (!rangsParClasseSexe[item.classe]) {
+                    rangsParClasseSexe[item.classe] = { F: [], M: [] };
+                }
+                if (item.sexe === 'F') rangsParClasseSexe[item.classe].F.push(rang);
+                if (item.sexe === 'M') rangsParClasseSexe[item.classe].M.push(rang);
             });
         });
     });
@@ -727,48 +753,97 @@ function renderClasse(arriveesParCourse) {
         if (e.statut === 'inapte') statsParClasse[e.classe].inaptes++;
     });
 
+    // ============================================================
+    // Construction du classement
+    // ============================================================
     const classement = Object.entries(rangsParClasse).map(([classe, rangs]) => {
-        const moy = rangs.reduce((a, b) => a + b, 0) / rangs.length;
+        const moy = rangs.length > 0
+            ? rangs.reduce((a, b) => a + b, 0) / rangs.length
+            : null;
+
+        const sexeRangs = rangsParClasseSexe[classe] || { F: [], M: [] };
+        const moyF = sexeRangs.F.length > 0
+            ? sexeRangs.F.reduce((a, b) => a + b, 0) / sexeRangs.F.length
+            : null;
+        const moyM = sexeRangs.M.length > 0
+            ? sexeRangs.M.reduce((a, b) => a + b, 0) / sexeRangs.M.length
+            : null;
+
         const stats = statsParClasse[classe] || { absents: 0, inaptes: 0 };
         return {
             classe,
             niveau: classe.charAt(0),
-            moyenne: Math.round(moy * 10) / 10,
+            moyenne: moy !== null ? Math.round(moy * 10) / 10 : null,
+            moyenneF: moyF !== null ? Math.round(moyF * 10) / 10 : null,
+            moyenneM: moyM !== null ? Math.round(moyM * 10) / 10 : null,
             nbClasses: rangs.length,
+            nbF: sexeRangs.F.length,
+            nbM: sexeRangs.M.length,
             nbAbsents: stats.absents,
             nbInaptes: stats.inaptes
         };
-    }).sort((a, b) => a.moyenne - b.moyenne);
+    });
 
+    // Tri : par moyenne globale, les classes sans moyenne à la fin
+    classement.sort((a, b) => {
+        if (a.moyenne === null && b.moyenne === null) return a.classe.localeCompare(b.classe);
+        if (a.moyenne === null) return 1;
+        if (b.moyenne === null) return -1;
+        return a.moyenne - b.moyenne;
+    });
     classement.forEach((c, idx) => { c.rang = idx + 1; });
 
-    const totalArrivees = Object.values(arriveesParCourse || {}).reduce((sum, c) => sum + Object.keys(c).length, 0);
+    const totalArrivees = Object.values(arriveesParCourse || {}).reduce(
+        (sum, c) => sum + Object.keys(c).length, 0
+    );
     const enCours = totalArrivees > 0;
 
+    // ============================================================
+    // Rendu
+    // ============================================================
     container.innerHTML = `
         <style>
-            .classe-body { background: #0f172a; min-height: 100vh; }
+            .classe-body { background: #0f172a; min-height: 100vh; width: 100%; }
             .classe-row {
                 display: grid;
-                grid-template-columns: 90px 100px 140px 1fr 100px;
+                grid-template-columns: 90px 130px 90px 140px 140px 140px 1fr;
                 align-items: center;
-                gap: 12px;
-                padding: 12px 20px;
+                gap: 16px;
+                padding: 14px 24px;
                 background: #1e293b;
                 border-radius: 12px;
                 margin-bottom: 8px;
                 border-left: 4px solid #334155;
             }
-            .classe-row--gold { border-left-color: #facc15; background: linear-gradient(90deg, #78350f30 0%, #1e293b 60%); }
+            .classe-row--gold   { border-left-color: #facc15; background: linear-gradient(90deg, #78350f30 0%, #1e293b 60%); }
             .classe-row--silver { border-left-color: #94a3b8; }
             .classe-row--bronze { border-left-color: #d97706; }
+            .classe-row--header {
+                background: #0f172a;
+                border-left-color: transparent;
+                color: #64748b;
+                font-weight: 900;
+                text-transform: uppercase;
+                font-size: 0.75rem;
+                letter-spacing: 0.1em;
+            }
+            .classe-avg { font-family: ui-monospace, monospace; font-weight: 900; font-size: 1.5rem; }
+            .classe-avg--global  { color: #22c55e; }
+            .classe-avg--filles  { color: #ec4899; }
+            .classe-avg--garcons { color: #3b82f6; }
+            @media (max-width: 900px) {
+                .classe-row { grid-template-columns: 60px 90px 60px 100px 100px 100px 1fr; gap: 8px; padding: 10px 14px; }
+                .classe-avg { font-size: 1.1rem; }
+            }
         </style>
 
         <div class="classe-body flex flex-col">
             <div class="bg-slate-900 border-b-4 border-emerald-500 px-6 py-4 flex justify-between items-center">
                 <div>
                     <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Cross · Classement par classe</div>
-                    <div class="text-3xl font-black text-white">${classement.length} classe${classement.length > 1 ? 's' : ''} classée${classement.length > 1 ? 's' : ''}</div>
+                    <div class="text-3xl font-black text-white">
+                        ${classement.length} classe${classement.length > 1 ? 's' : ''} classée${classement.length > 1 ? 's' : ''}
+                    </div>
                 </div>
                 <div class="text-right">
                     <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Arrivées totales</div>
@@ -776,36 +851,53 @@ function renderClasse(arriveesParCourse) {
                 </div>
             </div>
 
-            <div class="p-6 flex-1 overflow-y-auto">
+            <div class="p-4 md:p-6 flex-1 overflow-y-auto w-full">
                 ${classement.length === 0 ? `<div class="text-center py-20 text-slate-500 text-2xl">⏳ En attente des résultats...</div>` : `
-                    <div class="max-w-5xl mx-auto">
-                        <div class="classe-row" style="background: #0f172a; border-left-color: transparent; font-weight: 900; color: #64748b; text-transform: uppercase; font-size: 0.75rem;">
+                    <div class="w-full">
+                        <div class="classe-row classe-row--header">
                             <span>Rang</span>
                             <span>Classe</span>
                             <span class="text-center">Niveau</span>
-                            <span>Moyenne des rangs catégorie</span>
-                            <span class="text-right">Élèves</span>
+                            <span class="text-center">Rang moyen</span>
+                            <span class="text-center">👩 Filles</span>
+                            <span class="text-center">👦 Garçons</span>
+                            <span class="text-right">Effectif</span>
                         </div>
                         ${classement.map(c => {
-                            const cls = c.rang === 1 ? 'classe-row--gold' : c.rang === 2 ? 'classe-row--silver' : c.rang === 3 ? 'classe-row--bronze' : '';
+                            const cls = c.rang === 1 ? 'classe-row--gold'
+                                      : c.rang === 2 ? 'classe-row--silver'
+                                      : c.rang === 3 ? 'classe-row--bronze' : '';
                             const medaille = c.rang === 1 ? '🥇' : c.rang === 2 ? '🥈' : c.rang === 3 ? '🥉' : `${c.rang}.`;
+
+                            const fmtMoy = (v) => v !== null ? v.toFixed(1) : '—';
+
                             return `
                                 <div class="classe-row ${cls}">
                                     <span class="text-2xl font-black text-yellow-400">${medaille}</span>
                                     <span class="text-2xl font-black text-white">${c.classe}</span>
                                     <span class="text-center text-sm font-bold text-slate-400">${c.niveau}e</span>
-                                    <span class="text-2xl font-mono font-black text-emerald-400">${c.moyenne}</span>
+                                    <span class="classe-avg classe-avg--global text-center">${fmtMoy(c.moyenne)}</span>
+                                    <span class="classe-avg classe-avg--filles text-center">
+                                        ${fmtMoy(c.moyenneF)}
+                                        <span class="block text-[10px] text-slate-500 font-normal">${c.nbF} filles</span>
+                                    </span>
+                                    <span class="classe-avg classe-avg--garcons text-center">
+                                        ${fmtMoy(c.moyenneM)}
+                                        <span class="block text-[10px] text-slate-500 font-normal">${c.nbM} garçons</span>
+                                    </span>
                                     <span class="text-right text-sm">
                                         <span class="text-white font-bold">${c.nbClasses}</span>
-                                        ${c.nbAbsents > 0 ? `<span class="text-red-400 ml-1">(${c.nbAbsents}A)</span>` : ''}
-                                        ${c.nbInaptes > 0 ? `<span class="text-amber-400 ml-1">(${c.nbInaptes}I)</span>` : ''}
+                                        ${c.nbAbsents > 0 ? `<span class="text-red-400 ml-1" title="Absents">(${c.nbAbsents}A)</span>` : ''}
+                                        ${c.nbInaptes > 0 ? `<span class="text-amber-400 ml-1" title="Inaptes">(${c.nbInaptes}I)</span>` : ''}
                                     </span>
                                 </div>
                             `;
                         }).join('')}
                     </div>
-                    <p class="text-center text-xs text-slate-500 mt-4">
-                        Moyenne = rang moyen dans la catégorie (niveau). Plus petit = meilleur.
+                    <p class="text-center text-xs text-slate-500 mt-6 max-w-2xl mx-auto">
+                        Moyenne = rang moyen dans la catégorie de niveau.
+                        <strong class="text-slate-400">Plus petit = meilleur.</strong>
+                        Les colonnes Filles/Garçons affinent selon le sexe.
                     </p>
                 `}
             </div>
