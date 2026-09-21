@@ -45,6 +45,19 @@ const btnQuit = document.getElementById('btn-quit');
 const btnBackTerrain = document.getElementById('btn-back-terrain');
 
 export function initApp() {
+    // ✅ DÉTECTION MODE CROSS KIOSK (URL paramétrée)
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    if (mode && mode.startsWith('cross-')) {
+        console.log('[eleve] Mode cross kiosk détecté :', mode);
+        import('../../modules/cross/cross-kiosk.js').then(m => {
+            m.initCrossKiosk(mode, params);
+        }).catch(err => {
+            console.error('Erreur chargement kiosk cross :', err);
+        });
+        return;  // on ne continue PAS le flux normal
+    }
+
     currentConfig = null;
     showWaiting();
 
