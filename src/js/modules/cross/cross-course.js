@@ -242,6 +242,10 @@ function render(container) {
 // ÉCOUTE FIREBASE
 // ============================================================
 function attacherListenersFirebase() {
+    // ✅ Reset IMMÉDIAT des variables avant de réattacher les listeners
+    arriveesActuelles = {};
+    currentGoTimestamp = null;
+
     if (arriveesListener) { arriveesListener(); arriveesListener = null; }
     if (goListener) { goListener(); goListener = null; }
     if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
