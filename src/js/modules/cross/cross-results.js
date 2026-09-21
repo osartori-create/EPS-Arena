@@ -584,28 +584,45 @@ window.crossResultsExportExcel = async function() {
     XLSX.writeFile(wb, `Cross_Resultats_${dateStr}.xlsx`);
 };
 
-async function construireLignesCourse(courseId) {
-    // Pour chaque course, on doit lire Firebase
-    const { db, ref, get } = await import('../../core/firebase-service.js');
+// ============================================================
+// LECTURE FIREBASE (via onValue onlyOnce — get n'est pas exporté)
+// ============================================================
+async function lireFirebase(path) {
+    const { db, ref, onValue } = await import('../../core/firebase-service.js');
+    return new Promise(resolve => {
+        onValue(ref(db, path), snap => resolve(snap.val()), { onlyOnce: true });
+    });
+}
+
+async function chargerDonneesCourse(courseId) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const basePath = `etablissements/0680013V/profs/${profCode}/cross/courses/${courseId}`;
 
-    const [goSnap, arrSnap, modifSnap] = await Promise.all([
-        get(ref(db, `${basePath}/go`)),
-        get(ref(db, `${basePath}/arrivees`)),
-        get(ref(db, `${basePath}/modifications`))
+    const [go, arr, modifs] = await Promise.all([
+        lireFirebase(`${basePath}/go`),
+        lireFirebase(`${basePath}/arrivees`),
+        lireFirebase(`${basePath}/modifications`)
     ]);
 
-    const goTs = goSnap.val()?.timestamp || null;
-    const arr = arrSnap.val() || {};
-    const modifs = modifSnap.val() || {};
+    return {
+        goTs: go?.timestamp || null,
+        arrivees: arr || {},
+        modifs: modifs || {}
+    };
+}
 
+// ============================================================
+// CALCUL DES LIGNES D'UNE COURSE (avec rangs et notes)
+// ============================================================
+async function construireLignesCourse(courseId) {
+    const { goTs, arrivees, modifs } = await chargerDonneesCourse(courseId);
     const course = COURSES_DEFAUT.find(c => c.id === courseId);
+    if (!course) return [];
 
-    // Construire les arrivées triées
+    // --- Étape 1 : liste des arrivées uniques avec temps bruts ---
     const vus = new Set();
     const items = [];
-    Object.values(arr).sort((a, b) => a.timestamp - b.timestamp).forEach(a => {
+    Object.values(arrivees).sort((a, b) => a.timestamp - b.timestamp).forEach(a => {
         if (vus.has(a.dossard)) return;
         vus.add(a.dossard);
         const eleve = tousLesEleves[String(a.dossard)];
@@ -628,11 +645,13 @@ async function construireLignesCourse(courseId) {
             statutLabel: STATUTS[statutVisuel]?.label || 'Normal',
             exclu: applique.excluDuClassement,
             commentaire: applique.commentaire,
-            penalitePts: applique.penalitePoints
+            penalitePts: applique.penalitePoints,
+            modifTemps: modif?.tempsModifie || null,
+            penaliteSecondes: modif?.penaliteSecondes || 0
         });
     });
 
-    // Groupement par niveau + attribution des rangs
+    // --- Étape 2 : groupement par niveau + rangs + notes ---
     const parNiveau = {};
     course.niveaux.forEach(n => parNiveau[n] = []);
     items.forEach(i => parNiveau[i.niveau]?.push(i));
@@ -650,12 +669,14 @@ async function construireLignesCourse(courseId) {
 
         const nbClassables = liste.filter(x => !x.exclu && x.tempsEffectif !== null).length;
         let rang = 0;
+
         liste.forEach(item => {
             let noteBrute = 0, ptsMot = 0, ptsPerf = 0, pctVMA = null;
+            let rangNiveau = null;
 
             if (!item.exclu && item.tempsEffectif !== null) {
                 rang++;
-                item.rang = rang;
+                rangNiveau = rang;
                 if (item.eleve.vma) {
                     const note = calculerNoteEleve({
                         tempsSec: Math.round(item.tempsEffectif / 1000),
@@ -671,7 +692,7 @@ async function construireLignesCourse(courseId) {
             }
 
             result.push({
-                rang: item.rang || null,
+                rang: rangNiveau,
                 dossard: item.dossard,
                 nom: item.eleve.nom,
                 prenom: item.eleve.prenom,
@@ -687,12 +708,14 @@ async function construireLignesCourse(courseId) {
                 penalitePts: item.penalitePts,
                 noteFinale: Math.max(0, noteBrute - item.penalitePts),
                 statutLabel: item.statutLabel,
-                commentaire: item.commentaire
+                commentaire: item.commentaire,
+                penaliteSecondes: item.penaliteSecondes,
+                tempsModifie: item.modifTemps
             });
         });
     });
 
-    // Trier : par niveau décroissant puis rang croissant (exclus à la fin)
+    // Tri final : niveau décroissant puis rang croissant
     result.sort((a, b) => {
         const na = parseInt(a.niveau), nb = parseInt(b.niveau);
         if (na !== nb) return nb - na;
@@ -705,18 +728,218 @@ async function construireLignesCourse(courseId) {
     return result;
 }
 
-function construireRecapClasses() {
-    // Calcul des rangs moyens par classe (toutes courses)
-    const rangsParClasse = {};
-    const rangsParClasseSexe = {};
+// ============================================================
+// RÉCAP PAR CLASSE (calculé sur les 4 courses)
+// ============================================================
+async function construireRecapClasses() {
+    const rangsParClasse = {};        // { "607": [rangs...] }
+    const rangsParClasseSexe = {};    // { "607": { F: [rangs...], M: [rangs...] } }
+    const statutsParClasse = {};
 
-    // On refait un calcul simple : pour chaque course on a besoin des arrivées
-    // Comme on est dans un export, on va s'appuyer sur les data déjà en mémoire pour la course active
-    // Pour les autres courses, on charge asynchrone — mais ici on simplifie : on n'affiche que la course active
+    // Charger les 4 courses en parallèle
+    const resultats = await Promise.all(
+        COURSES_DEFAUT.map(async course => {
+            const lignes = await construireLignesCourse(course.id);
+            return { course, lignes };
+        })
+    );
 
-    // NOTE : ce récap est volontairement limité aux données en mémoire
-    // Il faudrait itérer sur toutes les courses pour un récap complet
-    // → on le fera dans une V2
+    // Agréger
+    resultats.forEach(({ course, lignes }) => {
+        lignes.forEach(l => {
+            // Ignorer les non-classés (exclus par statut abandon/blessure)
+            if (l.rang === null) return;
 
-    return [];
+            const classe = l.classe;
+            if (!rangsParClasse[classe]) rangsParClasse[classe] = [];
+            rangsParClasse[classe].push(l.rang);
+
+            if (!rangsParClasseSexe[classe]) rangsParClasseSexe[classe] = { F: [], M: [] };
+            if (l.sexe === 'F') rangsParClasseSexe[classe].F.push(l.rang);
+            if (l.sexe === 'M') rangsParClasseSexe[classe].M.push(l.rang);
+        });
+    });
+
+    // Compter absents/inaptes par classe (depuis le localStorage)
+    getTousLesElevesCross().forEach(e => {
+        if (!e.classe) return;
+        if (!statutsParClasse[e.classe]) statutsParClasse[e.classe] = { absents: 0, inaptes: 0 };
+        if (e.statut === 'absent') statutsParClasse[e.classe].absents++;
+        if (e.statut === 'inapte') statutsParClasse[e.classe].inaptes++;
+    });
+
+    // Construire la liste
+    const recap = Object.entries(rangsParClasse).map(([classe, rangs]) => {
+        const moy = rangs.length > 0 ? rangs.reduce((a, b) => a + b, 0) / rangs.length : null;
+
+        const sr = rangsParClasseSexe[classe] || { F: [], M: [] };
+        const moyF = sr.F.length > 0 ? sr.F.reduce((a, b) => a + b, 0) / sr.F.length : null;
+        const moyM = sr.M.length > 0 ? sr.M.reduce((a, b) => a + b, 0) / sr.M.length : null;
+
+        const stats = statutsParClasse[classe] || { absents: 0, inaptes: 0 };
+
+        return {
+            classe,
+            niveau: classe.charAt(0),
+            moyenne: moy !== null ? Math.round(moy * 10) / 10 : null,
+            moyF: moyF !== null ? Math.round(moyF * 10) / 10 : null,
+            moyM: moyM !== null ? Math.round(moyM * 10) / 10 : null,
+            nbClasses: rangs.length,
+            nbF: sr.F.length,
+            nbM: sr.M.length,
+            nbAbsents: stats.absents,
+            nbInaptes: stats.inaptes
+        };
+    });
+
+    // Tri : par moyenne croissante (plus petit = meilleur)
+    recap.sort((a, b) => {
+        if (a.moyenne === null && b.moyenne === null) return a.classe.localeCompare(b.classe);
+        if (a.moyenne === null) return 1;
+        if (b.moyenne === null) return -1;
+        return a.moyenne - b.moyenne;
+    });
+    recap.forEach((r, i) => { r.rang = i + 1; });
+
+    return recap;
 }
+
+// ============================================================
+// EXPORT EXCEL (patché avec get → onValue onlyOnce)
+// ============================================================
+window.crossResultsExportExcel = async function() {
+    const XLSX = window.XLSX;
+    if (!XLSX) {
+        alert('❌ SheetJS non chargé. Vérifie libs/xlsx.full.min.js dans maitre.html.');
+        return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    // ---- 1. Une feuille par course ----
+    for (const course of COURSES_DEFAUT) {
+        const lignes = await construireLignesCourse(course.id);
+        if (lignes.length === 0) continue;
+
+        const aoa = [
+            ['Rang', 'Dossard', 'Nom', 'Prénom', 'Classe', 'Niveau', 'Sexe', 'VMA',
+             'Temps effectif', '%VMA', 'Pts Motricité', 'Pts Performance',
+             'Note brute /20', 'Pénalité pts', 'Note finale /20',
+             'Pénalité sec', 'Temps modifié', 'Statut', 'Commentaire'],
+            ...lignes.map(l => [
+                l.rang || '',
+                l.dossard,
+                l.nom,
+                l.prenom,
+                l.classe,
+                l.niveau,
+                l.sexe,
+                l.vma || '',
+                l.temps,
+                l.pctVMA !== null ? Math.round(l.pctVMA * 10) / 10 : '',
+                l.ptsMot,
+                l.ptsPerf,
+                l.noteBrute,
+                l.penalitePts || 0,
+                l.noteFinale,
+                l.penaliteSecondes || '',
+                l.tempsModifie ? 'oui' : '',
+                l.statutLabel,
+                l.commentaire || ''
+            ])
+        ];
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [
+            { wch: 6 }, { wch: 8 }, { wch: 15 }, { wch: 12 }, { wch: 8 }, { wch: 6 },
+            { wch: 6 }, { wch: 6 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+            { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 30 }
+        ];
+
+        const sheetName = course.label.replace(/[\[\]\*\?\/\\:]/g, '_').substring(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    // ---- 2. Feuille récap : classement par classe ----
+    const recap = await construireRecapClasses();
+    if (recap.length > 0) {
+        const aoa = [
+            ['Rang', 'Classe', 'Niveau', 'Rang moyen', 'Rang moy. Filles', 'Rang moy. Garçons',
+             'Nb Filles', 'Nb Garçons', 'Effectif classé', 'Absents', 'Inaptes'],
+            ...recap.map(r => [
+                r.rang,
+                r.classe,
+                r.niveau + 'e',
+                r.moyenne,
+                r.moyF !== null ? r.moyF : '',
+                r.moyM !== null ? r.moyM : '',
+                r.nbF,
+                r.nbM,
+                r.nbClasses,
+                r.nbAbsents,
+                r.nbInaptes
+            ])
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [
+            { wch: 6 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
+            { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 10 }
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Classement classes');
+    }
+
+    // ---- 3. Feuille récap : notes moyennes par classe ----
+    const notesParClasse = {};
+    for (const course of COURSES_DEFAUT) {
+        const lignes = await construireLignesCourse(course.id);
+        lignes.forEach(l => {
+            if (l.rang === null) return;
+            if (!notesParClasse[l.classe]) {
+                notesParClasse[l.classe] = { notes: [], notesF: [], notesM: [], count: 0 };
+            }
+            notesParClasse[l.classe].notes.push(l.noteFinale);
+            notesParClasse[l.classe].count++;
+            if (l.sexe === 'F') notesParClasse[l.classe].notesF.push(l.noteFinale);
+            if (l.sexe === 'M') notesParClasse[l.classe].notesM.push(l.noteFinale);
+        });
+    }
+
+    const notesRecap = Object.entries(notesParClasse).map(([classe, data]) => {
+        const moy = data.notes.length > 0 ? data.notes.reduce((a, b) => a + b, 0) / data.notes.length : 0;
+        const moyF = data.notesF.length > 0 ? data.notesF.reduce((a, b) => a + b, 0) / data.notesF.length : null;
+        const moyM = data.notesM.length > 0 ? data.notesM.reduce((a, b) => a + b, 0) / data.notesM.length : null;
+        return {
+            classe,
+            niveau: classe.charAt(0),
+            moyenne: Math.round(moy * 10) / 10,
+            moyF: moyF !== null ? Math.round(moyF * 10) / 10 : null,
+            moyM: moyM !== null ? Math.round(moyM * 10) / 10 : null,
+            nbF: data.notesF.length,
+            nbM: data.notesM.length,
+            total: data.count
+        };
+    }).sort((a, b) => {
+        if (a.niveau !== b.niveau) return parseInt(b.niveau) - parseInt(a.niveau);
+        return b.moyenne - a.moyenne;
+    });
+
+    if (notesRecap.length > 0) {
+        const aoa = [
+            ['Classe', 'Niveau', 'Note moyenne /20', 'Note moy. Filles', 'Note moy. Garçons', 'Nb Filles', 'Nb Garçons', 'Effectif'],
+            ...notesRecap.map(r => [
+                r.classe, r.niveau + 'e', r.moyenne,
+                r.moyF !== null ? r.moyF : '',
+                r.moyM !== null ? r.moyM : '',
+                r.nbF, r.nbM, r.total
+            ])
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws['!cols'] = [
+            { wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 10 }
+        ];
+        XLSX.utils.book_append_sheet(wb, ws, 'Notes moyennes classes');
+    }
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Cross_Resultats_${dateStr}.xlsx`);
+};
