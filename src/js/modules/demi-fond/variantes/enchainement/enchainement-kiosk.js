@@ -100,20 +100,34 @@ async function envoyerResultatsCourse(courseNum) {
     state.derniereCourseEnvoyee = courseNum;
     const basePath = getBasePath(state.classe);
     const duree = state.config.durees[courseNum - 1] || state.config.duree;
-    try {
-        for (const code of state.codes) {
-            const timestamps = state.timestampsParEleve[code] || [];
-            const partiel = state.partielsParEleve[code] || 0;
-            const abandon = state.abandonsParEleve[code] || null;
-            if (timestamps.length === 0 && !abandon && !partiel) continue;
+
+    // ✅ SNAPSHOT immédiat (avant tout await) : évite qu'un reset concurrent
+    // (preparerNouvelleCourse) ne vide les tableaux pendant l'envoi asynchrone.
+    const timestampDebut = state.timestampDebut;
+    const tour = state.config.tour;
+    const plots = state.config.plots;
+    const snapshot = state.codes.map(code => ({
+        code,
+        timestamps: (state.timestampsParEleve[code] || []).slice(),
+        partiel: state.partielsParEleve[code] || 0,
+        abandon: state.abandonsParEleve[code] || null
+    }));
+
+    let envoyes = 0;
+    for (const { code, timestamps, partiel, abandon } of snapshot) {
+        if (timestamps.length === 0 && !abandon && !partiel) continue;
+        try {
             await set(ref(db, `${basePath}/observations/course-${courseNum}/${code}`), {
-                timestamps: timestamps.map(t => t - state.timestampDebut),
+                timestamps: timestamps.map(t => t - timestampDebut),
                 partiel, abandon,
-                duree, tour: state.config.tour, plots: state.config.plots, timestamp: Date.now()
+                duree, tour, plots, timestamp: Date.now()
             });
+            envoyes++;
+        } catch (err) {
+            console.error(`[Enchainement] Échec envoi série ${courseNum}/${code}:`, err);
         }
-        console.log(`[Enchainement] Résultats série ${courseNum} envoyés`);
-    } catch (err) { console.error(err); }
+    }
+    console.log(`[Enchainement] Résultats série ${courseNum} envoyés (${envoyes}/${snapshot.length} élèves)`);
 }
 
 function render() {
