@@ -6,6 +6,7 @@ import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as
 // ─── Modules Escalade ───────────────────────────────────────
 import { initEscaladeInterface, populateReserveEscalade, initSortableEscalade, loadEscaladeAssignments, exportEscaladeConfig, importEscaladeConfig } from '../../modules/escalade/escalade-interface.js';
 import { initBlocProf } from '../../modules/escalade/escalade-prof-blocs.js';
+import { initSuiviProf, cleanupSuiviProf } from '../../modules/escalade/escalade-voies-prof.js';
 
 // ─── Modules Badminton ──────────────────────────────────────
 import { initBadmintonInterface, generateBadmintonTeams, loadBadmintonAssignments, initSortableBadminton, saveBadmintonAssignments, updateCodes, exportBadmintonConfig, importBadmintonConfig, transmettreBadmintonConfig } from '../../modules/badminton/badminton-interface.js';
@@ -124,6 +125,7 @@ window.switchDiscipline = async function(disc) {
     // ✅ ÉTAPE 2 : masquer TOUTES les vues
     const allViews = [
         'viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
+        'viewEscaladeSuiviSettings',
         'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings',
         'viewTournoiSettings', 'viewNatationSettings', 'viewRelaisSettings',
         'viewDemiFondSettings', 'viewPPGSettings'
@@ -152,6 +154,7 @@ window.switchDiscipline = async function(disc) {
         'multi': 'viewMultiSettings',
         'co': 'viewCOSettings',
         'escalade': 'viewEscaladeSettings',
+        'escalade-suivi': 'viewEscaladeSuiviSettings',
         'badminton': 'viewBadmintonSettings',
         'arcathlon': 'viewArcathlonSettings',
         'evaluation': 'viewEvaluationSettings',
@@ -200,6 +203,8 @@ window.switchDiscipline = async function(disc) {
         const mode = disc === 'bloccontest' ? 'bloc' : 'classic';
         import('../../modules/escalade/escalade-live.js').then(m => { if (m.setEscaladeMode) m.setEscaladeMode(mode); });
         import('../../modules/escalade/escalade-tv-ui.js').then(m => { if (m.setEscaladeMode) m.setEscaladeMode(mode); });
+    } else if (disc === 'escalade-suivi') {
+        initSuiviProf(document.getElementById('selectClasse').value);
     } else if (disc === 'badminton') {
         try {
             initBadmintonInterface();
@@ -226,7 +231,7 @@ window.switchDiscipline = async function(disc) {
     }
 
     // ✅ ÉTAPE 5 : mettre à jour les boutons de discipline
-    const btnIds = ['multi', 'co', 'escalade', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais', 'demi-fond', 'ppg'];
+    const btnIds = ['multi', 'co', 'escalade', 'escalade-suivi', 'badminton', 'arcathlon', 'evaluation', 'tournoi', 'natation', 'relais', 'demi-fond', 'ppg'];
     btnIds.forEach(id => {
         const btn = document.getElementById(`btnDisc-${id}`);
         if (btn) {
@@ -354,6 +359,7 @@ window.switchDiscipline = async function(disc) {
         // Cacher toutes les vues de paramètres
         const settingsViews = [
     'viewMultiSettings', 'viewCOSettings', 'viewEscaladeSettings',
+    'viewEscaladeSuiviSettings',
     'viewBadmintonSettings', 'viewArcathlonSettings', 'viewEvaluationSettings',
     'viewTournoiSettings', 'viewNatationSettings', 'viewRelaisSettings',
     'viewPPGSettings'
@@ -375,6 +381,7 @@ window.switchDiscipline = async function(disc) {
     'multi': 'viewMultiSettings',
     'co': 'viewCOSettings',
     'escalade': 'viewEscaladeSettings',
+    'escalade-suivi': 'viewEscaladeSuiviSettings',
     'badminton': 'viewBadmintonSettings',
     'arcathlon': 'viewArcathlonSettings',
     'evaluation': 'viewEvaluationSettings',
@@ -618,6 +625,13 @@ window.switchDiscipline = async function(disc) {
                 if (escaladeModule?.transmettre) {
                     await escaladeModule.transmettre(activeClasse);
                     alert("✅ Configuration Bloc Contest transmise aux iPads !");
+                }
+            },
+            'escalade-suivi': async () => {
+                if (window.suiviTransmettre) {
+                    await window.suiviTransmettre();
+                } else {
+                    alert("❌ Module Suivi des réalisations non initialisé.");
                 }
             },
             'multi': async () => {

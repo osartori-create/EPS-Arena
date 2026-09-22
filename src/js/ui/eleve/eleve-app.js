@@ -14,6 +14,7 @@ import { initNatationKiosk } from '../../modules/natation/natation-kiosk.js';
 import { initRelaisKiosk, cleanupRelaisKiosk } from '../../modules/relais/relais-kiosk.js';
 import { initGrillesKiosk, cleanupGrillesKiosk } from '../../modules/grilles/grilles-kiosk.js';
 import { initDemiFondKiosk, cleanupDemiFondKiosk } from '../../modules/demi-fond/demifond-kiosk.js';
+import { initSuiviKiosk, cleanupSuiviKiosk } from '../../modules/escalade/escalade-voies-kiosk.js';
 
 const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
 const app = initializeApp(firebaseConfig);
@@ -40,6 +41,7 @@ const natationModule = document.getElementById('natation-module');
 const relaisModule = document.getElementById('relais-module');
 const grillesModule = document.getElementById('grilles-module');
 const demiFondModule = document.getElementById('demi-fond-module');
+const suiviModule = document.getElementById('suivi-module');
 const codeInfo = document.getElementById('code-info');
 const btnQuit = document.getElementById('btn-quit');
 const btnBackTerrain = document.getElementById('btn-back-terrain');
@@ -119,6 +121,10 @@ export function initApp() {
     console.log('[eleve] Activité 1/2 Fond détectée');
     masquerElementsCO();
     showLoginDemiFond();
+} else if (config.activite === 'escalade-suivi') {
+    console.log('[eleve] Activité Suivi des réalisations détectée');
+    masquerElementsCO();
+    showLoginSuivi();
 } else if (config.activite === 'ppg') {
     console.log('[eleve] Activité PPG détectée');
     masquerElementsCO();
@@ -176,6 +182,7 @@ function masquerTousLesModules() {
     if (relaisModule) relaisModule.classList.add('hidden');
     if (grillesModule) grillesModule.classList.add('hidden');
     if (demiFondModule) demiFondModule.classList.add('hidden');
+    if (suiviModule) suiviModule.classList.add('hidden');
     const ppgEl = document.getElementById('ppg-module');
     if (ppgEl) {
         ppgEl.classList.add('hidden');
@@ -489,6 +496,28 @@ function showLoginGrilles() {
 
     masquerElementsCO();
 }
+// ============================================================
+// SPÉCIAL SUIVI DES RÉALISATIONS
+// ============================================================
+function showLoginSuivi() {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+
+    setContainerWidth(true);
+    masquerTousLesModules();
+
+    if (suiviModule) {
+        suiviModule.classList.remove('hidden');
+        suiviModule.style.display = 'block';
+        initSuiviKiosk(selectedClass);
+    } else {
+        console.error('[eleve] Conteneur suivi-module introuvable !');
+    }
+
+    masquerElementsCO();
+}
+
 // ============================================================
 // SPÉCIAL 1/2 FOND
 // ============================================================
@@ -818,6 +847,10 @@ export function resetToLogin() {
         demiFondModule.style.display = 'none';
         demiFondModule.innerHTML = '';
     }
+    if (suiviModule) {
+        suiviModule.style.display = 'none';
+        suiviModule.innerHTML = '';
+    }
 
     const ppgModuleEl = document.getElementById('ppg-module');
     if (ppgModuleEl) {
@@ -826,6 +859,7 @@ export function resetToLogin() {
     }
 
     if (typeof cleanupDemiFondKiosk === 'function') cleanupDemiFondKiosk();
+    if (typeof cleanupSuiviKiosk === 'function') cleanupSuiviKiosk();
     if (typeof cleanupGrillesKiosk === 'function') cleanupGrillesKiosk();
     if (typeof cleanupRelaisKiosk === 'function') cleanupRelaisKiosk();
 
