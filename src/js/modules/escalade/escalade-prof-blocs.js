@@ -1,5 +1,6 @@
 // src/js/modules/escalade/escalade-prof-blocs.js
-// Interface professeur Bloc Contest – partage les groupes de l’escalade classique
+// Interface professeur Bloc Contest – partage les groupes de l’escalade classique.
+// Ajoute : hiérarchie des blocs, suivi par habiletés, export XLSX multi-feuilles.
 
 import {
     listenBlocConfig,
@@ -12,8 +13,11 @@ import {
 import {
     agregerDonnees,
     genererClassement,
-    genererCSVBlocContest
+    genererCSVBlocContest,
+    hierarchiserBlocs,
+    HABILETES_DEFAUT
 } from './escalade-blocs-core.js';
+import { exporterVersExcel, col } from '../../services/export-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -57,9 +61,6 @@ export function cleanupBlocProf() {
 // ============================================================
 // GROUPES (source LOCALE d'IDs => résolution code / nom côté prof)
 // ============================================================
-
-// Récupère les groupes d'IDs élèves partagés avec l'escalade classique,
-// ou en génère une répartition par défaut par groupes de 3.
 function lireGroupesEscalade(classe) {
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${classe}`) || '{}');
     const groupes = {};
@@ -90,7 +91,6 @@ function lireGroupesEscalade(classe) {
 }
 
 // Convertit des groupes d'IDs élèves en groupes de codes anonymes (A1, A2…).
-// C'est la seule représentation autorisée sur Firebase.
 function groupesIdsVersCodes(groupesIds) {
     const codes = {};
     Object.entries(groupesIds || {}).forEach(([lettre, ids]) => {
@@ -110,17 +110,19 @@ function ecrireMappingLocalBloc(classe, groupesIds) {
     localStorage.setItem(`eps_arena_local_mapping_${classe}`, JSON.stringify(mapping));
 }
 
+// Attribution d'une habileté par défaut à chaque bloc (rotation sur le catalogue).
 function construireBlocsParDefaut() {
     return Array.from({ length: 10 }, (_, i) => ({
         id: `bloc${i + 1}`,
         label: `Bloc ${i + 1}`,
         couleur: '#3b82f6',
-        ordre: i + 1
+        ordre: i + 1,
+        habiletes: [HABILETES_DEFAUT[i % HABILETES_DEFAUT.length]]
     }));
 }
 
 // ============================================================
-// Affichage de l’interface (vue prof)
+// Affichage de l'interface (vue prof)
 // ============================================================
 function afficherInterface() {
     const container = document.getElementById('bloc-prof-container');
@@ -138,13 +140,13 @@ function afficherInterface() {
         return;
     }
 
-    // Groupes locaux (IDs) pour l'agrégation et l'affichage.
     const groupes = lireGroupesEscalade(currentClasse);
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     const blocs = config.blocs || [];
     const params = config.score || { valeurInitiale: 100, decote: 10, mode: 'fige' };
     const dataAgregees = agregerDonnees(validations, blocs, eleves, groupes, params);
     const classement = genererClassement(dataAgregees);
+    const hierarchie = hierarchiserBlocs(dataAgregees);
 
     let html = `
         <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
@@ -155,12 +157,17 @@ function afficherInterface() {
             </div>
             <div class="flex gap-2 flex-wrap">
                 <button onclick="window.modifierConfigBloc()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">⚙️ Configurer</button>
+                <button onclick="window.modifierHabiletesBloc()" class="bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">🏷️ Habiletés</button>
                 <button onclick="window.reinitialiserValidationsBloc()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">🗑️ Réinitialiser</button>
-                <button onclick="window.exporterCSVBloc()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📥 Export iDoceo</button>
+                <button onclick="window.exporterCSVBloc()" class="bg-slate-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📄 CSV</button>
+                <button onclick="window.exporterXLSXBloc()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📥 Export XLSX</button>
                 <button onclick="window.transmettreConfigBloc()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">📡 Transmettre</button>
             </div>
         </div>
+    `;
 
+    // ---- Progression des élèves (points par bloc) ----
+    html += `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 overflow-x-auto">
             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Progression des élèves</h4>
             <table class="w-full text-sm">
@@ -179,10 +186,14 @@ function afficherInterface() {
         html += `<tr class="border-t border-slate-700">`;
         html += `<td class="p-2 sticky left-0 bg-slate-800 font-bold text-white">${e.code} (${e.groupe})</td>`;
         blocs.forEach(b => {
-            const bloc = e.blocs[b.id];
-            const points = bloc ? bloc.points : 0;
-            const couleur = bloc ? 'text-emerald-400' : 'text-slate-500';
-            html += `<td class="p-2 text-center ${couleur}">${points > 0 ? points : '—'}</td>`;
+            const bv = e.blocs[b.id];
+            if (!bv) {
+                html += `<td class="p-2 text-center text-slate-600">—</td>`;
+            } else if (bv.reussite) {
+                html += `<td class="p-2 text-center text-emerald-400 font-bold">${bv.points}</td>`;
+            } else {
+                html += `<td class="p-2 text-center text-red-400">✗</td>`;
+            }
         });
         html += `<td class="p-2 text-center font-bold text-yellow-400">${e.totalPoints}</td>`;
         html += `</tr>`;
@@ -190,6 +201,59 @@ function afficherInterface() {
 
     html += `</tbody></table></div>`;
 
+    // ---- Hiérarchie des blocs ----
+    html += `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">🧱 Hiérarchie des blocs (du plus stratégique au plus réussi)</h4>
+            <div class="space-y-2">
+    `;
+    if (hierarchie.length === 0) {
+        html += `<p class="text-xs text-slate-500">Aucun bloc configuré.</p>`;
+    }
+    hierarchie.forEach((b, idx) => {
+        const taux = b.tauxReussite === null ? '—' : `${b.tauxReussite}%`;
+        html += `
+            <div class="flex items-center gap-3 bg-slate-900 p-3 rounded-xl border border-slate-700">
+                <div class="text-2xl min-w-8 text-center">${idx === 0 ? '💎' : (idx === 1 ? '🥇' : (idx === 2 ? '🥈' : (idx + 1)))}</div>
+                <div class="flex-1">
+                    <div class="font-black text-white">${b.label}</div>
+                    <div class="text-[10px] text-slate-500">${(b.habiletes || []).map(h => typeof h === 'string' ? h : (h.label || h.id)).join(' · ') || '—'}</div>
+                </div>
+                <div class="text-right text-xs">
+                    <div class="text-slate-400">${b.reussites}/${b.tentatives} réussies</div>
+                    <div class="text-slate-400">Taux : <span class="font-bold text-white">${taux}</span></div>
+                    <div class="text-yellow-400 font-bold">${b.valeurActuelle} pts</div>
+                </div>
+            </div>
+        `;
+    });
+    html += `</div></div>`;
+
+    // ---- Suivi par habiletés ----
+    const habEntries = Object.values(dataAgregees.habiletes).sort((a, b) => a.label.localeCompare(b.label));
+    html += `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">🏷️ Suivi par habileté motrice</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    `;
+    if (habEntries.length === 0) {
+        html += `<p class="text-xs text-slate-500">Aucune habileté associée aux blocs.</p>`;
+    }
+    habEntries.forEach(h => {
+        const taux = h.taux === null ? '—' : `${h.taux}%`;
+        html += `
+            <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-700">
+                <span class="font-bold text-white text-sm">${h.label}</span>
+                <div class="text-right text-xs">
+                    <div class="text-slate-400">${h.reussites}/${h.tentatives} réussies</div>
+                    <div class="font-black text-blue-400">${taux}</div>
+                </div>
+            </div>
+        `;
+    });
+    html += `</div></div>`;
+
+    // ---- Classement des groupes ----
     html += `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">🏆 Classement des groupes</h4>
@@ -261,11 +325,114 @@ window.modifierConfigBloc = function() {
         .catch(err => alert('❌ Erreur : ' + err.message));
 };
 
+// Éditeur léger des habiletés par bloc (séparateur virgule).
+window.modifierHabiletesBloc = function() {
+    if (!config) return alert('Aucune configuration.');
+    const blocs = config.blocs || [];
+    if (blocs.length === 0) return alert('Aucun bloc configuré.');
+
+    const options = blocs.map(b => `${b.label}`).join('\n');
+    const choix = prompt('Quel bloc modifier ?\n' + options + '\n\nIndique le libellé exact (ex: Bloc 1).');
+    if (choix === null) return;
+
+    const bloc = blocs.find(b => b.label === choix.trim());
+    if (!bloc) return alert('Bloc introuvable.');
+
+    const actuelles = (bloc.habiletes || []).map(h => typeof h === 'string' ? h : (h.label || h.id)).join(', ');
+    const saisie = prompt(`Habiletés pour "${bloc.label}" (séparées par des virgules)\nSuggestions : ${HABILETES_DEFAUT.join(', ')}`, actuelles);
+    if (saisie === null) return;
+
+    const habiletes = saisie.split(',').map(s => s.trim()).filter(Boolean);
+    bloc.habiletes = habiletes;
+
+    setBlocConfig(currentClasse, { ...config, blocs })
+        .then(() => { alert('✅ Habiletés mises à jour.'); initBlocProf(currentClasse); })
+        .catch(err => alert('❌ Erreur : ' + err.message));
+};
+
 window.reinitialiserValidationsBloc = function() {
     if (!confirm('⚠️ Supprimer toutes les validations de cette classe ?')) return;
     clearValidations(currentClasse)
         .then(() => alert('✅ Validations réinitialisées.'))
         .catch(err => alert('❌ Erreur : ' + err.message));
+};
+
+function construireDonneesExport(blocs, dataAgregees) {
+    const elevesPresents = Object.values(dataAgregees.eleves).filter(e => e.statut === 'present');
+
+    const feuilleEleves = {
+        nom: 'Élèves',
+        colonnes: [
+            col('Groupe', 'groupe'),
+            col('Code', 'code'),
+            col('Nom de famille', 'nom'),
+            col('Prénom', 'prenom'),
+            ...blocs.map(b => col(b.label, `bloc_${b.id}`)),
+            col('Total Points', 'totalPoints')
+        ],
+        donnees: elevesPresents.map(e => {
+            const ligne = {
+                groupe: e.groupe,
+                code: e.code,
+                nom: e.nom,
+                prenom: e.prenom,
+                totalPoints: e.totalPoints
+            };
+            blocs.forEach(b => {
+                const bv = e.blocs[b.id];
+                ligne[`bloc_${b.id}`] = bv ? (bv.reussite ? bv.points : 'Échec') : '';
+            });
+            return ligne;
+        })
+    };
+
+    const feuilleBlocs = {
+        nom: 'Blocs',
+        colonnes: [
+            col('Bloc', 'label'),
+            col('Habiletés', 'habiletes'),
+            col('Tentatives', 'tentatives'),
+            col('Réussites', 'reussites'),
+            col('Taux de réussite (%)', 'taux'),
+            col('Valeur actuelle', 'valeur')
+        ],
+        donnees: blocs.map(b => {
+            const d = dataAgregees.blocs[b.id] || {};
+            return {
+                label: b.label,
+                habiletes: (d.habiletes || []).map(h => typeof h === 'string' ? h : (h.label || h.id)).join(', '),
+                tentatives: d.tentatives || 0,
+                reussites: d.reussites || 0,
+                taux: d.tauxReussite,
+                valeur: d.valeurActuelle
+            };
+        })
+    };
+
+    const feuilleHabiletes = {
+        nom: 'Habiletés',
+        colonnes: [
+            col('Habileté', 'label'),
+            col('Tentatives', 'tentatives'),
+            col('Réussites', 'reussites'),
+            col('Taux de réussite (%)', 'taux')
+        ],
+        donnees: Object.values(dataAgregees.habiletes)
+            .sort((a, b) => a.label.localeCompare(b.label))
+            .map(h => ({ label: h.label, tentatives: h.tentatives, reussites: h.reussites, taux: h.taux }))
+    };
+
+    return [feuilleEleves, feuilleBlocs, feuilleHabiletes];
+}
+
+window.exporterXLSXBloc = function() {
+    if (!config) return alert('Aucune configuration.');
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+    const groupes = lireGroupesEscalade(currentClasse);
+    const blocs = config.blocs || [];
+    const params = config.score || { valeurInitiale: 100, decote: 10, mode: 'fige' };
+    const dataAgregees = agregerDonnees(validations, blocs, eleves, groupes, params);
+    exporterVersExcel('BlocContest', currentClasse, construireDonneesExport(blocs, dataAgregees));
 };
 
 window.exporterCSVBloc = function() {
@@ -292,13 +459,11 @@ window.exporterCSVBloc = function() {
 export async function transmettreConfigBloc() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
 
-    // Source de vérité locale : groupes d'IDs → codes anonymes.
     const groupesIds = lireGroupesEscalade(currentClasse);
     if (Object.keys(groupesIds).length === 0) {
         return alert('Aucun groupe à transmettre. Répartis d\'abord les élèves en groupes.');
     }
 
-    // Préserver blocs/score déjà configurés, sinon valeurs par défaut.
     let existing = await getBlocConfigSnapshot(currentClasse);
     existing = existing || {};
 
@@ -318,7 +483,6 @@ export async function transmettreConfigBloc() {
         await set(ref(db, `${baseProf}/${currentClasse}/config`), { activite: 'bloccontest' });
         await set(ref(db, `${baseProf}/active_classes/${currentClasse}`), true);
 
-        // Mapping local (code → élève), uniquement côté prof — jamais partagé.
         ecrireMappingLocalBloc(currentClasse, groupesIds);
 
         alert('✅ Bloc Contest transmis aux iPads (codes anonymes) !');
