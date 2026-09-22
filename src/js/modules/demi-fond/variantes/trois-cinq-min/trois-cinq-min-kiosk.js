@@ -70,7 +70,7 @@ export function initTroisCinqMinKiosk(classe) {
 
     // Écoute séquence
     if (sequenceListener) sequenceListener();
-    sequenceListener = onValue(ref(db, `${basePath}/commandes/sequence`), (snap) => {
+    sequenceListener = onValue(ref(db, `${basePath}/commandes/sequence`), async (snap) => {
     const seq = snap.val();
     if (!seq) return;
 
@@ -100,6 +100,11 @@ export function initTroisCinqMinKiosk(classe) {
 
         // GO ou SKIP : reset complet
         if (seq.action === 'go' || seq.action === 'skip') {
+            // Si un SKIP survient pendant une pause, la course qui vient de se
+            // terminer attend encore d'être envoyée (partiels saisis pendant la pause).
+            if (seq.action === 'skip' && state.phase === 'pause') {
+                await envoyerResultatsCourse(state.courseNum);
+            }
             state.timestampsParEleve = {};
             state.partielsParEleve = {};
             state.abandonsParEleve = {};
@@ -172,13 +177,16 @@ function tick() {
         const anciennePhase = state.phase;
         const ancienneCourse = state.courseNum;
 
-        // Transition Course → Pause : envoyer les résultats
+        // Transition Course → Pause : la saisie des plots partiels se fait pendant
+        // la pause, on n'envoie donc PAS encore les résultats (sinon partiel = 0).
         if (anciennePhase === 'course' && phase === 'pause') {
-            envoyerResultatsCourse(ancienneCourse);
+            // Rien à envoyer ici : on attend la saisie des partiels pendant la pause.
         }
 
-        // Pause → Course suivante : préparer
+        // Pause → Course suivante : envoyer les résultats de la course terminée
+        // (avec les partiels saisis pendant la pause), puis préparer la suivante.
         if (anciennePhase === 'pause' && phase === 'course' && courseNum !== ancienneCourse) {
+            envoyerResultatsCourse(ancienneCourse);
             preparerNouvelleCourse(courseNum);
         }
 
@@ -628,7 +636,7 @@ function renderPause(container) {
                 <h3 class="font-black text-white text-lg mb-1">📝 Saisie des plots partiels</h3>
                 <p class="text-slate-400 text-sm mb-4">
                     Pour chaque élève, indique combien de plots supplémentaires il a parcourus dans son dernier tour
-                    (0 = il venait de finir un tour, 8 = il était presque au bout).
+                    (0 = il venait de finir un tour, ${state.config.plots || 8} = il était presque au bout).
                 </p>
                 <div class="space-y-3">
     `;
@@ -650,7 +658,7 @@ function renderPause(container) {
                     </div>
                 </div>
                 <div class="flex gap-1">
-                    ${[0,1,2,3,4,5,6,7,8].map(n => `
+                    ${listePlots().map(n => `
                         <button onclick="window.dmfKioskSetPartiel('${code}', ${n})"
                                 class="flex-1 py-2 rounded-lg font-black text-sm border-2 active:scale-95 ${partiel === n ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-800 text-slate-300 border-slate-700'}">
                             ${n}
@@ -720,7 +728,7 @@ function renderSaisieFinale(container) {
                         </div>
                     </div>
                     <div class="flex gap-1">
-                        ${[0,1,2,3,4,5,6,7,8].map(n => `
+                        ${listePlots().map(n => `
                             <button onclick="window.dmfKioskSetPartiel('${code}', ${n})"
                                     class="flex-1 py-2 rounded-lg font-black text-sm border-2 active:scale-95 ${partiel === n ? 'bg-blue-600 text-white border-blue-400' : 'bg-slate-800 text-slate-300 border-slate-700'}">
                                 ${n}
@@ -757,6 +765,11 @@ window.dmfKioskSetPartiel = function(code, valeur) {
     state.partielsParEleve[code] = valeur;
     render();
 };
+
+function listePlots() {
+    const plots = state.config?.plots || 8;
+    return Array.from({ length: plots + 1 }, (_, i) => i);
+}
 
 // ============================================================
 // ÉCRAN 5 : PAUSE MANUELLE

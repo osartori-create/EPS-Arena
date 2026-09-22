@@ -29,7 +29,7 @@ export function initEnchainementKiosk(classe) {
     configListener = onValue(ref(db, `${basePath}/config`), (snap) => { state.config = snap.val() || null; render(); });
 
     if (sequenceListener) sequenceListener();
-    sequenceListener = onValue(ref(db, `${basePath}/commandes/sequence`), (snap) => {
+    sequenceListener = onValue(ref(db, `${basePath}/commandes/sequence`), async (snap) => {
         const seq = snap.val();
         if (!seq) return;
         const ancienneAction = state.sequence?.actionTimestamp;
@@ -39,6 +39,11 @@ export function initEnchainementKiosk(classe) {
             if (seq.etat === 'termine') { state.phase = 'bilan'; render(); return; }
             if (seq.etat === 'pause_manuelle') { state.phase = 'pause_manuelle'; render(); return; }
             if (seq.action === 'go' || seq.action === 'skip') {
+                // Si on skip pendant une pause, la série qui vient de se terminer
+                // attend encore d'être envoyée (plots partiels saisis pendant la pause).
+                if (seq.action === 'skip' && state.phase === 'pause') {
+                    await envoyerResultatsCourse(state.courseNum);
+                }
                 state.timestampsParEleve = {}; state.partielsParEleve = {}; state.abandonsParEleve = {}; state.lastClickAt = {}; state.dernierClic = null; state.derniereCourseEnvoyee = 0;
                 state.codes.forEach(code => { state.timestampsParEleve[code] = []; });
             }
@@ -69,8 +74,17 @@ function tick() {
 
     if (state.phase !== phase || state.courseNum !== courseNum) {
         const anciennePhase = state.phase, ancienneCourse = state.courseNum;
-        if (anciennePhase === 'course' && phase === 'pause') envoyerResultatsCourse(ancienneCourse);
-        if (anciennePhase === 'pause' && phase === 'course' && courseNum !== ancienneCourse) preparerNouvelleCourse(courseNum);
+        // Course → Pause : la saisie des plots partiels se fait pendant la pause,
+        // on n'envoie donc PAS encore les résultats (sinon partiel = 0).
+        if (anciennePhase === 'course' && phase === 'pause') {
+            // Rien à envoyer ici : on attend la saisie des partiels pendant la pause.
+        }
+        // Pause → Course suivante : envoyer les résultats (avec partiels saisis),
+        // puis préparer la course suivante.
+        if (anciennePhase === 'pause' && phase === 'course' && courseNum !== ancienneCourse) {
+            envoyerResultatsCourse(ancienneCourse);
+            preparerNouvelleCourse(courseNum);
+        }
         state.phase = phase; state.courseNum = courseNum;
         render();
     }
@@ -211,7 +225,7 @@ function renderPause(container) {
     elevesActifs.forEach(code => {
         const nbTours = (state.timestampsParEleve[code] || []).length;
         const partiel = state.partielsParEleve[code] || 0;
-        html += `<div class="bg-slate-900 p-3 rounded-xl border border-slate-700"><div class="flex justify-between items-center mb-2"><div><span class="font-black text-2xl" style="color:${couleur.bg};">${code}</span><span class="text-xs text-slate-400 ml-2">${nbTours} tour${nbTours>1?'s':''}</span></div><div class="flex items-center gap-2"><span class="text-xs text-slate-400">Partiel :</span><span class="text-xl font-black text-white">${partiel}</span></div></div><div class="flex gap-1">${[0,1,2,3,4,5,6,7,8].map(n=>`<button onclick="window.enchainementKioskSetPartiel('${code}',${n})" class="flex-1 py-2 rounded-lg font-black text-sm border-2 ${partiel===n?'bg-blue-600 text-white border-blue-400':'bg-slate-800 text-slate-300 border-slate-700'}">${n}</button>`).join('')}</div></div>`;
+        html += `<div class="bg-slate-900 p-3 rounded-xl border border-slate-700"><div class="flex justify-between items-center mb-2"><div><span class="font-black text-2xl" style="color:${couleur.bg};">${code}</span><span class="text-xs text-slate-400 ml-2">${nbTours} tour${nbTours>1?'s':''}</span></div><div class="flex items-center gap-2"><span class="text-xs text-slate-400">Partiel :</span><span class="text-xl font-black text-white">${partiel}</span></div></div><div class="flex gap-1">${listePlots().map(n=>`<button onclick="window.enchainementKioskSetPartiel('${code}',${n})" class="flex-1 py-2 rounded-lg font-black text-sm border-2 ${partiel===n?'bg-blue-600 text-white border-blue-400':'bg-slate-800 text-slate-300 border-slate-700'}">${n}</button>`).join('')}</div></div>`;
     });
     html += `</div></div></div>`;
     container.innerHTML = html;
@@ -224,7 +238,7 @@ function renderSaisieFinale(container) {
     elevesActifs.forEach(code => {
         const nbTours = (state.timestampsParEleve[code] || []).length;
         const partiel = state.partielsParEleve[code] || 0;
-        html += `<div class="bg-slate-900 p-3 rounded-xl border border-slate-700"><div class="flex justify-between items-center mb-2"><div><span class="font-black text-2xl" style="color:${couleur.bg};">${code}</span><span class="text-xs text-slate-400 ml-2">${nbTours} tour${nbTours>1?'s':''}</span></div></div><div class="flex gap-1">${[0,1,2,3,4,5,6,7,8].map(n=>`<button onclick="window.enchainementKioskSetPartiel('${code}',${n})" class="flex-1 py-2 rounded-lg font-black text-sm border-2 ${partiel===n?'bg-blue-600 text-white border-blue-400':'bg-slate-800 text-slate-300 border-slate-700'}">${n}</button>`).join('')}</div></div>`;
+        html += `<div class="bg-slate-900 p-3 rounded-xl border border-slate-700"><div class="flex justify-between items-center mb-2"><div><span class="font-black text-2xl" style="color:${couleur.bg};">${code}</span><span class="text-xs text-slate-400 ml-2">${nbTours} tour${nbTours>1?'s':''}</span></div></div><div class="flex gap-1">${listePlots().map(n=>`<button onclick="window.enchainementKioskSetPartiel('${code}',${n})" class="flex-1 py-2 rounded-lg font-black text-sm border-2 ${partiel===n?'bg-blue-600 text-white border-blue-400':'bg-slate-800 text-slate-300 border-slate-700'}">${n}</button>`).join('')}</div></div>`;
     });
     html += `</div></div><button onclick="window.enchainementKioskTerminerSequence()" class="w-full bg-emerald-600 py-5 rounded-2xl font-black text-xl text-white">✅ Voir les bilans</button></div>`;
     container.innerHTML = html;
@@ -232,6 +246,11 @@ function renderSaisieFinale(container) {
 
 window.enchainementKioskSetPartiel = function(code, valeur) { state.partielsParEleve[code] = valeur; render(); };
 window.enchainementKioskTerminerSequence = async function() { await envoyerResultatsCourse(state.config.durees.length); state.phase = 'bilan'; render(); };
+
+function listePlots() {
+    const plots = state.config?.plots || 8;
+    return Array.from({ length: plots + 1 }, (_, i) => i);
+}
 
 function renderPauseManuelle(container) {
     const couleur = getCouleurGroupe(state.couleur);
