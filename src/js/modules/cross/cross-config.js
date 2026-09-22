@@ -1,7 +1,7 @@
 // src/js/modules/cross/cross-config.js
-// Helpers de stockage et chemins — dépend de live-engine.js et admin-service.js
+// Helpers de stockage et chemins — dépend de config/firebase-config.js
 
-import { getCurrentClasse } from '../../core/live-engine.js';
+import { DB_PATHS } from '../../config/firebase-config.js';
 
 // ============================================================
 // CLÉS DE STOCKAGE
@@ -23,7 +23,7 @@ export function getProfCode() {
 }
 
 export function getCrossBasePath() {
-    return `etablissements/0680013V/profs/${getProfCode()}/cross`;
+    return `${DB_PATHS.ETAB}/profs/${getProfCode()}/cross`;
 }
 
 export function getCoursePath(courseId) {

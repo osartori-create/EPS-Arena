@@ -39,6 +39,7 @@ import '../../modules/escalade/escalade-prof.js';
 import '../../modules/multi/multi-prof.js';
 import '../../modules/co/co-prof.js';
 import '../../modules/relais/index.js';
+import '../../modules/cross/index.js';
 
 // ─── Exports Excel (exposent window.exporter*Excel) ────────
 import '../../modules/badminton/badminton-export.js';

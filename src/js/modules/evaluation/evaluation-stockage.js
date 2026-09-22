@@ -318,13 +318,16 @@ export function synchroniserAvecAdmin(classe, eleveId, testId, valeur) {
 
     // Correspondance test → champ admin
     const mapping = {
-        endurance: { champ: 'vma', transform: (v) => getVMAFromPalier(v)?.toFixed(1) || null },
-        force: { champ: 'longueur', transform: (v) => v },
-        vitesse: { champ: 'sprint30', transform: (v) => v },
-        souplesse: { champ: 'souplesse', transform: (v) => v },
-        equilibre: { champ: 'equilibre', transform: (v) => v },
-        coordination: { champ: 'coordination', transform: (v) => v },
-        endurance_musculaire: { champ: 'endurance_musculaire', transform: (v) => v }
+        endurance: { champ: 'vma', transform: (v) => {
+            const vma = getVMAFromPalier(v);
+            return (vma === null || vma === undefined) ? null : parseFloat(vma.toFixed(1));
+        } },
+        force: { champ: 'longueur', transform: (v) => Number(v) },
+        vitesse: { champ: 'sprint30', transform: (v) => Number(v) },
+        souplesse: { champ: 'souplesse', transform: (v) => Number(v) },
+        equilibre: { champ: 'equilibre', transform: (v) => Number(v) },
+        coordination: { champ: 'coordination', transform: (v) => Number(v) },
+        endurance_musculaire: { champ: 'endurance_musculaire', transform: (v) => Number(v) }
     };
 
     const mappingTest = mapping[testId];
@@ -335,12 +338,17 @@ export function synchroniserAvecAdmin(classe, eleveId, testId, valeur) {
 
     if (nouvelleValeur === null || nouvelleValeur === undefined) return false;
 
-    // Vérifier si la valeur actuelle est différente
+    // Vérifier si la valeur actuelle est différente (comparaison numérique,
+    // les types string/number peuvent différer entre l'admin et le module).
     const ancienneValeur = eleve[champ];
-    if (ancienneValeur === nouvelleValeur) return false;
+    const a = (ancienneValeur === null || ancienneValeur === undefined || ancienneValeur === '')
+        ? null : Number(ancienneValeur);
+    const b = nouvelleValeur;
+    if (a !== null && b !== null && Math.abs(a - b) < 1e-9) return false;
 
     // Demander confirmation
-    const message = `Voulez-vous mettre à jour "${champ}" de ${eleve.prenom} ${eleve.nom} ?\nAncienne valeur : ${ancienneValeur ?? 'vide'}\nNouvelle valeur : ${nouvelleValeur}`;
+    const ancienneAffichee = (ancienneValeur === null || ancienneValeur === undefined || ancienneValeur === '') ? 'vide' : ancienneValeur;
+    const message = `Voulez-vous mettre à jour "${champ}" de ${eleve.prenom} ${eleve.nom} ?\nAncienne valeur : ${ancienneAffichee}\nNouvelle valeur : ${nouvelleValeur}`;
     if (!confirm(message)) return false;
 
     // Mettre à jour

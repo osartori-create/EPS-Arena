@@ -25,7 +25,9 @@ export function initEscaladeInterface(nbGroupes = 6, force = false) {
         // Estimation par défaut (1 élève = 1 groupe max 6, min 1)
         const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
         if (eleves.length > 0) {
-            savedGroupes = Math.max(1, Math.min(6, Math.ceil(eleves.length / 3)));
+            // Le nombre de groupes est dérivé de la liste réelle (aucun plafond
+            // théorique : les classes peuvent dépasser 18 élèves).
+            savedGroupes = Math.max(1, Math.ceil(eleves.length / 3));
         } else {
             savedGroupes = 6; // Par défaut
         }

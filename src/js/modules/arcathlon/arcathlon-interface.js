@@ -29,34 +29,41 @@ export function generateArcathlonTeams() {
 
     const sorted = [...eleves].sort((a, b) => (b.vma || 0) - (a.vma || 0));
 
-    const quartileSize = Math.ceil(sorted.length / 3);
-    const quartiles = [
-        sorted.slice(0, quartileSize),
-        sorted.slice(quartileSize, quartileSize * 2),
-        sorted.slice(quartileSize * 2)
-    ];
+    // Découpage en 3 tiers de niveaux VMA, de tailles aussi égales que possible.
+    const nbEleves = sorted.length;
+    const base = Math.floor(nbEleves / 3);
+    const reste = nbEleves % 3;
+    const tailles = [base, base, base];
+    for (let i = 0; i < reste; i++) tailles[i]++;
 
-    quartiles.forEach(q => {
+    const tiers = [];
+    let offset = 0;
+    tailles.forEach(t => {
+        tiers.push(sorted.slice(offset, offset + t));
+        offset += t;
+    });
+
+    tiers.forEach(q => {
         for (let i = q.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [q[i], q[j]] = [q[j], q[i]];
         }
     });
 
-    const nbEquipes = Math.min(
-        quartiles[0].length,
-        quartiles[1].length,
-        quartiles[2].length
-    );
-    if (nbEquipes === 0) return alert("Pas assez d'élèves dans un des quartiles pour former des équipes.");
+    // Le nombre d'équipes est dérivé de la taille de la liste complète.
+    // Tous les élèves sont placés : aucune perte. Si la classe n'est pas un
+    // multiple de 3, la dernière équipe peut être incomplète (elle reste
+    // déplaçable par glisser-déposer).
+    const nbEquipes = Math.max(...tiers.map(t => t.length));
+    if (nbEquipes === 0) return alert("Pas assez d'élèves pour former des équipes.");
 
     const equipes = [];
     for (let i = 0; i < nbEquipes; i++) {
-        const membres = [
-            { ...quartiles[0][i], maillot: couleursSelectionnees[0], absent: false, inapte: false },
-            { ...quartiles[1][i], maillot: couleursSelectionnees[1], absent: false, inapte: false },
-            { ...quartiles[2][i], maillot: couleursSelectionnees[2], absent: false, inapte: false }
-        ];
+        const membres = [];
+        if (tiers[0][i]) membres.push({ ...tiers[0][i], maillot: couleursSelectionnees[0], absent: false, inapte: false });
+        if (tiers[1][i]) membres.push({ ...tiers[1][i], maillot: couleursSelectionnees[1], absent: false, inapte: false });
+        if (tiers[2][i]) membres.push({ ...tiers[2][i], maillot: couleursSelectionnees[2], absent: false, inapte: false });
+
         equipes.push({
             id: `EQ${i + 1}`,
             pin: Math.floor(100 + Math.random() * 900).toString(),
@@ -64,9 +71,10 @@ export function generateArcathlonTeams() {
         });
     }
 
+    const nbPlaces = equipes.reduce((a, e) => a + e.membres.length, 0);
     sauvegarderEquipes(activeClasse, equipes);
     renderArcathlonTeams();
-    alert(`✅ ${equipes.length} équipes générées avec les couleurs : ${couleursSelectionnees.join(', ')}`);
+    alert(`✅ ${equipes.length} équipes générées (${nbPlaces} élèves placés) avec les couleurs : ${couleursSelectionnees.join(', ')}`);
 }
 
 // --------------------------------------------------------------

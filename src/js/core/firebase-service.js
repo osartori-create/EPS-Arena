@@ -16,23 +16,19 @@ export function getPerformancePath(classe, activite) {
     return `${getProfBasePath()}/${classe}/${activite}/montees`;
 }
 
-// ✅ Écoute des données des élèves (chemins hiérarchiques)
+// ✅ Écoute des données des élèves (chemins hiérarchiques).
+// Ne couvre que les activités dont le chemin de données est connu et stable.
+// (co/multi n'utilisent pas "montees" et ne sont donc PAS écoutés ici.)
 export function listenToActivityData(classe, callback) {
     const refEscalade = ref(db, getPerformancePath(classe, 'escalade'));
-    const refCO = ref(db, getPerformancePath(classe, 'co'));
-    const refMulti = ref(db, getPerformancePath(classe, 'multi'));
     const refOrientShow = ref(db, getOrientShowPassagesPath(classe));
 
     const unsubEscalade = onValue(refEscalade, (snap) => callback('escalade', snap.val() || {}));
-    const unsubCO = onValue(refCO, (snap) => callback('co', snap.val() || {}));
-    const unsubMulti = onValue(refMulti, (snap) => callback('multi', snap.val() || {}));
-    const unsubOrientShow = onValue(refOrientShow, (snap) => callback('orientshow', snap.val() || {})); //[cite: 4]
+    const unsubOrientShow = onValue(refOrientShow, (snap) => callback('orientshow', snap.val() || {}));
 
     return () => {
         unsubEscalade();
-        unsubCO();
-        unsubMulti();
-        unsubOrientShow(); 
+        unsubOrientShow();
     };
 }
 

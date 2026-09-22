@@ -1,24 +1,23 @@
 // src/js/modules/cross/index.js
+// Enregistre le module Cross dans le registre central.
+// L'interface prof est un onglet dédié (viewCross) piloté par ui/prof/layout.js,
+// mais on l'enregistre pour que getModule('cross') reste cohérent avec les
+// autres disciplines.
 import { registerModule } from '../registry.js';
+import { initCrossInterface } from './cross-interface.js';
+import { transmettreCrossConfig } from './cross-transmit.js';
 
-function initProf(classe) {
-    import('./cross-interface.js').then(m => m.initCrossInterface());
+function initProf() {
+    initCrossInterface();
 }
 
-function initKiosk(classe, code) {
-    // Sera ajouté à l'étape 4 (kiosk podium)
+async function transmettre() {
+    return transmettreCrossConfig();
 }
 
-async function transmettre(classe) {
-    alert('Transmission cross : à venir (étape 3).');
-}
-
-function renderLive(classe) {
-    // à venir
-}
-
-function renderTV(classe) {
-    // à venir
+function cleanup() {
+    // Cross ne pose pas de listener permanent au niveau module.
+    console.log('[Cross] Nettoyage');
 }
 
 registerModule({
@@ -26,13 +25,14 @@ registerModule({
     label: '🏃 Cross',
     icon: '🏃',
     initProf,
-    initKiosk,
+    initKiosk: () => {},
     generateTeams: () => {},
     transmettre,
-    renderLive,
-    renderTV,
+    renderLive: () => {},
+    renderTV: () => {},
     isDefault: false,
-    cleanup: () => { console.log('[Cross] Nettoyage'); }
+    cleanup
 });
 
-export default { id: 'cross', label: '🏃 Cross', initProf, initKiosk, transmettre, renderLive, renderTV };
+export { initProf, transmettre, cleanup };
+export default { id: 'cross', label: '🏃 Cross', initProf, transmettre, cleanup };
