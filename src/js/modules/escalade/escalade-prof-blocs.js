@@ -14,7 +14,6 @@ import {
     genererClassement,
     genererCSVBlocContest
 } from './escalade-blocs-core.js';
-import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -28,7 +27,6 @@ let validationsListener = null;
 // ============================================================
 export function initBlocProf(classe) {
     currentClasse = classe;
-    // Créer le conteneur s’il n’existe pas
     let container = document.getElementById('bloc-prof-container');
     if (!container) {
         const parent = document.getElementById('viewEscaladeSettings');
@@ -36,11 +34,10 @@ export function initBlocProf(classe) {
         container = document.createElement('div');
         container.id = 'bloc-prof-container';
         container.className = 'space-y-4 mt-6';
-        container.style.display = 'none'; // caché par défaut (mode classique)
+        container.style.display = 'none';
         parent.appendChild(container);
     }
 
-    // Écouter la config
     if (configListener) configListener();
     configListener = listenBlocConfig(classe, (data) => {
         config = data;
@@ -58,13 +55,77 @@ export function cleanupBlocProf() {
 }
 
 // ============================================================
-// Affichage de l’interface
+// GROUPES (source LOCALE d'IDs => résolution code / nom côté prof)
+// ============================================================
+
+// Récupère les groupes d'IDs élèves partagés avec l'escalade classique,
+// ou en génère une répartition par défaut par groupes de 3.
+function lireGroupesEscalade(classe) {
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${classe}`) || '{}');
+    const groupes = {};
+    Object.keys(assignments).forEach(key => {
+        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
+            groupes[key] = assignments[key];
+        }
+    });
+
+    if (Object.keys(groupes).length > 0) return groupes;
+
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    if (eleves.length === 0) return groupes;
+
+    const nbGroupes = Math.ceil(eleves.length / 3);
+    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    for (let i = 0; i < nbGroupes; i++) {
+        const lettre = lettres[i] || `G${i + 1}`;
+        groupes[lettre] = [];
+    }
+    eleves.forEach((e, index) => {
+        groupes[lettres[index % nbGroupes]].push(e.id);
+    });
+
+    const newAssignments = { ...assignments, ...groupes, nbGroupes };
+    localStorage.setItem(`eps_arena_escalade_assignments_${classe}`, JSON.stringify(newAssignments));
+    return groupes;
+}
+
+// Convertit des groupes d'IDs élèves en groupes de codes anonymes (A1, A2…).
+// C'est la seule représentation autorisée sur Firebase.
+function groupesIdsVersCodes(groupesIds) {
+    const codes = {};
+    Object.entries(groupesIds || {}).forEach(([lettre, ids]) => {
+        codes[lettre] = (ids || []).map((_, index) => `${lettre}${index + 1}`);
+    });
+    return codes;
+}
+
+// Écrit le mapping local { classe_A1: eleveId, ... } côté prof (jamais partagé).
+function ecrireMappingLocalBloc(classe, groupesIds) {
+    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
+    Object.entries(groupesIds || {}).forEach(([lettre, ids]) => {
+        (ids || []).forEach((id, index) => {
+            mapping[`${classe}_${lettre}${index + 1}`] = id;
+        });
+    });
+    localStorage.setItem(`eps_arena_local_mapping_${classe}`, JSON.stringify(mapping));
+}
+
+function construireBlocsParDefaut() {
+    return Array.from({ length: 10 }, (_, i) => ({
+        id: `bloc${i + 1}`,
+        label: `Bloc ${i + 1}`,
+        couleur: '#3b82f6',
+        ordre: i + 1
+    }));
+}
+
+// ============================================================
+// Affichage de l’interface (vue prof)
 // ============================================================
 function afficherInterface() {
     const container = document.getElementById('bloc-prof-container');
     if (!container) return;
 
-    // Si pas de config, afficher un message + bouton pour créer
     if (!config) {
         container.innerHTML = `
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
@@ -77,50 +138,14 @@ function afficherInterface() {
         return;
     }
 
-    // Récupérer les groupes depuis la configuration escalade classique (partage)
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
-    const groupes = {};
-    Object.keys(assignments).forEach(key => {
-        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
-            groupes[key] = assignments[key];
-        }
-    });
-
-    // Si pas de groupes, on génère une répartition par défaut
-    if (Object.keys(groupes).length === 0) {
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-        if (eleves.length === 0) {
-            container.innerHTML = '<p class="text-slate-500">Aucun élève dans cette classe.</p>';
-            return;
-        }
-        const nbGroupes = Math.ceil(eleves.length / 3);
-        const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        for (let i = 0; i < nbGroupes; i++) {
-            const lettre = lettres[i] || `G${i+1}`;
-            groupes[lettre] = [];
-        }
-        eleves.forEach((e, index) => {
-            const g = lettres[index % nbGroupes];
-            groupes[g].push(e.id);
-        });
-        // Sauvegarder pour l’escalade classique
-        const newAssignments = { ...assignments, ...groupes, nbGroupes };
-        localStorage.setItem(`eps_arena_escalade_assignments_${currentClasse}`, JSON.stringify(newAssignments));
-    }
-
-    // Mettre à jour la config avec les groupes (si besoin)
-    if (!config.groupes || Object.keys(config.groupes).length === 0) {
-        config.groupes = groupes;
-        // On ne sauvegarde pas automatiquement, on laisse l’utilisateur cliquer sur "Créer" ou "Transmettre"
-    }
-
+    // Groupes locaux (IDs) pour l'agrégation et l'affichage.
+    const groupes = lireGroupesEscalade(currentClasse);
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     const blocs = config.blocs || [];
     const params = config.score || { valeurInitiale: 100, decote: 10, mode: 'fige' };
     const dataAgregees = agregerDonnees(validations, blocs, eleves, groupes, params);
     const classement = genererClassement(dataAgregees);
 
-    // Construction de l’interface
     let html = `
         <div class="flex justify-between items-center bg-slate-800 p-4 rounded-2xl border border-slate-700 flex-wrap gap-2">
             <div>
@@ -129,22 +154,13 @@ function afficherInterface() {
                 <p class="text-[10px] text-slate-500">Groupes partagés avec l’escalade classique</p>
             </div>
             <div class="flex gap-2 flex-wrap">
-                <button onclick="window.modifierConfigBloc()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
-                    ⚙️ Configurer
-                </button>
-                <button onclick="window.reinitialiserValidationsBloc()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
-                    🗑️ Réinitialiser
-                </button>
-                <button onclick="window.exporterCSVBloc()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">
-                    📥 Export iDoceo
-                </button>
-                <button onclick="window.transmettreConfigBloc()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">
-                    📡 Transmettre
-                </button>
+                <button onclick="window.modifierConfigBloc()" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">⚙️ Configurer</button>
+                <button onclick="window.reinitialiserValidationsBloc()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">🗑️ Réinitialiser</button>
+                <button onclick="window.exporterCSVBloc()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📥 Export iDoceo</button>
+                <button onclick="window.transmettreConfigBloc()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">📡 Transmettre</button>
             </div>
         </div>
 
-        <!-- Vue d’ensemble : tableau élèves x blocs -->
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 overflow-x-auto">
             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Progression des élèves</h4>
             <table class="w-full text-sm">
@@ -158,7 +174,6 @@ function afficherInterface() {
                 <tbody>
     `;
 
-    // Filtrer les élèves présents (statut !== 'absent' && statut !== 'inapte')
     const elevesPresents = Object.values(dataAgregees.eleves).filter(e => e.statut === 'present');
     elevesPresents.forEach(e => {
         html += `<tr class="border-t border-slate-700">`;
@@ -175,15 +190,13 @@ function afficherInterface() {
 
     html += `</tbody></table></div>`;
 
-    // Classement des groupes
     html += `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
             <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">🏆 Classement des groupes</h4>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
     `;
-    const classementGroupes = classement.classementGroupes;
-    classementGroupes.forEach((g, idx) => {
-        const medaille = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `${idx+1}.`));
+    classement.classementGroupes.forEach((g, idx) => {
+        const medaille = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `${idx + 1}.`));
         html += `
             <div class="bg-slate-900 p-3 rounded-xl border border-slate-600 text-center">
                 <div class="text-2xl">${medaille}</div>
@@ -206,54 +219,20 @@ window.creerConfigBloc = function() {
     const activeClasse = currentClasse;
     if (!activeClasse) return alert('Sélectionnez une classe.');
 
-    // Récupérer les groupes depuis l’escalade classique
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${activeClasse}`) || '{}');
-    const groupes = {};
-    Object.keys(assignments).forEach(key => {
-        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
-            groupes[key] = assignments[key];
-        }
-    });
-
-    if (Object.keys(groupes).length === 0) {
-        const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
-        if (eleves.length === 0) return alert('Aucun élève dans cette classe.');
-        const nbGroupes = Math.ceil(eleves.length / 3);
-        const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-        for (let i = 0; i < nbGroupes; i++) {
-            const lettre = lettres[i] || `G${i+1}`;
-            groupes[lettre] = [];
-        }
-        eleves.forEach((e, index) => {
-            const g = lettres[index % nbGroupes];
-            groupes[g].push(e.id);
-        });
-        const newAssignments = { ...assignments, ...groupes, nbGroupes };
-        localStorage.setItem(`eps_arena_escalade_assignments_${activeClasse}`, JSON.stringify(newAssignments));
-    }
-
-    // Créer des blocs par défaut (ex: 10 blocs)
-    const blocs = [];
-    for (let i = 1; i <= 10; i++) {
-        blocs.push({
-            id: `bloc${i}`,
-            label: `Bloc ${i}`,
-            couleur: '#3b82f6',
-            ordre: i
-        });
+    const groupesIds = lireGroupesEscalade(activeClasse);
+    if (Object.keys(groupesIds).length === 0) {
+        return alert('Aucun élève dans cette classe.');
     }
 
     const configData = {
-        groupes: groupes,
-        blocs: blocs,
-        score: {
-            valeurInitiale: 100,
-            decote: 10,
-            mode: 'fige'
-        },
+        groupes: groupesIdsVersCodes(groupesIds),
+        blocs: construireBlocsParDefaut(),
+        score: { valeurInitiale: 100, decote: 10, mode: 'fige' },
         actif: true,
         dateCreation: new Date().toISOString()
     };
+
+    ecrireMappingLocalBloc(activeClasse, groupesIds);
 
     setBlocConfig(activeClasse, configData)
         .then(() => {
@@ -271,39 +250,28 @@ window.modifierConfigBloc = function() {
     if (newDecote === null) return;
     const mode = confirm('Mode figé ? (OK = figé, Annuler = évolutif)') ? 'fige' : 'evolutif';
 
-    const updates = {
+    updateBlocConfig(currentClasse, {
         score: {
             valeurInitiale: parseInt(newValeur, 10) || 100,
             decote: parseInt(newDecote, 10) || 10,
-            mode: mode
+            mode
         }
-    };
-    updateBlocConfig(currentClasse, updates)
-        .then(() => {
-            alert('✅ Configuration mise à jour.');
-        })
+    })
+        .then(() => alert('✅ Configuration mise à jour.'))
         .catch(err => alert('❌ Erreur : ' + err.message));
 };
 
 window.reinitialiserValidationsBloc = function() {
     if (!confirm('⚠️ Supprimer toutes les validations de cette classe ?')) return;
     clearValidations(currentClasse)
-        .then(() => {
-            alert('✅ Validations réinitialisées.');
-        })
+        .then(() => alert('✅ Validations réinitialisées.'))
         .catch(err => alert('❌ Erreur : ' + err.message));
 };
 
 window.exporterCSVBloc = function() {
     if (!config) return alert('Aucune configuration.');
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${currentClasse}`) || '{}');
-    const groupes = {};
-    Object.keys(assignments).forEach(key => {
-        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
-            groupes[key] = assignments[key];
-        }
-    });
+    const groupes = lireGroupesEscalade(currentClasse);
     const blocs = config.blocs || [];
     const params = config.score || { valeurInitiale: 100, decote: 10, mode: 'fige' };
     const dataAgregees = agregerDonnees(validations, blocs, eleves, groupes, params);
@@ -313,75 +281,10 @@ window.exporterCSVBloc = function() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `BlocContest_${currentClasse}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `BlocContest_${currentClasse}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 };
-
-// ============================================================
-// CONSTRUCTION / LECTURE DE LA CONFIG (partagée)
-// ============================================================
-
-// Récupère les groupes partagés avec l'escalade classique (dans le localStorage),
-// ou en génère une répartition par défaut par groupes de 3 si besoin.
-function lireGroupesEscalade(classe) {
-    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${classe}`) || '{}');
-    const groupes = {};
-    Object.keys(assignments).forEach(key => {
-        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
-            groupes[key] = assignments[key];
-        }
-    });
-
-    if (Object.keys(groupes).length > 0) return groupes;
-
-    // Fallback : génère des groupes de 3 à partir de la liste des élèves
-    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
-    if (eleves.length === 0) return groupes;
-
-    const nbGroupes = Math.ceil(eleves.length / 3);
-    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    for (let i = 0; i < nbGroupes; i++) {
-        const lettre = lettres[i] || `G${i + 1}`;
-        groupes[lettre] = [];
-    }
-    eleves.forEach((e, index) => {
-        const g = lettres[index % nbGroupes];
-        groupes[g].push(e.id);
-    });
-
-    // Sauvegarde pour l'escalade classique
-    const newAssignments = { ...assignments, ...groupes, nbGroupes };
-    localStorage.setItem(`eps_arena_escalade_assignments_${classe}`, JSON.stringify(newAssignments));
-    return groupes;
-}
-
-function construireConfigBlocParDefaut(classe) {
-    return {
-        groupes: lireGroupesEscalade(classe),
-        blocs: Array.from({ length: 10 }, (_, i) => ({
-            id: `bloc${i + 1}`,
-            label: `Bloc ${i + 1}`,
-            couleur: '#3b82f6',
-            ordre: i + 1
-        })),
-        score: { valeurInitiale: 100, decote: 10, mode: 'fige' },
-        actif: true,
-        dateCreation: new Date().toISOString()
-    };
-}
-
-// Écrit le mapping local { classe_A1: eleveId, ... } indispensable au kiosk.
-function ecrireMappingLocalBloc(classe, groupes) {
-    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
-    Object.entries(groupes || {}).forEach(([lettre, ids]) => {
-        (ids || []).forEach((id, index) => {
-            const code = `${lettre}${index + 1}`;
-            mapping[`${classe}_${code}`] = id;
-        });
-    });
-    localStorage.setItem(`eps_arena_local_mapping_${classe}`, JSON.stringify(mapping));
-}
 
 // ============================================================
 // TRANSMISSION (exposée pour le bouton et pour import)
@@ -389,41 +292,40 @@ function ecrireMappingLocalBloc(classe, groupes) {
 export async function transmettreConfigBloc() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
 
-    // 1. Lire la config existante, ou en construire une par défaut
-    let configData = await getBlocConfigSnapshot(currentClasse);
-    if (!configData || !configData.groupes || Object.keys(configData.groupes).length === 0) {
-        configData = construireConfigBlocParDefaut(currentClasse);
+    // Source de vérité locale : groupes d'IDs → codes anonymes.
+    const groupesIds = lireGroupesEscalade(currentClasse);
+    if (Object.keys(groupesIds).length === 0) {
+        return alert('Aucun groupe à transmettre. Répartis d\'abord les élèves en groupes.');
     }
-    if (!configData.blocs || configData.blocs.length === 0) {
-        configData.blocs = construireConfigBlocParDefaut(currentClasse).blocs;
-    }
-    if (!configData.score) {
-        configData.score = { valeurInitiale: 100, decote: 10, mode: 'fige' };
-    }
-    configData.actif = true;
+
+    // Préserver blocs/score déjà configurés, sinon valeurs par défaut.
+    let existing = await getBlocConfigSnapshot(currentClasse);
+    existing = existing || {};
+
+    const configData = {
+        groupes: groupesIdsVersCodes(groupesIds),
+        blocs: (existing.blocs && existing.blocs.length > 0) ? existing.blocs : construireBlocsParDefaut(),
+        score: existing.score || { valeurInitiale: 100, decote: 10, mode: 'fige' },
+        actif: true,
+        dateCreation: existing.dateCreation || new Date().toISOString()
+    };
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const baseProf = `etablissements/0680013V/profs/${profCode}`;
 
     try {
-        // 2. Écrire la config Bloc complète (groupes + blocs + score + actif)
         await setBlocConfig(currentClasse, configData);
-
-        // 3. Activer l'activité sur la config principale
         await set(ref(db, `${baseProf}/${currentClasse}/config`), { activite: 'bloccontest' });
-
-        // 4. Marquer la classe active
         await set(ref(db, `${baseProf}/active_classes/${currentClasse}`), true);
 
-        // 5. Écrire le mapping local (code → élève) pour que le kiosk retrouve l'élève
-        ecrireMappingLocalBloc(currentClasse, configData.groupes);
+        // Mapping local (code → élève), uniquement côté prof — jamais partagé.
+        ecrireMappingLocalBloc(currentClasse, groupesIds);
 
-        alert('✅ Bloc Contest transmis aux iPads !');
+        alert('✅ Bloc Contest transmis aux iPads (codes anonymes) !');
     } catch (err) {
         console.error(err);
         alert('❌ Erreur : ' + err.message);
     }
 }
 
-// Rendre la fonction accessible depuis le HTML (via window)
 window.transmettreConfigBloc = transmettreConfigBloc;

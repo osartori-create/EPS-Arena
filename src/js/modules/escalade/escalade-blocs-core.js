@@ -51,6 +51,15 @@ export function agregerDonnees(validations, blocs, eleves, groupes, params) {
         result.blocs[b.id] = { nbValidations: 0, valeurActuelle: params.valeurInitiale, eleves: [] };
     });
 
+    // Index code anonyme → ID réel. Chaque groupe `{ A: [id1, id2] }`
+    // implique `A1 → id1`, `A2 → id2`, etc.
+    const codeVersId = {};
+    Object.entries(groupes).forEach(([lettre, ids]) => {
+        (ids || []).forEach((id, index) => {
+            codeVersId[`${lettre}${index + 1}`] = id;
+        });
+    });
+
     // Initialisation des élèves
     eleves.forEach(e => {
         const groupe = trouverGroupe(e.id, groupes);
@@ -67,10 +76,15 @@ export function agregerDonnees(validations, blocs, eleves, groupes, params) {
         result.groupes[groupe].nbEleves++;
     });
 
-    // Parcours des validations
+    // Parcours des validations.
+    // `v.eleveId` peut être un ID réel (ancien format) ou un code anonyme
+    // (nouveau format RGPD). On résout dans les deux cas.
     const validationsArray = Object.values(validations);
     validationsArray.forEach(v => {
-        const eleveId = v.eleveId;
+        let eleveId = v.eleveId;
+        if (!result.eleves[eleveId] && codeVersId[eleveId]) {
+            eleveId = codeVersId[eleveId];
+        }
         const blocId = v.blocId;
         if (!result.eleves[eleveId]) return; // élève inconnu ou non affecté
         if (!result.blocs[blocId]) return; // bloc inconnu
