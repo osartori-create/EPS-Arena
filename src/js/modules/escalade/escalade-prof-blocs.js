@@ -6,7 +6,8 @@ import {
     setBlocConfig,
     updateBlocConfig,
     listenValidations,
-    clearValidations
+    clearValidations,
+    getBlocConfigSnapshot
 } from './escalade-blocs-firebase.js';
 import {
     agregerDonnees,
@@ -318,17 +319,110 @@ window.exporterCSVBloc = function() {
 };
 
 // ============================================================
+// CONSTRUCTION / LECTURE DE LA CONFIG (partagée)
+// ============================================================
+
+// Récupère les groupes partagés avec l'escalade classique (dans le localStorage),
+// ou en génère une répartition par défaut par groupes de 3 si besoin.
+function lireGroupesEscalade(classe) {
+    const assignments = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${classe}`) || '{}');
+    const groupes = {};
+    Object.keys(assignments).forEach(key => {
+        if (key !== 'reserve' && key !== 'nbGroupes' && Array.isArray(assignments[key])) {
+            groupes[key] = assignments[key];
+        }
+    });
+
+    if (Object.keys(groupes).length > 0) return groupes;
+
+    // Fallback : génère des groupes de 3 à partir de la liste des élèves
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    if (eleves.length === 0) return groupes;
+
+    const nbGroupes = Math.ceil(eleves.length / 3);
+    const lettres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    for (let i = 0; i < nbGroupes; i++) {
+        const lettre = lettres[i] || `G${i + 1}`;
+        groupes[lettre] = [];
+    }
+    eleves.forEach((e, index) => {
+        const g = lettres[index % nbGroupes];
+        groupes[g].push(e.id);
+    });
+
+    // Sauvegarde pour l'escalade classique
+    const newAssignments = { ...assignments, ...groupes, nbGroupes };
+    localStorage.setItem(`eps_arena_escalade_assignments_${classe}`, JSON.stringify(newAssignments));
+    return groupes;
+}
+
+function construireConfigBlocParDefaut(classe) {
+    return {
+        groupes: lireGroupesEscalade(classe),
+        blocs: Array.from({ length: 10 }, (_, i) => ({
+            id: `bloc${i + 1}`,
+            label: `Bloc ${i + 1}`,
+            couleur: '#3b82f6',
+            ordre: i + 1
+        })),
+        score: { valeurInitiale: 100, decote: 10, mode: 'fige' },
+        actif: true,
+        dateCreation: new Date().toISOString()
+    };
+}
+
+// Écrit le mapping local { classe_A1: eleveId, ... } indispensable au kiosk.
+function ecrireMappingLocalBloc(classe, groupes) {
+    const mapping = JSON.parse(localStorage.getItem(`eps_arena_local_mapping_${classe}`) || '{}');
+    Object.entries(groupes || {}).forEach(([lettre, ids]) => {
+        (ids || []).forEach((id, index) => {
+            const code = `${lettre}${index + 1}`;
+            mapping[`${classe}_${code}`] = id;
+        });
+    });
+    localStorage.setItem(`eps_arena_local_mapping_${classe}`, JSON.stringify(mapping));
+}
+
+// ============================================================
 // TRANSMISSION (exposée pour le bouton et pour import)
 // ============================================================
-export function transmettreConfigBloc() {
-    if (!config) return alert('Aucune configuration.');
+export async function transmettreConfigBloc() {
+    if (!currentClasse) return alert('Sélectionnez une classe.');
+
+    // 1. Lire la config existante, ou en construire une par défaut
+    let configData = await getBlocConfigSnapshot(currentClasse);
+    if (!configData || !configData.groupes || Object.keys(configData.groupes).length === 0) {
+        configData = construireConfigBlocParDefaut(currentClasse);
+    }
+    if (!configData.blocs || configData.blocs.length === 0) {
+        configData.blocs = construireConfigBlocParDefaut(currentClasse).blocs;
+    }
+    if (!configData.score) {
+        configData.score = { valeurInitiale: 100, decote: 10, mode: 'fige' };
+    }
+    configData.actif = true;
+
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const mainConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
-    set(mainConfigRef, { activite: 'bloccontest' })
-        .then(() => {
-            alert('✅ Bloc Contest activé pour les iPads !');
-        })
-        .catch(err => alert('❌ Erreur : ' + err.message));
+    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+
+    try {
+        // 2. Écrire la config Bloc complète (groupes + blocs + score + actif)
+        await setBlocConfig(currentClasse, configData);
+
+        // 3. Activer l'activité sur la config principale
+        await set(ref(db, `${baseProf}/${currentClasse}/config`), { activite: 'bloccontest' });
+
+        // 4. Marquer la classe active
+        await set(ref(db, `${baseProf}/active_classes/${currentClasse}`), true);
+
+        // 5. Écrire le mapping local (code → élève) pour que le kiosk retrouve l'élève
+        ecrireMappingLocalBloc(currentClasse, configData.groupes);
+
+        alert('✅ Bloc Contest transmis aux iPads !');
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur : ' + err.message);
+    }
 }
 
 // Rendre la fonction accessible depuis le HTML (via window)
