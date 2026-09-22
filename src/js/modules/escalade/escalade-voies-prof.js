@@ -35,7 +35,8 @@ export function initSuiviProf(classe) {
 
     let container = document.getElementById('suivi-prof-container');
     if (!container) {
-        const parent = document.getElementById('viewEscaladeSuiviSettings') || document.getElementById('viewEscaladeSettings');
+        // Le suivi vit DANS le module Escalade (3e mode).
+        const parent = document.getElementById('viewEscaladeSettings');
         if (!parent) return;
         container = document.createElement('div');
         container.id = 'suivi-prof-container';

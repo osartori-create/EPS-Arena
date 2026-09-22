@@ -17,6 +17,7 @@ import {
     cleanupBlocProf,
     transmettreConfigBloc
 } from './escalade-prof-blocs.js';
+import { initSuiviProf, cleanupSuiviProf } from './escalade-voies-prof.js';
 
 import { registerModule, getModule } from '../registry.js';
 
@@ -41,10 +42,11 @@ export function initEscaladeModeSelector() {
     
     const selector = document.createElement('div');
     selector.id = 'escalade-mode-selector';
-    selector.className = 'flex gap-2 mb-4 bg-slate-800 p-3 rounded-2xl border border-slate-700';
+    selector.className = 'flex flex-wrap gap-2 mb-4 bg-slate-800 p-3 rounded-2xl border border-slate-700';
     selector.innerHTML = `
         <button id="escalade-mode-classic" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white">🧗 Escalade classique</button>
         <button id="escalade-mode-bloc" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">🧗 Bloc Contest</button>
+        <button id="escalade-mode-suivi" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">🏔️ Suivi des réalisations</button>
     `;
     // Insérer en haut de la vue
     escView.prepend(selector);
@@ -55,6 +57,9 @@ export function initEscaladeModeSelector() {
     document.getElementById('escalade-mode-bloc').addEventListener('click', () => {
         setEscaladeMode('bloc');
     });
+    document.getElementById('escalade-mode-suivi').addEventListener('click', () => {
+        setEscaladeMode('suivi');
+    });
     
     // Par défaut, on met le mode classique
     setEscaladeMode('classic');
@@ -62,64 +67,52 @@ export function initEscaladeModeSelector() {
 
 function setEscaladeMode(mode) {
     escaladeMode = mode;
-    // Mettre à jour l'interface
-    const classicContainer = document.getElementById('escalade-classic-container');
-    const blocContainer = document.getElementById('bloc-prof-container');
-    
-    // Créer les conteneurs s'ils n'existent pas
-    const escView = document.getElementById('viewEscaladeSettings');
-    if (!classicContainer && escView) {
-        const container = document.createElement('div');
-        container.id = 'escalade-classic-container';
-        container.className = 'space-y-4';
-        // Insérer après le sélecteur
-        const selector = document.getElementById('escalade-mode-selector');
-        if (selector) {
-            selector.after(container);
-        } else {
-            escView.prepend(container);
-        }
-        // On y mettra le contenu de l'escalade classique plus tard
-    }
-    if (!blocContainer && escView) {
-        const container = document.createElement('div');
-        container.id = 'bloc-prof-container';
-        container.className = 'space-y-4 mt-6';
-        container.style.display = 'none';
-        escView.appendChild(container);
-    }
 
-    const classicEl = document.getElementById('escalade-classic-container');
-    const blocEl = document.getElementById('bloc-prof-container');
-    
+    const escView = document.getElementById('viewEscaladeSettings');
+    const classicEl = document.getElementById('escalade-classic-block');
+    let blocEl = document.getElementById('bloc-prof-container');
+    let suiviEl = document.getElementById('suivi-prof-container');
+
+    const btnClassic = document.getElementById('escalade-mode-classic');
+    const btnBloc = document.getElementById('escalade-mode-bloc');
+    const btnSuivi = document.getElementById('escalade-mode-suivi');
+
+    const clsOn = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
+    const clsOff = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
+
+    // Masquer / afficher les contenus selon le mode.
+    if (classicEl) classicEl.style.display = (mode === 'classic') ? '' : 'none';
+    if (blocEl) blocEl.style.display = (mode === 'bloc') ? '' : 'none';
+    if (suiviEl) suiviEl.style.display = (mode === 'suivi') ? '' : 'none';
+
+    if (btnClassic) btnClassic.className = (mode === 'classic') ? clsOn : clsOff;
+    if (btnBloc) btnBloc.className = (mode === 'bloc') ? clsOn : clsOff;
+    if (btnSuivi) btnSuivi.className = (mode === 'suivi') ? clsOn : clsOff;
+
+    const activeClasse = document.getElementById('selectClasse') ? document.getElementById('selectClasse').value : '';
+
     if (mode === 'classic') {
-        if (classicEl) classicEl.style.display = '';
-        if (blocEl) blocEl.style.display = 'none';
-        const btnClassic = document.getElementById('escalade-mode-classic');
-        const btnBloc = document.getElementById('escalade-mode-bloc');
-        if (btnClassic) btnClassic.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
-        if (btnBloc) btnBloc.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
-        // Initialiser l'interface classique
         initEscaladeInterface();
         initSortableEscalade();
         loadEscaladeAssignments();
-    } else {
-        if (classicEl) classicEl.style.display = 'none';
-        if (blocEl) {
-            blocEl.style.display = '';
-            const activeClasse = document.getElementById('selectClasse').value;
-            if (activeClasse) initBlocProf(activeClasse);
-            else blocEl.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+    } else if (mode === 'bloc') {
+        if (!blocEl && escView) {
+            blocEl = document.createElement('div');
+            blocEl.id = 'bloc-prof-container';
+            blocEl.className = 'space-y-4 mt-6';
+            escView.appendChild(blocEl);
         }
-        const btnClassic = document.getElementById('escalade-mode-classic');
-        const btnBloc = document.getElementById('escalade-mode-bloc');
-        if (btnBloc) btnBloc.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
-        if (btnClassic) btnClassic.className = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
+        if (blocEl) blocEl.style.display = '';
+        if (activeClasse) initBlocProf(activeClasse);
+        else if (blocEl) blocEl.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+    } else if (mode === 'suivi') {
+        if (activeClasse) initSuiviProf(activeClasse);
+        else if (suiviEl) suiviEl.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
     }
-    
+
     // Émettre un événement pour que activities.js mette à jour currentDiscipline
-    window.dispatchEvent(new CustomEvent('escalade-mode-changed', { 
-        detail: { mode: escaladeMode } 
+    window.dispatchEvent(new CustomEvent('escalade-mode-changed', {
+        detail: { mode: escaladeMode }
     }));
 }
 
@@ -140,7 +133,7 @@ export function initProf(classe) {
     } else if (classe) {
         // Mode classique
         // On s'assure que le conteneur classique est visible
-        const classicContainer = document.getElementById('escalade-classic-container');
+        const classicContainer = document.getElementById('escalade-classic-block');
         if (classicContainer) classicContainer.style.display = '';
         initEscaladeInterface();
         initSortableEscalade();
@@ -161,7 +154,11 @@ export async function transmettre(classe) {
         await transmettreConfigBloc();
         return;
     }
-    
+    if (escaladeMode === 'suivi') {
+        if (window.suiviTransmettre) { await window.suiviTransmettre(); }
+        return;
+    }
+
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const baseProf = `etablissements/0680013V/profs/${profCode}`;
     const configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${classe}`) || '{}');
@@ -194,7 +191,11 @@ export async function generateTeams(classe) {
         alert('Pour Bloc Contest, configurez les blocs depuis l’interface professeur.');
         return;
     }
-    
+    if (escaladeMode === 'suivi') {
+        alert('Pour le Suivi des réalisations, configurez les secteurs et voies dans l’onglet dédié.');
+        return;
+    }
+
     const nbGroupes = Math.ceil(eleves.length / 3);
     initEscaladeInterface(nbGroupes, true);
     await populateReserveEscalade(eleves);
@@ -256,6 +257,7 @@ export function registerEscaladeModule() {
         isDefault: false,
         cleanup: () => {
             cleanupBlocProf();
+            cleanupSuiviProf();
             console.log('[Escalade] Nettoyage effectué');
         }
     });

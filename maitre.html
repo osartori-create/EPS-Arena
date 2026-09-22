@@ -88,7 +88,6 @@
                     <button onclick="switchDiscipline('multi')" id="btnDisc-multi" class="bg-slate-900 border-2 border-blue-500 p-6 rounded-2xl font-black text-center text-sm uppercase text-blue-400 active:scale-95 transition-transform">🏋️ Multi-activités</button>
                     <button onclick="switchDiscipline('co')" id="btnDisc-co" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🧭 CO</button>
                     <button onclick="switchDiscipline('escalade')" id="btnDisc-escalade" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">⛰️ Escalade</button>
-                    <button onclick="switchDiscipline('escalade-suivi')" id="btnDisc-escalade-suivi" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏔️ Suivi des réalisations</button>
                     <button onclick="switchDiscipline('badminton')" id="btnDisc-badminton" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏸 Badminton</button>
                     <button onclick="switchDiscipline('arcathlon')" id="btnDisc-arcathlon" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">🏹 Arcathlon</button>
                     <button onclick="switchDiscipline('evaluation')" id="btnDisc-evaluation" class="bg-slate-900 border-2 border-slate-600 p-6 rounded-2xl font-black text-center text-sm uppercase text-slate-400 active:scale-95 transition-transform">📊 Évaluation</button>
@@ -195,6 +194,7 @@
 
             <!-- PARAMÈTRES ESCALADE -->
             <div id="viewEscaladeSettings" class="hidden space-y-4">
+                <div id="escalade-classic-block">
                 <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="font-black text-blue-400 uppercase text-sm">Groupes d'escalade</h3>
@@ -226,10 +226,8 @@
                         </div>
                     </div>
                 </div>
+                </div>
             </div>
-
-            <!-- PARAMÈTRES SUIVI DES RÉALISATIONS (ESCALADE) -->
-<div id="viewEscaladeSuiviSettings" class="hidden space-y-4"></div>
 
             <!-- PARAMÈTRES BADMINTON -->
 <div id="viewBadmintonSettings" class="hidden space-y-4">
