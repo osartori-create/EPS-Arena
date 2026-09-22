@@ -33,6 +33,15 @@ export function initDemiFondKiosk(classe) {
                         console.error('[DemiFond] Erreur chargement kiosque:', err);
                         container.innerHTML = `<p class="text-red-400 text-center">❌ Erreur : ${err.message}</p>`;
                     });
+            } else if (sousModule === 'enchainement') {
+                import('./variantes/enchainement/enchainement-kiosk.js')
+                    .then(m => {
+                        cleanupCurrent = m.initEnchainementKiosk(classe) || null;
+                    })
+                    .catch(err => {
+                        console.error('[DemiFond] Erreur chargement kiosque:', err);
+                        container.innerHTML = `<p class="text-red-400 text-center">❌ Erreur : ${err.message}</p>`;
+                    });
             }
         }, { onlyOnce: true });
     });

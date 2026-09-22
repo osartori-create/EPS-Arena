@@ -12,13 +12,24 @@ function initKiosk(classe, code) {
 }
 
 async function generateTeams(classe) {
-    const m = await import('./variantes/trois-cinq-min/trois-cinq-min-interface.js');
-    if (m.troisCinqMinGenererGroupes) m.troisCinqMinGenererGroupes();
+    const sousModule = localStorage.getItem('eps_arena_demifond_sous_module') || '3x5min';
+    if (sousModule === 'enchainement') {
+        const m = await import('./variantes/enchainement/enchainement-interface.js');
+        if (m.initEnchainementInterface) { window.enchainementGenererGroupes?.(); }
+    } else {
+        const m = await import('./variantes/trois-cinq-min/trois-cinq-min-interface.js');
+        if (m.troisCinqMinGenererGroupes) m.troisCinqMinGenererGroupes();
+    }
 }
 
 async function transmettre(classe) {
-    const m = await import('./variantes/trois-cinq-min/trois-cinq-min-interface.js');
-    if (m.transmettreTroisCinqMin) await m.transmettreTroisCinqMin();
+    const sousModule = localStorage.getItem('eps_arena_demifond_sous_module') || '3x5min';
+    if (sousModule === 'enchainement') {
+        if (window.enchainementTransmettre) await window.enchainementTransmettre();
+    } else {
+        const m = await import('./variantes/trois-cinq-min/trois-cinq-min-interface.js');
+        if (m.transmettreTroisCinqMin) await m.transmettreTroisCinqMin();
+    }
 }
 
 function renderLive(classe) {

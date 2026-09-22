@@ -35,6 +35,11 @@ export function initDemiFondInterface() {
                 <div class="text-xl mb-1">⏱️ 3×5min R=3'</div>
                 <div class="text-[10px] font-normal opacity-80">3 courses de 5min, 3min de pause entre chaque</div>
             </button>
+            <button onclick="window.demifondSetSousModule('enchainement')" id="dmfSubMod-enchainement"
+                    class="p-4 rounded-xl font-black text-sm border-2 text-left active:scale-95 transition-all">
+                <div class="text-xl mb-1">🔗 Enchaînement (durées libres)</div>
+                <div class="text-[10px] font-normal opacity-80">Plusieurs séries avec durées et repos personnalisables (ex. 6e : 9 min + 6 min)</div>
+            </button>
         </div>
     `;
     container.appendChild(selector);
@@ -46,9 +51,11 @@ export function initDemiFondInterface() {
 
     // Marquer la sélection
     const btn3x5 = document.getElementById('dmfSubMod-3x5min');
-    if (btn3x5) {
-        btn3x5.className = 'p-4 rounded-xl font-black text-sm border-2 border-blue-500 bg-blue-900/40 text-white text-left active:scale-95 transition-all ring-2 ring-blue-400';
-    }
+    const btnEnch = document.getElementById('dmfSubMod-enchainement');
+    const classeActive = 'p-4 rounded-xl font-black text-sm border-2 border-blue-500 bg-blue-900/40 text-white text-left active:scale-95 transition-all ring-2 ring-blue-400';
+    const classeInactive = 'p-4 rounded-xl font-black text-sm border-2 text-left active:scale-95 transition-all';
+    if (btn3x5) btn3x5.className = sousModule === '3x5min' ? classeActive : classeInactive;
+    if (btnEnch) btnEnch.className = sousModule === 'enchainement' ? classeActive : classeInactive;
 
     // Charger le sous-module
     chargerSousModule(sousModule, subContainer);
@@ -58,6 +65,13 @@ function chargerSousModule(sousModule, container) {
     if (sousModule === '3x5min') {
         import('./variantes/trois-cinq-min/trois-cinq-min-interface.js').then(m => {
             m.initTroisCinqMinInterface(container);
+        }).catch(err => {
+            console.error('[DemiFond] Erreur chargement sous-module:', err);
+            container.innerHTML = `<p class="text-red-400">❌ Erreur de chargement : ${err.message}</p>`;
+        });
+    } else if (sousModule === 'enchainement') {
+        import('./variantes/enchainement/enchainement-interface.js').then(m => {
+            m.initEnchainementInterface(container);
         }).catch(err => {
             console.error('[DemiFond] Erreur chargement sous-module:', err);
             container.innerHTML = `<p class="text-red-400">❌ Erreur de chargement : ${err.message}</p>`;

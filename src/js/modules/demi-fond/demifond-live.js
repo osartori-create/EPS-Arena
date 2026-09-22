@@ -37,6 +37,15 @@ export function renderDemiFondLive() {
                         console.error('[DemiFond Live] Erreur:', err);
                         container.innerHTML = `<p class="text-red-400 text-center">❌ ${err.message}</p>`;
                     });
+            } else if (sousModule === 'enchainement') {
+                import('./variantes/enchainement/enchainement-live.js')
+                    .then(m => {
+                        currentUnsub = m.renderEnchainementLive() || null;
+                    })
+                    .catch(err => {
+                        console.error('[DemiFond Live] Erreur:', err);
+                        container.innerHTML = `<p class="text-red-400 text-center">❌ ${err.message}</p>`;
+                    });
             }
         }, { onlyOnce: true });
     });

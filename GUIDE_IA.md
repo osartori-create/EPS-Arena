@@ -121,7 +121,7 @@ evaluation	❌	Luc Léger, saut, sprint (prof only)
 tournoi	✅	Élimination + ATP
 natation	✅	Indice de nage
 relais	✅	Relais 10s + 2 zones
-demi-fond	✅	3×5min R=3'
+demi-fond	✅	3×5min R=3' + Enchaînement (séries à durées libres)
 ppg	✅	Programme personnalisé
 cross	✅	Voir section 6
 grilles	✅	Auto-évaluation par grilles

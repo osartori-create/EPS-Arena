@@ -37,6 +37,15 @@ export function renderDemiFondTV() {
                         console.error('[DemiFond TV] Erreur:', err);
                         container.innerHTML = `<p class="text-red-400 text-center">❌ ${err.message}</p>`;
                     });
+            } else if (sousModule === 'enchainement') {
+                import('./variantes/enchainement/enchainement-tv.js')
+                    .then(m => {
+                        currentUnsub = m.renderEnchainementTV() || null;
+                    })
+                    .catch(err => {
+                        console.error('[DemiFond TV] Erreur:', err);
+                        container.innerHTML = `<p class="text-red-400 text-center">❌ ${err.message}</p>`;
+                    });
             }
         }, { once: true });
     });
