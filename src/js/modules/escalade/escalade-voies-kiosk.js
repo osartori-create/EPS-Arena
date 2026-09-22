@@ -214,7 +214,8 @@ window.suiviChoisirSecteur = function(secteurId) {
 // ============================================================
 function afficherVoiesSecteur(secteurId) {
     const container = viderContainer();
-    const voies = Object.values(config.voies || {}).filter(v => v.secteur === secteurId);
+    // Seules les VOIES (pas les blocs) sont listées sous un secteur.
+    const voies = Object.values(config.voies || {}).filter(v => v.secteur === secteurId && v.type !== 'bloc');
 
     let voiesHtml;
     if (voies.length === 0) {

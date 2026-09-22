@@ -1,8 +1,9 @@
 // src/js/modules/escalade/escalade-voies-prof.js
 // Interface professeur du module « Suivi des réalisations ».
-// - Gestion des secteurs (1..21) et des voies par secteur.
-// - Tableau de suivi par élève / voie / secteur (résolution noms en LOCAL uniquement).
-// - Export CSV compatible iDoceo.
+// - Onglets : Suivi / Secteurs (voies) / Blocs (numérotations séparées).
+// - Gestion des couleurs personnalisées.
+// - Import / export CSV des voies et des blocs.
+// - Tableau de suivi par élève / voie / secteur (noms résolus en local uniquement).
 
 import {
     listenSuiviConfig,
@@ -12,7 +13,7 @@ import {
 } from './escalade-voies-firebase.js';
 import { calculerStatsEleve, agregerParVoie } from './escalade-voies-core.js';
 import {
-    COULEURS,
+    COULEURS_BASE,
     COULEUR_LABELS,
     construireSecteursDefaut
 } from './escalade-voies-config.js';
@@ -20,14 +21,57 @@ import { getExistingEleves } from '../../services/admin-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 
 let currentClasse = '';
-let config = { secteurs: {}, voies: {} };
+let config = { secteurs: {}, blocs: {}, voies: {}, couleurs: {} };
 let montees = {};
 let configListener = null;
 let monteesListener = null;
-let ongletActif = 'suivi'; // 'suivi' | 'secteurs'
+let ongletActif = 'suivi'; // 'suivi' | 'secteurs' | 'blocs'
 
 // ============================================================
-// INITIALISATION (appelée depuis activities.js)
+// COULEURS (base + personnalisées)
+// ============================================================
+function couleurHexProf(couleur) {
+    const base = {
+        bleue: '#3b82f6', rouge: '#ef4444', verte: '#22c55e', jaune: '#eab308',
+        rose: '#ec4899', orange: '#f97316', sable: '#d6b98c', toutes: '#94a3b8'
+    };
+    if (base[couleur]) return base[couleur];
+    const custom = (config.couleurs || {})[couleur];
+    return custom?.hex || '#64748b';
+}
+
+function couleurLabelProf(couleur) {
+    if (COULEUR_LABELS[couleur]) return COULEUR_LABELS[couleur];
+    const custom = (config.couleurs || {})[couleur];
+    return custom?.label || couleur;
+}
+
+function couleurExiste(c) {
+    const cle = normaliserCouleur(c);
+    if (COULEURS_BASE.includes(cle)) return cle;
+    return (config.couleurs || {})[cle] ? cle : null;
+}
+
+function normaliserCouleur(c) {
+    const map = {
+        'bleues': 'bleue', 'rouges': 'rouge', 'vertes': 'verte',
+        'jaunes': 'jaune', 'sables': 'sable', 'roses': 'rose',
+        'oranges': 'orange', 'toutes': 'toutes'
+    };
+    const brut = String(c || '').trim().toLowerCase();
+    if (map[brut]) return map[brut];
+    // Nettoyage : minuscules, accents retirés, espaces -> tirets.
+    return brut.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function listeCouleursDisponibles() {
+    const base = COULEURS_BASE.map(c => ({ key: c, label: couleurLabelProf(c), hex: couleurHexProf(c), custom: false }));
+    const customs = Object.entries(config.couleurs || {}).map(([k, v]) => ({ key: k, label: v.label || k, hex: v.hex || '#64748b', custom: true }));
+    return [...base, ...customs];
+}
+
+// ============================================================
+// INITIALISATION (appelée depuis escalade-prof.js)
 // ============================================================
 export function initSuiviProf(classe) {
     if (!classe) return;
@@ -35,7 +79,6 @@ export function initSuiviProf(classe) {
 
     let container = document.getElementById('suivi-prof-container');
     if (!container) {
-        // Le suivi vit DANS le module Escalade (3e mode).
         const parent = document.getElementById('viewEscaladeSettings');
         if (!parent) return;
         container = document.createElement('div');
@@ -48,8 +91,10 @@ export function initSuiviProf(classe) {
     if (monteesListener) monteesListener();
 
     configListener = listenSuiviConfig(classe, (data) => {
-        config = data || { secteurs: {}, voies: {} };
+        config = data || { secteurs: {}, blocs: {}, voies: {}, couleurs: {} };
         if (!config.voies) config.voies = {};
+        if (!config.blocs) config.blocs = {};
+        if (!config.couleurs) config.couleurs = {};
         if (monteesListener) monteesListener();
         monteesListener = listenMontees(classe, (data) => {
             montees = data;
@@ -78,10 +123,11 @@ function afficherInterface() {
                     <p class="text-xs text-slate-400">Classe : ${currentClasse} · RGPD : codes anonymes, noms résolus en local</p>
                 </div>
                 <div class="flex gap-2 flex-wrap">
-                    <button onclick="window.suiviOnglet('suivi')" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📊 Suivi</button>
-                    <button onclick="window.suiviOnglet('secteurs')" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">🧭 Secteurs & voies</button>
+                    <button onclick="window.suiviOnglet('suivi')" class="${ongletActif === 'suivi' ? 'bg-blue-600' : 'bg-slate-700'} px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📊 Suivi</button>
+                    <button onclick="window.suiviOnglet('secteurs')" class="${ongletActif === 'secteurs' ? 'bg-blue-600' : 'bg-slate-700'} px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">🧗 Secteurs (voies)</button>
+                    <button onclick="window.suiviOnglet('blocs')" class="${ongletActif === 'blocs' ? 'bg-blue-600' : 'bg-slate-700'} px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">🧱 Blocs</button>
                     <button onclick="window.suiviInitialiserConfig()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">⚙️ Init. 21 secteurs</button>
-                    <button onclick="window.suiviExporterCSV()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">📥 Export CSV</button>
+                    <button onclick="window.suiviExporterCSV()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">📥 Export suivi</button>
                     <button onclick="window.suiviTransmettre()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">📡 Transmettre</button>
                 </div>
             </div>
@@ -94,30 +140,75 @@ function afficherInterface() {
 
 window.suiviOnglet = function(onglet) {
     ongletActif = onglet;
-    afficherOngletActif();
+    afficherInterface();
 };
 
 function afficherOngletActif() {
     if (ongletActif === 'secteurs') afficherVueSecteurs();
+    else if (ongletActif === 'blocs') afficherVueBlocs();
     else afficherVueSuivi();
 }
 
-// Enregistre une configuration par défaut (21 secteurs, aucune voie).
 window.suiviInitialiserConfig = async function() {
     if (!currentClasse) return alert('Sélectionne une classe.');
     const snapshot = await getSuiviConfigSnapshot(currentClasse);
     const base = snapshot || {};
     const configData = {
         secteurs: construireSecteursDefaut(),
+        blocs: base.blocs || {},
         voies: base.voies || {},
+        couleurs: base.couleurs || {},
         murImage: base.murImage || null
     };
     await setSuiviConfig(currentClasse, configData);
-    alert('✅ Configuration initialisée : 21 secteurs prêts à être complétés.');
+    alert('✅ 21 secteurs initialisés. Les blocs et couleurs existants sont conservés.');
 };
 
 // ============================================================
-// VUE SECTEURS & VOIES (ajout / modification des secteurs)
+// VUE COULEURS (partagée en haut des onglets secteurs / blocs)
+// ============================================================
+function afficherBlocCouleurs() {
+    const couleurs = listeCouleursDisponibles();
+    const badges = couleurs.map(c => `
+        <span class="inline-flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg text-[10px] font-black text-white border border-slate-600">
+            <span class="w-3 h-3 rounded-full border border-white/40" style="background:${c.hex}"></span>
+            ${c.label}
+            ${c.custom ? `<button onclick="window.suiviSupprimerCouleur('${c.key}')" class="ml-1 text-red-400">✕</button>` : ''}
+        </span>
+    `).join('');
+
+    return `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-2">🎨 Couleurs des prises</h4>
+            <div class="flex flex-wrap gap-2 mb-2">${badges}</div>
+            <button onclick="window.suiviAjouterCouleur()" class="bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">+ Ajouter une couleur</button>
+        </div>
+    `;
+}
+
+window.suiviAjouterCouleur = async function() {
+    const label = prompt('Nom de la couleur (ex: Violette)');
+    if (!label) return;
+    const hex = prompt('Code hexadécimal (ex: #8b5cf6)', '#8b5cf6');
+    if (hex === null) return;
+
+    const cle = normaliserCouleur(label);
+    const couleurs = { ...(config.couleurs || {}) };
+    couleurs[cle] = { label: label.trim(), hex: /^#[0-9a-fA-F]{6}$/.test(hex.trim()) ? hex.trim() : '#64748b' };
+    await setSuiviConfig(currentClasse, { ...config, couleurs });
+    afficherInterface();
+};
+
+window.suiviSupprimerCouleur = async function(cle) {
+    if (!confirm('Supprimer cette couleur ?')) return;
+    const couleurs = { ...(config.couleurs || {}) };
+    delete couleurs[cle];
+    await setSuiviConfig(currentClasse, { ...config, couleurs });
+    afficherInterface();
+};
+
+// ============================================================
+// VUE SECTEURS & VOIES
 // ============================================================
 function afficherVueSecteurs() {
     const content = document.getElementById('suivi-onglet-content');
@@ -126,14 +217,25 @@ function afficherVueSecteurs() {
     const secteurs = Object.entries(config.secteurs || {}).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
 
     content.innerHTML = `
+        ${afficherBlocCouleurs()}
+
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Ajouter un secteur</h4>
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-2">Ajouter un secteur</h4>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-1">
                 <input id="suivi-new-secteur-num" placeholder="N° (ex: 22)" class="bg-slate-900 border border-slate-600 rounded p-2 text-white">
-                <input id="suivi-new-secteur-label" placeholder="Libellé (ex: Secteur 22)" class="bg-slate-900 border border-slate-600 rounded p-2 text-white col-span-2">
+                <input id="suivi-new-secteur-label" placeholder="Libellé" class="bg-slate-900 border border-slate-600 rounded p-2 text-white col-span-2">
                 <button onclick="window.suiviAjouterSecteur()" class="bg-blue-600 rounded p-2 font-black text-white active:scale-95">+ Ajouter</button>
             </div>
-            <button onclick="window.suiviAjouterSecteurBloc()" class="mt-2 bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">🧱 + Secteur de bloc (type bloc)</button>
+        </div>
+
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-2">Importer les voies (CSV)</h4>
+            <p class="text-xs text-slate-400 mb-2">Format : <code class="bg-slate-900 px-1 rounded">secteur;couleur;cotation</code> (1 ligne = 1 voie).</p>
+            <div class="flex gap-2">
+                <button onclick="document.getElementById('suivi-import-csv').click()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">📥 Importer CSV</button>
+                <button onclick="window.suiviExporterVoiesCSV()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">⬇️ Modèle CSV</button>
+            </div>
+            <input type="file" id="suivi-import-csv" accept=".csv,text/csv" class="hidden" onchange="window.suiviImporterCSV(event)">
         </div>
 
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
@@ -145,15 +247,12 @@ function afficherVueSecteurs() {
                             <span class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-black text-white">${id}</span>
                             <div class="flex-1 min-w-[160px]">
                                 <div class="font-black text-white">${s.label || 'Secteur ' + id}</div>
-                                <div class="text-[10px] text-slate-400">Type : ${s.type || 'voie'} · ${Object.values(config.voies || {}).filter(v => v.secteur === id).length} voie(s)</div>
+                                <div class="text-[10px] text-slate-400">${Object.values(config.voies || {}).filter(v => v.secteur === id).length} voie(s)</div>
                             </div>
                             <button onclick="window.suiviSupprimerSecteur('${id}')" class="bg-red-950 text-red-400 px-3 py-1 rounded-lg text-xs font-black active:scale-95">🗑️</button>
                         </div>
                         <div class="mt-2">${afficherVoiesSecteurProf(id)}</div>
-                        <div class="mt-2 flex gap-2 flex-wrap">
-                            <select id="suivi-voie-secteur-${id}" class="bg-slate-800 border border-slate-600 rounded p-1 text-xs text-white">
-                                ${Object.values(config.voies || {}).filter(v => v.secteur === id).length === 0 ? '' : ''}
-                            </select>
+                        <div class="mt-2">
                             <button onclick="window.suiviAjouterVoie('${id}')" class="bg-emerald-600 px-3 py-1 rounded-lg text-xs font-black text-white active:scale-95">+ Ajouter une voie</button>
                         </div>
                     </div>
@@ -170,44 +269,20 @@ function afficherVoiesSecteurProf(secteurId) {
         <div class="flex items-center gap-2 text-xs">
             <span class="w-3 h-3 rounded-full border border-white/40" style="background:${couleurHexProf(v.couleur)}"></span>
             <span class="text-white font-bold">${v.label || 'voie'}</span>
-            <span class="text-slate-400">${COULEUR_LABELS[v.couleur] || v.couleur}</span>
+            <span class="text-slate-400">${couleurLabelProf(v.couleur)}</span>
             <span class="text-yellow-400 font-black ml-auto">${v.cotation}</span>
             <button onclick="window.suiviSupprimerVoie('${v.id}')" class="bg-red-950 text-red-400 px-2 py-0.5 rounded text-[10px] font-black">✕</button>
         </div>`).join('')}</div>`;
 }
 
-function couleurHexProf(couleur) {
-    const map = {
-        bleue: '#3b82f6', rouge: '#ef4444', verte: '#22c55e', jaune: '#eab308',
-        rose: '#ec4899', orange: '#f97316', sable: '#d6b98c', toutes: '#94a3b8'
-    };
-    return map[couleur] || '#3b82f6';
-}
-
-// Ajouter un secteur de voie.
 window.suiviAjouterSecteur = async function() {
     const num = document.getElementById('suivi-new-secteur-num').value.trim();
     const label = document.getElementById('suivi-new-secteur-label').value.trim();
     if (!num) return alert('Indique un numéro de secteur.');
     const secteurs = { ...(config.secteurs || {}) };
-    secteurs[num] = {
-        type: 'voie',
-        label: label || `Secteur ${num}`,
-        x: 50, y: 50
-    };
+    secteurs[num] = { label: label || `Secteur ${num}`, x: 50, y: 50 };
     await setSuiviConfig(currentClasse, { ...config, secteurs });
-    alert(`✅ Secteur ${num} ajouté.`);
-};
-
-// Ajouter un secteur de bloc (évolution prévue d'emblée).
-window.suiviAjouterSecteurBloc = async function() {
-    const num = prompt('Numéro du secteur de bloc ?');
-    if (!num) return;
-    const label = prompt('Libellé ?', `Bloc ${num}`);
-    const secteurs = { ...(config.secteurs || {}) };
-    secteurs[num] = { type: 'bloc', label: label || `Bloc ${num}`, x: 50, y: 50 };
-    await setSuiviConfig(currentClasse, { ...config, secteurs });
-    alert(`✅ Secteur de bloc ${num} ajouté.`);
+    afficherInterface();
 };
 
 window.suiviSupprimerSecteur = async function(id) {
@@ -217,40 +292,36 @@ window.suiviSupprimerSecteur = async function(id) {
     const voies = { ...(config.voies || {}) };
     Object.keys(voies).forEach(k => { if (voies[k].secteur === id) delete voies[k]; });
     await setSuiviConfig(currentClasse, { ...config, secteurs, voies });
-    afficherVueSecteurs();
+    afficherInterface();
 };
 
-// Ajouter une voie à un secteur.
 window.suiviAjouterVoie = async function(secteurId) {
     if (!config.secteurs || !config.secteurs[secteurId]) return alert('Secteur inexistant.');
 
-    const type = config.secteurs[secteurId].type || 'voie';
     const label = prompt('Libellé de la voie (ex: bleue, sable…)');
     if (label === null) return;
 
-    const couleurChoisie = prompt('Couleur des prises (' + COULEURS.join(', ') + ')', 'bleue');
+    const couleurs = listeCouleursDisponibles().map(c => c.key).join(', ');
+    const couleurChoisie = prompt('Couleur des prises (' + couleurs + ')', COULEURS_BASE[0]);
     if (couleurChoisie === null) return;
-    const couleur = COULEURS.includes(couleurChoisie.trim().toLowerCase()) ? couleurChoisie.trim().toLowerCase() : 'toutes';
+    const couleur = normaliserCouleur(couleurChoisie);
+    if (!couleurExiste(couleur)) return alert('Couleur inconnue. Ajoute-la d\'abord dans « + Ajouter une couleur ».');
 
-    let cotation = null;
-    if (type === 'voie') {
-        cotation = prompt('Cotation (ex: 6A+, 5B…)');
-        if (cotation === null) return;
-    }
+    const cotation = prompt('Cotation (ex: 6A+, 5B…)');
+    if (cotation === null) return;
 
-    const id = `${secteurId}-${Date.now()}`;
+    const id = `${secteurId}-${couleur}-${cotation.trim().toUpperCase()}`;
     const voies = { ...(config.voies || {}) };
     voies[id] = {
         id,
-        type,
+        type: 'voie',
         secteur: secteurId,
-        label: label || 'voie',
+        label: label || couleurLabelProf(couleur),
         couleur,
-        cotation: cotation || ''
+        cotation: cotation.trim().toUpperCase()
     };
-
     await setSuiviConfig(currentClasse, { ...config, voies });
-    afficherVueSecteurs();
+    afficherInterface();
 };
 
 window.suiviSupprimerVoie = async function(voieId) {
@@ -258,8 +329,303 @@ window.suiviSupprimerVoie = async function(voieId) {
     const voies = { ...(config.voies || {}) };
     delete voies[voieId];
     await setSuiviConfig(currentClasse, { ...config, voies });
-    afficherVueSecteurs();
+    afficherInterface();
 };
+
+// ============================================================
+// IMPORT / EXPORT CSV DES VOIES
+// ============================================================
+window.suiviImporterCSV = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const texte = e.target.result || '';
+            if (!texte.trim()) { alert('Fichier vide.'); return; }
+
+            const lignes = parserCsv(texte);
+            if (lignes.length === 0) { alert('Aucune ligne de données détectée.'); return; }
+
+            // L'import REMPLACE toutes les voies existantes (topo complet).
+            const voies = {};
+            Object.entries(config.voies || {}).forEach(([k, v]) => {
+                if (v.type === 'bloc') voies[k] = v;
+            });
+            const secteurs = { ...(config.secteurs || {}) };
+            let nb = 0;
+            const erreurs = [];
+
+            lignes.forEach((ligne, idx) => {
+                const secteur = String(ligne.secteur || '').trim();
+                if (secteur && !secteurs[secteur]) {
+                    // Auto-création du secteur s'il n'existe pas encore.
+                    secteurs[secteur] = { label: `Secteur ${secteur}`, x: 50, y: 50 };
+                }
+                const cotationBrute = String(ligne.cotation || '').trim();
+                if (!secteur) { erreurs.push(`Ligne ${idx + 2} : secteur vide`); return; }
+
+                const couleur = normaliserCouleur(ligne.couleur);
+                if (!couleurExiste(couleur)) { erreurs.push(`Ligne ${idx + 2} : couleur « ${ligne.couleur} » inconnue`); return; }
+
+                const label = (ligne.label && String(ligne.label).trim()) || couleurLabelProf(couleur);
+                const cotation = cotationBrute.toUpperCase();
+
+                const id = `${secteur}-${couleur}-${cotation}`;
+                voies[id] = { id, type: 'voie', secteur, label, couleur, cotation };
+                nb++;
+            });
+
+            await setSuiviConfig(currentClasse, { ...config, voies, secteurs });
+            afficherInterface();
+
+            if (erreurs.length > 0) {
+                alert(`⚠️ ${nb} voie(s) importée(s).\n${erreurs.length} ligne(s) ignorée(s) :\n${erreurs.slice(0, 5).join('\n')}${erreurs.length > 5 ? '\n…' : ''}`);
+            } else {
+                alert(`✅ ${nb} voie(s) importée(s) !`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('❌ Erreur import CSV : ' + err.message);
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file, 'utf-8');
+};
+
+window.suiviExporterVoiesCSV = function() {
+    const voies = Object.values(config.voies || {})
+        .filter(v => v.type !== 'bloc')
+        .sort((a, b) => parseInt(a.secteur) - parseInt(b.secteur) || (a.couleur || '').localeCompare(b.couleur || ''));
+
+    const lignes = ['secteur;couleur;cotation'];
+    voies.forEach(v => lignes.push(`${v.secteur};${v.couleur};${v.cotation}`));
+
+    const csv = '\uFEFF' + lignes.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `topo_voies_${currentClasse}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+// ============================================================
+// VUE BLOCS (numérotation indépendante des secteurs)
+// ============================================================
+function afficherVueBlocs() {
+    const content = document.getElementById('suivi-onglet-content');
+    if (!content) return;
+
+    const blocs = Object.entries(config.blocs || {}).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+
+    content.innerHTML = `
+        ${afficherBlocCouleurs()}
+
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-2">Ajouter un bloc</h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs mb-1">
+                <input id="suivi-new-bloc-num" placeholder="N° (ex: 1)" class="bg-slate-900 border border-slate-600 rounded p-2 text-white">
+                <input id="suivi-new-bloc-label" placeholder="Libellé" class="bg-slate-900 border border-slate-600 rounded p-2 text-white col-span-2">
+                <button onclick="window.suiviAjouterBloc()" class="bg-blue-600 rounded p-2 font-black text-white active:scale-95">+ Ajouter</button>
+            </div>
+        </div>
+
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-2">Importer les blocs (CSV)</h4>
+            <p class="text-xs text-slate-400 mb-2">Format : <code class="bg-slate-900 px-1 rounded">bloc;couleur;cotation</code> (1 ligne = 1 bloc).</p>
+            <div class="flex gap-2">
+                <button onclick="document.getElementById('suivi-import-csv-bloc').click()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">📥 Importer CSV</button>
+                <button onclick="window.suiviExporterBlocsCSV()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">⬇️ Modèle CSV</button>
+            </div>
+            <input type="file" id="suivi-import-csv-bloc" accept=".csv,text/csv" class="hidden" onchange="window.suiviImporterCSVBloc(event)">
+        </div>
+
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <h4 class="font-bold text-slate-400 uppercase text-xs mb-3">Blocs (${blocs.length})</h4>
+            <div class="space-y-3">
+                ${blocs.map(([id, b]) => `
+                    <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <span class="w-8 h-8 rounded-lg bg-orange-600 flex items-center justify-center font-black text-white">${id}</span>
+                            <div class="flex-1 min-w-[160px]">
+                                <div class="font-black text-white">${b.label || 'Bloc ' + id}</div>
+                                <div class="text-[10px] text-slate-400">${Object.values(config.voies || {}).filter(v => v.type === 'bloc' && v.secteur === id).length} bloc(s)</div>
+                            </div>
+                            <button onclick="window.suiviSupprimerBloc('${id}')" class="bg-red-950 text-red-400 px-3 py-1 rounded-lg text-xs font-black active:scale-95">🗑️</button>
+                        </div>
+                        <div class="mt-2">${afficherBlocsProf(id)}</div>
+                        <div class="mt-2">
+                            <button onclick="window.suiviAjouterVoieBloc('${id}')" class="bg-emerald-600 px-3 py-1 rounded-lg text-xs font-black text-white active:scale-95">+ Ajouter un bloc</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function afficherBlocsProf(blocId) {
+    const blocs = Object.values(config.voies || {}).filter(v => v.type === 'bloc' && v.secteur === blocId);
+    if (blocs.length === 0) return '<p class="text-xs text-slate-500 italic">Aucun bloc.</p>';
+    return `<div class="space-y-1">${blocs.map(v => `
+        <div class="flex items-center gap-2 text-xs">
+            <span class="w-3 h-3 rounded-full border border-white/40" style="background:${couleurHexProf(v.couleur)}"></span>
+            <span class="text-white font-bold">${v.label || 'bloc'}</span>
+            <span class="text-slate-400">${couleurLabelProf(v.couleur)}</span>
+            <span class="text-yellow-400 font-black ml-auto">${v.cotation}</span>
+            <button onclick="window.suiviSupprimerVoie('${v.id}')" class="bg-red-950 text-red-400 px-2 py-0.5 rounded text-[10px] font-black">✕</button>
+        </div>`).join('')}</div>`;
+}
+
+window.suiviAjouterBloc = async function() {
+    const num = document.getElementById('suivi-new-bloc-num').value.trim();
+    const label = document.getElementById('suivi-new-bloc-label').value.trim();
+    if (!num) return alert('Indique un numéro de bloc (indépendant des secteurs).');
+    const blocs = { ...(config.blocs || {}) };
+    blocs[num] = { label: label || `Bloc ${num}`, x: 50, y: 50 };
+    await setSuiviConfig(currentClasse, { ...config, blocs });
+    afficherInterface();
+};
+
+window.suiviSupprimerBloc = async function(id) {
+    if (!confirm(`Supprimer le bloc ${id} et ses éléments ?`)) return;
+    const blocs = { ...(config.blocs || {}) };
+    delete blocs[id];
+    const voies = { ...(config.voies || {}) };
+    Object.keys(voies).forEach(k => { if (voies[k].type === 'bloc' && voies[k].secteur === id) delete voies[k]; });
+    await setSuiviConfig(currentClasse, { ...config, blocs, voies });
+    afficherInterface();
+};
+
+window.suiviAjouterVoieBloc = async function(blocId) {
+    if (!config.blocs || !config.blocs[blocId]) return alert('Bloc inexistant.');
+
+    const label = prompt('Libellé du bloc (ex: orange, bleu…)');
+    if (label === null) return;
+
+    const couleurs = listeCouleursDisponibles().map(c => c.key).join(', ');
+    const couleurChoisie = prompt('Couleur (' + couleurs + ')', COULEURS_BASE[0]);
+    if (couleurChoisie === null) return;
+    const couleur = normaliserCouleur(couleurChoisie);
+    if (!couleurExiste(couleur)) return alert('Couleur inconnue. Ajoute-la d\'abord.');
+
+    const cotation = prompt('Cotation (ex: 6A+, 5B…)');
+    if (cotation === null) return;
+
+    const id = `bloc-${blocId}-${couleur}-${cotation.trim().toUpperCase()}`;
+    const voies = { ...(config.voies || {}) };
+    voies[id] = {
+        id,
+        type: 'bloc',
+        secteur: blocId,
+        label: label || couleurLabelProf(couleur),
+        couleur,
+        cotation: cotation.trim().toUpperCase()
+    };
+    await setSuiviConfig(currentClasse, { ...config, voies });
+    afficherInterface();
+};
+
+window.suiviImporterCSVBloc = function(event) {
+    importerCsvParType(event, 'bloc', 'bloc');
+};
+
+window.suiviExporterBlocsCSV = function() {
+    const blocs = Object.values(config.voies || {})
+        .filter(v => v.type === 'bloc')
+        .sort((a, b) => parseInt(a.secteur) - parseInt(b.secteur) || (a.couleur || '').localeCompare(b.couleur || ''));
+
+    const lignes = ['bloc;couleur;cotation'];
+    blocs.forEach(v => lignes.push(`${v.secteur};${v.couleur};${v.cotation}`));
+
+    const csv = '\uFEFF' + lignes.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `topo_blocs_${currentClasse}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+
+function importerCsvParType(event, type, cleSecteur) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const texte = e.target.result || '';
+            if (!texte.trim()) { alert('Fichier vide.'); return; }
+            const lignes = parserCsv(texte);
+            if (lignes.length === 0) { alert('Aucune ligne de données détectée.'); return; }
+
+            // L'import REMPLACE tous les éléments de ce type.
+            const voies = {};
+            const autreType = (type === 'bloc') ? 'voie' : 'bloc';
+            Object.entries(config.voies || {}).forEach(([k, v]) => {
+                if (v.type === autreType) voies[k] = v;
+            });
+            let nb = 0;
+            const erreurs = [];
+
+            lignes.forEach((ligne, idx) => {
+                const secteur = String(ligne[cleSecteur] || ligne.secteur || '').trim();
+                const cotationBrute = String(ligne.cotation || '').trim();
+                if (!secteur) { erreurs.push(`Ligne ${idx + 2} : ${cleSecteur} vide`); return; }
+
+                const couleur = normaliserCouleur(ligne.couleur);
+                if (!couleurExiste(couleur)) { erreurs.push(`Ligne ${idx + 2} : couleur « ${ligne.couleur} » inconnue`); return; }
+
+                const label = (ligne.label && String(ligne.label).trim()) || couleurLabelProf(couleur);
+                const cotation = cotationBrute.toUpperCase();
+                const id = `${type === 'bloc' ? 'bloc-' : ''}${secteur}-${couleur}-${cotation}`;
+                voies[id] = { id, type, secteur, label, couleur, cotation };
+                nb++;
+            });
+
+            await setSuiviConfig(currentClasse, { ...config, voies });
+            afficherInterface();
+
+            if (erreurs.length > 0) {
+                alert(`⚠️ ${nb} ${type === 'bloc' ? 'bloc(s)' : 'voie(s)'} importé(s).\n${erreurs.length} ligne(s) ignorée(s) :\n${erreurs.slice(0, 5).join('\n')}${erreurs.length > 5 ? '\n…' : ''}`);
+            } else {
+                alert(`✅ ${nb} ${type === 'bloc' ? 'bloc(s)' : 'voie(s)'} importé(s) !`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('❌ Erreur import CSV : ' + err.message);
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file, 'utf-8');
+}
+
+function parserCsv(texte) {
+    const parse = window.Papa ? window.Papa.parse : null;
+    if (parse) {
+        const res = parse(texte, {
+            header: true,
+            skipEmptyLines: true,
+            delimiter: ';',
+            transformHeader: h => String(h).trim().toLowerCase()
+        });
+        return res.data || [];
+    }
+    const lignesBrutes = texte.split(/\r?\n/).filter(l => l.trim());
+    const entete = lignesBrutes[0].split(';').map(h => h.trim().toLowerCase());
+    return lignesBrutes.slice(1).map(l => {
+        const vals = l.split(';');
+        const o = {};
+        entete.forEach((h, i) => { o[h] = (vals[i] || '').trim(); });
+        return o;
+    });
+}
 
 // ============================================================
 // VUE SUIVI (tableau de progression réelle)
@@ -271,7 +637,6 @@ function afficherVueSuivi() {
     const eleves = getExistingEleves(currentClasse);
     const voies = config.voies || {};
 
-    // Associer chaque code (numéro) présent dans les montées à un élève local.
     const codesActifs = new Set();
     Object.values(montees).forEach(m => codesActifs.add(String(m.code)));
 
@@ -283,7 +648,6 @@ function afficherVueSuivi() {
         statsParCode[code] = calculerStatsEleve(mesMontées);
     });
 
-    // Statistiques par voie et par secteur.
     const parVoie = agregerParVoie(Object.values(montees));
     const parSecteur = {};
     Object.values(montees).forEach(m => {
@@ -293,7 +657,6 @@ function afficherVueSuivi() {
         if (m.reussie) parSecteur[s].reussies++;
     });
 
-    // En-tête des colonnes voies (tri par secteur puis cotation).
     const colonnesVoies = Object.values(voies)
         .filter(v => v.type !== 'bloc')
         .sort((a, b) => parseInt(a.secteur) - parseInt(b.secteur));
@@ -386,7 +749,7 @@ function afficherVueSuivi() {
 }
 
 // ============================================================
-// EXPORT CSV (compatible iDoceo)
+// EXPORT SUIVI CSV (compatible iDoceo)
 // ============================================================
 window.suiviExporterCSV = function() {
     const eleves = getExistingEleves(currentClasse);
@@ -435,11 +798,12 @@ window.suiviTransmettre = async function() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const baseProf = `etablissements/0680013V/profs/${profCode}`;
 
-    // S'assurer de la présence des secteurs.
     let snapshot = await getSuiviConfigSnapshot(currentClasse);
     snapshot = snapshot || {};
     if (!snapshot.secteurs) snapshot.secteurs = construireSecteursDefaut();
+    if (!snapshot.blocs) snapshot.blocs = {};
     if (!snapshot.voies) snapshot.voies = {};
+    if (!snapshot.couleurs) snapshot.couleurs = {};
 
     try {
         await setSuiviConfig(currentClasse, snapshot);

@@ -1,6 +1,7 @@
 // src/js/modules/escalade/escalade-voies-config.js
-// Constantes partagées du module « Suivi des réalisations » (voies et, à terme, blocs).
-// Source de vérité unique pour les cotations, couleurs, niveaux de maîtrise et ressentis.
+// Constantes partagées du module « Suivi des réalisations ».
+// Source de vérité unique pour les cotations, couleurs, niveaux de maîtrise, ressentis.
+// Les SECTEURS (voies) et les BLOCS sont deux espaces de numérotation distincts.
 
 // ============================================================
 // COTATIONS (échelle française, de 3A à 7B avec les « + »)
@@ -24,16 +25,13 @@ function construireCotations() {
 
 export const COTATIONS = construireCotations();
 
-// Index croissant pour trier / calculer la progression.
 export const COTATION_INDEX = {};
 COTATIONS.forEach((cot, i) => { COTATION_INDEX[cot] = i; });
 
-// Niveau entier d'une cotation (3, 4, 5, 6, 7).
 export function niveauCotation(cot) {
     return parseInt(String(cot).charAt(0), 10);
 }
 
-// Renvoie la cotation la plus élevée entre deux cotations (ou null).
 export function maxCotation(a, b) {
     if (!a) return b;
     if (!b) return a;
@@ -41,9 +39,9 @@ export function maxCotation(a, b) {
 }
 
 // ============================================================
-// COULEURS DES PRISES
+// COULEURS DES PRISES (liste par défaut, extensible par le prof)
 // ============================================================
-export const COULEURS = ['bleue', 'rouge', 'verte', 'jaune', 'rose', 'orange', 'sable', 'toutes'];
+export const COULEURS_BASE = ['bleue', 'rouge', 'verte', 'jaune', 'rose', 'orange', 'sable', 'toutes'];
 
 export const COULEUR_LABELS = {
     bleue: 'Bleue',
@@ -67,6 +65,9 @@ export const COULEUR_HEX = {
     sable: '#d6b98c',
     toutes: '#94a3b8'
 };
+
+// Couleur de repli pour les couleurs personnalisées sans hex.
+export const COULEUR_HEX_DEFAUT = '#64748b';
 
 // ============================================================
 // NIVEAUX DE MAÎTRISE (ordre du plus encadré au plus autonome)
@@ -100,12 +101,6 @@ export const HAUTEUR_MUR = 9;
 export const HAUTEUR_ECHEC_MIN = 3;
 
 // ============================================================
-// TYPES (voie aujourd'hui, bloc demain — prévu d'emblée)
-// ============================================================
-export const TYPES = ['voie', 'bloc'];
-export const TYPE_LABELS = { voie: 'Voie', bloc: 'Bloc' };
-
-// ============================================================
 // BADGES (seuils)
 // ============================================================
 export const BADGES = {
@@ -130,20 +125,25 @@ export const BADGES = {
 };
 
 // ============================================================
-// CONFIGURATION PAR DÉFAUT DES SECTEURS (21 secteurs du mur)
+// CONFIGURATION PAR DÉFAUT
+//  - secteurs : zones de voies numérotées 1..21 au bas du mur.
+//  - blocs     : zones de bloc (numérotation indépendante, vide par défaut).
 // ============================================================
 export function construireSecteursDefaut() {
     const secteurs = {};
     for (let i = 1; i <= 21; i++) {
-        // Position par défaut en grille (7 colonnes × 3 lignes), en pourcentage.
         const col = (i - 1) % 7;
         const row = Math.floor((i - 1) / 7);
         secteurs[String(i)] = {
-            type: 'voie',
             label: `Secteur ${i}`,
-            x: 5 + (col * 15), // 5, 20, 35, 50, 65, 80, 95
-            y: 20 + (row * 30) // 20, 50, 80
+            x: 5 + (col * 15),
+            y: 20 + (row * 30)
         };
     }
     return secteurs;
+}
+
+export function construireBlocsDefaut() {
+    // Les blocs ont leur propre numérotation (1, 2, 3…) indépendante des secteurs.
+    return {};
 }

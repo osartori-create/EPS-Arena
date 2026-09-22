@@ -39,7 +39,9 @@ export function listenSuiviConfig(classe, callback) {
     return onValue(configRef, (snap) => {
         const data = snap.val() || {};
         if (!data.secteurs) data.secteurs = construireSecteursDefaut();
+        if (!data.blocs) data.blocs = {};
         if (!data.voies) data.voies = {};
+        if (!data.couleurs) data.couleurs = {};
         callback(data);
     });
 }
