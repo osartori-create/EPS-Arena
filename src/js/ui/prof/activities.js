@@ -444,6 +444,18 @@ window.switchDiscipline = async function(disc) {
 } else {
                 // Pour les autres disciplines, on les restaure
                 if (exportCSVBtn) exportCSVBtn.style.display = '';
+
+                // 1/2 fond : export CSV dédié (lit Firebase, pas le DOM)
+                if (disc === 'demi-fond') {
+                    exportCSVBtn.textContent = '📥 Export CSV';
+                    exportCSVBtn.onclick = function() {
+                        if (typeof window.exportDemiFondLiveCSV === 'function') window.exportDemiFondLiveCSV();
+                        else alert('Export CSV non disponible.');
+                    };
+                } else {
+                    exportCSVBtn.onclick = function() { window.exportResultsLive(); };
+                }
+
                 // Pour CO, on restaure le bouton iDoceo
                 if (exportIDoceoBtn) {
                     if (disc === 'co') {
