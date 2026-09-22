@@ -85,6 +85,13 @@ function mesMontees() {
     return filtrerMonteesParCode(montees, currentCode);
 }
 
+// Revient à la saisie du numéro élève (coupe l'écoute des montées).
+window.suiviEleveSuivant = function() {
+    if (monteesListener) { monteesListener(); monteesListener = null; }
+    montees = {};
+    afficherSaisieNumero();
+};
+
 // ============================================================
 // ÉCRAN 1 — SAISIE DU NUMÉRO PERSONNEL
 // ============================================================
@@ -149,12 +156,81 @@ function afficherSaisieNumero() {
             if (!numero) return;
             currentCode = numero;
             ecouterMesMontees();
-            afficherChoixSecteur();
+            afficherChoixMode();
         };
         keypad.appendChild(ok);
     };
     buildKeypad();
 }
+
+// ============================================================
+// ÉCRAN 1bis — CHOIX VOIES / BLOCS
+// ============================================================
+function afficherChoixMode() {
+    const container = viderContainer();
+
+    container.innerHTML = `
+        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
+            <div class="flex items-center justify-between gap-3 mb-4">
+                <div>
+                    <p class="text-xs text-slate-400">Numéro</p>
+                    <p class="text-2xl font-black text-white">${currentCode}</p>
+                </div>
+                <button onclick="window.suiviVoirProgression()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📊 Ma progression</button>
+            </div>
+            <h2 class="text-xl font-black text-white text-center mb-4">Que veux-tu grimper ?</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="window.suiviChoisirMode('voies')" class="bg-blue-600 py-8 rounded-2xl font-black text-white text-lg active:scale-95 transition-transform">🧗 Voies</button>
+                <button onclick="window.suiviChoisirMode('blocs')" class="bg-orange-600 py-8 rounded-2xl font-black text-white text-lg active:scale-95 transition-transform">🧱 Blocs</button>
+            </div>
+            <div class="mt-4">
+                <p class="text-xs text-slate-500 text-center">Tu pourras passer de l'un à l'autre à tout moment.</p>
+            </div>
+        </div>
+    `;
+}
+
+window.suiviChoisirMode = function(mode) {
+    if (mode === 'blocs') afficherChoixBloc();
+    else afficherChoixSecteur();
+};
+
+// ============================================================
+// ÉCRAN 2bis — CHOIX D'UN BLOC (grille simple)
+// ============================================================
+function afficherChoixBloc() {
+    const container = viderContainer();
+    const blocs = config.blocs || {};
+    const idsBlocs = Object.keys(blocs).sort((a, b) => parseInt(a) - parseInt(b));
+
+    const grille = idsBlocs.length > 0
+        ? idsBlocs.map(id => {
+            const dejaFait = mesMontees().some(m => m.secteur === id && m.type === 'bloc');
+            return `<button onclick="window.suiviChoisirBloc('${id}')" class="h-14 rounded-xl ${dejaFait ? 'bg-emerald-600' : 'bg-orange-600'} text-white font-black text-lg active:scale-95 transition-transform">${id}</button>`;
+        }).join('')
+        : '<p class="text-slate-400 text-center py-6 col-span-7">⚠️ Aucun bloc configuré. Demande à ton professeur.</p>';
+
+    container.innerHTML = `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <div class="flex items-center justify-between gap-3 mb-3">
+                <div>
+                    <p class="text-xs text-slate-400">Numéro</p>
+                    <p class="text-2xl font-black text-white">${currentCode}</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="window.suiviVoirProgression()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📊 Ma progression</button>
+                    <button onclick="window.suiviChoisirMode('voies')" class="bg-blue-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">↔ Voies</button>
+                </div>
+            </div>
+            <p class="text-sm text-slate-400 mb-3 text-center">Choisis ton bloc</p>
+            <div class="grid grid-cols-7 gap-2">${grille}</div>
+        </div>
+    `;
+}
+
+window.suiviChoisirBloc = function(blocId) {
+    afficherVoiesSecteur(blocId, 'bloc');
+};
 
 // ============================================================
 // ÉCRAN 2 — CHOIX DU SECTEUR (photo + pastilles ou grille)
@@ -192,7 +268,10 @@ function afficherChoixSecteur() {
                     <p class="text-xs text-slate-400">Numéro</p>
                     <p class="text-2xl font-black text-white">${currentCode}</p>
                 </div>
-                <button onclick="window.suiviVoirProgression()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📊 Ma progression</button>
+                <div class="flex gap-2">
+                    <button onclick="window.suiviVoirProgression()" class="bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">📊 Ma progression</button>
+                    <button onclick="window.suiviChoisirMode('blocs')" class="bg-orange-600 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">↔ Blocs</button>
+                </div>
             </div>
             <p class="text-sm text-slate-400 mb-3 text-center">Choisis ton secteur (n° au bas du mur)</p>
             ${photoHtml}
@@ -206,23 +285,25 @@ function secteurDejaFait(secteurId) {
 
 window.suiviChoisirSecteur = function(secteurId) {
     saisie.secteur = secteurId;
-    afficherVoiesSecteur(secteurId);
+    afficherVoiesSecteur(secteurId, 'voie');
 };
 
 // ============================================================
-// ÉCRAN 3 — VOIES DU SECTEUR
+// ÉCRAN 3 — VOIES DU SECTEUR (ou BLOCS d'un bloc)
 // ============================================================
-function afficherVoiesSecteur(secteurId) {
+function afficherVoiesSecteur(secteurId, type = 'voie') {
     const container = viderContainer();
-    // Seules les VOIES (pas les blocs) sont listées sous un secteur.
-    const voies = Object.values(config.voies || {}).filter(v => v.secteur === secteurId && v.type !== 'bloc');
+    const estBloc = (type === 'bloc');
+    const elements = Object.values(config.voies || {}).filter(v => v.secteur === secteurId && v.type === type);
+    const titre = estBloc ? `Bloc ${secteurId}` : `Secteur ${secteurId}`;
+    const libelleElement = estBloc ? 'Bloc' : 'Voie';
 
-    let voiesHtml;
-    if (voies.length === 0) {
-        voiesHtml = `<p class="text-slate-400 text-center py-6">⚠️ Aucune voie configurée pour le secteur ${secteurId}.<br>Demande à ton professeur de l'ajouter.</p>`;
+    let elementsHtml;
+    if (elements.length === 0) {
+        elementsHtml = `<p class="text-slate-400 text-center py-6">⚠️ Aucun élément configuré pour ${estBloc ? 'ce bloc' : 'ce secteur'}.<br>Demande à ton professeur de l'ajouter.</p>`;
     } else {
-        voiesHtml = voies.map(v => {
-            const bg = (COULEUR_HEX[v.couleur] || '#3b82f6');
+        elementsHtml = elements.map(v => {
+            const bg = COULEUR_HEX[v.couleur] || '#3b82f6';
             const dejaReussi = mesMontees().some(m => m.voieId === v.id && m.reussie);
             return `
                 <button onclick="window.suiviChoisirVoie('${v.id}')"
@@ -230,7 +311,7 @@ function afficherVoiesSecteur(secteurId) {
                     <div class="flex items-center gap-3">
                         <span class="w-6 h-6 rounded-full border-2 border-white/50" style="background:${bg}"></span>
                         <div class="flex-1">
-                            <span class="font-black text-white">Voie ${v.label || ''}</span>
+                            <span class="font-black text-white">${libelleElement} ${v.label || ''}</span>
                             <span class="text-xs text-slate-400 ml-2">${COULEUR_LABELS[v.couleur] || v.couleur}</span>
                         </div>
                         <span class="text-xl font-black text-yellow-400">${v.cotation || ''}</span>
@@ -244,13 +325,26 @@ function afficherVoiesSecteur(secteurId) {
     container.innerHTML = `
         <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
             <div class="flex items-center gap-3 mb-4">
-                <button onclick="window.suiviRetourSecteurs()" class="bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">←</button>
-                <h2 class="text-lg font-black text-white">Secteur ${secteurId}</h2>
+                <button onclick="window.suiviRetourElements('${secteurId}', '${type}')" class="bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">←</button>
+                <h2 class="text-lg font-black text-white">${titre}</h2>
+                <div class="ml-auto">
+                    <button onclick="window.suiviBasculerMode('${type}')" class="px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95 ${estBloc ? 'bg-blue-600' : 'bg-orange-600'}">${estBloc ? '↔ Voies' : '↔ Blocs'}</button>
+                </div>
             </div>
-            <div class="space-y-3">${voiesHtml}</div>
+            <div class="space-y-3">${elementsHtml}</div>
         </div>
     `;
 }
+
+window.suiviRetourElements = function(id, type) {
+    if (type === 'bloc') afficherChoixBloc();
+    else afficherChoixSecteur();
+};
+
+window.suiviBasculerMode = function(typeActuel) {
+    if (typeActuel === 'bloc') afficherChoixSecteur();
+    else afficherChoixBloc();
+};
 
 window.suiviChoisirVoie = function(voieId) {
     const voie = (config.voies || {})[voieId];
@@ -270,13 +364,15 @@ function afficherSaisieResultat() {
     const container = viderContainer();
     const voie = saisie.voie;
     const bg = COULEUR_HEX[voie.couleur] || '#3b82f6';
+    const estBloc = voie.type === 'bloc';
+    const libelle = estBloc ? 'Bloc' : 'Voie';
 
     container.innerHTML = `
         <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
             <div class="flex items-center gap-3 mb-4">
                 <button onclick="window.suiviRetourVoie()" class="bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">←</button>
                 <div class="flex-1">
-                    <h2 class="text-lg font-black text-white">Voie ${voie.label || ''}</h2>
+                    <h2 class="text-lg font-black text-white">${libelle} ${voie.label || ''}</h2>
                     <p class="text-xs text-slate-400">${COULEUR_LABELS[voie.couleur] || ''} · Cotation <span class="text-yellow-400 font-bold">${voie.cotation}</span></p>
                 </div>
                 <span class="w-8 h-8 rounded-full border-2 border-white/50" style="background:${bg}"></span>
@@ -338,7 +434,11 @@ function afficherSaisieResultat() {
 }
 
 window.suiviRetourVoie = function() {
-    afficherVoiesSecteur(saisie.secteur);
+    if (saisie.voie) {
+        afficherVoiesSecteur(saisie.secteur, saisie.voie.type || 'voie');
+    } else {
+        afficherChoixMode();
+    }
 };
 
 window.suiviSetReussite = function(reussie) {
@@ -459,21 +559,16 @@ function afficherFeedback(montee, stats, nouveaux) {
                 <div class="flex justify-between"><span class="text-slate-400">Taux de réussite</span><span class="font-black text-yellow-400">${Math.round(stats.tauxReussite)}%</span></div>
                 <div class="flex justify-between"><span class="text-slate-400">Cotation max</span><span class="font-black text-white">${stats.cotationMax || '—'}</span></div>
             </div>
-            <button onclick="window.suiviNouvelleMontée()" class="mt-6 bg-blue-600 px-6 py-4 rounded-2xl font-black text-white active:scale-95">↩ Autre voie</button>
+            <button onclick="window.suiviNouvelleMontée()" class="mt-6 bg-blue-600 px-6 py-4 rounded-2xl font-black text-white active:scale-95">↩ Autre montée</button>
+            <button onclick="window.suiviEleveSuivant()" class="mt-3 w-full bg-emerald-600 px-6 py-5 rounded-2xl text-xl font-black text-white active:scale-95">👤 Élève suivant</button>
         </div>
     `;
-
-    setTimeout(() => {
-        if (document.getElementById('suivi-module') || document.getElementById('suivi-kiosk-container')) {
-            afficherChoixSecteur();
-        }
-    }, 8000);
 }
 
 window.suiviNouvelleMontée = function() {
     saisie.secteur = null;
     saisie.voie = null;
-    afficherChoixSecteur();
+    afficherChoixMode();
 };
 
 // ============================================================
@@ -494,7 +589,7 @@ window.suiviVoirProgression = function() {
     container.innerHTML = `
         <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
             <div class="flex items-center gap-3 mb-4">
-                <button onclick="window.suiviRetourSecteurs()" class="bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">←</button>
+                <button onclick="window.suiviRetourElementsMode()" class="bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">←</button>
                 <h2 class="text-lg font-black text-white">Ma progression</h2>
             </div>
             <div class="grid grid-cols-2 gap-3 mb-5">
@@ -513,7 +608,13 @@ window.suiviVoirProgression = function() {
                     ${stats.badges.map(b => `<div class="bg-slate-900 p-3 rounded-xl text-center"><div class="text-2xl">${b.emoji}</div><div class="text-[10px] text-slate-300 font-bold">${b.titre}</div></div>`).join('')}
                 </div>
             </div>
-            <button onclick="window.suiviRetourSecteurs()" class="w-full bg-blue-600 py-4 rounded-2xl font-black text-white active:scale-95">Retour aux secteurs</button>
+            <button onclick="window.suiviRetourElementsMode()" class="w-full bg-blue-600 py-4 rounded-2xl font-black text-white active:scale-95">↩ Retour à la saisie</button>
+            <button onclick="window.suiviEleveSuivant()" class="mt-3 w-full bg-emerald-600 py-5 rounded-2xl text-xl font-black text-white active:scale-95">👤 Élève suivant</button>
         </div>
     `;
+};
+
+// Retourne au choix Voies / Blocs depuis l'écran progression.
+window.suiviRetourElementsMode = function() {
+    afficherChoixMode();
 };
