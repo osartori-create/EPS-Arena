@@ -187,6 +187,7 @@ function renderSelectCode(container) {
             codes.push({
                 code: `${idx}_${m.lettre}`,
                 label: `G${groupe.numero}${m.lettre}`,
+                numero: m.code ?? '',
                 groupeIdx: idx,
                 lettre: m.lettre
             });
@@ -213,7 +214,8 @@ function renderSelectCode(container) {
             <button onclick="window.relaisKioskSelectCode('${c.code}')"
                     class="${bgClass} p-5 rounded-2xl font-black text-2xl text-white border-2 active:scale-95 transition-all">
                 ${c.label}
-                ${hasV ? '<span class="block text-xs font-normal mt-1">✓ saisi</span>' : ''}
+                ${c.numero ? `<span class="block text-sm font-normal mt-1 opacity-90">#${c.numero}</span>` : ''}
+                ${hasV ? '<span class="block text-xs font-normal mt-1 opacity-80">✓ saisi</span>' : ''}
             </button>
         `;
     });

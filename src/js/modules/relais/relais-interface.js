@@ -302,7 +302,7 @@ window.relaisRenderVitesses = function() {
         html += `
             <div class="bg-slate-900 p-3 rounded-xl border ${complet ? 'border-emerald-600' : 'border-slate-700'}">
                 <div class="flex items-center gap-3 flex-wrap">
-                    <div class="font-bold text-white text-sm min-w-[140px] flex-1">${e.prenom} ${e.nom}</div>
+                    <div class="font-bold text-white text-sm min-w-[160px] flex-1">${e.prenom} ${e.nom}${e.codeAutoEval !== undefined && e.codeAutoEval !== null ? ` <span class="text-blue-400">#${e.codeAutoEval}</span>` : ''}</div>
                     <div class="flex items-center gap-2 text-xs">
                         <label class="text-slate-400">Arrêté</label>
                         <input type="number" id="rv-arret-${e.id}" value="${arret}" min="0" max="40" step="0.5"
@@ -886,7 +886,7 @@ export async function transmettreRelaisConfig() {
             if (!eleve) return null;
             const lettre = getLettre(i);
             localMapping[`${activeClasse}_${newIdx}_${lettre}`] = id;
-            return { lettre, sexe: eleve.sexe || '' };
+            return { lettre, sexe: eleve.sexe || '', code: eleve.codeAutoEval ?? '' };
         }).filter(Boolean);
 
         if (membres.length > 0) {
