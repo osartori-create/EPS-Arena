@@ -2,7 +2,7 @@
 // UI Professeur : groupes, vitesses, réglages, transmission
 // ⚠️ RGPD : seules les lettres (a,b,c) et le sexe transitent sur Firebase.
 
-import { db, ref, set } from '../../core/firebase-service.js';
+import { db, ref, set, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, setLocalMapping, getLocalMapping } from '../../core/live-engine.js';
 import { getLettre, PALIERS_TRANSMISSION, DISTANCES_2ZONES_DEFAUT } from './relais-core.js';
@@ -35,6 +35,7 @@ export function initRelaisInterface() {
     container.innerHTML = '';
     container.appendChild(createHeader());
     container.appendChild(createBody());
+    container.appendChild(createVitessesBlock());
 
     // Restaurer les valeurs
     const savedNbGroupes = localStorage.getItem(`eps_arena_relais_nb_groupes_${currentClasse}`) || 5;
@@ -62,6 +63,7 @@ export function initRelaisInterface() {
         window.relaisUpdateSousActiviteUI();
         window.relaisUpdateModeStyle();
         loadAffectations();
+        window.relaisRenderVitesses();
     }, 100);
 }
 
@@ -231,6 +233,143 @@ function createBody() {
     `;
     return div;
 }
+
+// ============================================================
+// BLOC VITESSES (5" arrêté / lancé) — affichage + édition
+// ============================================================
+function createVitessesBlock() {
+    const div = document.createElement('div');
+    div.className = 'bg-slate-800 p-5 rounded-2xl border border-slate-700';
+    div.innerHTML = `
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <div>
+                <h4 class="font-bold text-blue-400 uppercase text-xs">📊 Vitesses des élèves</h4>
+                <p class="text-[10px] text-slate-500 mt-1">5" départ arrêté / 5" départ lancé (importées du CSV ou saisies manuellement)</p>
+            </div>
+            <div class="flex gap-2 flex-wrap">
+                <button onclick="window.relaisRecupererVitesses()"
+                        class="bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                    ⬇️ Récupérer depuis les iPads
+                </button>
+                <button onclick="window.relaisRenderVitesses()"
+                        class="bg-slate-600 hover:bg-slate-500 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95">
+                    🔄 Rafraîchir
+                </button>
+            </div>
+        </div>
+        <div id="relais-vitesses-list" class="space-y-2"></div>
+    `;
+    return div;
+}
+
+window.relaisRenderVitesses = function() {
+    const activeClasse = getCurrentClasse();
+    if (!activeClasse) return;
+
+    const container = document.getElementById('relais-vitesses-list');
+    if (!container) return;
+
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${activeClasse}`) || '[]');
+    const vitesses = JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}');
+
+    // On affiche tous les élèves pour pouvoir éditer/mettre à jour facilement
+    const elevesTries = [...eleves].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+
+    if (elevesTries.length === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-xs">Aucun élève dans cette classe.</p>';
+        return;
+    }
+
+    let html = '';
+    elevesTries.forEach(e => {
+        const v = vitesses[e.id] || {};
+        const arret = v.arret ?? '';
+        const lance = v.lance ?? '';
+        const vTheo = (v.arret && v.lance) ? ((v.arret + v.lance) / 2).toFixed(1) : '--';
+        const complet = v.arret && v.lance;
+
+        html += `
+            <div class="bg-slate-900 p-3 rounded-xl border ${complet ? 'border-emerald-600' : 'border-slate-700'}">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <div class="font-bold text-white text-sm min-w-[140px] flex-1">${e.prenom} ${e.nom}</div>
+                    <div class="flex items-center gap-2 text-xs">
+                        <label class="text-slate-400">Arrêté</label>
+                        <input type="number" id="rv-arret-${e.id}" value="${arret}" min="0" max="40" step="0.5"
+                               onchange="window.relaisSaveVitesse('${e.id}')"
+                               class="w-20 bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-center">
+                        <span class="text-slate-600">km/h</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs">
+                        <label class="text-slate-400">Lancé</label>
+                        <input type="number" id="rv-lance-${e.id}" value="${lance}" min="0" max="40" step="0.5"
+                               onchange="window.relaisSaveVitesse('${e.id}')"
+                               class="w-20 bg-slate-800 border border-slate-600 rounded p-1.5 text-white text-center">
+                        <span class="text-slate-600">km/h</span>
+                    </div>
+                    <div class="text-xs text-slate-400 min-w-[110px] text-right">
+                        V théorique : <span class="font-black ${complet ? 'text-yellow-400' : 'text-slate-600'}">${vTheo}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+};
+
+window.relaisRecupererVitesses = function() {
+    const activeClasse = getCurrentClasse();
+    if (!activeClasse) return alert('Sélectionnez une classe.');
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const basePath = `etablissements/0680013V/profs/${profCode}/${activeClasse}/relais`;
+    const mapping = getLocalMapping(activeClasse) || {};
+
+    onValue(ref(db, `${basePath}/vitesses`), snap => {
+        const fbV = snap.val() || {};
+        const vitessesLocales = JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}');
+        let nb = 0;
+
+        Object.entries(fbV).forEach(([cle, v]) => {
+            // cle = "groupeIdx_lettre" (ex "0_a"), le mapping local est "classe_groupeIdx_lettre"
+            const eleveId = mapping[`${activeClasse}_${cle}`];
+            if (!eleveId) return;
+            if (v && v.arret && v.lance) {
+                vitessesLocales[eleveId] = { arret: v.arret, lance: v.lance, timestamp: v.timestamp || Date.now() };
+                nb++;
+            }
+        });
+
+        localStorage.setItem(getVitessesKey(activeClasse), JSON.stringify(vitessesLocales));
+        window.relaisRenderVitesses();
+        alert(`✅ ${nb} vitesse(s) récupérée(s) depuis les iPads.`);
+    }, { onlyOnce: true });
+};
+
+window.relaisSaveVitesse = function(eleveId) {
+    const activeClasse = getCurrentClasse();
+    if (!activeClasse) return;
+
+    const arretEl = document.getElementById(`rv-arret-${eleveId}`);
+    const lanceEl = document.getElementById(`rv-lance-${eleveId}`);
+    const arret = arretEl ? parseFloat(arretEl.value) : NaN;
+    const lance = lanceEl ? parseFloat(lanceEl.value) : NaN;
+
+    const vitesses = JSON.parse(localStorage.getItem(getVitessesKey(activeClasse)) || '{}');
+
+    if (isNaN(arret) && isNaN(lance)) {
+        delete vitesses[eleveId];
+    } else {
+        vitesses[eleveId] = {
+            arret: isNaN(arret) ? null : arret,
+            lance: isNaN(lance) ? null : lance,
+            timestamp: Date.now()
+        };
+    }
+
+    localStorage.setItem(getVitessesKey(activeClasse), JSON.stringify(vitesses));
+    window.relaisRenderVitesses();
+};
 
 // ============================================================
 // SÉLECTEUR DE SOUS-ACTIVITÉ

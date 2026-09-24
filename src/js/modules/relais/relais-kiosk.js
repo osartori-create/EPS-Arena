@@ -364,6 +364,7 @@ function renderSelectPaire(container) {
         const vRelaye = state.vitesses[codeRelaye] || {};
         const vRelayeur = state.vitesses[codeRelayeur] || {};
         const pret = vRelaye.arret && vRelayeur.lance;
+        const vTheo = calculerVTheorique(vRelaye.arret, vRelayeur.lance);
 
         const essaisPaire = mesuresGroupe.filter(m => m.pairId === p.pairId);
         const meilleur = essaisPaire.length > 0 ? Math.max(...essaisPaire.map(m => m.score)) : null;
@@ -372,6 +373,7 @@ function renderSelectPaire(container) {
             <button onclick="window.relaisKioskSelectPaire(${i})"
                     class="bg-slate-800 hover:bg-slate-700 border-2 ${pret ? 'border-slate-700 hover:border-blue-500' : 'border-red-800'} p-4 rounded-2xl active:scale-95 transition-all text-left">
                 <div class="text-3xl font-black text-white mb-1">${p.relaye.lettre} → ${p.relayeur.lettre}</div>
+                ${vTheo !== null ? `<div class="mt-1 text-xs font-bold text-emerald-400">V théorique : ${vTheo.toFixed(1)} km/h</div>` : ''}
                 ${meilleur !== null ? `<div class="mt-1 text-xs text-yellow-400 font-bold">🏆 Meilleur : ${meilleur.toFixed(1)} pts</div>` : ''}
                 ${!pret ? `<div class="mt-1 text-xs text-red-400 font-bold">⚠️ Vitesses manquantes</div>` : ''}
             </button>

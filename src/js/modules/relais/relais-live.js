@@ -143,7 +143,8 @@ async function renderAll(container, classe, config, mesures, vitesses) {
         for (const eff of effArray) {
             const eleveId = getEleveIdFromMapping(classe, groupeIdx, eff.membre.lettre);
             const nomComplet = getNomComplet(classe, eleveId, eff.membre.lettre);
-            const photoUrl = eleveId ? await getPhotoUrl(eleveId) : null;
+            let photoUrl = null;
+            if (eleveId) { try { photoUrl = await getPhotoUrl(eleveId); } catch (e) { photoUrl = null; } }
             const photoHtml = photoUrl
                 ? `<img src="${photoUrl}" class="w-7 h-7 rounded-full object-cover border border-slate-600">`
                 : `<div class="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs">👤</div>`;
@@ -230,7 +231,8 @@ async function renderModalMembres(groupeIdx, groupe, classe) {
     for (const m of groupe.membres) {
         const eleveId = getEleveIdFromMapping(classe, groupeIdx, m.lettre);
         const nomComplet = getNomComplet(classe, eleveId, m.lettre);
-        const photoUrl = eleveId ? await getPhotoUrl(eleveId) : null;
+        let photoUrl = null;
+        if (eleveId) { try { photoUrl = await getPhotoUrl(eleveId); } catch (e) { photoUrl = null; } }
         const photoHtml = photoUrl
             ? `<img src="${photoUrl}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">`
             : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg">👤</div>`;
