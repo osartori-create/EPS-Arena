@@ -64,6 +64,17 @@ export function initRelaisInterface() {
         window.relaisUpdateModeStyle();
         loadAffectations();
         window.relaisRenderVitesses();
+
+        // Si on a demandé à ouvrir directement les vitesses, on scrolle dessus
+        if (window.__relaisScrollToVitesses) {
+            window.__relaisScrollToVitesses = false;
+            const bloc = document.getElementById('relais-vitesses-list');
+            if (bloc) {
+                bloc.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                bloc.classList.add('ring-4', 'ring-blue-400');
+                setTimeout(() => bloc.classList.remove('ring-4', 'ring-blue-400'), 1600);
+            }
+        }
     }, 100);
 }
 
@@ -916,4 +927,37 @@ export async function transmettreRelaisConfig() {
 }
 
 window.relaisTransmettre = async function() { await transmettreRelaisConfig(); };
+
+// Ouvre les réglages Relais et fait défiler jusqu'au bloc "Vitesses des élèves".
+window.relaisOpenVitesses = function() {
+    // Conteneur de la liste des vitesses (dans le bloc vitesses)
+    let bloc = document.getElementById('relais-vitesses-list');
+
+    // Si le bloc n'existe pas encore, on s'assure que l'interface Relais est montée
+    if (!bloc) {
+        // Marqueur global pour scroller dès que l'interface est prête
+        window.__relaisScrollToVitesses = true;
+        if (typeof window.switchActivitySubTab === 'function') {
+            window.switchActivitySubTab('settings');
+        }
+        import('./relais-interface.js').then(m => {
+            if (m.initRelaisInterface) m.initRelaisInterface();
+        });
+        return;
+    }
+
+    // Le bloc existe déjà : on ouvre les réglages puis on scrolle
+    if (typeof window.switchActivitySubTab === 'function') {
+        window.switchActivitySubTab('settings');
+    }
+    setTimeout(() => {
+        bloc = document.getElementById('relais-vitesses-list');
+        if (bloc) {
+            bloc.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            bloc.classList.add('ring-4', 'ring-blue-400');
+            setTimeout(() => bloc.classList.remove('ring-4', 'ring-blue-400'), 1600);
+        }
+    }, 150);
+};
+
 window.initRelaisInterface = initRelaisInterface;

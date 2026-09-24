@@ -329,7 +329,13 @@ window.switchDiscipline = async function(disc) {
     // ============================================================
     window.switchActivitySubTab = function(subTab) {
     const disc = currentDiscipline;
-    
+
+    // ✅ Bouton "Vitesses élèves" visible uniquement pour le Relais
+    const vitessesBtn = document.getElementById('subtab-vitesses');
+    if (vitessesBtn) {
+        vitessesBtn.classList.toggle('hidden', disc !== 'relais');
+    }
+     
     // ✅ NOUVEAU : cacher TOUT dans viewActivities sauf les 2 premiers blocs (sélecteur + sous-onglets)
     const viewActivitiesEl = document.getElementById('viewActivities');
     if (viewActivitiesEl) {
