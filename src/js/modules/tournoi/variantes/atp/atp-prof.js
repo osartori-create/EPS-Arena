@@ -92,6 +92,9 @@ export function initProf(classe) {
 }
 
 function recalculerEtRendre() {
+    // ✅ Relit systématiquement les élèves (le live fait ça ; le prof ne doit
+    // pas rester figé sur une liste capturée avant l'import).
+    currentEleves = getExistingEleves(currentClasse) || [];
     const codes = currentEleves.map(e => String(e.codeAutoEval)).filter(Boolean);
     const bareme = getBareme(currentConfig);
     currentJoueursMap = recalculerTout(codes, currentMatchs, bareme);
@@ -170,7 +173,10 @@ async function rendreProf() {
 
     for (const item of classement) {
         const eleve = item.eleve;
-        const photo = eleve ? await getPhotoUrl(eleve.id) : null;
+        let photo = null;
+        if (eleve) {
+            try { photo = await getPhotoUrl(eleve.id); } catch (e) { photo = null; }
+        }
         const photoHtml = photo
             ? `<img src="${photo}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">`
             : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg">👤</div>`;
@@ -517,6 +523,7 @@ window.atpVoirArchives = function() {
                                 <div class="text-sm font-bold text-white">${a.commentaire || 'Archive'}</div>
                                 <div class="text-[10px] text-slate-500">${date}</div>
                             </div>
+                            <button onclick="window.atpExporterArchive('${a._key}')" class="bg-emerald-600 hover:bg-emerald-500 px-2 py-1 rounded text-xs font-black text-white">📄</button>
                             <button onclick="window.atpSupprimerArchive('${a._key}')" class="bg-red-600 hover:bg-red-500 px-2 py-1 rounded text-xs font-black text-white">🗑️</button>
                         </div>
                         <div class="text-xs text-slate-400">
@@ -539,6 +546,32 @@ window.atpVoirArchives = function() {
             </div>`;
         document.body.appendChild(modal);
         modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    }, { onlyOnce: true });
+};
+
+window.atpExporterArchive = function(key) {
+    if (!currentClasse) return alert('Sélectionnez une classe.');
+    const baseATP = getATPBasePath(currentClasse);
+    onValue(ref(db, `${baseATP}/archives/${key}`), snap => {
+        const a = snap.val();
+        if (!a) return alert('Archive introuvable.');
+        const elevesMap = elevesParCode(currentEleves);
+        const lignes = Object.entries(a.snapshot || {})
+            .map(([code, pts]) => ({ code, pts: Number(pts) || 0, eleve: elevesMap[String(code)] }))
+            .sort((x, y) => y.pts - x.pts);
+
+        let csv = '\uFEFF"Rang";"Code";"Nom de famille";"Prénom";"Points"\n';
+        lignes.forEach((l, i) => {
+            csv += `"${i+1}";"${l.code}";"${l.eleve?.nom || ''}";"${l.eleve?.prenom || ''}";"${l.pts}"\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `ATP_Archive_${currentClasse}_${new Date(a.timestamp).toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }, { onlyOnce: true });
 };
 

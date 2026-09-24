@@ -452,6 +452,13 @@ window.switchDiscipline = async function(disc) {
                         if (typeof window.exportDemiFondLiveCSV === 'function') window.exportDemiFondLiveCSV();
                         else alert('Export CSV non disponible.');
                     };
+                } else if (disc === 'tournoi') {
+                    // Tournoi (ATP) : export CSV du classement live
+                    exportCSVBtn.textContent = '📥 Export CSV';
+                    exportCSVBtn.onclick = function() {
+                        if (typeof window.exportTournoiLiveCSV === 'function') window.exportTournoiLiveCSV();
+                        else alert('Export CSV non disponible.');
+                    };
                 } else {
                     exportCSVBtn.onclick = function() { window.exportResultsLive(); };
                 }

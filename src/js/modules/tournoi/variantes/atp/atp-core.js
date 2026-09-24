@@ -21,6 +21,25 @@ export function getPoints(joueur) {
 }
 
 // ============================================================
+// AJUSTEMENTS MANUELS (bonus/malus saisis par le prof dans le live)
+// ============================================================
+/**
+ * Applique des ajustements manuels de points, stockés en Firebase sous
+ * `tournoi/atp/ajustements/{code}` (nombre positif ou négatif).
+ * @param {Object} joueursMap - résultat de recalculerTout()
+ * @param {Object} ajustements - { code: delta }
+ */
+export function appliquerAjustements(joueursMap, ajustements = {}) {
+    Object.keys(ajustements || {}).forEach(code => {
+        const j = joueursMap[String(code)];
+        if (!j) return;
+        const delta = Number(ajustements[code]) || 0;
+        j.points += delta;
+    });
+    return joueursMap;
+}
+
+// ============================================================
 // PALIER DU BARÈME
 // ============================================================
 export function getPalier(ecart, bareme = BAREME_DEFAUT) {
