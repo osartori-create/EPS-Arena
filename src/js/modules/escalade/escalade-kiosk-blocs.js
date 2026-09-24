@@ -152,9 +152,12 @@ function getValidation(blocId) {
 }
 
 function getEtatBloc(blocId) {
-    const v = getValidation(blocId);
-    if (!v) return 'aucune';
-    return v.reussite !== false ? 'reussie' : 'echec';
+    // "réussi" s'il existe au moins une tentative réussie ;
+    // "échec" s'il existe au moins une tentative ratée ; sinon "aucune".
+    const mes = Object.values(validations).filter(v => v.eleveId === currentCode && v.blocId === blocId);
+    if (mes.some(v => v.reussite !== false)) return 'reussie';
+    if (mes.length > 0) return 'echec';
+    return 'aucune';
 }
 
 function compterReussites(blocId) {
@@ -217,8 +220,9 @@ function afficherMessage(msg) {
 // Actions de saisie réussite / échec
 // ============================================================
 window.choisirResultatBloc = function(blocId) {
-    if (getEtatBloc(blocId) !== 'aucune') {
-        alert('Tu as déjà fait une tentative sur ce bloc.');
+    // On ne bloque que si le bloc est déjà réussi. Un bloc raté peut être retenté.
+    if (getEtatBloc(blocId) === 'reussie') {
+        alert('Tu as déjà réussi ce bloc.');
         return;
     }
     blocSelectionne = blocId;
@@ -235,8 +239,8 @@ window.enregistrerTentativeBloc = function(blocId, reussite) {
         alert('Veuillez sélectionner votre code.');
         return;
     }
-    if (getEtatBloc(blocId) !== 'aucune') {
-        alert('Tu as déjà fait une tentative sur ce bloc.');
+    if (getEtatBloc(blocId) === 'reussie') {
+        alert('Tu as déjà réussi ce bloc.');
         return;
     }
 
@@ -250,8 +254,12 @@ window.enregistrerTentativeBloc = function(blocId, reussite) {
         blocId: blocId,
         reussite: !!reussite,
         timestamp: Date.now(),
-        valeurAuMoment: (reussite && params.mode === 'fige') ? valeur : undefined,
     };
+    // Firebase interdit les valeurs undefined : on n'ajoute la valeur figée
+    // qu'en cas de réussite (les échecs ne rapportent aucun point).
+    if (reussite && params.mode === 'fige') {
+        validationData.valeurAuMoment = valeur;
+    }
 
     addValidation(currentClasse, validationData)
         .then(() => {

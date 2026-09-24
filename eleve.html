@@ -4,6 +4,45 @@
     body { overflow-x: hidden; }
     /* On enlève la hauteur forcée pour que l'écran s'adapte au contenu */
     #activity-screen { min-height: auto; }
+
+    /* ==== THÈME CLAIR — lisibilité plein soleil ==== */
+    html { font-size: 17px; }
+    body { background: #f1f5f9 !important; color: #0f172a !important; }
+
+    [class*="bg-slate-900"] { background-color: #f1f5f9 !important; }
+    [class*="bg-slate-800"] { background-color: #ffffff !important; }
+    [class*="bg-slate-700"] { background-color: #e2e8f0 !important; }
+    [class*="bg-slate-600"] { background-color: #cbd5e1 !important; }
+
+    .text-white { color: #0f172a !important; }
+    .text-slate-100, .text-slate-200 { color: #0f172a !important; }
+    .text-slate-300 { color: #1e293b !important; }
+    .text-slate-400 { color: #475569 !important; }
+
+    [class*="bg-blue-"].text-white,
+    [class*="bg-emerald-"].text-white,
+    [class*="bg-green-"].text-white,
+    [class*="bg-red-"].text-white,
+    [class*="bg-indigo-"].text-white,
+    [class*="bg-amber-"].text-white,
+    [class*="bg-orange-"].text-white,
+    [class*="bg-rose-"].text-white,
+    [class*="bg-pink-"].text-white,
+    [class*="bg-cyan-"].text-white,
+    [class*="bg-purple-"].text-white,
+    [class*="bg-teal-"].text-white,
+    [class*="bg-lime-"].text-white,
+    [class*="bg-fuchsia-"].text-white,
+    [class*="bg-sky-"].text-white,
+    [class*="bg-violet-"].text-white,
+    [class*="bg-yellow-"].text-white {
+        color: #ffffff !important;
+    }
+
+    .border-slate-600, .border-slate-700, .border-slate-800, .border-slate-900 { border-color: #e2e8f0 !important; }
+    .border-slate-500 { border-color: #cbd5e1 !important; }
+
+    .text-\[9px\], .text-\[10px\], .text-\[11px\] { font-size: 12px !important; line-height: 1rem !important; }
 </style>
 <head>
     <meta charset="UTF-8">

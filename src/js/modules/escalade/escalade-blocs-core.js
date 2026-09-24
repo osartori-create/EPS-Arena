@@ -32,27 +32,14 @@ function labelHabilete(h) {
 }
 
 // ============================================================
-// Calcul des points d'un élève pour un bloc (mode figé ou évolutif)
-// ============================================================
-export function calculerPointsEleve(validation, validationsDuBloc, params) {
-    const { valeurInitiale, decote, mode } = params;
-    if (validation.reussite === false) return 0; // échec → aucun point
-    if (mode === 'fige') {
-        // On utilise la valeur stockée au moment de la validation
-        return validation.valeurAuMoment || 0;
-    } else {
-        // Mode évolutif : on recalcule en fonction du nombre total de réussites du bloc
-        const nbTotal = validationsDuBloc.filter(v => v.reussite !== false).length;
-        return calculerValeurBloc(nbTotal, valeurInitiale, decote);
-    }
-}
-
-// ============================================================
 // Agrégation des données pour une classe
 // ============================================================
 // Chaque validation peut être :
 //   { eleveId/code, blocId, reussite: true|false, timestamp, valeurAuMoment? }
 // (rétro-compat : une validation sans champ `reussite` est considérée réussie)
+//
+// Un élève peut faire plusieurs tentatives sur un même bloc (échec puis
+// réussite). La réussite n'est comptabilisée qu'une seule fois pour les points.
 export function agregerDonnees(validations, blocs, eleves, groupes, params) {
     const result = {
         eleves: {},
@@ -125,8 +112,12 @@ export function agregerDonnees(validations, blocs, eleves, groupes, params) {
         result.groupes[groupe].nbEleves++;
     });
 
-    // Parcours des validations (résolution code anonyme ↔ ID réel).
-    const validationsArray = Object.values(validations);
+    // Traitement chronologique : garantit une valeur "figée" correcte
+    // (la décote dépend de l'ordre des réussites).
+    const validationsArray = Object.values(validations)
+        .filter(v => v && v.eleveId !== undefined && v.blocId !== undefined)
+        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
     validationsArray.forEach(v => {
         let eleveId = v.eleveId;
         if (!result.eleves[eleveId] && codeVersId[eleveId]) {
@@ -137,12 +128,14 @@ export function agregerDonnees(validations, blocs, eleves, groupes, params) {
         if (!result.blocs[blocId]) return; // bloc inconnu
 
         const eleve = result.eleves[eleveId];
-        // Une seule tentative par (élève, bloc) : on ignore les doublons éventuels.
-        if (eleve.blocs[blocId]) return;
-
-        const reussite = v.reussite !== false; // rétro-compat : ancien format = réussite
         const bloc = result.blocs[blocId];
+        const reussite = v.reussite !== false;
 
+        // L'élève avait-il déjà réussi ce bloc avant cette tentative ?
+        const dejaReussi = !!(eleve.blocs[blocId] && eleve.blocs[blocId].reussite);
+        const reussitesAvant = bloc.reussites;
+
+        // Compteurs globaux du bloc
         bloc.tentatives++;
         if (reussite) bloc.reussites++;
         bloc.nbValidations = bloc.reussites;
@@ -164,31 +157,43 @@ export function agregerDonnees(validations, blocs, eleves, groupes, params) {
             eleve.habiletes[label] = eh;
         });
 
-        // Valeur du bloc au moment de la validation (pour le mode figé)
-        const reussitesAvant = bloc.reussites - (reussite ? 1 : 0);
-        const valeurAuMoment = calculerValeurBloc(reussitesAvant, params.valeurInitiale, params.decote);
-
-        // Points : uniquement en cas de réussite
-        let points = 0;
+        // Mise à jour de l'état de l'élève sur ce bloc
+        if (!eleve.blocs[blocId]) {
+            eleve.blocs[blocId] = {
+                reussite: false,
+                points: 0,
+                tentatives: 0,
+                reussites: 0,
+                valeur: null,
+                timestamp: null
+            };
+        }
+        const eb = eleve.blocs[blocId];
+        eb.tentatives++;
         if (reussite) {
-            points = (params.mode === 'fige')
-                ? valeurAuMoment
-                : calculerValeurBloc(bloc.reussites, params.valeurInitiale, params.decote);
+            eb.reussites++;
+            eb.reussite = true;
+            eb.valeur = calculerValeurBloc(reussitesAvant, params.valeurInitiale, params.decote);
+            eb.timestamp = v.timestamp;
         }
 
-        eleve.blocs[blocId] = {
-            reussite,
-            points,
-            valeur: valeurAuMoment,
-            timestamp: v.timestamp
-        };
+        // Points : uniquement au premier succès (pas de double comptage).
+        if (reussite && !dejaReussi) {
+            const points = (params.mode === 'fige')
+                ? calculerValeurBloc(reussitesAvant, params.valeurInitiale, params.decote)
+                : calculerValeurBloc(bloc.reussites, params.valeurInitiale, params.decote);
 
-        if (reussite) {
-            bloc.eleves.push(eleveId);
+            eb.points = points;
             eleve.totalPoints += points;
+
             const grp = eleve.groupe;
             result.groupes[grp].totalPoints += points;
             result.groupes[grp].nbBlocsValides++;
+        }
+
+        // Un seul ajout à la liste des grimpeurs ayant réussi ce bloc.
+        if (reussite && !dejaReussi) {
+            bloc.eleves.push(eleveId);
         }
     });
 
