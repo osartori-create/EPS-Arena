@@ -173,14 +173,6 @@ async function rendreProf() {
 
     for (const item of classement) {
         const eleve = item.eleve;
-        let photo = null;
-        if (eleve) {
-            try { photo = await getPhotoUrl(eleve.id); } catch (e) { photo = null; }
-        }
-        const photoHtml = photo
-            ? `<img src="${photo}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">`
-            : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg">👤</div>`;
-
         const couleur = item.rang === 1 ? 'border-yellow-500' :
                         item.rang === 2 ? 'border-slate-400' :
                         item.rang === 3 ? 'border-amber-600' : 'border-slate-700';
@@ -188,7 +180,7 @@ async function rendreProf() {
         html += `
             <div class="flex items-center gap-3 bg-slate-900 p-2 rounded-xl border-2 ${couleur}">
                 <div class="text-2xl min-w-[42px] text-center font-black text-slate-300">${getMedaille(item.rang)}</div>
-                ${photoHtml}
+                <div class="atp-photo w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg" data-id="${eleve ? eleve.id : ''}">👤</div>
                 <div class="flex-1 min-w-0">
                     <div class="font-bold text-white text-sm truncate">${eleve ? eleve.prenom + ' ' + eleve.nom : 'Code ' + item.code}</div>
                     <div class="text-[10px] text-slate-500">#${item.code} · ${item.victoires}V-${item.defaites}D · diff ${formatEcart(item.diffPoints)}</div>
@@ -257,6 +249,23 @@ async function rendreProf() {
 
     html += `</div></div></div>`;
     container.innerHTML = html;
+
+    // Chargement des photos en arrière-plan (non bloquant).
+    chargerPhotosProf();
+}
+
+async function chargerPhotosProf() {
+    const placeholders = document.querySelectorAll('#tournoi-prof-container .atp-photo[data-id]');
+    await Promise.all(Array.from(placeholders).map(async el => {
+        const id = el.dataset.id;
+        if (!id) return;
+        try {
+            const url = await getPhotoUrl(id);
+            if (url) {
+                el.innerHTML = `<img src="${url}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600">`;
+            }
+        } catch (e) { /* photo absente : on garde l'avatar 👤 */ }
+    }));
 }
 
 // ============================================================
@@ -479,7 +488,10 @@ window.atpArchiver = async function() {
     const commentaire = prompt('Commentaire (optionnel) :', `Fin séance ${new Date().toLocaleDateString('fr-FR')}`);
     if (commentaire === null) return;
 
-    const snapshot = genererSnapshot(currentJoueursMap);
+    // ✅ Recalcul à la volée (ne dépend jamais d'un état d'écran périmé).
+    const codes = currentEleves.map(e => String(e.codeAutoEval)).filter(Boolean);
+    const joueurs = recalculerTout(codes, currentMatchs, getBareme(currentConfig));
+    const snapshot = genererSnapshot(joueurs);
     const baseATP = getATPBasePath(currentClasse);
 
     try {
