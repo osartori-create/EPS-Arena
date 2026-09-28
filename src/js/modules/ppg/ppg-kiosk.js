@@ -16,6 +16,9 @@ let obsListener = null;
 const COOLDOWN_MS = 30 * 1000;
 const COOLDOWN_KEY = 'eps_arena_ppg_last_send';
 
+// État du pavé numérique (saisie tactile sans clavier natif)
+let kpad = { active: false, target: null, label: '', value: '' };
+
 // ============================================================
 // INIT
 // ============================================================
@@ -137,9 +140,11 @@ function rendreChoixCode(container) {
 
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <label class="text-xs font-bold text-slate-400 uppercase block mb-2">Ton code élève</label>
-                <input type="number" id="ppg-k-code" inputmode="numeric" placeholder="Ex: 12"
-                       class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-4 text-center text-4xl font-black text-white"
-                       oninput="window.ppgKSetCode(this.value)">
+                <button id="ppg-k-code-display" onclick="window.ppgKOuvrirPave('code')"
+                        class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-4 text-center text-4xl font-black text-white active:scale-95 transition-all min-h-[76px]">
+                    —
+                </button>
+                <p class="text-[10px] text-slate-500 text-center mt-2">👆 Touche pour ouvrir le pavé numérique</p>
             </div>
 
             <button onclick="window.ppgKValiderCode()"
@@ -158,7 +163,7 @@ function rendreChoixCode(container) {
 // ============================================================
 // ÉCRAN 2 : SAISIE PAR ATELIER
 // ============================================================
-function rendreSaisie(container) {
+funaméliorations PPGction rendreSaisie(container) {
     const ateliersActifs = currentSeance.ateliers
         .map(id => getAtelierById(id, currentBibliotheque))
         .filter(Boolean);
@@ -239,17 +244,17 @@ function rendreSaisie(container) {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-[10px] text-slate-400 block mb-1 text-center">Passage 1</label>
-                    <input type="number" inputmode="numeric" min="0"
-                           value="${saisie[a.id].p1}"
-                           oninput="window.ppgKSetP('${a.id}', 1, this.value)"
-                           class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-4 text-center text-3xl font-black text-white">
+                    <button id="ppg-k-input-${a.id}-1" onclick="window.ppgKOuvrirPave('${a.id}:1')"
+                            class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-4 text-center text-3xl font-black text-white active:scale-95 transition-all min-h-[76px]">
+                        ${saisie[a.id].p1 !== '' && saisie[a.id].p1 !== null && saisie[a.id].p1 !== undefined ? saisie[a.id].p1 : '—'}
+                    </button>
                 </div>
                 <div>
                     <label class="text-[10px] text-slate-400 block mb-1 text-center">Passage 2</label>
-                    <input type="number" inputmode="numeric" min="0"
-                           value="${saisie[a.id].p2}"
-                           oninput="window.ppgKSetP('${a.id}', 2, this.value)"
-                           class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-4 text-center text-3xl font-black text-white">
+                    <button id="ppg-k-input-${a.id}-2" onclick="window.ppgKOuvrirPave('${a.id}:2')"
+                            class="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-4 text-center text-3xl font-black text-white active:scale-95 transition-all min-h-[76px]">
+                        ${saisie[a.id].p2 !== '' && saisie[a.id].p2 !== null && saisie[a.id].p2 !== undefined ? saisie[a.id].p2 : '—'}
+                    </button>
                 </div>
             </div>
         `;
@@ -294,10 +299,6 @@ function calculerBest(atelierId) {
 // ============================================================
 // SETTERS / ACTIONS
 // ============================================================
-window.ppgKSetCode = function(v) {
-    currentCode = v ? parseInt(v) : null;
-};
-
 window.ppgKValiderCode = function() {
     if (!currentCode) {
         alert('Saisis ton code.');
@@ -318,12 +319,6 @@ window.ppgKRetourCode = function() {
 window.ppgKSetNiveau = function(atelierId, niveau) {
     if (!saisie[atelierId]) saisie[atelierId] = { p1: '', p2: '', niveau: null };
     saisie[atelierId].niveau = niveau;
-    rendre();
-};
-
-window.ppgKSetP = function(atelierId, passage, valeur) {
-    if (!saisie[atelierId]) saisie[atelierId] = { p1: '', p2: '', niveau: null };
-    saisie[atelierId][`p${passage}`] = valeur;
     rendre();
 };
 
@@ -433,6 +428,146 @@ function afficherConfirmation() {
             rendre();
         }
     }, 3000);
+}
+
+// ============================================================
+// PAVÉ NUMÉRIQUE (saisie tactile)
+// ============================================================
+window.ppgKOuvrirPave = function(target) {
+    kpad.target = target;
+    if (target === 'code') {
+        kpad.value = currentCode ? String(currentCode) : '';
+        kpad.label = 'Code élève';
+    } else {
+        const [id, passage] = target.split(':');
+        const s = saisie[id] || {};
+        const raw = s[`p${passage}`];
+        kpad.value = (raw !== '' && raw !== null && raw !== undefined) ? String(raw) : '';
+        const atelier = getAtelierById(id, currentBibliotheque);
+        kpad.label = `${atelier ? atelier.label : ''} — Passage ${passage}`;
+    }
+    kpad.active = true;
+    rendrePave();
+};
+
+window.ppgKPaveDigit = function(d) {
+    if (kpad.value.length >= 5) return;
+    if (kpad.value === '0') kpad.value = d;
+    else kpad.value += d;
+    mettreAJourAffichagePave();
+};
+
+window.ppgKPaveBack = function() {
+    kpad.value = kpad.value.slice(0, -1);
+    mettreAJourAffichagePave();
+};
+
+window.ppgKPaveClear = function() {
+    kpad.value = '';
+    mettreAJourAffichagePave();
+};
+
+window.ppgKPaveValider = function() {
+    const num = kpad.value === '' ? null : parseInt(kpad.value, 10);
+
+    if (kpad.target === 'code') {
+        if (num === null || isNaN(num)) {
+            alert('Saisis ton code.');
+            return;
+        }
+        currentCode = num;
+        saisie = {};
+        kpad.active = false;
+        fermerPave();
+        rendre();
+    } else {
+        const [id, passage] = kpad.target.split(':');
+        if (!saisie[id]) saisie[id] = { p1: '', p2: '', niveau: null };
+        saisie[id][`p${passage}`] = (num === null || isNaN(num)) ? '' : String(num);
+        kpad.active = false;
+        fermerPave();
+        rendre();
+    }
+};
+
+window.ppgKPaveAnnuler = function() {
+    kpad.active = false;
+    fermerPave();
+    // Ré-affiche l'écran sous-jacent (les valeurs déjà validées sont conservées)
+    rendre();
+};
+
+function mettreAJourAffichagePave() {
+    const disp = kpad.value === '' ? '—' : kpad.value;
+
+    // Mise à jour du champ source sous le pavé
+    let source = null;
+    if (kpad.target === 'code') {
+        source = document.getElementById('ppg-k-code-display');
+    } else {
+        const [id, passage] = kpad.target.split(':');
+        source = document.getElementById(`ppg-k-input-${id}-${passage}`);
+    }
+    if (source) source.textContent = disp;
+
+    // Mise à jour de l'écran du pavé
+    const ecran = document.getElementById('ppg-kpad-ecran');
+    if (ecran) ecran.textContent = disp;
+}
+
+function rendrePave() {
+    fermerPave();
+    if (!kpad.active) return;
+
+    const el = document.createElement('div');
+    el.id = 'ppg-kpad';
+    el.className = 'fixed inset-x-0 bottom-0 z-50 bg-slate-950 border-t-2 border-slate-700 p-3 pb-5';
+    el.style.background = '#0f172a';
+
+    const grille = [['1','2','3'],['4','5','6'],['7','8','9']];
+    let lignesHtml = '';
+    grille.forEach(ligne => {
+        lignesHtml += `<div class="grid grid-cols-3 gap-2 mb-2">`;
+        ligne.forEach(d => {
+            lignesHtml += `<button onclick="window.ppgKPaveDigit('${d}')"
+                class="bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-xl py-4 text-2xl font-black text-white transition-all">${d}</button>`;
+        });
+        lignesHtml += `</div>`;
+    });
+
+    el.innerHTML = `
+        <div class="max-w-md mx-auto">
+            <div class="flex items-center justify-between mb-3">
+                <div class="text-xs font-bold text-slate-400 uppercase">${kpad.label}</div>
+                <button onclick="window.ppgKPaveAnnuler()" class="bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg text-xs font-black text-red-300 active:scale-95">✕ Fermer</button>
+            </div>
+            <div id="ppg-kpad-ecran" class="bg-slate-900 border-2 border-blue-500 rounded-xl py-3 text-center text-5xl font-black text-yellow-400 mb-3 min-h-[72px]">
+                —
+            </div>
+            ${lignesHtml}
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="window.ppgKPaveBack()"
+                        class="bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-xl py-4 text-xl font-black text-white transition-all">⌫</button>
+                <button onclick="window.ppgKPaveDigit('0')"
+                        class="bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-xl py-4 text-2xl font-black text-white transition-all">0</button>
+                <button onclick="window.ppgKPaveClear()"
+                        class="bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-600 rounded-xl py-4 text-xl font-black text-amber-400 transition-all">C</button>
+            </div>
+            <button onclick="window.ppgKPaveValider()"
+                    class="w-full mt-3 bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-black text-xl text-white active:scale-95 transition-all">
+                ✓ Valider
+            </button>
+        </div>
+    `;
+    document.body.appendChild(el);
+
+    // Affichage initial
+    mettreAJourAffichagePave();
+}
+
+function fermerPave() {
+    const el = document.getElementById('ppg-kpad');
+    if (el) el.remove();
 }
 
 // ============================================================
