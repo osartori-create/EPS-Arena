@@ -28,6 +28,7 @@ export function calculerBilan(observations, config, vma) {
     const tour = config.tour || 200;
     const plots = config.plots || 8;
     const duree = config.duree || 300;
+    const pause = config.pause || 180;
 
     const courses = [];
 
@@ -38,9 +39,25 @@ export function calculerBilan(observations, config, vma) {
             continue;
         }
 
-        const timestamps = obs.timestamps || [];
         const partiel = obs.partiel || 0;
         const abandon = obs.abandon || null;
+
+        // Début de la course sur la timeline de la séquence (ms)
+        const courseDebutMs = (i - 1) * (duree + pause) * 1000;
+
+        let timestamps = obs.timestamps || [];
+
+        // Les timestamps sont stockés relativement au début de la séquence
+        // (0 = départ de la course 1). Pour compatibilité avec d'anciennes
+        // données enregistrées relativement au début de chaque course, on les
+        // décale si nécessaire : si un timestamp est antérieur au début
+        // théorique de la course, c'est qu'il était relatif à cette course.
+        if (timestamps.length > 0 && courseDebutMs > 0) {
+            const minTs = Math.min(...timestamps);
+            if (minTs < courseDebutMs) {
+                timestamps = timestamps.map(t => t + courseDebutMs);
+            }
+        }
 
         const distance = calculerDistance(timestamps, partiel, tour, plots);
         const vitesse = abandon ? 0 : calculerVitesse(distance, duree);
@@ -49,7 +66,7 @@ export function calculerBilan(observations, config, vma) {
         // Vitesses par tour (pour le graphique)
         const vitessesParTour = [];
         for (let j = 0; j < timestamps.length; j++) {
-            const t0 = j === 0 ? 0 : timestamps[j - 1];
+            const t0 = j === 0 ? courseDebutMs : timestamps[j - 1];
             const t1 = timestamps[j];
             const dt = (t1 - t0) / 1000;
             if (dt > 0) {
@@ -63,12 +80,13 @@ export function calculerBilan(observations, config, vma) {
         // Dernier tour partiel
         if (partiel > 0 && timestamps.length > 0) {
             const tDernier = timestamps[timestamps.length - 1];
-            const dt = (duree * 1000 - tDernier) / 1000;
+            const finSeqMs = courseDebutMs + duree * 1000;
+            const dt = (finSeqMs - tDernier) / 1000;
             if (dt > 0) {
                 const distancePartielle = (partiel * tour) / plots;
                 vitessesParTour.push({
                     debut: tDernier,
-                    fin: duree * 1000,
+                    fin: finSeqMs,
                     vitesse: Math.round((distancePartielle / dt) * 3.6 * 10) / 10,
                     partiel: true
                 });
@@ -236,7 +254,7 @@ export function rendreBilanHTML(bilan, couleurId) {
 // ============================================================
 // GRAPHIQUE SVG
 // ============================================================
-function genererSVG(bilan) {
+export function genererSVG(bilan) {
     const config = bilan.config;
     const duree = config.duree;
     const pause = config.pause;
@@ -248,10 +266,9 @@ function genererSVG(bilan) {
     const points = []; // { tSec, vitesse, courseNum }
     bilan.courses.forEach((c, i) => {
         if (!c || c.abandon) return;
-        const courseOffset = i * (duree + pause);
         c.vitessesParTour.forEach(v => {
             points.push({
-                tSec: courseOffset + (v.fin / 1000),
+                tSec: v.fin / 1000,
                 vitesse: v.vitesse,
                 courseNum: i + 1,
                 partiel: v.partiel

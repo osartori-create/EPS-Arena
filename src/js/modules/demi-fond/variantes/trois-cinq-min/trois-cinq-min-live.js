@@ -6,6 +6,7 @@ import { getCurrentClasse, getLocalMapping } from '../../../../core/live-engine.
 import { getPhotoUrl, getExistingEleves } from '../../../../services/admin-service.js';
 import { COULEURS_GROUPES, getCouleurGroupe, getBasePath, getVMAEleve } from '../../demifond-common.js';
 import { calculerDistance, calculerVitesse, calculerRegularite } from './trois-cinq-min-core.js';
+import { calculerBilan, genererSVG } from './trois-cinq-min-bilan.js';
 
 let unsubs = [];
 let cache = {
@@ -239,7 +240,9 @@ function renderEleveCard(code, couleur, observations, config, eleves, mapping) {
     }
 
     return `
-        <div class="bg-slate-800 p-2 rounded-xl border ${abandonne ? 'border-red-700/60' : 'border-slate-700'} flex items-center gap-2">
+        <div onclick="window.dmfLiveAfficherBilan('${code}')"
+             title="Voir le graphique de régularité"
+             class="bg-slate-800 p-2 rounded-xl border ${abandonne ? 'border-red-700/60' : 'border-slate-700'} flex items-center gap-2 cursor-pointer hover:border-blue-400/60 active:scale-[0.98] transition-all">
             <div id="${photoContainerId}" class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-slate-700 flex items-center justify-center text-lg">
                 <span>👤</span>
             </div>
@@ -376,3 +379,76 @@ function demarrerChronoTimerLive() {
         el.textContent = info.restant;
     }, 500);
 }
+
+// ============================================================
+// BILAN ÉLÈVE (graphique de régularité) — clique sur une fiche
+// ============================================================
+window.dmfLiveAfficherBilan = function(code) {
+    const { config, observations, eleves, mapping, classe } = cache;
+    if (!config) return;
+
+    // Retrouver la couleur du groupe de l'élève
+    let couleur = null;
+    for (const c of COULEURS_GROUPES) {
+        if ((config.groupes?.[c.id] || []).some(gc => String(gc) === String(code))) {
+            couleur = c;
+            break;
+        }
+    }
+
+    const eleveId = couleur ? mapping[`${classe}_${couleur.id}_${code}`] : null;
+    const eleve = eleves.find(e => e.id === eleveId);
+    const vma = eleve ? getVMAEleve(classe, eleve.id) : null;
+
+    const obs = {
+        course1: observations.course1?.[String(code)] || null,
+        course2: observations.course2?.[String(code)] || null,
+        course3: observations.course3?.[String(code)] || null
+    };
+
+    const bilan = calculerBilan(obs, config, vma);
+    const nom = eleve ? `${eleve.prenom} ${eleve.nom}` : `#${code}`;
+    const svg = genererSVG(bilan);
+
+    // Cartes des 3 courses (vitesse + distance)
+    let cartesHtml = '<div class="grid grid-cols-3 gap-2 mb-3">';
+    bilan.courses.forEach((c, i) => {
+        const num = i + 1;
+        if (!c) {
+            cartesHtml += `<div class="bg-slate-800 p-2 rounded-lg border border-slate-700 text-center"><div class="text-[9px] text-slate-500 font-bold">C${num}</div><div class="text-[10px] text-slate-600">—</div></div>`;
+        } else if (c.abandon) {
+            cartesHtml += `<div class="bg-red-900/30 p-2 rounded-lg border border-red-700 text-center"><div class="text-[9px] text-red-400 font-bold">C${num}</div><div class="text-[10px] text-red-300 font-black">🚫</div></div>`;
+        } else {
+            cartesHtml += `<div class="bg-slate-800 p-2 rounded-lg border border-slate-700 text-center"><div class="text-[9px] text-slate-400 font-bold">C${num}</div><div class="text-sm font-black" style="color:${couleur?.bg || '#3b82f6'};">${c.vitesse.toFixed(1)}</div><div class="text-[9px] text-slate-500">${c.distance} m</div></div>`;
+        }
+    });
+    cartesHtml += '</div>';
+
+    let overlay = document.getElementById('dmf-live-bilan-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'dmf-live-bilan-overlay';
+        overlay.className = 'fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4';
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+        <div class="bg-slate-900 p-5 rounded-2xl border-2 max-w-2xl w-full max-h-[90vh] overflow-y-auto" style="border-color:${couleur?.border || '#3b82f6'};">
+            <div class="flex justify-between items-center mb-3">
+                <div>
+                    <div class="text-[10px] uppercase text-slate-400 font-bold">Régularité — 3 courses</div>
+                    <div class="text-xl font-black text-white">${nom}</div>
+                    <div class="text-xs font-bold" style="color:${couleur?.bg || '#3b82f6'};">#${code}${vma ? ` · VMA ${vma}` : ''}</div>
+                </div>
+                <button onclick="window.dmfLiveFermerBilan()" class="bg-slate-700 hover:bg-slate-600 w-10 h-10 rounded-full font-black text-white text-xl flex-shrink-0">✕</button>
+            </div>
+            ${svg}
+            ${cartesHtml}
+        </div>
+    `;
+};
+
+window.dmfLiveFermerBilan = function() {
+    const overlay = document.getElementById('dmf-live-bilan-overlay');
+    if (overlay) overlay.style.display = 'none';
+};

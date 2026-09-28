@@ -1,5 +1,5 @@
 // src/js/modules/demi-fond/variantes/trois-cinq-min/trois-cinq-min-tv.js
-// TV : classement en direct des élèves par distance cumulée
+// TV : podium fixe (top 3) + liste défilante en boucle (comme le tournoi ATP)
 
 import { db, ref, onValue } from '../../../../core/firebase-service.js';
 import { getCurrentClasse, getLocalMapping } from '../../../../core/live-engine.js';
@@ -17,6 +17,8 @@ let cache = {
     mapping: {}
 };
 
+let _rafId = null;
+
 export function renderTroisCinqMinTV() {
     const container = document.getElementById('tvGlobe');
     if (!container) return;
@@ -31,14 +33,18 @@ export function renderTroisCinqMinTV() {
     container.style.height = '100vh';
     container.style.width = '100%';
     container.style.backgroundColor = '#0f172a';
-    container.style.overflowY = 'auto';
-    container.style.padding = '30px';
+    container.style.overflow = 'hidden';
+    container.style.padding = '20px';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
 
     const classe = getCurrentClasse();
     if (!classe) {
         container.innerHTML = '<p style="text-align:center; color:#64748b;">Sélectionnez une classe.</p>';
         return;
     }
+
+    if (_rafId) cancelAnimationFrame(_rafId);
 
     unsubs.forEach(u => { try { u(); } catch (e) {} });
     unsubs = [];
@@ -80,6 +86,7 @@ export function renderTroisCinqMinTV() {
     return () => {
         unsubs.forEach(u => { try { u(); } catch (e) {} });
         unsubs = [];
+        if (_rafId) cancelAnimationFrame(_rafId);
     };
 }
 
@@ -144,51 +151,111 @@ async function renderTV() {
     // Max pour la barre
     const maxDistance = Math.max(...resultats.map(r => r.distanceTotale), 1);
 
-    // Titre
-    let html = `
-        <h1 style="text-align:center; color:#3b82f6; font-size:3rem; font-weight:900; margin-bottom:40px;">
-            🏃 1/2 Fond — Classement
-        </h1>
-        <div style="display:flex; flex-direction:column; gap:14px; max-width:1400px; margin:0 auto;">
-    `;
+    const top3 = resultats.slice(0, 3);
+    const reste = resultats.slice(3);
 
-    // Afficher les 20 premiers
-    for (let i = 0; i < Math.min(resultats.length, 20); i++) {
-        const r = resultats[i];
-        const pct = (r.distanceTotale / maxDistance) * 100;
-        const medaille = i === 0 ? '🥇' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : `${i + 1}.`));
-
-        // Photo
-        let photoUrl = null;
-        if (r.eleveId) {
-            try { photoUrl = await getPhotoUrl(r.eleveId); } catch (e) {}
-        }
+    // ---- Podium fixe (top 3) ----
+    let podiumHtml = '';
+    for (let i = 0; i < top3.length; i++) {
+        const r = top3[i];
+        const photoUrl = r.eleveId ? await getPhotoUrl(r.eleveId).catch(() => null) : null;
         const photoHtml = photoUrl
-            ? `<img src="${photoUrl}" style="width:60px; height:60px; border-radius:50%; object-fit:cover; border:3px solid ${r.couleur.bg};">`
-            : `<div style="width:60px; height:60px; border-radius:50%; background:#334155; display:flex; align-items:center; justify-content:center; font-size:24px;">👤</div>`;
-
+            ? `<img src="${photoUrl}" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:5px solid ${i===0?'#facc15':i===1?'#94a3b8':'#d97706'};">`
+            : `<div style="width:110px;height:110px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;font-size:55px;">👤</div>`;
+        const medaille = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+        const mt = i === 0 ? 0 : i === 1 ? 30 : 60;
         const nom = r.eleve ? `${r.eleve.prenom} ${r.eleve.nom}` : `#${r.code}`;
-        const abandonIcon = r.abandonne ? ' 🚫' : '';
-
-        html += `
-            <div style="display:flex; align-items:center; gap:16px;">
-                <div style="font-size:2rem; min-width:70px; text-align:center;">${medaille}</div>
+        podiumHtml += `
+            <div style="display:flex;flex-direction:column;align-items:center;margin-top:${mt}px;">
+                <div style="font-size:2.6rem;">${medaille}</div>
                 ${photoHtml}
-                <div style="min-width:220px;">
-                    <div style="font-size:1.4rem; font-weight:900; color:white;">${nom}${abandonIcon}</div>
-                    <div style="font-size:0.9rem; color:${r.couleur.bg}; font-weight:700;">${r.couleur.label} #${r.code} · ${r.nbCours} course(s)</div>
+                <div style="color:white;font-size:1.15rem;font-weight:900;margin-top:8px;text-align:center;">
+                    ${nom}${r.abandonne ? ' 🚫' : ''}
                 </div>
-                <div style="flex:1; background:#1e293b; height:50px; border-radius:25px; overflow:hidden; position:relative;">
-                    <div style="background:linear-gradient(90deg, ${r.couleur.bg}, ${r.couleur.border}); width:${pct}%; height:100%; transition:width 0.5s;"></div>
-                </div>
-                <div style="min-width:200px; text-align:right;">
-                    <div style="font-size:1.8rem; font-weight:900; color:#facc15;">${r.distanceTotale.toLocaleString('fr-FR')} m</div>
-                    <div style="font-size:1rem; color:#94a3b8;">${r.vitesseMoyenne.toFixed(1)} km/h moy</div>
-                </div>
-            </div>
-        `;
+                <div style="color:${r.couleur.bg};font-size:0.9rem;font-weight:700;">${r.couleur.label} #${r.code}</div>
+                <div style="color:#facc15;font-size:2.1rem;font-weight:900;">${r.distanceTotale.toLocaleString('fr-FR')} m</div>
+            </div>`;
     }
 
-    html += `</div>`;
-    container.innerHTML = html;
+    // ---- Liste défilante (reste) - on duplique si nécessaire ----
+    let liste = [...reste];
+    while (liste.length < 10) {
+        if (reste.length === 0) break;
+        liste = liste.concat(reste);
+    }
+
+    let listeHtml = '';
+    for (let i = 0; i < liste.length; i++) {
+        const r = liste[i];
+        const rang = resultats.indexOf(r) + 1;
+        const pct = (r.distanceTotale / maxDistance) * 100;
+        const photoUrl = r.eleveId ? await getPhotoUrl(r.eleveId).catch(() => null) : null;
+        const photoHtml = photoUrl
+            ? `<img src="${photoUrl}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">`
+            : `<div style="width:40px;height:40px;border-radius:50%;background:#334155;display:flex;align-items:center;justify-content:center;">👤</div>`;
+        const nom = r.eleve ? `${r.eleve.prenom} ${r.eleve.nom}` : `#${r.code}`;
+        listeHtml += `
+            <div class="dmf-tv-row" style="display:flex;align-items:center;gap:14px;padding:7px 0;">
+                <div style="min-width:36px;text-align:center;font-size:1.2rem;font-weight:900;color:#94a3b8;">${rang}.</div>
+                ${photoHtml}
+                <div style="min-width:220px;color:white;font-weight:700;">
+                    ${nom}${r.abandonne ? ' 🚫' : ''}
+                    <span style="color:${r.couleur.bg};font-size:0.8rem;margin-left:6px;">#${r.code}</span>
+                </div>
+                <div style="flex:1;background:#1e293b;height:22px;border-radius:11px;overflow:hidden;">
+                    <div style="background:linear-gradient(90deg,${r.couleur.bg},${r.couleur.border});width:${pct}%;height:100%;"></div>
+                </div>
+                <div style="min-width:160px;text-align:right;color:#facc15;font-size:1.3rem;font-weight:900;">
+                    ${r.distanceTotale.toLocaleString('fr-FR')} m
+                </div>
+            </div>`;
+    }
+
+    container.innerHTML = `
+        <h1 style="text-align:center;color:#3b82f6;font-size:2.8rem;font-weight:900;margin-bottom:20px;">🏃 1/2 Fond — Classement</h1>
+        <div style="display:flex;justify-content:center;align-items:flex-end;gap:40px;flex-shrink:0;">
+            ${podiumHtml}
+        </div>
+        <div id="dmf-tv-scroller" style="flex:1;min-height:0;overflow:hidden;margin-top:20px;position:relative;">
+            <div id="dmf-tv-track" style="max-width:1400px;margin:0 auto;">
+                ${listeHtml}
+            </div>
+        </div>
+    `;
+
+    demarrerDefilement();
+}
+
+// Défilement régulier vers le haut, en boucle
+function demarrerDefilement() {
+    if (_rafId) cancelAnimationFrame(_rafId);
+
+    const scroller = document.getElementById('dmf-tv-scroller');
+    const track = document.getElementById('dmf-tv-track');
+    if (!scroller || !track) return;
+
+    // On ajoute une copie de la liste pour un défilement sans rupture.
+    track.innerHTML += track.innerHTML;
+
+    let offset = 0;
+    const step = 0.5; // px par frame
+
+    function frame() {
+        offset += step;
+        const halfHeight = track.scrollHeight / 2;
+        if (halfHeight > 0 && offset >= halfHeight) offset -= halfHeight;
+        track.style.transform = `translateY(-${offset}px)`;
+        _rafId = requestAnimationFrame(frame);
+    }
+
+    // Démarre le défilement uniquement si le contenu dépasse la zone visible.
+    if (track.scrollHeight > scroller.clientHeight) {
+        _rafId = requestAnimationFrame(frame);
+    }
+}
+
+export function cleanupTroisCinqMinTV() {
+    unsubs.forEach(u => { try { u(); } catch (e) {} });
+    unsubs = [];
+    if (_rafId) cancelAnimationFrame(_rafId);
 }
