@@ -4,8 +4,9 @@
 import { db, ref, set, onValue } from '../../../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves, migrerCodesAutoEval } from '../../../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../../core/live-engine.js';
+import { enregistrerCritereParCodeAutoEval } from '../../../../services/criteria-service.js';
 import { COULEURS_GROUPES, getCouleurGroupe, getGroupesKey, getConfigKey, getBasePath, getVMAEleve } from '../../demifond-common.js';
-import { DEFAUT_PARAMS, SOUS_MODULE_ID, TITRE_AFFICHE, repartirEnGroupes } from './trois-cinq-min-core.js';
+import { DEFAUT_PARAMS, SOUS_MODULE_ID, TITRE_AFFICHE, repartirEnGroupes, calculerDistance, calculerVitesse } from './trois-cinq-min-core.js';
 
 let currentClasse = '';
 let currentContainer = null;
@@ -841,6 +842,38 @@ window.troisCinqMinTransmettre = async function() {
     const existing = getLocalMapping(currentClasse) || {};
     setLocalMapping(currentClasse, { ...existing, ...localMapping });
 
+    // ✅ Exposer la vitesse moyenne 1/2 fond comme critère transversal (multi).
+    // On fige la donnée à chaque transmission, en lisant les observations déjà
+    // remontées par les kiosques.
+    let nbVitessesEcrites = 0;
+    try {
+        const basePath = getBasePath(currentClasse);
+        const lireObs = (i) => new Promise(resolve => {
+            onValue(ref(db, `${basePath}/observations/course-${i}`), snap => resolve(snap.val() || {}), { onlyOnce: true });
+        });
+        const [obs1, obs2, obs3] = await Promise.all([lireObs(1), lireObs(2), lireObs(3)]);
+        const observations = { course1: obs1, course2: obs2, course3: obs3 };
+
+        const allCodes = Object.values(configData.groupes || {}).flat();
+        allCodes.forEach(code => {
+            const vitesses = [1, 2, 3].map(n => {
+                const obs = observations[`course${n}`]?.[String(code)];
+                if (!obs || obs.abandon) return null;
+                const dist = calculerDistance(obs.timestamps || [], obs.partiel || 0, configData.tour, configData.plots);
+                return calculerVitesse(dist, configData.duree);
+            }).filter(v => v !== null);
+            if (vitesses.length === 0) return;
+            const vitesseMoy = vitesses.reduce((a, b) => a + b, 0) / vitesses.length;
+            if (enregistrerCritereParCodeAutoEval(currentClasse, code, 'vitesseDemiFond', vitesseMoy)) {
+                nbVitessesEcrites++;
+            }
+        });
+    } catch (err) {
+        // La lecture des observations est opportuniste : une absence de données
+        // ne doit pas bloquer la transmission.
+        console.warn('[DemiFond] Pas de critère vitesse à exporter :', err);
+    }
+
     try {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         await set(ref(db, `${getBasePath(currentClasse)}/config`), configData);
@@ -852,7 +885,10 @@ window.troisCinqMinTransmettre = async function() {
 
         const nbEleves = Object.values(configData.groupes).reduce((a, b) => a + b.length, 0);
         const nbVMA = Object.keys(vmaParCode).length;
-        alert(`✅ Configuration transmise.\n${Object.keys(configData.groupes).length} groupes · ${nbEleves} élèves · ${nbVMA} VMA connues.`);
+        const critereMsg = nbVitessesEcrites > 0
+            ? `\n🏃 Vitesse 1/2 fond enregistrée pour ${nbVitessesEcrites} élève(s) (critère Multi disponible).`
+            : '';
+        alert(`✅ Configuration transmise.\n${Object.keys(configData.groupes).length} groupes · ${nbEleves} élèves · ${nbVMA} VMA connues.${critereMsg}`);
     } catch (err) {
         console.error(err);
         alert('❌ Erreur : ' + err.message);

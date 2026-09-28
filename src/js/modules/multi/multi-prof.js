@@ -2,6 +2,7 @@
 // Module professeur pour les Multi-activités
 
 import { generateTeams as generateClassicTeams } from '../teams/team-generator.js';
+import { getCriteresDisponibles } from '../../services/criteria-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 import { registerModule } from '../registry.js';
@@ -21,6 +22,7 @@ let sortableInstances = [];
 export async function initProf(classe) {
     currentClasse = classe;
     initPalette();
+    majSelectCritere();
     loadTeamsFromStorage(classe);
     const savedColors = JSON.parse(localStorage.getItem('eps_arena_team_colors') || '{}');
     teamColorState = savedColors;
@@ -57,6 +59,29 @@ function saveTeamsToStorage(classe, teams) {
 }
 
 // ============================================================
+// CRITÈRES DISPONIBLES (dynamique)
+// ============================================================
+
+// Met à jour le <select id="critereForce"> avec les critères réellement
+// disponibles (statiques + dérivés écrits par natation / demi-fond).
+function majSelectCritere() {
+    const select = document.getElementById('critereForce');
+    if (!select) return;
+
+    const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
+    const criteres = getCriteresDisponibles(eleves);
+    const precedente = select.value;
+
+    select.innerHTML = criteres.map(c =>
+        `<option value="${c.id}">${c.label}</option>`
+    ).join('');
+
+    if (precedente && criteres.some(c => c.id === precedente)) {
+        select.value = precedente;
+    }
+}
+
+// ============================================================
 // GÉNÉRATION DES ÉQUIPES
 // ============================================================
 
@@ -82,6 +107,9 @@ export async function generateTeams(classe, eleves) {
     if (elevesActifs.length === 0) {
         return alert("Aucun élève présent dans cette classe.");
     }
+
+    // S'assurer que le <select> critère reflète les données disponibles.
+    majSelectCritere();
 
     const options = {
         mode: document.getElementById('modeRepartition')?.value || 'melange',
@@ -213,6 +241,15 @@ function renderTeams(teams, statuts) {
                         const longueurDisplay = m.longueur ? `${m.longueur} cm` : '--';
                         const sprintDisplay = m.sprint30 ? `${m.sprint30} s` : '--';
 
+                        // Critères dérivés (natation, demi-fond, …)
+                        let deriveHtml = '';
+                        if (m.indiceNage !== undefined && m.indiceNage !== null) {
+                            deriveHtml += `<span class="text-cyan-600">🏊 ${Number(m.indiceNage).toFixed(2)}</span>`;
+                        }
+                        if (m.vitesseDemiFond !== undefined && m.vitesseDemiFond !== null) {
+                            deriveHtml += `<span class="text-green-600">🏃 ${Number(m.vitesseDemiFond).toFixed(1)} km/h</span>`;
+                        }
+
                         const statut = statuts[m.id] || 'present';
                         const isAbsent = statut === 'absent';
                         const isInapte = statut === 'inapte';
@@ -228,6 +265,7 @@ function renderTeams(teams, statuts) {
                                         <span class="text-orange-600">L : ${longueurDisplay}</span>
                                         <span class="text-purple-600">30m : ${sprintDisplay}</span>
                                         <span class="text-yellow-600">${starsHtml}</span>
+                                        ${deriveHtml}
                                     </div>
                                     <div class="flex gap-1 mt-0.5">
                                         <button onclick="window.setEleveStatut('${m.id}', 'present')" 
@@ -406,7 +444,11 @@ export function exportConfig() {
             membres: team.members.map(m => m.id)
         })),
         statuts: statuts,
-        eleves: eleves.map(e => ({ id: e.id, nom: e.nom, prenom: e.prenom, sexe: e.sexe, vma: e.vma, force: e.force, longueur: e.longueur, sprint30: e.sprint30 }))
+        eleves: eleves.map(e => ({
+            id: e.id, nom: e.nom, prenom: e.prenom, sexe: e.sexe,
+            vma: e.vma, force: e.force, longueur: e.longueur, sprint30: e.sprint30,
+            indiceNage: e.indiceNage, vitesseDemiFond: e.vitesseDemiFond
+        }))
     };
 
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

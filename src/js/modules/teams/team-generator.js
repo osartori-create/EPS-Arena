@@ -1,36 +1,32 @@
 // src/js/modules/teams/team-generator.js
+// Générateur d'équipes générique, piloté par un critère numérique.
 
-function shuffleArray(arr) {
-    for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-}
+import { getCritereValue } from '../../services/criteria-service.js';
 
-// Tri par critère (VMA, Force)
+// Tri par critère décroissant (le "meilleur" d'abord).
 function sortByCriteria(pool, critere) {
-    return [...pool].sort((a, b) => {
-        if (critere === 'vma') return (b.vma || 0) - (a.vma || 0);
-        return (b.force || 0) - (a.force || 0);
-    });
+    return [...pool].sort((a, b) => getCritereValue(b, critere) - getCritereValue(a, critere));
 }
 
 export function generateTeams(eleves, options) {
     let pool = [...eleves];
     let teams = [];
 
+    const critere = options.critere || 'vma';
+
     // 1. Gestion de la mixité
     if (options.mixite === 'non-mixte') {
         const garcons = pool.filter(e => e.sexe === 'M');
         const filles = pool.filter(e => e.sexe === 'F' || !e.sexe);
-        teams = [...buildTeams(garcons, options, 0, false), ...buildTeams(filles, options, garcons.length, false)];
-    } 
-    else if (options.mixite === 'mixte') {
+        teams = [
+            ...buildTeams(garcons, options, 0, false),
+            ...buildTeams(filles, options, garcons.length, false)
+        ];
+    } else if (options.mixite === 'mixte') {
         // On trie chaque sexe par niveau
-        const garconsTries = sortByCriteria(pool.filter(e => e.sexe === 'M'), options.critere);
-        const fillesTries = sortByCriteria(pool.filter(e => e.sexe === 'F'), options.critere);
-        const autresTries = sortByCriteria(pool.filter(e => e.sexe !== 'M' && e.sexe !== 'F'), options.critere);
+        const garconsTries = sortByCriteria(pool.filter(e => e.sexe === 'M'), critere);
+        const fillesTries = sortByCriteria(pool.filter(e => e.sexe === 'F'), critere);
+        const autresTries = sortByCriteria(pool.filter(e => e.sexe !== 'M' && e.sexe !== 'F'), critere);
 
         // Création du pool mixte entrelacé : G1, F1, G2, F2...
         let poolMixte = [];
@@ -43,8 +39,7 @@ export function generateTeams(eleves, options) {
 
         // On passe le pool mixte sans re-tri pour ne pas casser l'alternance
         teams = buildTeams(poolMixte, options, 0, false);
-    } 
-    else {
+    } else {
         // Mode 'ignore'
         teams = buildTeams(pool, options, 0, true);
     }
@@ -55,17 +50,17 @@ export function generateTeams(eleves, options) {
 function buildTeams(pool, options, startIndex, doSort) {
     if (pool.length === 0) return [];
 
+    const critere = options.critere || 'vma';
+
     // >>> CORRECTION DU BUG DE DIVISION PAR ZÉRO <<<
     let nbEq = options.nbEquipes;
     let nbParEquipe = options.nbParEquipe;
 
     if ((!nbEq || nbEq <= 0) && (!nbParEquipe || nbParEquipe <= 0)) {
         nbEq = Math.max(1, Math.ceil(pool.length / 4));
-    } 
-    else if (nbEq && nbEq > 0 && (!nbParEquipe || nbParEquipe <= 0)) {
+    } else if (nbEq && nbEq > 0 && (!nbParEquipe || nbParEquipe <= 0)) {
         nbParEquipe = Math.ceil(pool.length / nbEq);
-    }
-    else if ((!nbEq || nbEq <= 0) && nbParEquipe && nbParEquipe > 0) {
+    } else if ((!nbEq || nbEq <= 0) && nbParEquipe && nbParEquipe > 0) {
         nbEq = Math.ceil(pool.length / nbParEquipe);
     }
 
@@ -76,10 +71,7 @@ function buildTeams(pool, options, startIndex, doSort) {
 
     // Si doSort est true (mode ignore), on trie par niveau
     if (doSort) {
-        pool.sort((a, b) => {
-            if (options.critere === 'vma') return (b.vma || 0) - (a.vma || 0);
-            return (b.force || 0) - (a.force || 0);
-        });
+        pool.sort((a, b) => getCritereValue(b, critere) - getCritereValue(a, critere));
     }
 
     // Génération des labels
@@ -95,8 +87,8 @@ function buildTeams(pool, options, startIndex, doSort) {
     // Création des équipes
     let teams = Array.from({ length: nbEq }, (_, i) => {
         const globalIndex = startIndex + i;
-        const color = options.couleurs && options.couleurs.length > 0 
-            ? options.couleurs[globalIndex % options.couleurs.length] 
+        const color = options.couleurs && options.couleurs.length > 0
+            ? options.couleurs[globalIndex % options.couleurs.length]
             : '#3b82f6';
 
         return {
@@ -116,7 +108,7 @@ function buildTeams(pool, options, startIndex, doSort) {
             const teamIndex = Math.floor(i / perTeam);
             if (teams[teamIndex]) {
                 teams[teamIndex].members.push(pool[i]);
-                teams[teamIndex].totalScore += (options.critere === 'vma' ? (pool[i].vma || 0) : (pool[i].force || 0));
+                teams[teamIndex].totalScore += getCritereValue(pool[i], critere);
             }
         }
     } else {
@@ -125,8 +117,8 @@ function buildTeams(pool, options, startIndex, doSort) {
         let direction = 1;
         for (const eleve of pool) {
             teams[index].members.push(eleve);
-            teams[index].totalScore += (options.critere === 'vma' ? (eleve.vma || 0) : (eleve.force || 0));
-            
+            teams[index].totalScore += getCritereValue(eleve, critere);
+
             index += direction;
             if (index >= nbEq) { index = nbEq - 1; direction = -1; }
             else if (index < 0) { index = 0; direction = 1; }

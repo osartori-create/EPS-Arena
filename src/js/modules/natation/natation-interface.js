@@ -1,5 +1,6 @@
 // src/js/modules/natation/natation-interface.js
 import { getPhotoUrl } from '../../services/admin-service.js';
+import { enregistrerCritereEleve } from '../../services/criteria-service.js';
 import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, setLocalMapping } from '../../core/live-engine.js';
 import { colonnesIdentite, col, exporterVersIDoceo as exporterService } from '../../services/export-service.js';
@@ -529,11 +530,22 @@ export async function transmettreNatationConfig() {
         nbEleves: elevesData.length
     };
 
+    // ✅ Exposer l'indice de nage comme critère transversal pour le multi.
+    // On fige la donnée à chaque transmission (sur demande du prof).
+    let nbIndicesEcrits = 0;
+    elevesData.forEach(e => {
+        const cle = String(e.numero);
+        const indice = calculIndice(tempsData[cle], coupsData[cle]);
+        if (indice !== null && enregistrerCritereEleve(classe, e.id, 'indiceNage', indice)) {
+            nbIndicesEcrits++;
+        }
+    });
+
     try {
         await set(ref(db, `${baseProf}/${classe}/natation/config`), configData);
         await set(ref(db, `${baseProf}/${classe}/config`), { activite: 'natation' });
         await set(ref(db, `${baseProf}/active_classes/${classe}`), true);
-        alert('✅ Configuration Natation transmise aux iPads !');
+        alert(`✅ Configuration Natation transmise aux iPads !\n🏊 Indice de nage enregistré pour ${nbIndicesEcrits} élève(s) (critère Multi disponible).`);
     } catch (e) {
         console.error(e);
         alert('Erreur lors de la transmission.');
