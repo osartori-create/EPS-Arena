@@ -163,7 +163,7 @@ function rendreChoixCode(container) {
 // ============================================================
 // ÉCRAN 2 : SAISIE PAR ATELIER
 // ============================================================
-funaméliorations PPGction rendreSaisie(container) {
+function rendreSaisie(container) {
     const ateliersActifs = currentSeance.ateliers
         .map(id => getAtelierById(id, currentBibliotheque))
         .filter(Boolean);
