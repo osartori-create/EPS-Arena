@@ -1,4 +1,5 @@
 // src/js/modules/natation/natation-interface.js
+import { getEtab } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { enregistrerCritereEleve } from '../../services/criteria-service.js';
 import { db, ref, set, update, onValue } from '../../core/firebase-service.js';
@@ -122,8 +123,8 @@ function chargerTempsEtCoups() {
     if (coupsUnsubscribe) coupsUnsubscribe();
     
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups`);
+    const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps`);
+    const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups`);
 
     tempsUnsubscribe = onValue(tempsRef, (snap) => {
         tempsData = snap.val() || {};
@@ -453,13 +454,13 @@ window.sauvegarderEditNatation = function(eleveId) {
 
 function sauvegarderTemps(numero, tempsMs) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
+    const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
     set(tempsRef, tempsMs);
 }
 
 function sauvegarderCoups(numero, nbCoups) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
+    const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
     set(coupsRef, nbCoups);
 }
 
@@ -513,7 +514,7 @@ export async function transmettreNatationConfig() {
     if (!classe) return alert('Sélectionnez une classe.');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    const baseProf = `${getEtab()}/profs/${profCode}`;
     const distance = parseInt(document.getElementById('natation-distance')?.value) || 25;
 
     // ✅ On conserve le mapping local : il permet au prof de retrouver un élève
@@ -590,11 +591,11 @@ export function importNatationConfig(event) {
             const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
             
             if (data.temps) {
-                const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${data.classe}/natation/temps`);
+                const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${data.classe}/natation/temps`);
                 await set(tempsRef, data.temps);
             }
             if (data.coups) {
-                const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${data.classe}/natation/coups`);
+                const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${data.classe}/natation/coups`);
                 await set(coupsRef, data.coups);
             }
             if (data.bareme && Array.isArray(data.bareme)) {

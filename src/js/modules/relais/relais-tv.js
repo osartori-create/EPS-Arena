@@ -1,6 +1,7 @@
 // src/js/modules/relais/relais-tv.js
 // TV : classement des équipes (10s ou 2 zones)
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
 import { getMeilleurEssaiParPaire, calculerScoreEquipe } from './relais-core.js';
@@ -33,7 +34,7 @@ export function renderRelaisTV() {
     currentUnsubs = [];
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/relais`;
+    const basePath = `${getEtab()}/profs/${profCode}/${classe}/relais`;
 
     let config = null, m10 = {}, m2z = {};
     let loaded = 0;

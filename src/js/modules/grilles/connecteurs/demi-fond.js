@@ -4,6 +4,7 @@
 // - Performance : seuils fixes par sexe sur la vitesse Course 3
 // - Régularité : coefficient de variation des temps de tour
 
+import { getEtab } from '../../../core/firebase-service.js';
 import { db, ref, onValue } from '../../../core/firebase-service.js';
 import { getLocalMapping } from '../../../core/live-engine.js';
 import { getExistingEleves } from '../../../services/admin-service.js';
@@ -36,7 +37,7 @@ export function calculerNiveauxDemiFond(classe, eleveId, config) {
 
         // Lire les observations
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/demi-fond/observations`;
+        const basePath = `${getEtab()}/profs/${profCode}/${classe}/demi-fond/observations`;
 
         let cours = { 1: null, 2: null, 3: null };
         let loaded = 0;

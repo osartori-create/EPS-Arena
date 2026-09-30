@@ -1,4 +1,5 @@
 // src/js/modules/escalade/escalade-interface.js
+import { getEtab } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { exporterVersIDoceo } from '../../services/export-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
@@ -336,7 +337,7 @@ function exportEscaladeIDoceo() {
     if (eleves.length === 0) return alert('Aucun élève dans cette classe.');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const monteesPath = `etablissements/0680013V/profs/${profCode}/${activeClasse}/escalade/montees`;
+    const monteesPath = `${getEtab()}/profs/${profCode}/${activeClasse}/escalade/montees`;
     const monteesRef = ref(db, monteesPath);
 
     onValue(monteesRef, (snap) => {

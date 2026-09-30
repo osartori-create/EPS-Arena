@@ -1,4 +1,5 @@
 // src/js/modules/tournoi/variantes/atp/atp-prof.js
+import { getEtab } from '../../../../core/firebase-service.js';
 import { db, ref, onValue, push, set, remove } from '../../../../core/firebase-service.js';
 import { getPhotoUrl } from '../../../../services/admin-service.js';
 import { getExistingEleves } from '../../../../services/admin-service.js';
@@ -28,7 +29,7 @@ let notesEleves = {};         // { code: note }
 // ============================================================
 function getATPBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/atp`;
+    return `${getEtab()}/profs/${profCode}/${classe}/tournoi/atp`;
 }
 
 // ============================================================

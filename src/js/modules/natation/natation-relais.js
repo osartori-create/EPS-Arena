@@ -2,6 +2,7 @@
 // Gestion du relais : préparation, course en direct, résultats
 // Ne modifie PAS les mesures (temps/coups/historique), il les lit seulement.
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
@@ -29,7 +30,7 @@ let etatCourse = null;
 // ============================================================
 function getBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/natation/organisation`;
+    return `${getEtab()}/profs/${profCode}/${classe}/natation/organisation`;
 }
 
 function formatSecondes(s) {

@@ -1,6 +1,7 @@
 // src/js/modules/demi-fond/variantes/enchainement/enchainement-interface.js
 // UI Professeur du sous-module "Enchaînement" (séries à durées variables).
 
+import { getEtab } from '../../../../core/firebase-service.js';
 import { db, ref, set, onValue } from '../../../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves, migrerCodesAutoEval } from '../../../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../../core/live-engine.js';
@@ -428,8 +429,8 @@ window.enchainementTransmettre = async function() {
         await set(ref(db, `${getBasePath(currentClasse)}/config`), configData);
         await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), { etat: 'idle', timestampMaj: Date.now() });
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/active_classes/${currentClasse}`), true);
+        await set(ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
+        await set(ref(db, `${getEtab()}/profs/${profCode}/active_classes/${currentClasse}`), true);
         const nbEleves = Object.values(configData.groupes).reduce((a, b) => a + b.length, 0);
         alert(`✅ Configuration transmise.\n${configData.durees.length} séries · ${nbEleves} élèves · ${Object.keys(configData.vmaParCode).length} VMA connues.`);
     } catch (err) { console.error(err); alert('❌ Erreur : ' + err.message); }

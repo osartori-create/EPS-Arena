@@ -2,6 +2,7 @@
 // Code partagé entre tous les modes Badminton
 // ✅ Reset complet à l'init + listener results (fix cache fantôme)
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 
 // ============================================================
@@ -34,8 +35,8 @@ export function initBadmintonCommon(classe) {
     if (resultsListener) { resultsListener(); resultsListener = null; }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/config`);
+    const resultsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results`);
 
     console.log(`🔍 [Common] initBadmintonCommon pour la classe : ${classe}`);
 

@@ -5,6 +5,8 @@
 config.local.js
 src/js/config/config.local.js
 src/js/config/config.local.*.js
+# Exception : le MODÈLE d'exemple est volontairement public (aucun secret)
+!src/js/config/config.local.example.js
 *.local.js
 
 # Variables d'environnement

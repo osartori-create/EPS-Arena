@@ -1,11 +1,12 @@
 // src/js/modules/badminton/badminton-firebase.js
 // Communication Firebase
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
 export function listenBadmintonConfig(classe, callback) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/config`);
     return onValue(configRef, (snap) => {
         callback(snap.val() || {});
     });
@@ -13,7 +14,7 @@ export function listenBadmintonConfig(classe, callback) {
 
 export function listenBadmintonResults(classe, terrain, callback) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+    const resultsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results`);
     return onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
         const filtered = {};
@@ -26,6 +27,6 @@ export function listenBadmintonResults(classe, terrain, callback) {
 
 export function saveBadmintonResult(classe, matchId, data) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results/${matchId}`);
+    const resultRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results/${matchId}`);
     return update(resultRef, data);
 }

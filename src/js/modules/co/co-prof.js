@@ -2,6 +2,7 @@
 // Point d’entrée : sélecteur de mode (Classique / OrientShow)
 // Gère la configuration du CO classique (circuits, catégorie active, mode validation, chrono)
 
+import { getEtab } from '../../core/firebase-service.js';
 import { registerModule } from '../registry.js';
 import { initCOInterface, initSortableCO, loadCOAssignments } from './co-interface.js';
 import { db, ref, set, onValue } from '../../core/firebase-service.js';
@@ -132,7 +133,7 @@ function setCOMode(mode) {
 // ============================================================
 function renderClassiqueConfig(classe, container) {
     const profCode = getProfCode();
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/co`;
+    const basePath = `${getEtab()}/profs/${profCode}/${classe}/co`;
     const configRef = ref(db, `${basePath}/config`);
     const startRef = ref(db, `${basePath}/startTime`);
     const endRef = ref(db, `${basePath}/endTime`);
@@ -292,7 +293,7 @@ window.coAjouterCircuit = function() {
     };
 
     const profCode = getProfCode();
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${newCircuit.id}`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/config/circuits/${newCircuit.id}`);
     set(configRef, newCircuit);
 };
 
@@ -302,14 +303,14 @@ window.coEditerCircuit = function(id) {
     const nouvellesBalises = prompt(`Modifier les balises du circuit "${circ.nom}" :`, circ.balises.join(', '));
     if (nouvellesBalises === null) return;
     const profCode = getProfCode();
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${id}/balises`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/config/circuits/${id}/balises`);
     set(configRef, nouvellesBalises.split(',').map(b => b.trim()));
 };
 
 window.coSupprimerCircuit = function(id) {
     if (!confirm('Supprimer ce circuit définitivement ?')) return;
     const profCode = getProfCode();
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${id}`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/config/circuits/${id}`);
     set(configRef, null);
 };
 
@@ -318,28 +319,28 @@ window.coSupprimerCategorie = function(cat) {
     const profCode = getProfCode();
     const idsASupprimer = circuits.filter(c => c.cat === cat).map(c => c.id);
     idsASupprimer.forEach(id => {
-        const refCircuit = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/circuits/${id}`);
+        const refCircuit = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/config/circuits/${id}`);
         set(refCircuit, null);
     });
 };
 
 window.coActiverCategorie = function(cat) {
     const profCode = getProfCode();
-    const catRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/activeCategory`);
+    const catRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/config/activeCategory`);
     set(catRef, cat);
 };
 
 window.coSetValMode = function(mode) {
     const profCode = getProfCode();
-    const modeRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/config/valMode`);
+    const modeRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/config/valMode`);
     set(modeRef, mode);
 };
 
 window.coToggleChrono = function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     const profCode = getProfCode();
-    const startRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/startTime`);
-    const endRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/endTime`);
+    const startRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/startTime`);
+    const endRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/endTime`);
 
     if (!startTime) {
         set(startRef, Date.now());

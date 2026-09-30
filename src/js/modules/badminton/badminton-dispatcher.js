@@ -1,6 +1,7 @@
 // src/js/modules/badminton/badminton-dispatcher.js
 // Dispatcher : lit config.mode et charge le bon module
 
+import { getEtab } from '../../core/firebase-service.js';
 import { getModeConfig, getDefaultMode, getModesList } from './badminton-registry.js';
 import { initBadmintonCommon, currentClasse } from './badminton-common.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
@@ -26,7 +27,7 @@ export async function loadBadmintonMode(classe) {
 
     // Lire la config Firebase pour connaître le mode
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/config`);
     
     return new Promise((resolve) => {
         onValue(configRef, async (snap) => {

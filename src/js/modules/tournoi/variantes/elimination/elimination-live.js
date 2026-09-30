@@ -1,4 +1,5 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-live.js
+import { getEtab } from '../../../../core/firebase-service.js';
 import { db, ref, onValue } from '../../../../core/firebase-service.js';
 import { getPhotoUrl } from '../../../../services/admin-service.js';
 import { getCurrentClasse } from '../../../../core/live-engine.js';
@@ -24,7 +25,7 @@ export function renderEliminationLive() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const joueursRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/joueurs`);
+    const joueursRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/tournoi/joueurs`);
 
     container.innerHTML = '<p class="text-slate-500 text-center">Chargement...</p>';
 

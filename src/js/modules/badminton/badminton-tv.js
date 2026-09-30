@@ -1,6 +1,7 @@
 // src/js/modules/badminton/badminton-tv.js
 // TV Badminton : classement général en temps réel
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse, getStudentsMap } from '../../core/live-engine.js';
@@ -63,7 +64,7 @@ export function renderBadmintonTV() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+    const resultsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results`);
 
     if (currentUnsub) currentUnsub();
 

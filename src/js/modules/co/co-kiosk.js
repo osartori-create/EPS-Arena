@@ -2,6 +2,7 @@
 // Kiosk élève pour la Course d'orientation classique
 // Utilise la matrice pour corriger les codes saisis par l'élève
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 import { MATRICE } from './matrice.js';
 
@@ -46,7 +47,7 @@ export function initCoKiosk(classe, code) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     console.log('[CO Kiosk] Initialisation pour', classe, code, 'profCode:', profCode);
 
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/co`;
+    const basePath = `${getEtab()}/profs/${profCode}/${classe}/co`;
 
     // 1. Écouter la configuration complète
     const configRef = ref(db, `${basePath}/config`);
@@ -91,7 +92,7 @@ function chargerSessions() {
         sessionsListener = null;
     }
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const passagesRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`);
+    const passagesRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/passages`);
     sessionsListener = onValue(passagesRef, (snap) => {
         const data = snap.val() || {};
         sessions = {};
@@ -386,7 +387,7 @@ function synchroniserPassage() {
     };
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const passagesRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`);
+    const passagesRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/co/passages`);
     push(passagesRef, data)
         .then(() => afficherScoreGlobal())
         .catch(err => {

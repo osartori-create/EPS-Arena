@@ -1,5 +1,6 @@
 // src/js/modules/tournoi/tournoi-prof.js
 // Entrée prof unifiée : sélecteur de variante + délégation à la variante active
+import { getEtab } from '../../core/firebase-service.js';
 import { TOURNOI_VARIANTS, getVariantConfig, getDefaultVariant } from './tournoi-registry.js';
 import { db, ref, onValue, set } from '../../core/firebase-service.js';
 
@@ -10,7 +11,7 @@ let modeUnsub = null;
 
 function getProfBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi`;
+    return `${getEtab()}/profs/${profCode}/${classe}/tournoi`;
 }
 
 export function initTournoiProf(classe) {

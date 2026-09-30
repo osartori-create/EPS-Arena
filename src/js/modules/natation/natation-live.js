@@ -1,4 +1,5 @@
 // src/js/modules/natation/natation-live.js
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
@@ -84,9 +85,9 @@ export function renderNatationLive() {
     if (currentUnsubHistorique) currentUnsubHistorique();
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups`);
-    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique`);
+    const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps`);
+    const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups`);
+    const historiqueRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/historique`);
 
     let tempsData = {};
     let coupsData = {};
@@ -362,8 +363,8 @@ export function renderNatationLive() {
             const tempsMs = Math.round(temps * 1000);
             
             const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-            const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
-            const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
+            const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
+            const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
             
             Promise.all([
                 set(tempsRef, tempsMs),
@@ -383,7 +384,7 @@ export function renderNatationLive() {
     // ============================================================
     window.modifierEssaiNatation = function(numero, index) {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
+        const historiqueRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
         
         onValue(historiqueRef, (snap) => {
             let historique = snap.val() || [];
@@ -440,7 +441,7 @@ export function renderNatationLive() {
         
         const tempsMs = Math.round(temps * 1000);
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
+        const historiqueRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
         
         onValue(historiqueRef, (snap) => {
             let historique = snap.val() || [];
@@ -455,8 +456,8 @@ export function renderNatationLive() {
             historique[index].timestamp = Date.now();
             
             set(historiqueRef, historique).then(() => {
-                const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
-                const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
+                const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
+                const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
                 
                 const dernier = historique[historique.length - 1];
                 return Promise.all([
@@ -478,7 +479,7 @@ export function renderNatationLive() {
         if (!confirm(`Supprimer l'essai ${index+1} définitivement ?`)) return;
         
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
+        const historiqueRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
         
         onValue(historiqueRef, (snap) => {
             let historique = snap.val() || [];
@@ -490,8 +491,8 @@ export function renderNatationLive() {
             historique.splice(index, 1);
             
             set(historiqueRef, historique).then(() => {
-                const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
-                const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
+                const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
+                const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
                 
                 if (historique.length > 0) {
                     const dernier = historique[historique.length - 1];

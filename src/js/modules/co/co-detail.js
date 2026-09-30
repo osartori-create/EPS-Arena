@@ -1,6 +1,7 @@
 // src/js/modules/co/co-detail.js
 // Modale de détail et correction manuelle des résultats pour la CO classique
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, set, update } from '../../core/firebase-service.js';
 import { MATRICE } from './matrice.js';
 
@@ -145,7 +146,7 @@ window.forcerCorrection = function(circuitId, posteIdx) {
     if (!confirm(`Forcer la correction du poste ${posteIdx + 1} ?`)) return;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`;
+    const basePath = `${getEtab()}/profs/${profCode}/${currentClasse}/co/passages`;
 
     let passageKey = null;
     for (const [key, value] of Object.entries(currentPassages)) {

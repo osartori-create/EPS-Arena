@@ -1,6 +1,7 @@
 // src/js/modules/grilles/connecteurs/escalade.js
 // Connecteur : remplit automatiquement le critère "Grimpeur" de la grille Escalade (C3 ou C4)
 
+import { getEtab } from '../../../core/firebase-service.js';
 import { db, ref, onValue } from '../../../core/firebase-service.js';
 import { getLocalMapping } from '../../../core/live-engine.js';
 
@@ -29,7 +30,7 @@ export function calculerNiveauxEscalade(classe, eleveId, config, options = {}) {
         }
 
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const path = `etablissements/0680013V/profs/${profCode}/${classe}/escalade/montees`;
+        const path = `${getEtab()}/profs/${profCode}/${classe}/escalade/montees`;
 
         onValue(ref(db, path), (snap) => {
             const montees = snap.val() || {};

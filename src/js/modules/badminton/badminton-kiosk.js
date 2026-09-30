@@ -1,6 +1,7 @@
 // src/js/modules/badminton/badminton-kiosk.js
 // Module Badminton – Saisie "Avec la manière" (cases à cocher)
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -46,7 +47,7 @@ export function initBadmintonKiosk(classe) {
     resultsListenerAttached = false;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/config`);
 
     onValue(configRef, (snap) => {
         const config = snap.val() || {};
@@ -467,7 +468,7 @@ window.endMatch = function() {
 
 function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, winner = null, loser = null) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
+    const resultRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/badminton/results/${currentMatch.id}`);
 
     const data = {
         terrain: currentTerrain,
@@ -491,7 +492,7 @@ function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecM
 
 function listenForScoreUpdates() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`);
+    const resultsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/badminton/results`);
     onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
         matchSchedule.forEach(m => {

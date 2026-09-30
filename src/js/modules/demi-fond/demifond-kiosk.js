@@ -1,3 +1,4 @@
+import { getEtab } from '../../core/firebase-service.js';
 // src/js/modules/demi-fond/demifond-kiosk.js
 // Dispatch vers le sous-module sélectionné
 
@@ -12,7 +13,7 @@ export function initDemiFondKiosk(classe) {
 
     // Détecter le sous-module actif via Firebase (config/sousModule)
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/demi-fond/config`;
+    const basePath = `${getEtab()}/profs/${profCode}/${classe}/demi-fond/config`;
 
     import('../../core/firebase-service.js').then(({ db, ref, onValue }) => {
         onValue(ref(db, basePath), (snap) => {

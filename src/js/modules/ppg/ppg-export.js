@@ -1,5 +1,6 @@
 // src/js/modules/ppg/ppg-export.js
 // Export Excel (multi-feuilles) : séance du jour + historique complet
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
 import { getExistingEleves } from '../../services/admin-service.js';
@@ -8,7 +9,7 @@ import { fusionnerBibliotheque, agregerSeance, getAtelierById } from './ppg-core
 
 function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}`;
+    return `${getEtab()}/profs/${profCode}`;
 }
 function getTodayDate() {
     return new Date().toISOString().split('T')[0];

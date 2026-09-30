@@ -2,6 +2,7 @@
 // UI Professeur : groupes, vitesses, réglages, transmission
 // ⚠️ RGPD : seules les lettres (a,b,c) et le sexe transitent sur Firebase.
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, set, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse, setLocalMapping, getLocalMapping } from '../../core/live-engine.js';
@@ -333,7 +334,7 @@ window.relaisRecupererVitesses = function() {
     if (!activeClasse) return alert('Sélectionnez une classe.');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${activeClasse}/relais`;
+    const basePath = `${getEtab()}/profs/${profCode}/${activeClasse}/relais`;
     const mapping = getLocalMapping(activeClasse) || {};
 
     onValue(ref(db, `${basePath}/vitesses`), snap => {
@@ -839,7 +840,7 @@ export async function transmettreRelaisConfig() {
     if (!activeClasse) return alert('Sélectionnez une classe.');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${activeClasse}/relais`;
+    const basePath = `${getEtab()}/profs/${profCode}/${activeClasse}/relais`;
 
     const sousActivite = localStorage.getItem(getSousActiviteKey(activeClasse)) || 'relais10s';
     const modeEl = document.getElementById(sousActivite === 'relais2zones' ? 'relaisMode2' : 'relaisMode');
@@ -906,9 +907,9 @@ export async function transmettreRelaisConfig() {
 
     try {
         await set(ref(db, `${basePath}/config`), configData);
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${activeClasse}/config`), { activite: 'relais' });
+        await set(ref(db, `${getEtab()}/profs/${profCode}/${activeClasse}/config`), { activite: 'relais' });
         await set(ref(db, `${basePath}/vitesses`), Object.keys(vitessesFirebase).length > 0 ? vitessesFirebase : null);
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/active_classes/${activeClasse}`), true);
+        await set(ref(db, `${getEtab()}/profs/${profCode}/active_classes/${activeClasse}`), true);
 
         // Fusionner le mapping local
         const existingMapping = getLocalMapping(activeClasse) || {};

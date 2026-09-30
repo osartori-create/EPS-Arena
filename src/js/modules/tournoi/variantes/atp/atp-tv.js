@@ -1,5 +1,6 @@
 // src/js/modules/tournoi/variantes/atp/atp-tv.js
 // TV ATP : podium fixe (top 3) + liste défilante en boucle
+import { getEtab } from '../../../../core/firebase-service.js';
 import { db, ref, onValue } from '../../../../core/firebase-service.js';
 import { getCurrentClasse } from '../../tournoi-core.js';
 import { getPhotoUrl } from '../../../../services/admin-service.js';
@@ -17,7 +18,7 @@ let _rafId = null;
 
 function getATPBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/atp`;
+    return `${getEtab()}/profs/${profCode}/${classe}/tournoi/atp`;
 }
 
 export function renderTV() {

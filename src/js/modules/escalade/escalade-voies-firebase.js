@@ -12,6 +12,7 @@
 //   4. La configuration (secteurs, voies) est une donnée NON personnelle.
 //   5. La photo du mur n'est autorisée que si AUCUN élève n'y est identifiable.
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push, set, update, remove } from '../../core/firebase-service.js';
 import { construireSecteursDefaut } from './escalade-voies-config.js';
 
@@ -20,7 +21,7 @@ import { construireSecteursDefaut } from './escalade-voies-config.js';
 // ============================================================
 function getBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/escalade-suivi`;
+    return `${getEtab()}/profs/${profCode}/${classe}/escalade-suivi`;
 }
 
 export function getConfigPath(classe) {

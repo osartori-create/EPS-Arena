@@ -1,5 +1,6 @@
 // src/js/modules/tournoi/variantes/atp/atp-kiosk.js
 // Kiosk élève : saisie d'un match ATP (code V, code P, scores)
+import { getEtab } from '../../../../core/firebase-service.js';
 import { db, ref, push, onValue } from '../../../../core/firebase-service.js';
 import { getCurrentClasse } from '../../tournoi-core.js';
 
@@ -136,7 +137,7 @@ window.atpKValider = async function() {
 
     // ✅ Lecture Firebase — c'est ICI que ref/db/onValue sont utilisés
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseATP = `etablissements/0680013V/profs/${profCode}/${currentClasse}/tournoi/atp`;
+    const baseATP = `${getEtab()}/profs/${profCode}/${currentClasse}/tournoi/atp`;
 
     const { recalculerTout, calculerMatch, BAREME_DEFAUT, POINTS_INITIAUX } = await import('./atp-core.js');
 

@@ -1,4 +1,5 @@
 // src/js/core/live-engine.js
+import { getEtab } from './firebase-service.js';
 import { listenToActivityData, getBadmintonResultsPath, ref, onValue } from './firebase-service.js';
 import { db } from './firebase-service.js';
 import { getPhotoUrl } from '../services/admin-service.js';
@@ -28,7 +29,7 @@ async function loadConfig() {
     if (!currentClasse) return;
     configData = {};
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/config`);
     currentConfigUnsub = onValue(configRef, (snap) => {
         configData = snap.val() || {};
         window.dispatchEvent(new CustomEvent('live-config-updated', { detail: configData }));

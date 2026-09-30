@@ -1,6 +1,7 @@
 // src/js/modules/badminton/badminton-terrain.js
 // Mode "Terrain" : clic sur zones, classement V/D (3/1/0), chrono paramétrable
 
+import { getEtab } from '../../core/firebase-service.js';
 import {
     currentTerrain, matchSchedule, playersList, terrainsConfig,
     renderMatchSetup, renderClassement, renderTerrainSelection
@@ -505,7 +506,7 @@ window.endMatch = function() {
 function saveMatchResult(p1, p2, score1, score2, pts1, pts2, stats, winner = null, loser = null) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const currentClasse = document.querySelector('#class-select')?.value || '';
-    const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results/${window.currentMatchId}`);
+    const resultRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/badminton/results/${window.currentMatchId}`);
 
     const data = {
         mode: 'terrain',

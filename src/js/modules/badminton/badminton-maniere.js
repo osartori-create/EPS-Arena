@@ -3,6 +3,7 @@
 // Version simplifiée : bonus uniquement sur les points en zone dangereuse (vert)
 // Seuil "avec la manière" = nombre de cases cochées en vert (paramétrable 3-8)
 
+import { getEtab } from '../../core/firebase-service.js';
 import { 
     currentTerrain, matchSchedule, playersList, terrainsConfig,
     renderMatchSetup, renderClassement, currentClasse
@@ -432,7 +433,7 @@ window.endMatchManiere = function() {
 function saveMatchResult(p1, p2, score1, score2, pts1, pts2, avecManiere1, avecManiere2, vert1, vert2, winner = null, loser = null) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const classe = currentClasse || document.querySelector('#class-select')?.value || '';
-    const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results/${window.currentMatchId}`);
+    const resultRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results/${window.currentMatchId}`);
 
     const data = {
         terrain: currentTerrain,

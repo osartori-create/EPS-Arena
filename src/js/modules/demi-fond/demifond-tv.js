@@ -1,3 +1,4 @@
+import { getEtab } from '../../core/firebase-service.js';
 // src/js/modules/demi-fond/demifond-tv.js
 // Dispatch vers le sous-module actif
 
@@ -16,7 +17,7 @@ export function renderDemiFondTV() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configPath = `etablissements/0680013V/profs/${profCode}/${classe}/demi-fond/config`;
+    const configPath = `${getEtab()}/profs/${profCode}/${classe}/demi-fond/config`;
 
     import('../../core/firebase-service.js').then(({ db, ref, onValue }) => {
         onValue(ref(db, configPath), (snap) => {

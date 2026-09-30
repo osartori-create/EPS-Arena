@@ -2,6 +2,7 @@
 // Organisation pédagogique : référence, équipes équilibrées, rôles or/argent/bronze
 // ⚠️ Ne modifie PAS les données de mesure (temps/coups/historique), il les LIT seulement.
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, set, remove } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
@@ -63,7 +64,7 @@ const CONTENUS_RELAIS = {
 // ============================================================
 function getBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/natation/organisation`;
+    return `${getEtab()}/profs/${profCode}/${classe}/natation/organisation`;
 }
 
 function calculIndice(tempsMs, nbCoups) {
@@ -88,7 +89,7 @@ function chargerElevesTries(classe) {
 // ============================================================
 async function chargerMesures(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseMesure = `etablissements/0680013V/profs/${profCode}/${classe}/natation`;
+    const baseMesure = `${getEtab()}/profs/${profCode}/${classe}/natation`;
 
     const lire = (path) => new Promise(resolve => {
         onValue(ref(db, path), snap => resolve(snap.val() || {}), { onlyOnce: true });

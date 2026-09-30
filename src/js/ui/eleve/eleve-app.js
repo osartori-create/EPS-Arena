@@ -1,4 +1,5 @@
 // src/js/ui/eleve/eleve-app.js
+import { getEtab } from '../../core/firebase-service.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
 import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
 import { getPerformancePath } from '../../core/firebase-service.js';
@@ -76,7 +77,7 @@ export function initApp() {
     localStorage.setItem('eps_arena_profCode', profCode);
     console.log('[eleve] profCode utilisé :', profCode);
 
-    const activeClassesRef = ref(db, `etablissements/0680013V/profs/${profCode}/active_classes`);
+    const activeClassesRef = ref(db, `${getEtab()}/profs/${profCode}/active_classes`);
     onValue(activeClassesRef, (snap) => {
         const data = snap.val() || {};
         classSelect.innerHTML = '<option value="">-- Choisir la classe --</option>' + 
@@ -96,7 +97,7 @@ export function initApp() {
             arcathlonConfigListener = null;
         }
 
-        const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/config`);
+        const configRef = ref(db, `${getEtab()}/profs/${profCode}/${selectedClass}/config`);
         currentConfigListener = onValue(configRef, (snap) => {
             const config = snap.val();
             console.log('[eleve] Config principale reçue :', config);
@@ -137,7 +138,7 @@ export function initApp() {
                     showWaiting();
                 }
             } else {
-                const arcConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
+                const arcConfigRef = ref(db, `${getEtab()}/profs/${profCode}/${selectedClass}/arcathlon/config`);
                 if (arcathlonConfigListener) arcathlonConfigListener();
                 arcathlonConfigListener = onValue(arcConfigRef, (snap) => {
                     const arcConfig = snap.val();
@@ -272,7 +273,7 @@ function showLogin() {
         activityTitle.innerText = "Choisis ton code";
 
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const blocConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/bloccontest/config`);
+        const blocConfigRef = ref(db, `${getEtab()}/profs/${profCode}/${selectedClass}/bloccontest/config`);
         onValue(blocConfigRef, (snap) => {
             const blocConfig = snap.val();
             if (blocConfig && blocConfig.groupes) {
@@ -594,7 +595,7 @@ function showLoginArcathlon() {
     arcModule.classList.remove('hidden');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const arcConfigRef = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
+    const arcConfigRef = ref(db, `${getEtab()}/profs/${profCode}/${selectedClass}/arcathlon/config`);
     onValue(arcConfigRef, (snap) => {
         const arcConfig = snap.val();
         const equipes = arcConfig?.equipes || {};
@@ -617,7 +618,7 @@ function showLoginArcathlon() {
 
     window.selectEquipeArcathlon = (equipeId) => {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const arcConfigRef2 = ref(db, `etablissements/0680013V/profs/${profCode}/${selectedClass}/arcathlon/config`);
+        const arcConfigRef2 = ref(db, `${getEtab()}/profs/${profCode}/${selectedClass}/arcathlon/config`);
         onValue(arcConfigRef2, (snap) => {
             const arcConfig = snap.val();
             const equipes = arcConfig?.equipes || {};

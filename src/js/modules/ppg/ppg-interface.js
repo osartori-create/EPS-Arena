@@ -1,5 +1,6 @@
 // src/js/modules/ppg/ppg-interface.js
 // UI Professeur : config séance du jour + aperçu classe
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, set, remove } from '../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
@@ -21,7 +22,7 @@ let unsubs = [];
 // ============================================================
 function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}`;
+    return `${getEtab()}/profs/${profCode}`;
 }
 function getPPGBasePath(classe) {
     return `${getProfBasePath()}/${classe}/ppg`;

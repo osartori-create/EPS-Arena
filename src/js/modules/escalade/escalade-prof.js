@@ -1,6 +1,7 @@
 // src/js/modules/escalade/escalade-prof.js
 // Module professeur pour l’Escalade (classique et Bloc Contest)
 
+import { getEtab } from '../../core/firebase-service.js';
 import {
     initEscaladeInterface,
     populateReserveEscalade,
@@ -160,7 +161,7 @@ export async function transmettre(classe) {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    const baseProf = `${getEtab()}/profs/${profCode}`;
     const configData = JSON.parse(localStorage.getItem(`eps_arena_escalade_assignments_${classe}`) || '{}');
     configData.activite = 'escalade';
     

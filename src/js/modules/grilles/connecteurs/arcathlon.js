@@ -3,6 +3,7 @@
 // - Projet : vitesse 1ère série vs VMA (issue du Luc Léger)
 // - Performance/Tir : cumul scoreTir sur toutes les séries
 
+import { getEtab } from '../../../core/firebase-service.js';
 import { db, ref, onValue } from '../../../core/firebase-service.js';
 import { getExistingEleves } from '../../../services/admin-service.js';
 import { getVMAFromPalier } from '../../evaluation/evaluation-utils.js';
@@ -33,7 +34,7 @@ export function calculerNiveauxArcathlon(classe, eleveId, config, options = {}) 
 
         // 3. Lire les passages
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/passages`;
+        const basePath = `${getEtab()}/profs/${profCode}/${classe}/arcathlon/passages`;
 
         onValue(ref(db, basePath), (snap) => {
             const passages = snap.val() || {};

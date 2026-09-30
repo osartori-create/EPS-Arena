@@ -1,6 +1,7 @@
 // src/js/modules/demi-fond/variantes/trois-cinq-min/trois-cinq-min-interface.js
 // UI Professeur pour le sous-module 3x5min
 
+import { getEtab } from '../../../../core/firebase-service.js';
 import { db, ref, set, onValue } from '../../../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves, migrerCodesAutoEval } from '../../../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../../core/live-engine.js';
@@ -227,7 +228,7 @@ function initProfChrono() {
     if (!currentClasse) return;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const seqRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/demi-fond/commandes/sequence`);
+    const seqRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/demi-fond/commandes/sequence`);
 
     let currentSeq = null;
 
@@ -683,7 +684,7 @@ window.troisCinqMinGo = async function() {
     try {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         await set(ref(db, `${getBasePath(currentClasse)}/config`), configData);
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
+        await set(ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
 
         await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
             etat: 'actif',
@@ -877,8 +878,8 @@ window.troisCinqMinTransmettre = async function() {
     try {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
         await set(ref(db, `${getBasePath(currentClasse)}/config`), configData);
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/active_classes/${currentClasse}`), true);
+        await set(ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
+        await set(ref(db, `${getEtab()}/profs/${profCode}/active_classes/${currentClasse}`), true);
         await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
             etat: 'idle', timestampMaj: Date.now()
         });

@@ -1,4 +1,5 @@
 // src/js/modules/escalade/escalade-live.js
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, remove, update } from '../../core/firebase-service.js';
 import { getNomFromCode, getPhotoHtml, getEleveIdFromCode, getCurrentClasse } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
@@ -33,9 +34,9 @@ export function renderEscaladeLive() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const monteesPath = `etablissements/0680013V/profs/${profCode}/${classe}/escalade/montees`;
-    const validationsPath = `etablissements/0680013V/profs/${profCode}/${classe}/bloccontest/validations`;
-    const configPath = `etablissements/0680013V/profs/${profCode}/${classe}/bloccontest/config`;
+    const monteesPath = `${getEtab()}/profs/${profCode}/${classe}/escalade/montees`;
+    const validationsPath = `${getEtab()}/profs/${profCode}/${classe}/bloccontest/validations`;
+    const configPath = `${getEtab()}/profs/${profCode}/${classe}/bloccontest/config`;
 
     container.innerHTML = '<p class="text-slate-500 text-center">Chargement...</p>';
 
@@ -192,7 +193,7 @@ function renderClassicLive(container, data, classe) {
     // Modification / suppression d'une montée (depuis le live)
     window.deleteMonteeClassic = async function(key) {
         if (!confirm('🗑️ Supprimer cette montée ?')) return;
-        const monteesPath = `etablissements/0680013V/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}/${classe}/escalade/montees`;
+        const monteesPath = `${getEtab()}/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}/${classe}/escalade/montees`;
         try {
             await remove(ref(db, `${monteesPath}/${key}`));
             document.getElementById('bilanModal')?.remove();
@@ -239,7 +240,7 @@ function renderClassicLive(container, data, classe) {
         const coeff = BAREME[cotation] || 1;
         const points = hauteurSafe * coeff;
 
-        const monteesPath = `etablissements/0680013V/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}/${classe}/escalade/montees`;
+        const monteesPath = `${getEtab()}/profs/${localStorage.getItem('eps_arena_profCode') || 'DEFAULT'}/${classe}/escalade/montees`;
         try {
             await update(ref(db, `${monteesPath}/${key}`), { hauteur: hauteurSafe, points, reussie: hauteurSafe >= 9 });
             document.getElementById('edit-montee-classic-modal')?.remove();
@@ -359,7 +360,7 @@ function renderBlocLive(container, validations, config, classe) {
         window.deleteValidationBloc = async function(key) {
             if (!confirm('🗑️ Supprimer cette validation ?')) return;
             const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-            const validationsPath = `etablissements/0680013V/profs/${profCode}/${classe}/bloccontest/validations`;
+            const validationsPath = `${getEtab()}/profs/${profCode}/${classe}/bloccontest/validations`;
             try {
                 await remove(ref(db, `${validationsPath}/${key}`));
                 document.getElementById('fiche-bloc-modal')?.remove();

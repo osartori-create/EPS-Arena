@@ -1,6 +1,7 @@
 // src/js/modules/arcathlon/arcathlon-kiosk.js
 // Flux validé avec logs pour déboguer le bouton "Fin de tir"
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
 // --------------------------------------------------------------
@@ -75,7 +76,7 @@ export function initArcathlonKiosk(classe, code) {
     state.seriesTerminees = 0;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/arcathlon/config`);
 
     if (configListener) configListener();
     configListener = onValue(configRef, (snap) => {
@@ -107,7 +108,7 @@ export function initArcathlonKiosk(classe, code) {
     });
 
     if (state.mode === 'poursuite') {
-        const departRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/arcathlon/commandes/depart`);
+        const departRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/arcathlon/commandes/depart`);
         if (departListener) departListener();
         departListener = onValue(departRef, (snap) => {
             const data = snap.val();
@@ -619,7 +620,7 @@ function savePassage(isFinale) {
     state.seriesTerminees++;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/arcathlon/passages/${state.mode}`;
+    const path = `${getEtab()}/profs/${profCode}/${state.classe}/arcathlon/passages/${state.mode}`;
     push(ref(db, path), passageData)
         .then(() => {
             if (isFinale) {

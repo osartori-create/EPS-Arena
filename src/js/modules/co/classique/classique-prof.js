@@ -1,6 +1,7 @@
 // src/js/modules/co/classique/classique-prof.js
 // Module professeur pour le CO classique
 
+import { getEtab } from '../../../core/firebase-service.js';
 import {
     initCOInterface,
     populateReserveWithStudents,
@@ -62,7 +63,7 @@ export async function transmettre(classe) {
     if (!activeClasse) return alert("Sélectionnez une classe.");
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    const baseProf = `${getEtab()}/profs/${profCode}`;
     
     const configData = JSON.parse(localStorage.getItem(`eps_arena_co_assignments_${activeClasse}`) || '{}');
     configData.activite = 'co';

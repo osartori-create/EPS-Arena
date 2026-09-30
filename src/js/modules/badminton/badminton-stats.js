@@ -1,4 +1,5 @@
 // src/js/modules/badminton/badminton-stats.js
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, update } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
@@ -49,7 +50,7 @@ export async function openBadmintonPlayerStats(player, terrain, classe) {
 
     // Écouter les résultats pour cet élève
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+    const resultsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results`);
     
     onValue(resultsRef, (snap) => {
         const data = snap.val() || {};
@@ -116,7 +117,7 @@ window.saveMatchScore = function(matchId, p1, p2, player) {
 
     if (confirm(`Confirmer la modification du score (${p1} vs ${p2} : ${s1} - ${s2}) ?`)) {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const resultRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentEditClasse}/badminton/results/${matchId}`);
+        const resultRef = ref(db, `${getEtab()}/profs/${profCode}/${currentEditClasse}/badminton/results/${matchId}`);
         
         update(resultRef, { s1: s1, s2: s2 })
             .then(() => {

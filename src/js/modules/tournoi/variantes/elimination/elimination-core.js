@@ -1,4 +1,5 @@
 // src/js/modules/tournoi/variantes/elimination/elimination-core.js
+import { getEtab } from '../../../../core/firebase-service.js';
 import { getJoueurs, getCurrentClasse, updateJoueur, ajouterHistorique, getJoueursPath, getHistoriquePath } from '../../tournoi-core.js';
 import { db, ref, onValue, set } from '../../../../core/firebase-service.js';
 
@@ -42,7 +43,7 @@ export function reinitialiserTournoi() {
 
 export function initCore(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const exclusRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/exclus`);
+    const exclusRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/tournoi/exclus`);
     onValue(exclusRef, (snap) => {
         exclus = snap.val() || {};
         window.dispatchEvent(new CustomEvent('tournoi-updated'));

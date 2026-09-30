@@ -1,6 +1,7 @@
 // src/js/modules/relais/relais-live.js
 // Live prof : filtré par sousActivite
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, remove } from '../../core/firebase-service.js';
 import { getCurrentClasse, getLocalMapping } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
@@ -30,7 +31,7 @@ export function renderRelaisLive() {
     currentUnsubs = [];
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/relais`;
+    const basePath = `${getEtab()}/profs/${profCode}/${classe}/relais`;
 
     let config = null, m10 = {}, m2z = {}, vitesses = {};
     let loaded = 0;
@@ -303,7 +304,7 @@ window.supprimerRelaisEssai = async function(mesureKey, groupeIdx) {
     if (!data) return;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const sub = data.config.sousActivite === 'relais2zones' ? 'mesures-2zones' : 'mesures-10s';
-    const path = `etablissements/0680013V/profs/${profCode}/${data.classe}/relais/${sub}/${mesureKey}`;
+    const path = `${getEtab()}/profs/${profCode}/${data.classe}/relais/${sub}/${mesureKey}`;
 
     try {
         await remove(ref(db, path));

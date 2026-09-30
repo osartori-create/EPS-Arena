@@ -1,5 +1,6 @@
 // src/js/modules/tournoi/variantes/atp/atp-live.js
 // Live prof ATP : classement temps réel + ajustement manuel des points + export CSV
+import { getEtab } from '../../../../core/firebase-service.js';
 import { db, ref, onValue, set } from '../../../../core/firebase-service.js';
 import { getCurrentClasse } from '../../tournoi-core.js';
 import { getPhotoUrl } from '../../../../services/admin-service.js';
@@ -17,7 +18,7 @@ let _ajustements = {};
 
 function getATPBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/atp`;
+    return `${getEtab()}/profs/${profCode}/${classe}/tournoi/atp`;
 }
 
 function getBareme() {

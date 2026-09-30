@@ -1,6 +1,7 @@
 // src/js/modules/badminton/badminton-interface.js
 // Interface professeur : répartition des terrains + transmission Firebase
 
+import { getEtab } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 
@@ -386,7 +387,7 @@ export async function transmettreBadmintonConfig() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}`;
+    const basePath = `${getEtab()}/profs/${profCode}`;
 
     try {
         await set(ref(db, `${basePath}/${activeClasse}/config`), configData);

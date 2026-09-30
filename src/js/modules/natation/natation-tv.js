@@ -1,4 +1,5 @@
 // src/js/modules/natation/natation-tv.js
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
@@ -65,8 +66,8 @@ export function renderNatationTV() {
     if (animationId) cancelAnimationFrame(animationId);
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/temps`);
-    const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/coups`);
+    const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/natation/temps`);
+    const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/natation/coups`);
 
     let tempsData = {};
     let coupsData = {};

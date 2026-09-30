@@ -2,6 +2,7 @@
 // Génération PDF des dossards + import CSV + données bidons
 // A4 portrait · 2 dossards paysage empilés (200 × 141 mm)
 
+import { getEtab } from '../../core/firebase-service.js';
 import {
     getTousLesElevesCross, setDossardPourEleve, getProchainDossardLibre,
     getStatutsCross, getClassesParticipantes,
@@ -780,7 +781,7 @@ window.crossSimulerCrossComplet = async function() {
     ];
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/cross`;
+    const basePath = `${getEtab()}/profs/${profCode}/cross`;
 
     const { db: fdb, ref: fref, set: fset } = await import('../../core/firebase-service.js');
 

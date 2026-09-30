@@ -1,4 +1,5 @@
 // src/js/modules/tournoi/tournoi-dispatcher.js
+import { getEtab } from '../../core/firebase-service.js';
 import { getVariantConfig, getDefaultVariant } from './tournoi-registry.js';
 import { initTournoiCore, getCurrentClasse, getCurrentVariant } from './tournoi-core.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
@@ -14,7 +15,7 @@ export async function loadTournoiVariant(classe, mode) {
 
     if (!mode) {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/config`);
+        const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/tournoi/config`);
         const snap = await new Promise(resolve => onValue(configRef, resolve, { onlyOnce: true }));
         const config = snap.val() || {};
         mode = config.mode || getDefaultVariant();

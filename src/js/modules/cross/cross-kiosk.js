@@ -6,6 +6,7 @@
 //   eleve.html?mode=cross-consult&prof=XXXX
 //   eleve.html?mode=cross-clic&course=course1&prof=XXXX
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 import { COURSES_DEFAUT, getNiveauFromClasse, formatTemps, getMedaille, calculerNoteEleve } from './cross-core.js';
 
@@ -110,7 +111,7 @@ if (header) header.style.display = 'none';
 // CHARGEMENT CONFIG
 // ============================================================
 function chargerConfig() {
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
 
     // Chargement des courses
     if (unsubCourses) unsubCourses();
@@ -139,7 +140,7 @@ function chargerConfig() {
 // PODIUM
 // ============================================================
 function initPodium(container) {
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
 
     // GO
     if (unsubGo) unsubGo();
@@ -331,7 +332,7 @@ const CONSULT_LIMIT = 20;
 const DISTANCE_CONSULT_M = 2500;
 
 function initConsult(container) {
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
 
     if (unsubGo) unsubGo();
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
@@ -526,7 +527,7 @@ function demarrerChronoConsult() {
 // MODE CLASSEMENT — tous les élèves triés par temps
 // ============================================================
 function initClassement(container) {
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
 
     if (unsubGo) unsubGo();
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
@@ -773,7 +774,7 @@ function demarrerChronoClassement() {
 // MODE PAR CLASSE — classement des classes par moyenne des rangs
 // ============================================================
 function initClasse(container) {
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
 
     // On doit charger les arrivées des 4 courses
     const arriveesParCourse = {};
@@ -1031,7 +1032,7 @@ function renderClasse(arriveesParCourse) {
 // MODE CLIC — backup manuel (bouton énorme)
 // ============================================================
 function initClic(container) {
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
 
     if (unsubGo) unsubGo();
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
@@ -1115,7 +1116,7 @@ window.crossKioskClic = async () => {
     // Vibration feedback si supporté
     if (navigator.vibrate) navigator.vibrate(50);
 
-    const basePath = `etablissements/0680013V/profs/${currentProfCode}/cross`;
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
     try {
         await push(ref(db, `${basePath}/courses/${currentCourseId}/clics`), {
             timestamp: Date.now(),

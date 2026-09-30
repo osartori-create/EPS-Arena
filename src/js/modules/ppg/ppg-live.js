@@ -1,5 +1,6 @@
 // src/js/modules/ppg/ppg-live.js
 // Live prof : suivi temps réel de la séance PPG du jour
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
@@ -17,7 +18,7 @@ let currentDateAffichee = null;    // date "YYYY-MM-DD" ou null (= aujourd'hui)
 
 function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}`;
+    return `${getEtab()}/profs/${profCode}`;
 }
 function getPPGBasePath(classe) {
     return `${getProfBasePath()}/${classe}/ppg`;

@@ -1,6 +1,7 @@
 // src/js/modules/demi-fond/demifond-common.js
 // Helpers communs à tous les sous-modules 1/2 Fond
 
+import { getEtab } from '../../core/firebase-service.js';
 import { getVMAFromPalier } from '../evaluation/evaluation-utils.js';
 import { getExistingEleves } from '../../services/admin-service.js';
 
@@ -62,7 +63,7 @@ export function getConfigKey(classe, sousModule) {
 // ============================================================
 export function getBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/demi-fond`;
+    return `${getEtab()}/profs/${profCode}/${classe}/demi-fond`;
 }
 
 // ============================================================

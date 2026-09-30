@@ -1,6 +1,7 @@
 // src/js/modules/escalade/escalade-blocs-firebase.js
 // Communication Firebase pour le module Bloc Contest
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push, set, update, remove } from '../../core/firebase-service.js';
 
 // ============================================================
@@ -8,7 +9,7 @@ import { db, ref, onValue, push, set, update, remove } from '../../core/firebase
 // ============================================================
 function getBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}/${classe}/bloccontest`;
+    return `${getEtab()}/profs/${profCode}/${classe}/bloccontest`;
 }
 
 export function getConfigPath(classe) {

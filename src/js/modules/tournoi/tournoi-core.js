@@ -1,4 +1,5 @@
 // src/js/modules/tournoi/tournoi-core.js
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, set, update, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -16,7 +17,7 @@ let unsubConfig = null;
 // ============================================================
 function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}`;
+    return `${getEtab()}/profs/${profCode}`;
 }
 
 /**

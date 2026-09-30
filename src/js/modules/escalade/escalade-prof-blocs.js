@@ -2,6 +2,7 @@
 // Interface professeur Bloc Contest – partage les groupes de l’escalade classique.
 // Ajoute : hiérarchie des blocs, suivi par habiletés, export XLSX multi-feuilles.
 
+import { getEtab } from '../../core/firebase-service.js';
 import {
     listenBlocConfig,
     setBlocConfig,
@@ -476,7 +477,7 @@ export async function transmettreConfigBloc() {
     };
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    const baseProf = `${getEtab()}/profs/${profCode}`;
 
     try {
         await setBlocConfig(currentClasse, configData);

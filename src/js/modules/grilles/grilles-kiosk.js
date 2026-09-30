@@ -2,6 +2,7 @@
 // Kiosque élève : auto-évaluation anonyme (code numérique)
 // ⚠️ Aucune donnée nominative
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 import { NIVEAUX, getCouleurNiveau, getToutesGrilles } from './grilles-core.js';
 
@@ -26,7 +27,7 @@ export function initGrillesKiosk(classe) {
     if (!container) return;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/grilles/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/grilles/config`);
 
     if (configListener) configListener();
     configListener = onValue(configRef, (snap) => {
@@ -214,7 +215,7 @@ window.grillesKioskValider = function() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
+    const path = `${getEtab()}/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
 
     const data = {
         code: currentCode,

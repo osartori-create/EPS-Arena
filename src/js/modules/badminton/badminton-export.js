@@ -1,6 +1,7 @@
 // src/js/modules/badminton/badminton-export.js
 // Export Excel des matchs de badminton (multi-feuilles)
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse, getLocalMapping, getStudentsMap } from '../../core/live-engine.js';
 import { exporterVersExcel, col } from '../../services/export-service.js';
@@ -10,7 +11,7 @@ export function exporterBadmintonExcel() {
     if (!classe) return alert('Sélectionnez une classe.');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+    const resultsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results`);
 
     onValue(resultsRef, (snap) => {
         const results = snap.val() || {};

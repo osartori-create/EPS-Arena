@@ -5,6 +5,7 @@
 // - Import / export CSV des voies et des blocs.
 // - Tableau de suivi par élève / voie / secteur (noms résolus en local uniquement).
 
+import { getEtab } from '../../core/firebase-service.js';
 import {
     listenSuiviConfig,
     getSuiviConfigSnapshot,
@@ -799,7 +800,7 @@ window.suiviTransmettre = async function() {
     if (!currentClasse) return alert('Sélectionne une classe.');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    const baseProf = `${getEtab()}/profs/${profCode}`;
 
     let snapshot = await getSuiviConfigSnapshot(currentClasse);
     snapshot = snapshot || {};

@@ -1,4 +1,5 @@
 // src/js/modules/natation/natation-kiosk.js
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, set } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -170,7 +171,7 @@ export function initNatationKiosk(classe) {
     if (btnQuit) btnQuit.style.display = 'none';
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/natation/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/natation/config`);
     if (configListener) configListener();
     configListener = onValue(configRef, (snap) => {
         config = snap.val() || {};
@@ -213,7 +214,7 @@ function afficherListeNumeros(container) {
     for (let i = 1; i <= nbEleves; i++) nums.push(i);
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps`);
+    const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps`);
     let tempsData = {};
     onValue(tempsRef, (snap) => {
         tempsData = snap.val() || {};
@@ -517,7 +518,7 @@ function afficherFeedback(container, tempsMs, nbCoups) {
 // ============================================================
 function chargerHistoriqueEleve(numero, callback) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
+    const historiqueRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
     
     onValue(historiqueRef, (snap) => {
         const data = snap.val() || [];
@@ -581,7 +582,7 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         timestamp: Date.now()
     };
 
-    const historiqueRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
+    const historiqueRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/historique/${numero}`);
     
     onValue(historiqueRef, (snap) => {
         let historique = snap.val() || [];
@@ -596,8 +597,8 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         if (historique.length > 10) historique.shift();
         
         set(historiqueRef, historique).then(() => {
-            const tempsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
-            const coupsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
+            const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);
+            const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups/${numero}`);
             
             return Promise.all([
                 set(tempsRef, tempsMs),

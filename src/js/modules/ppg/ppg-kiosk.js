@@ -1,5 +1,6 @@
 // src/js/modules/ppg/ppg-kiosk.js
 // Kiosk élève PPG : saisie des performances par atelier
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, set, push } from '../../core/firebase-service.js';
 import { fusionnerBibliotheque, getAtelierById } from './ppg-core.js';
 
@@ -36,7 +37,7 @@ export function initPPGKiosk(classe) {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/ppg`;
+    const basePath = `${getEtab()}/profs/${profCode}/${classe}/ppg`;
     const today = new Date().toISOString().split('T')[0];
 
     // Cleanup
@@ -386,7 +387,7 @@ window.ppgKValider = async function() {
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const today = new Date().toISOString().split('T')[0];
-    const obsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/ppg/observations/${today}/${currentCode}`);
+    const obsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/ppg/observations/${today}/${currentCode}`);
 
     try {
         await set(obsRef, payload);

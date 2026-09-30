@@ -1,5 +1,6 @@
 // src/js/ui/prof/activities.js
 // ─── Modules CO ─────────────────────────────────────────────
+import { getEtab } from '../../core/firebase-service.js';
 import { populateReserveWithStudents, exportCOConfig, importCOConfig } from '../../modules/co/co-interface.js';
 import { renderCircuits, getCircuits, addCircuit as addCircuitCO, editCircuit as editCircuitCO, delCircuit } from '../../modules/co/circuit-manager.js';
 
@@ -61,7 +62,7 @@ function isLightColor(hex) {
 
 function getBaseProf() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    return `etablissements/0680013V/profs/${profCode}`;
+    return `${getEtab()}/profs/${profCode}`;
 }
 
 // ============================================================
@@ -505,7 +506,7 @@ window.switchDiscipline = async function(disc) {
     const classe = document.getElementById('selectClasse').value;
     if (!classe) return Promise.resolve();
 
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/tournoi/config`);
     return new Promise(resolve => {
         onValue(configRef, snap => {
             const cfg = snap.val() || {};
@@ -562,7 +563,7 @@ window.switchDiscipline = async function(disc) {
     const classe = document.getElementById('selectClasse').value;
     if (!classe) return Promise.resolve();
 
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/tournoi/config`);
     return new Promise(resolve => {
         onValue(configRef, snap => {
             const cfg = snap.val() || {};
@@ -718,7 +719,7 @@ window.switchDiscipline = async function(disc) {
     // ============================================================
     window.openPurgeModal = function() {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const basePath = `etablissements/0680013V/profs/${profCode}`;
+        const basePath = `${getEtab()}/profs/${profCode}`;
 
         const overlay = document.createElement('div');
         overlay.id = 'purge-modal-overlay';

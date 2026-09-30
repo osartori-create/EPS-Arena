@@ -2,6 +2,7 @@
 // Kiosk OrientShow – version élève
 // ✅ Anti-triche par code (cooldown individuel) et retour automatique après 3 secondes
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -41,7 +42,7 @@ export function initOrientShowKiosk(classe, code, config) {
         configListener = null;
     }
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/orientshow/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/orientshow/config`);
     configListener = onValue(configRef, (snap) => {
         const data = snap.val() || {};
         matrix = data.matrix || {};
@@ -96,7 +97,7 @@ function chargerSessions() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/orientshow/passages`;
+    const path = `${getEtab()}/profs/${profCode}/${currentClasse}/orientshow/passages`;
     const sessionsRef = ref(db, path);
     sessionsListener = onValue(sessionsRef, (snap) => {
         const data = snap.val() || {};
@@ -306,7 +307,7 @@ function validerCircuit() {
     else playTone(150, 0.4, 'sawtooth');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const passagesRef = ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/orientshow/passages`);
+    const passagesRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/orientshow/passages`);
 
     const passageData = {
         code: currentCode,

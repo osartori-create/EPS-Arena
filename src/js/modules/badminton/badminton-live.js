@@ -1,6 +1,7 @@
 // src/js/modules/badminton/badminton-live.js
 // Live Badminton : mode-aware
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse, getStudentsMap } from '../../core/live-engine.js';
@@ -21,7 +22,7 @@ export function renderBadmintonLive() {
 
     currentClasse = classe;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/config`);
+    const configRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/config`);
 
     if (currentUnsub) { currentUnsub(); currentUnsub = null; }
 
@@ -43,7 +44,7 @@ function renderBadmintonLiveContent(mode, terrainType) {
     const mapping = getLocalMapping(classe) || {};
     const studentsMap = getStudentsMap(classe) || {};
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const resultsRef = ref(db, `etablissements/0680013V/profs/${profCode}/${classe}/badminton/results`);
+    const resultsRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/badminton/results`);
 
     function getEleveFromCode(terrain, lettre) {
         const key = `${classe}_${terrain}_${lettre}`;

@@ -1,6 +1,7 @@
 // src/js/modules/cross/cross-results.js
 // Onglet Résultats : tableau complet, modifications prof, export Excel
 
+import { getEtab } from '../../core/firebase-service.js';
 import { COURSES_DEFAUT, getNiveauFromClasse, formatTemps, calculerNoteEleve } from './cross-core.js';
 import { getTousLesElevesCross, KEYS } from './cross-config.js';
 import {
@@ -69,7 +70,7 @@ function attacherListeners() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/cross`;
+    const basePath = `${getEtab()}/profs/${profCode}/cross`;
 
     unsubArrivees = onValue(ref(db, `${basePath}/courses/${currentCourseId}/arrivees`), snap => {
         arrivees = snap.val() || {};
@@ -542,7 +543,7 @@ window.crossResultsResetModifs = async function() {
     if (!confirm('✅ Dernière confirmation ?')) return;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/cross/courses/${currentCourseId}/modifications`;
+    const path = `${getEtab()}/profs/${profCode}/cross/courses/${currentCourseId}/modifications`;
     const { db, ref, remove } = await import('../../core/firebase-service.js');
     await remove(ref(db, path));
     alert('✅ Modifications supprimées.');
@@ -560,7 +561,7 @@ async function lireFirebase(path) {
 
 async function chargerDonneesCourse(courseId) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/cross/courses/${courseId}`;
+    const basePath = `${getEtab()}/profs/${profCode}/cross/courses/${courseId}`;
 
     const [go, arr, modifs] = await Promise.all([
         lireFirebase(`${basePath}/go`),

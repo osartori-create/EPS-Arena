@@ -2,6 +2,7 @@
 // Kiosque élève : menu + saisie vitesses + relais 10s OU relais 2 zones
 // ⚠️ RGPD : aucune donnée nominative.
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push, set } from '../../core/firebase-service.js';
 import {
     zoneToVitesse, calculerVTheorique, calculerScore, getScoreCouleur, getScoreLabel,
@@ -51,7 +52,7 @@ export function initRelaisKiosk(classe, code) {
     container.classList.remove('hidden');
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/relais`;
+    const basePath = `${getEtab()}/profs/${profCode}/${classe}/relais`;
 
     // ---------- CONFIG ----------
     if (configListener) configListener();
@@ -632,7 +633,7 @@ async function finaliserChrono2Zones() {
     };
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/relais/mesures-2zones`;
+    const path = `${getEtab()}/profs/${profCode}/${state.classe}/relais/mesures-2zones`;
 
     try {
         await push(ref(db, path), mesure);
@@ -828,7 +829,7 @@ window.relaisKioskValiderVitesses = async function() {
     if (!code || !v.arret || !v.lance) return;
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/relais/vitesses/${code}`;
+    const path = `${getEtab()}/profs/${profCode}/${state.classe}/relais/vitesses/${code}`;
 
     try {
         await set(ref(db, path), { arret: v.arret, lance: v.lance, timestamp: Date.now() });
@@ -915,7 +916,7 @@ window.relaisKioskValiderZone = async function() {
     };
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${state.classe}/relais/mesures-10s`;
+    const path = `${getEtab()}/profs/${profCode}/${state.classe}/relais/mesures-10s`;
 
     try {
         await push(ref(db, path), mesure);

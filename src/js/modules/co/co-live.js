@@ -2,6 +2,7 @@
 // Affichage en direct des résultats des élèves pour la CO classique
 // Les cartes sont cliquables pour ouvrir la modale de correction
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
@@ -38,7 +39,7 @@ export function renderCOLive() {
             }
 
             const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-            const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/co/passages`;
+            const basePath = `${getEtab()}/profs/${profCode}/${currentClasse}/co/passages`;
             const passagesRef = ref(db, basePath);
 
             if (currentUnsub) {

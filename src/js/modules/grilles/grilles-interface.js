@@ -1,6 +1,7 @@
 // src/js/modules/grilles/grilles-interface.js
 // UI Prof : bibliothèque + passation + export + auto-évaluations reçues
 
+import { getEtab } from '../../core/firebase-service.js';
 import {
     getToutesGrilles, getGrille, sauvegarderGrille, supprimerGrille, figerGrille,
     calculerNoteFinale, getEvaluationsClasse, sauvegarderEvaluation,
@@ -408,9 +409,9 @@ async function chargerDonneesAutoGenerique(eleves) {
     
     let configPath;
     if (activite === 'escalade' || cheminActivite === null) {
-        configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`;
+        configPath = `${getEtab()}/profs/${profCode}/${currentClasse}/config`;
     } else {
-        configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/${cheminActivite}/config`;
+        configPath = `${getEtab()}/profs/${profCode}/${currentClasse}/${cheminActivite}/config`;
     }
 
     const configSnap = await new Promise((resolve) => {
@@ -804,7 +805,7 @@ window.grillesRenommer = function(id) {
 window.grillesActiver = async function() {
     if (!currentGrille) return;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
+    const path = `${getEtab()}/profs/${profCode}/${currentClasse}/grilles/config`;
 
     try {
         const { set } = await import('../../core/firebase-service.js');
@@ -814,7 +815,7 @@ window.grillesActiver = async function() {
             periode: currentPeriode,
             timestamp: Date.now()
         });
-        await set(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/config`), {
+        await set(ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/config`), {
             activite: 'grilles'
         });
         alert(`✅ Auto-évaluation activée pour les iPads.\nGrille : ${currentGrille.titre}\nPériode : ${currentPeriode}`);
@@ -827,7 +828,7 @@ window.grillesActiver = async function() {
 window.grillesDesactiver = async function() {
     if (!currentClasse) return;
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/config`;
+    const path = `${getEtab()}/profs/${profCode}/${currentClasse}/grilles/config`;
 
     try {
         const { set } = await import('../../core/firebase-service.js');
@@ -885,7 +886,7 @@ async function genererDonneesTestRelais(eleves) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const { push } = await import('../../core/firebase-service.js');
 
-    const configPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/config`;
+    const configPath = `${getEtab()}/profs/${profCode}/${currentClasse}/relais/config`;
     const configSnap = await new Promise(resolve => {
         onValue(ref(db, configPath), resolve, { onlyOnce: true });
     });
@@ -895,8 +896,8 @@ async function genererDonneesTestRelais(eleves) {
         return;
     }
 
-    const mesures10sPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
-    const mesures2zPath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
+    const mesures10sPath = `${getEtab()}/profs/${profCode}/${currentClasse}/relais/mesures-10s`;
+    const mesures2zPath = `${getEtab()}/profs/${profCode}/${currentClasse}/relais/mesures-2zones`;
 
     let nb10s = 0, nb2z = 0;
 
@@ -965,7 +966,7 @@ async function genererDonneesTestArcathlon(eleves) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const { push } = await import('../../core/firebase-service.js');
 
-    const basePath = `etablissements/0680013V/profs/${profCode}/${currentClasse}/arcathlon`;
+    const basePath = `${getEtab()}/profs/${profCode}/${currentClasse}/arcathlon`;
     const equipes = JSON.parse(localStorage.getItem(`arcathlon_equipes_${currentClasse}`) || '[]');
     if (equipes.length === 0) {
         alert('⚠️ Aucune équipe Arcathlon configurée.\nGénère d\'abord les équipes dans Activités → Arcathlon.');
@@ -1034,7 +1035,7 @@ async function genererDonneesTestEscalade(eleves) {
                 const hauteur = hauteurs[Math.floor(Math.random() * hauteurs.length)];
                 const cotation = cotations[Math.floor(Math.random() * cotations.length)];
 
-                push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/escalade/montees`), {
+                push(ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/escalade/montees`), {
                     groupe: lettre,
                     role,
                     voie_num: 1 + Math.floor(Math.random() * 10),
@@ -1076,7 +1077,7 @@ async function genererDonneesTestBadminton(eleves) {
                 const avec2 = s2 >= 8;
                 const winner = s1 > s2 ? 'p1' : 'p2';
 
-                await push(ref(db, `etablissements/0680013V/profs/${profCode}/${currentClasse}/badminton/results`), {
+                await push(ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/badminton/results`), {
                     terrain: parseInt(terrain),
                     p1: lettres[i],
                     p2: lettres[j],
@@ -1107,7 +1108,7 @@ window.grillesVoirAutoEvals = function() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const path = `etablissements/0680013V/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
+    const path = `${getEtab()}/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
 
     const overlay = document.createElement('div');
     overlay.id = 'auto-evals-modal';

@@ -1,6 +1,7 @@
 // src/js/modules/co/orientshow/orientshow-prof.js
 // Module professeur pour OrientShow (sous-module CO)
 
+import { getEtab } from '../../../core/firebase-service.js';
 import {
     initOrientShowInterface,
     loadOrientShowAssignments,
@@ -59,7 +60,7 @@ export async function transmettre(classe) {
     if (!activeClasse) return alert("Sélectionnez une classe.");
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    const baseProf = `${getEtab()}/profs/${profCode}`;
     
     const matrix = JSON.parse(localStorage.getItem('eps_arena_os_matrix') || '{}');
     const startTimeStr = localStorage.getItem('eps_arena_os_startTime');

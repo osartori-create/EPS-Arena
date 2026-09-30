@@ -2,6 +2,7 @@
 // Connecteur : remplit automatiquement les critères "auto" de la grille Relais C4
 // Lit les mesures du module Relais (mesures-10s et mesures-2zones)
 
+import { getEtab } from '../../../core/firebase-service.js';
 import { db, ref, onValue } from '../../../core/firebase-service.js';
 import { getLocalMapping } from '../../../core/live-engine.js';
 
@@ -20,7 +21,7 @@ export function calculerNiveauxRelais(classe, eleveId, config) {
         }
 
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-        const basePath = `etablissements/0680013V/profs/${profCode}/${classe}/relais`;
+        const basePath = `${getEtab()}/profs/${profCode}/${classe}/relais`;
 
         let mesures10s = {};
         let mesures2z = {};

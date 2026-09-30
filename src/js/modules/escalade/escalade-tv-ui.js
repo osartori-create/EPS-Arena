@@ -1,5 +1,6 @@
 // src/js/modules/escalade/escalade-tv-ui.js
 // TV Escalade : photos individuelles des élèves + défilement latéral.
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
@@ -48,9 +49,9 @@ export async function renderEscaladeTV() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const monteesPath = `etablissements/0680013V/profs/${profCode}/${classe}/escalade/montees`;
-    const validationsPath = `etablissements/0680013V/profs/${profCode}/${classe}/bloccontest/validations`;
-    const configPath = `etablissements/0680013V/profs/${profCode}/${classe}/bloccontest/config`;
+    const monteesPath = `${getEtab()}/profs/${profCode}/${classe}/escalade/montees`;
+    const validationsPath = `${getEtab()}/profs/${profCode}/${classe}/bloccontest/validations`;
+    const configPath = `${getEtab()}/profs/${profCode}/${classe}/bloccontest/config`;
 
     container.innerHTML = '<p style="text-align:center; color: #64748b; margin-top: 50px;">En attente des performances...</p>';
 

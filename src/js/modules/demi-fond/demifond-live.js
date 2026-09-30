@@ -1,6 +1,7 @@
 // src/js/modules/demi-fond/demifond-live.js
 // Dispatch vers le sous-module actif
 
+import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
 import { getExistingEleves } from '../../services/admin-service.js';
@@ -22,7 +23,7 @@ export function renderDemiFondLive() {
     }
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const configPath = `etablissements/0680013V/profs/${profCode}/${classe}/demi-fond/config`;
+    const configPath = `${getEtab()}/profs/${profCode}/${classe}/demi-fond/config`;
 
     import('../../core/firebase-service.js').then(({ db, ref, onValue }) => {
         onValue(ref(db, configPath), (snap) => {

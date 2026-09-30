@@ -1,6 +1,7 @@
 // src/js/modules/multi/multi-prof.js
 // Module professeur pour les Multi-activités
 
+import { getEtab } from '../../core/firebase-service.js';
 import { generateTeams as generateClassicTeams } from '../teams/team-generator.js';
 import { getCriteresDisponibles } from '../../services/criteria-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
@@ -619,7 +620,7 @@ export async function transmettre(classe) {
     if (!activeClasse) return alert("Sélectionnez une classe.");
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
-    const baseProf = `etablissements/0680013V/profs/${profCode}`;
+    const baseProf = `${getEtab()}/profs/${profCode}`;
     
     const configData = { activite: 'multi' };
     const localMapping = {};
