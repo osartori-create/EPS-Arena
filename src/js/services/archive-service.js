@@ -196,6 +196,32 @@ export function normaliserGenerique(classe, activite, entrees) {
 }
 
 /**
+ * Aplatit un arbre de collections imbriquées (map de maps) en une liste
+ * plate d'enregistrements "feuilles".
+ *
+ * Exemple : { "2025-01-01": { "A1": { ...record } } } → [ { ...record } ]
+ * Un "record feuille" est un objet dont au moins une valeur n'est pas un objet.
+ * Les tableaux sont descendus récursivement.
+ *
+ * @param {*} entree - objet, tableau ou valeur
+ * @returns {Array<object>} liste plate d'enregistrements
+ */
+export function aplanirCollections(entree) {
+    if (Array.isArray(entree)) {
+        return entree.flatMap(aplanirCollections);
+    }
+    if (entree && typeof entree === 'object') {
+        const valeurs = Object.values(entree);
+        const estCollection = valeurs.length > 0 && valeurs.every(v => v && typeof v === 'object');
+        if (estCollection) {
+            return valeurs.flatMap(aplanirCollections);
+        }
+        return [entree];
+    }
+    return [];
+}
+
+/**
  * Calcule l'indice de nage (vitesse × distance par cycle).
  * Reprend la formule de natation-live.js (25 m, cycles = coups/2).
  */

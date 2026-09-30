@@ -34,6 +34,7 @@ import { generateTeams as generateClassicTeams } from '../../modules/teams/team-
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set, remove, onValue } from '../../core/firebase-service.js';
 import { getModule, getAllModules } from '../../modules/registry.js';
+import { normaliserGenerique, aplanirCollections, archiver } from '../../services/archive-service.js';
 
 // ─── Modules "prof" (enregistrement + side effects) ─────────
 import '../../modules/escalade/escalade-prof.js';
@@ -64,6 +65,82 @@ function getBaseProf() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     return `${getEtab()}/profs/${profCode}`;
 }
+
+// ============================================================
+// ARCHIVAGE GRIST CENTRALISÉ (par discipline)
+// ============================================================
+// Mapping discipline → chemin(s) Firebase du nœud de résultats.
+// Les données sont lues en one-shot, aplaties (aplanirCollections),
+// normalisées (normaliserGenerique) puis poussées vers Grist (ou Excel).
+const ARCHIVE_SOURCES = {
+    badminton:   (b, c) => `${b}/${c}/badminton/results`,
+    relais:      (b, c) => [`${b}/${c}/relais/mesures-10s`, `${b}/${c}/relais/mesures-2zones`],
+    'demi-fond': (b, c) => `${b}/${c}/demi-fond`,
+    ppg:         (b, c) => `${b}/${c}/ppg/observations`,
+    tournoi:     (b, c) => `${b}/${c}/tournoi/joueurs`,
+    co:          (b, c) => `${b}/${c}/co/passages`,
+    arcathlon:   (b, c) => `${b}/${c}/arcathlon/passages`,
+    cross:       (b, c) => `${b}/cross/courses`
+};
+
+const ARCHIVE_LABELS = {
+    badminton: 'Badminton',
+    relais: 'Relais',
+    'demi-fond': 'Demi-fond',
+    ppg: 'PPG',
+    tournoi: 'Tournoi',
+    co: 'Course d\'orientation',
+    arcathlon: 'Arcathlon',
+    cross: 'Cross'
+};
+
+async function lireCheminUneFois(chemin) {
+    const snap = await new Promise(resolve => onValue(ref(db, chemin), resolve, { onlyOnce: true }));
+    return snap.val() || {};
+}
+
+// Archive la discipline courante (bouton « 🗄️ Archiver Grist » du Live).
+window.archiverDisciplineCourante = async function() {
+    const disc = currentDiscipline;
+    const source = ARCHIVE_SOURCES[disc];
+    if (!source) {
+        alert(`Archivage Grist non disponible pour l'activité « ${disc} ».`);
+        return;
+    }
+
+    const classe = document.getElementById('selectClasse')?.value || '';
+    if (!classe) {
+        alert('Sélectionnez une classe.');
+        return;
+    }
+
+    const base = getBaseProf();
+    let chemins = source(base, classe);
+    if (!Array.isArray(chemins)) chemins = [chemins];
+
+    const tous = [];
+    for (const chemin of chemins) {
+        const brut = await lireCheminUneFois(chemin);
+        tous.push(...aplanirCollections(brut));
+    }
+
+    if (tous.length === 0) {
+        alert('Aucune donnée à archiver pour cette activité.');
+        return;
+    }
+
+    const lignes = normaliserGenerique(classe, disc, tous);
+    try {
+        const resultat = await archiver(ARCHIVE_LABELS[disc] || disc, classe, lignes);
+        const message = resultat.cible === 'grist'
+            ? `✅ ${resultat.nb} résultat(s) archivé(s) dans Grist.`
+            : `💾 Grist non configuré/inaccessible — export Excel local (${resultat.nb} ligne(s)) généré.`;
+        alert(message);
+    } catch (err) {
+        console.error('[archive] Erreur :', err);
+        alert('❌ Erreur lors de l\'archivage : ' + err.message);
+    }
+};
 
 // ============================================================
 // INITIALISATION PRINCIPALE
@@ -439,6 +516,15 @@ window.switchDiscipline = async function(disc) {
     }
     const container = document.getElementById('live-content');
     container.innerHTML = '<p class="text-slate-500 text-center">Chargement du Live...</p>';
+
+            // --- GESTION DU BOUTON ARCHIVER GRIST ---
+            // Affiché uniquement pour les disciplines gérées par le dispatcher central.
+            // Natation et escalade ont leurs propres boutons (dans leur Live respectif).
+            const archiverBtn = document.getElementById('btn-archiver-grist');
+            if (archiverBtn) {
+                const aUneSource = Object.prototype.hasOwnProperty.call(ARCHIVE_SOURCES, disc);
+                archiverBtn.style.display = aUneSource ? '' : 'none';
+            }
 
             // --- GESTION DES BOUTONS D'EXPORT ---
             const exportCSVBtn = document.querySelector('#viewLive .bg-indigo-600');
