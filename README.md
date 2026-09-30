@@ -1,93 +1,115 @@
-# eps-arena
+# EPS-Arena
 
+Application web d'**EPS** pour animer les séances en temps réel et consolider les résultats des élèves, conçue pour être **simplement partagée entre enseignants**.
 
+- **Temps réel pendant la séance** : un kiosk élève (tablette/iPad) envoie un clic ou une mesure, et l'affichage TV, le Live prof et les bilans se mettent à jour quasi instantanément sur tous les appareils.
+- **Archivage long terme** : les résultats consolidés (indices de nage, vitesses, classements, badges…) peuvent être exportés et archivés dans **Grist**.
+- **Zéro serveur à gérer** : l'application est 100 % frontend (JavaScript vanilla, modules ES) et s'appuie sur des services managés.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## 📦 Aperçu des activités
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+| Activité | Écriture temps réel | Export / archivage |
+|---|---|---|
+| 🏊 Natation | ✅ | ✅ Excel / Grist |
+| ⛰️ Escalade (classique, Bloc Contest, suivi) | ✅ | ✅ Excel / Grist |
+| 🏃 Demi-fond (3×5 min, enchaînement) | ✅ | ✅ Excel / Grist |
+| 🏸 Badminton | ✅ | ✅ Excel / Grist |
+| 🏆 Tournoi (ATP, élimination) | ✅ | ✅ Excel / Grist |
+| 🏁 Relais (10 s, 2 zones) | ✅ | ✅ Excel / Grist |
+| 🏋️ PPG | ✅ | ✅ Excel / Grist |
+| 🧭 Course d'orientation / OrientShow | ✅ | ✅ Excel / Grist |
+| 📊 Évaluation (VMA, sprint, force) | ✅ | Excel |
+| 🏹 Arcathlon | ✅ | ✅ Excel / Grist |
+| 🏃 Cross | ✅ | ✅ Excel / Grist |
 
-## Add your files
+---
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## 🧱 Architecture
+
+Architecture **à deux vitesses**, volontairement découplée :
+
+- **Moteur temps réel `onValue`** : Firebase Realtime Database.
+  - Chemin hiérarchique : `etablissements/<RNE>/profs/<codeProf>/<classe>/<activite>/...`
+  - Écritures kiosk `push/set/update`, lectures en direct (`onValue`) côté TV, Live prof et bilans.
+- **Service central** : `src/js/core/firebase-service.js`
+  - Point d'entrée unique du SDK Firebase.
+  - Helpers de chemins : `getEtab()`, `getProfBasePath()`, `getPath()`.
+- **Archivage** : `src/js/services/archive-service.js`
+  - Normalise les données en lignes « élève × résultat ».
+  - Pousse vers **Grist** via son API REST.
+  - Repli automatique en **export Excel local** si Grist n'est pas configuré.
 
 ```
-cd existing_repo
-git remote add origin https://forge.apps.education.fr/sartoriolivier/eps-arena.git
-git branch -M main
-git push -uf origin main
+EPS-Arena/
+├── maitre.html                 → Interface professeur
+├── eleve.html                  → Kiosk élève
+├── src/js/
+│   ├── config/                 → firebase-config.js (RNE dynamique)
+│   ├── core/                   → firebase-service.js, live-engine.js
+│   ├── services/               → archive-service.js, export-service.js…
+│   └── modules/                → un dossier par activité
+└── libs/                       → dépendances locales (xlsx)
 ```
 
-## Integrate with your tools
+---
 
-* [Set up project integrations](https://forge.apps.education.fr/sartoriolivier/eps-arena/-/settings/integrations)
+## 🚀 Démarrage rapide
 
-## Collaborate with your team
+### 1. Ouvrir l'application
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+- **Professeur** : `maitre.html`
+- **Élève** : `eleve.html`
 
-## Test and Deploy
+### 2. Au premier lancement
 
-Use the built-in continuous integration in GitLab.
+L'application demande le **code RNE** de l'établissement (isolé en `localStorage`), puis le **code prof** habituel.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### 3. Configuration de ton établissement (optionnel)
 
-***
+Par défaut, l'app pointe vers la base Firebase de démonstration. Pour utiliser **ton** projet :
 
-# Editing this README
+1. Copie `src/js/config/config.local.example.js` en `src/js/config/config.local.js` (ce fichier est ignoré par Git) ;
+2. Renseigne ton `rne` et ton `firebaseDatabaseURL`.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+> ⚠️ `config.local.js` contient des informations propres à ton établissement : **ne le versionne jamais**.
 
-## Suggestions for a good README
+---
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+## 🗄️ Archivage vers Grist
 
-## Name
-Choose a self-explaining name for your project.
+1. En fin de séance, dans l'onglet **Live**, clique sur **« 🗄️ Archiver Grist »**.
+2. À la première utilisation, une fenêtre te demande l'identifiant du **document Grist**, la **table** et ton **jeton d'accès**.
+3. Ces informations restent dans le navigateur (`localStorage`), **jamais dans le code**.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Sans configuration Grist, l'export retombe automatiquement en **fichier Excel**.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+> 🔐 Le jeton Grist saisi est stocké **côté navigateur** uniquement. Pour un usage partagé renforcé, il est prévu de passer par **n8n** comme proxy de secret (voir feuille de route).
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+---
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## 🛠️ Aspects techniques
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+- **Frontend uniquement** : HTML/CSS/JS, modules ES, aucune étape de build.
+- **Firebase Realtime Database** : temps réel `onValue` (kiosk → TV → Live prof → bilans).
+- **Grist** : archivage long terme par API REST (`POST /docs/{docId}/tables/{tableId}/records`).
+- **Exports** : CSV iDoceo et Excel (via SheetJS) définis dans `export-service.js`.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+---
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+## 📚 Feuille de route
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+- ✅ Dématérialisation du RNE (`getEtab()`) — l'app est réutilisable par établissement.
+- ✅ Centralisation des imports Firebase dans `firebase-service.js`.
+- ✅ Couche `archive-service.js` + archivage natation (pilote).
+- ✅ Archivage généralisé aux autres activités.
+- ✅ Saisie du RNE au premier lancement.
+- ⏳ **n8n** en proxy de secret pour l'archivage Grist (sécurité renforcée).
+- ⏳ Supabase Realtime (si besoin de full open-source/self-hostable).
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+---
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## 🧑‍🏫 Licence & partage
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Le code est hébergé sur **Forge** (forge.apps.education.fr) pour la communauté enseignante. Les données élèves (noms, photos) restent en local sur les appareils (IndexedDB) — aucun envoi de données personnelles hors de l'établissement.
