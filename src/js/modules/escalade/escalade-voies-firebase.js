@@ -12,7 +12,7 @@
 //   4. La configuration (secteurs, voies) est une donnée NON personnelle.
 //   5. La photo du mur n'est autorisée que si AUCUN élève n'y est identifiable.
 
-import { db, ref, onValue, push, set, update } from '../../core/firebase-service.js';
+import { db, ref, onValue, push, set, update, remove } from '../../core/firebase-service.js';
 import { construireSecteursDefaut } from './escalade-voies-config.js';
 
 // ============================================================
@@ -98,4 +98,28 @@ export function addMontee(classe, monteeData) {
 // ============================================================
 export function filtrerMonteesParCode(montees, code) {
     return Object.values(montees || {}).filter(m => m.code === code);
+}
+
+// ============================================================
+// MODIFICATION / SUPPRESSION D'UNE MONTÉE (par sa clé push)
+// ============================================================
+const CLES_MONTEE_AUTORISEES = [
+    'code', 'voieId', 'secteur', 'couleur', 'cotation',
+    'reussie', 'maitrise', 'ressenti', 'hauteur', 'timestamp'
+];
+
+function sanitizeMontee(source) {
+    const out = {};
+    CLES_MONTEE_AUTORISEES.forEach(k => {
+        if (source && source[k] !== undefined) out[k] = source[k];
+    });
+    return out;
+}
+
+export function deleteMontee(classe, key) {
+    return remove(ref(db, `${getMonteesPath(classe)}/${key}`));
+}
+
+export function updateMontee(classe, key, updates) {
+    return update(ref(db, `${getMonteesPath(classe)}/${key}`), sanitizeMontee(updates));
 }

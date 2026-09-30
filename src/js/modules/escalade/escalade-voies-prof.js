@@ -9,15 +9,18 @@ import {
     listenSuiviConfig,
     getSuiviConfigSnapshot,
     setSuiviConfig,
-    listenMontees
+    listenMontees,
+    deleteMontee,
+    updateMontee
 } from './escalade-voies-firebase.js';
-import { calculerStatsEleve, agregerParVoie } from './escalade-voies-core.js';
+import { calculerStatsEleve, agregerParVoie, courbeProgression } from './escalade-voies-core.js';
 import {
     COULEURS_BASE,
     COULEUR_LABELS,
-    construireSecteursDefaut
+    construireSecteursDefaut,
+    MAITRISE_LABELS
 } from './escalade-voies-config.js';
-import { getExistingEleves } from '../../services/admin-service.js';
+import { getExistingEleves, getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
 
 let currentClasse = '';
@@ -676,7 +679,7 @@ function afficherVueSuivi() {
         }).join('');
 
         return `
-            <tr class="border-t border-slate-800 hover:bg-slate-800/50">
+            <tr class="border-t border-slate-800 hover:bg-slate-800/50 cursor-pointer" onclick="window.suiviOuvrirBilanEleve('${code}')" title="Voir le bilan élève">
                 <td class="p-2 sticky left-0 bg-slate-900 font-bold text-white whitespace-nowrap">${nomAffiche}</td>
                 <td class="p-2 text-center text-xs text-slate-400 sticky left-0 bg-slate-900">#${code}</td>
                 <td class="p-2 text-center font-black text-white">${stats.total}</td>
@@ -813,6 +816,239 @@ window.suiviTransmettre = async function() {
     } catch (err) {
         console.error(err);
         alert('❌ Erreur de transmission : ' + err.message);
+    }
+};
+
+// ============================================================
+// BILAN ÉLÈVE (super bilan) + modification / suppression montées
+// ============================================================
+function libelleVoieMontee(m) {
+    if (!m) return '—';
+    if (m.voieId && config.voies[m.voieId]) {
+        const v = config.voies[m.voieId];
+        return `S${v.secteur} · ${v.label || ''} · ${v.cotation || ''}`;
+    }
+    const s = m.secteur ? `S${m.secteur}` : '';
+    const c = m.couleur ? couleurLabelProf(m.couleur) : '';
+    const cot = m.cotation || '';
+    return [s, c, cot].filter(Boolean).join(' · ') || 'Montée';
+}
+
+function dateHeure(timestamp) {
+    if (!timestamp) return '—';
+    const d = new Date(timestamp);
+    return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function estAujourdhui(timestamp) {
+    if (!timestamp) return false;
+    const d = new Date(timestamp);
+    const now = new Date();
+    return d.toDateString() === now.toDateString();
+}
+
+window.suiviOuvrirBilanEleve = async function(code) {
+    const eleves = getExistingEleves(currentClasse);
+    const eleve = eleves.find(e => String(e.codeAutoEval) === String(code));
+    const nom = eleve ? `${eleve.prenom} ${eleve.nom}` : `#${code}`;
+
+    const mesMontees = Object.entries(montees)
+        .filter(([, m]) => String(m.code) === String(code))
+        .sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+    const stats = calculerStatsEleve(mesMontees.map(([, m]) => m));
+    const progression = courbeProgression(mesMontees.map(([, m]) => m));
+
+    // Photo (résolution locale uniquement)
+    let photoUrl = null;
+    if (eleve) {
+        try { photoUrl = await getPhotoUrl(eleve.id); } catch (e) {}
+    }
+    const photoHtml = photoUrl
+        ? `<img src="${photoUrl}" class="w-20 h-20 rounded-full object-cover border-2 border-slate-500">`
+        : `<div class="w-20 h-20 rounded-full bg-slate-700 flex items-center justify-center text-3xl">👤</div>`;
+
+    // Badges
+    let badgesHtml = '<div class="flex flex-wrap gap-2">';
+    if (stats.badges && stats.badges.length > 0) {
+        stats.badges.forEach(b => {
+            badgesHtml += `<span class="inline-flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-lg text-[11px] font-black text-white border border-slate-600">${b.emoji} ${b.titre}</span>`;
+        });
+    } else {
+        badgesHtml += '<span class="text-xs text-slate-500 italic">Aucun badge pour l\'instant.</span>';
+    }
+    badgesHtml += '</div>';
+
+    // Travail du jour
+    const duJour = mesMontees.filter(([, m]) => estAujourdhui(m.timestamp));
+    const nbDuJour = duJour.length;
+    const reussiesDuJour = duJour.filter(([, m]) => m.reussie).length;
+
+    // Progression (évolution de cotation max réussie)
+    let progressionHtml = '';
+    if (progression.length > 0) {
+        progressionHtml = progression.map(p =>
+            `<span class="inline-block bg-slate-800 px-2 py-0.5 rounded text-[10px] font-black text-yellow-400 mr-1">${p.cotation}</span>`
+        ).join('<span class="text-slate-600">→</span> ');
+    } else {
+        progressionHtml = '<span class="text-xs text-slate-500 italic">Aucune voie réussie.</span>';
+    }
+
+    // Liste des montées avec boutons modifier / supprimer
+    let monteesHtml = '';
+    if (mesMontees.length === 0) {
+        monteesHtml = '<p class="text-xs text-slate-500 italic">Aucune montée enregistrée.</p>';
+    } else {
+        monteesHtml = '<div class="space-y-2 max-h-64 overflow-y-auto">';
+        mesMontees.forEach(([key, m]) => {
+            const voie = libelleVoieMontee(m);
+            monteesHtml += `
+                <div class="bg-slate-900 p-2 rounded-lg border border-slate-700 flex items-center gap-2">
+                    <span class="text-lg">${m.reussie ? '✅' : '❌'}</span>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-xs font-bold text-white truncate">${voie}</div>
+                        <div class="text-[10px] text-slate-400">${dateHeure(m.timestamp)} · ${m.reussie ? 'Réussie' : (m.hauteur ? 'Hauteur ' + m.hauteur + 'm' : 'Échec')}${m.maitrise ? ' · ' + (MAITRISE_LABELS[m.maitrise] || m.maitrise) : ''}</div>
+                    </div>
+                    <button onclick="window.suiviModifierMontee('${key}')" class="bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white px-2 py-1 rounded text-[10px] font-black">✏️</button>
+                    <button onclick="window.suiviSupprimerMontee('${key}')" class="bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white px-2 py-1 rounded text-[10px] font-black">🗑️</button>
+                </div>
+            `;
+        });
+        monteesHtml += '</div>';
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'suivi-bilan-modal';
+    modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50';
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center gap-4 mb-4">
+                ${photoHtml}
+                <div>
+                    <h3 class="text-2xl font-black text-white">${nom}</h3>
+                    <p class="text-xs text-slate-400">Code #${code}</p>
+                </div>
+                <button onclick="window.suiviFermerBilan()" class="ml-auto bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">✕ Fermer</button>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">Montées</div><div class="text-2xl font-black text-white">${stats.total}</div></div>
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">Réussites</div><div class="text-2xl font-black text-emerald-400">${stats.reussies}</div></div>
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">Taux</div><div class="text-2xl font-black text-yellow-400">${Math.round(stats.tauxReussite)}%</div></div>
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">Cotation max</div><div class="text-2xl font-black text-blue-400">${stats.cotationMax || '—'}</div></div>
+            </div>
+
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+                <h4 class="font-bold text-slate-300 uppercase text-xs mb-2">🏅 Badges</h4>
+                ${badgesHtml}
+            </div>
+
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+                <h4 class="font-bold text-slate-300 uppercase text-xs mb-2">📅 Travail du jour</h4>
+                <p class="text-sm text-white">${nbDuJour} montée(s) · <span class="text-emerald-400 font-black">${reussiesDuJour} réussie(s)</span></p>
+            </div>
+
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+                <h4 class="font-bold text-slate-300 uppercase text-xs mb-2">📈 Progression (cotation max réussie)</h4>
+                <div>${progressionHtml}</div>
+            </div>
+
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <h4 class="font-bold text-slate-300 uppercase text-xs mb-2">🧗 Réalisations (${mesMontees.length})</h4>
+                ${monteesHtml}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) window.suiviFermerBilan();
+    });
+};
+
+window.suiviFermerBilan = function() {
+    const el = document.getElementById('suivi-bilan-modal');
+    if (el) el.remove();
+};
+
+window.suiviSupprimerMontee = async function(key) {
+    const m = montees[key];
+    if (!m) return;
+    if (!confirm('🗑️ Supprimer cette montée ?')) return;
+    try {
+        await deleteMontee(currentClasse, key);
+        window.suiviFermerBilan();
+        // Ré-écoute déclenchée par Firebase → afficherInterface sera rappelé.
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur suppression : ' + err.message);
+    }
+};
+
+window.suiviModifierMontee = function(key) {
+    const m = montees[key];
+    if (!m) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'suivi-edit-montee-modal';
+    modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50';
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
+            <h3 class="text-xl font-black text-white mb-4">✏️ Modifier la montée</h3>
+            <p class="text-xs text-slate-400 mb-4">${libelleVoieMontee(m)}</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Résultat</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="suivi-edit-reussie-oui" class="py-3 rounded-xl font-black text-sm ${m.reussie ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}">✅ Réussie</button>
+                        <button id="suivi-edit-reussie-non" class="py-3 rounded-xl font-black text-sm ${!m.reussie ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300'}">❌ Échec</button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Hauteur atteinte (m)</label>
+                    <input type="number" id="suivi-edit-hauteur" value="${m.hauteur || 0}" min="0" max="9" step="1"
+                           class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-center text-xl font-black">
+                </div>
+
+                <button onclick="window.suiviSauverModifMontee('${key}')" class="w-full bg-emerald-600 py-3 rounded-xl font-black text-white text-sm active:scale-95">
+                    💾 Enregistrer
+                </button>
+                <button onclick="document.getElementById('suivi-edit-montee-modal').remove()" class="w-full bg-slate-700 py-2 rounded-xl font-black text-white text-sm active:scale-95">
+                    Annuler
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    let reussie = m.reussie === true;
+    const setBtns = () => {
+        const oui = document.getElementById('suivi-edit-reussie-oui');
+        const non = document.getElementById('suivi-edit-reussie-non');
+        oui.className = 'py-3 rounded-xl font-black text-sm ' + (reussie ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300');
+        non.className = 'py-3 rounded-xl font-black text-sm ' + (!reussie ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300');
+    };
+    modal.querySelector('#suivi-edit-reussie-oui').addEventListener('click', () => { reussie = true; setBtns(); });
+    modal.querySelector('#suivi-edit-reussie-non').addEventListener('click', () => { reussie = false; setBtns(); });
+
+    window.__suiviReussieTemp = () => reussie;
+};
+
+window.suiviSauverModifMontee = async function(key) {
+    const reussie = window.__suiviReussieTemp ? window.__suiviReussieTemp() : false;
+    const hauteurInput = document.getElementById('suivi-edit-hauteur');
+    const hauteur = hauteurInput ? parseInt(hauteurInput.value, 10) : 0;
+    const hauteurSafe = isNaN(hauteur) ? 0 : Math.max(0, Math.min(9, hauteur));
+
+    try {
+        await updateMontee(currentClasse, key, { reussie, hauteur: hauteurSafe });
+        document.getElementById('suivi-edit-montee-modal')?.remove();
+        window.suiviFermerBilan();
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur modification : ' + err.message);
     }
 };
 
