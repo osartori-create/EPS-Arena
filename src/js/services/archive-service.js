@@ -119,6 +119,83 @@ export function normaliserNatation(classe, data, elevesTries) {
 }
 
 /**
+ * Normalise les montées d'ESCALADE en lignes génériques.
+ * @param {string} classe
+ * @param {object} montees - objet { cle: { groupe, role, voie_num, couleur, cotation, hauteur, points, reussie, timestamp } }
+ * @returns {Array<object>}
+ */
+export function normaliserEscalade(classe, montees = {}) {
+    const lignes = [];
+    for (const m of Object.values(montees)) {
+        if (!m) continue;
+        lignes.push({
+            etablissement: getRNE(),
+            prof: getProfCode(),
+            classe,
+            activite: 'escalade',
+            code: m.groupe && m.role ? `${m.groupe}${m.role}` : '',
+            voie_num: m.voie_num ?? null,
+            couleur: m.couleur ?? '',
+            cotation: m.cotation ?? '',
+            hauteur: m.hauteur ?? null,
+            points: m.points ?? null,
+            reussie: m.reussie ?? (m.hauteur >= 9),
+            horodatage: new Date(m.timestamp || Date.now()).toISOString()
+        });
+    }
+    return lignes;
+}
+
+/**
+ * Normalise les validations BLOC CONTEST en lignes génériques.
+ * @param {string} classe
+ * @param {object} validations - objet { cle: { eleveId, code, blocId, valeurAuMoment, reussite, timestamp } }
+ * @returns {Array<object>}
+ */
+export function normaliserBlocContest(classe, validations = {}) {
+    const lignes = [];
+    for (const v of Object.values(validations)) {
+        if (!v) continue;
+        lignes.push({
+            etablissement: getRNE(),
+            prof: getProfCode(),
+            classe,
+            activite: 'bloccontest',
+            eleve_id: v.eleveId ?? v.code ?? null,
+            bloc_id: v.blocId ?? null,
+            valeur_pts: v.valeurAuMoment ?? null,
+            reussite: !!v.reussite,
+            horodatage: new Date(v.timestamp || Date.now()).toISOString()
+        });
+    }
+    return lignes;
+}
+
+/**
+ * Normaliseur GÉNÉRIQUE de secours : aplatit une liste d'objets en y
+ * injectant les métadonnées (établissement, prof, classe, activité).
+ * Chaque entrée conserve tous ses champs d'origine.
+ *
+ * @param {string} classe
+ * @param {string} activite - identifiant métier ('badminton', 'demi-fond', ...)
+ * @param {Array|object} entrees - liste d'objets (ou objet dont on prend les valeurs)
+ * @returns {Array<object>}
+ */
+export function normaliserGenerique(classe, activite, entrees) {
+    const liste = Array.isArray(entrees) ? entrees : Object.values(entrees || {});
+    return liste
+        .filter(e => e && typeof e === 'object')
+        .map(e => ({
+            etablissement: getRNE(),
+            prof: getProfCode(),
+            classe,
+            activite,
+            horodatage: e.horodatage || new Date((e.timestamp || Date.now())).toISOString(),
+            ...e
+        }));
+}
+
+/**
  * Calcule l'indice de nage (vitesse × distance par cycle).
  * Reprend la formule de natation-live.js (25 m, cycles = coups/2).
  */
@@ -203,14 +280,18 @@ export async function archiver(nomModule, classe, lignes) {
         }
     }
 
-    // Repli : export Excel local (réutilise les conventions existantes)
-    const feuilles = [{
-        nom: nomModule,
-        colonnes: [...colonnesIdentite(), col('Classe', 'classe'), col('Activité', 'activite'),
-                   col('Numéro', 'numero'), col('Temps (ms)', 'temps_ms'), col('Coups', 'coups'),
-                   col('Indice de nage', 'indice_nage'), col('Horodatage', 'horodatage')],
-        donnees: lignes
-    }];
+    // Repli : export Excel local.
+    // Les colonnes sont dérivées automatiquement des clés rencontrées
+    // dans les lignes (identité en tête, horodatage en fin).
+    const cles = [...new Set(lignes.flatMap(l => Object.keys(l)))];
+    const identite = cles.filter(c => c === 'nom' || c === 'prenom');
+    const corps = cles.filter(c => c !== 'nom' && c !== 'prenom' && c !== 'horodatage');
+    const colonnes = [
+        ...(identite.length ? identite.map(c => col(c === 'nom' ? 'Nom de famille' : 'Prénom', c)) : []),
+        ...corps.map(c => col(c, c)),
+        ...(cles.includes('horodatage') ? [col('Horodatage', 'horodatage')] : [])
+    ];
+    const feuilles = [{ nom: nomModule, colonnes, donnees: lignes }];
     exporterVersExcel(nomModule, classe, feuilles);
     return { cible: 'local', nb: lignes.length };
 }

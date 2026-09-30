@@ -4,10 +4,15 @@ import { db, ref, onValue, remove, update } from '../../core/firebase-service.js
 import { getNomFromCode, getPhotoHtml, getEleveIdFromCode, getCurrentClasse } from '../../core/live-engine.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { BAREME, coeffToCotation } from './escalade-calculations.js';
+import { normaliserEscalade, normaliserBlocContest, archiver } from '../../services/archive-service.js';
 
 let currentUnsub = null;
 let currentEscaladeMode = 'classic';
 let currentEscaladeClasse = '';
+
+// Données consolidées (remplies par onValue) — portée module.
+let escaladeMontees = {};
+let blocValidations = {};
 
 export function setEscaladeMode(mode) {
     currentEscaladeMode = mode;
@@ -15,6 +20,37 @@ export function setEscaladeMode(mode) {
         renderEscaladeLive();
     }
 }
+
+// Archive les montées (classique) ou validations (Bloc Contest) vers Grist,
+// avec repli en export Excel local si Grist n'est pas configuré.
+window.exporterEscaladeVersGrist = async function() {
+    const classe = currentEscaladeClasse;
+    if (!classe) {
+        alert('Sélectionnez une classe.');
+        return;
+    }
+
+    const lignes = currentEscaladeMode === 'classic'
+        ? normaliserEscalade(classe, escaladeMontees)
+        : normaliserBlocContest(classe, blocValidations);
+
+    if (lignes.length === 0) {
+        alert('Aucune donnée à archiver.');
+        return;
+    }
+
+    const nomModule = currentEscaladeMode === 'classic' ? 'Escalade' : 'Bloc Contest';
+    try {
+        const resultat = await archiver(nomModule, classe, lignes);
+        const message = resultat.cible === 'grist'
+            ? `✅ ${resultat.nb} résultat(s) archivé(s) dans Grist.`
+            : `💾 Grist non configuré/inaccessible — export Excel local (${resultat.nb} ligne(s)) généré.`;
+        alert(message);
+    } catch (err) {
+        console.error('[archive] Erreur :', err);
+        alert('❌ Erreur lors de l\'archivage : ' + err.message);
+    }
+};
 
 export function renderEscaladeLive() {
     const container = document.getElementById('live-content');
@@ -43,8 +79,8 @@ export function renderEscaladeLive() {
     if (currentEscaladeMode === 'classic') {
         const monteesRef = ref(db, monteesPath);
         currentUnsub = onValue(monteesRef, (snap) => {
-            const data = snap.val() || {};
-            renderClassicLive(container, data, classe);
+            escaladeMontees = snap.val() || {};
+            renderClassicLive(container, escaladeMontees, classe);
         });
     } else {
         // Bloc Contest
@@ -69,6 +105,7 @@ export function renderEscaladeLive() {
 
         currentUnsub = onValue(validationsRef, (snap) => {
             validations = snap.val() || {};
+            blocValidations = snap.val() || {};
             loaded++;
             checkAndRender();
         });
@@ -83,7 +120,10 @@ function renderClassicLive(container, data, classe) {
         return;
     }
 
-    let html = `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Montées Escalade (Cliquez pour le bilan)</h3><div class="space-y-2">`;
+    let html = `<div class="flex justify-between items-center mb-2">
+        <h3 class="font-black text-blue-400 uppercase text-sm">🧗 Montées Escalade (Cliquez pour le bilan)</h3>
+        <button onclick="window.exporterEscaladeVersGrist()" class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">🗄️ Archiver Grist</button>
+    </div><div class="space-y-2">`;
     
     const promises = entries.slice(0, 20).map(async m => {
         const code = `${m.groupe}${m.role}`;
@@ -271,7 +311,10 @@ function renderBlocLive(container, validations, config, classe) {
 
     const eleves = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
     
-    let html = `<h3 class="font-black text-blue-400 uppercase text-sm mb-2">🧗 Bloc Contest - Classement (cliquez pour la fiche)</h3><div class="space-y-2">`;
+    let html = `<div class="flex justify-between items-center mb-2">
+        <h3 class="font-black text-blue-400 uppercase text-sm">🧗 Bloc Contest - Classement (cliquez pour la fiche)</h3>
+        <button onclick="window.exporterEscaladeVersGrist()" class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">🗄️ Archiver Grist</button>
+    </div><div class="space-y-2">`;
     
     const sorted = Object.entries(scores)
         .sort((a, b) => b[1] - a[1])
