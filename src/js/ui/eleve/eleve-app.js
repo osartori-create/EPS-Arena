@@ -1,5 +1,5 @@
 // src/js/ui/eleve/eleve-app.js
-import { getEtab, db, ref, onValue, push } from '../../core/firebase-service.js';
+import { getEtab, db, ref, onValue, push, assurerRNE } from '../../core/firebase-service.js';
 import { getPerformancePath } from '../../core/firebase-service.js';
 import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade-calculations.js';
 import { BAREME_ESCALADE } from '../../config/constants.js';
@@ -46,6 +46,8 @@ const btnBackTerrain = document.getElementById('btn-back-terrain');
 export function initApp() {
     // ✅ DÉTECTION MODE CROSS KIOSK (URL paramétrée)
     const params = new URLSearchParams(window.location.search);
+    // ✅ Saisie du RNE au premier lancement (isolation par établissement)
+    assurerRNE();
     const mode = params.get('mode');
     if (mode && mode.startsWith('cross-')) {
         console.log('[eleve] Mode cross kiosk détecté :', mode);

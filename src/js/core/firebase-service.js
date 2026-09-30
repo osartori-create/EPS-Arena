@@ -8,14 +8,14 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
 import { getDatabase, ref, onValue, push, set, update, remove } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
-import { FIREBASE_CONFIG, getRNE, getEtabPath } from "../config/firebase-config.js";
+import { FIREBASE_CONFIG, getRNE, getEtabPath, assurerRNE } from "../config/firebase-config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
 export const db = getDatabase(app);
 export { ref, onValue, push, set, update, remove };
 
 // Ré-export des helpers de configuration (source unique du RNE).
-export { getRNE, getEtabPath };
+export { getRNE, getEtabPath, assurerRNE };
 
 // ------------------------------------------------------------------
 // HELPERS DE CHEMINS — source de vérité unique
