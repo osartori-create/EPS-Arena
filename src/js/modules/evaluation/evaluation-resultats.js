@@ -3,7 +3,7 @@
 
 import { templateTableauBord, templateFicheEleve } from './evaluation-templates.js';
 import { getElevesTous, setResultat, setStatutEleve, sauvegarderDonnees } from './evaluation-stockage.js';
-import { COULEURS_GROUPES, LIBELLES_GROUPES, FONCTIONS_GROUPE } from './evaluation-utils.js';
+import { COULEURS_GROUPES, LIBELLES_GROUPES, FONCTIONS_GROUPE, LIBELLES_TESTS } from './evaluation-utils.js';
 import { renderRadar } from './evaluation-graphiques.js';
 
 let currentData = null;
@@ -91,6 +91,7 @@ export function ouvrirFiche(eleveId) {
 
     window.evalToggleEdition = toggleEdition;
     window.evalSauvegarderFiche = sauvegarderFiche;
+    window.evalSupprimerTest = supprimerTest;
     window.evalRetourResultats = afficherResultats.bind(null, currentData);
     window.evalRetourMenu = retourMenu;
 }
@@ -131,6 +132,7 @@ function toggleEdition() {
 
     window.evalToggleEdition = toggleEdition;
     window.evalSauvegarderFiche = sauvegarderFiche;
+    window.evalSupprimerTest = supprimerTest;
     window.evalRetourResultats = afficherResultats.bind(null, currentData);
     window.evalRetourMenu = retourMenu;
 }
@@ -279,7 +281,44 @@ function sauvegarderFiche() {
         }, 200);
         window.evalToggleEdition = toggleEdition;
         window.evalSauvegarderFiche = sauvegarderFiche;
+        window.evalSupprimerTest = supprimerTest;
         window.evalRetourResultats = afficherResultats.bind(null, currentData);
         window.evalRetourMenu = retourMenu;
     }
+}
+
+// ============================================================
+// SUPPRESSION D'UNE PERFORMANCE
+// ============================================================
+function supprimerTest(testId) {
+    const eleve = currentData?.eleves?.[currentEleveId];
+    if (!eleve) return;
+
+    const libelle = LIBELLES_TESTS[testId] || testId;
+    if (!confirm(`🗑️ Supprimer la performance "${libelle}" de ${eleve.prenom} ${eleve.nom} ?`)) return;
+
+    eleve.resultats[testId] = null;
+    sauvegarderDonnees(currentData.classe, currentData);
+
+    modeEdition = false;
+    const container = document.getElementById('viewEvaluationSettings');
+    if (!container) return;
+
+    container.innerHTML = templateFicheEleve(eleve, currentData, false);
+    chargerPhoto(currentEleveId);
+
+    setTimeout(() => {
+        const radarContainer = document.getElementById('eval-radar-canvas');
+        if (radarContainer && currentData) {
+            renderRadar(radarContainer, currentData, currentEleveId);
+        }
+    }, 200);
+
+    window.evalToggleEdition = toggleEdition;
+    window.evalSauvegarderFiche = sauvegarderFiche;
+    window.evalSupprimerTest = supprimerTest;
+    window.evalRetourResultats = afficherResultats.bind(null, currentData);
+    window.evalRetourMenu = retourMenu;
+
+    alert('✅ Performance supprimée.');
 }

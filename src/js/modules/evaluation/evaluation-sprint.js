@@ -359,6 +359,7 @@ function templateColonnesSprint(colonnes, eleveSelectionneId, essaisParEleve) {
 // ============================================================
 
 function selectionnerEleve(eleveId) {
+    fermerToastSprint();
     if (chronoRunning) {
         if (!confirm('Un chrono est en cours. Arrêter et sélectionner un autre élève ?')) return;
         arreterChrono();
@@ -437,24 +438,17 @@ function arreterChrono() {
         compteur++;
     }
 
-    let message = `✅ Essai enregistré (${essaisActuels.length}/${maxEssais})`;
-    if (aFini) {
-        message += `\n🏁 ${eleveActuel?.prenom} a terminé ses 3 essais !`;
-    }
-    if (prochain) {
-        message += `\n\nPasser à ${prochain.prenom} ${prochain.nom} ?`;
-    } else {
-        message += `\n\n🎉 Tous les élèves ont terminé !`;
-    }
+    // Notification non bloquante en haut à droite (ne recouvre pas le chrono)
+    afficherToastSprint({
+        temps,
+        essaisActuels: essaisActuels.length,
+        aFini,
+        eleveActuel,
+        prochain
+    });
 
-    if (prochain && confirm(message)) {
-        selectionnerEleve(prochain.id);
-    } else if (!prochain) {
-        alert('🎉 Tous les élèves ont terminé leurs 3 essais !');
-        afficherSprint();
-    } else {
-        afficherSprint();
-    }
+    // Rafraîchit l'affichage (nouvel essai, meilleur temps, liste)
+    afficherSprint();
 }
 
 function updateChrono() {
@@ -541,6 +535,48 @@ async function chargerPhotosColonnesSprint() {
 }
 
 // ============================================================
+// TOAST DE CONFIRMATION (haut à droite, non bloquant)
+// ============================================================
+
+function fermerToastSprint() {
+    const el = document.getElementById('sprint-toast');
+    if (el) el.remove();
+}
+
+function afficherToastSprint({ temps, essaisActuels, aFini, eleveActuel, prochain }) {
+    fermerToastSprint();
+
+    const el = document.createElement('div');
+    el.id = 'sprint-toast';
+    el.className = 'fixed top-4 right-4 z-50 w-80 bg-slate-900 border-2 border-emerald-500 rounded-2xl p-4 shadow-2xl';
+
+    let suiteHtml = '';
+    if (aFini) {
+        suiteHtml += `<div class="text-[11px] text-emerald-300 font-bold mt-1">🏁 ${eleveActuel?.prenom || 'Élève'} a terminé ses 3 essais !</div>`;
+    }
+    if (prochain) {
+        suiteHtml += `
+            <button onclick="window.evalSprintPasser('${prochain.id}')"
+                    class="mt-2 w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-xl font-black text-sm text-white active:scale-95">
+                Passer à ${prochain.prenom} ${prochain.nom} →
+            </button>
+        `;
+    } else {
+        suiteHtml += `<div class="mt-2 text-[11px] text-amber-300 font-bold">🎉 Tous les élèves ont terminé !</div>`;
+    }
+
+    el.innerHTML = `
+        <div class="flex justify-between items-start gap-2">
+            <span class="font-black text-emerald-400 text-xs uppercase">✅ Essai enregistré (${essaisActuels}/${maxEssais})</span>
+            <button onclick="window.evalSprintFermerToast()" class="text-slate-400 hover:text-white text-sm font-black leading-none">✕</button>
+        </div>
+        <div class="text-4xl font-black text-white mt-1 tabular-nums">${temps.toFixed(1)}s</div>
+        ${suiteHtml}
+    `;
+    document.body.appendChild(el);
+}
+
+// ============================================================
 // FONCTIONS GLOBALES
 // ============================================================
 
@@ -548,3 +584,8 @@ window.evalSprintReset = resetChrono;
 window.evalSprintSelectionner = selectionnerEleve;
 window.evalSprintSetStatut = setStatut;
 window.evalSprintAnnulerEssai = annulerDernierEssai;
+window.evalSprintFermerToast = fermerToastSprint;
+window.evalSprintPasser = function(id) {
+    fermerToastSprint();
+    selectionnerEleve(id);
+};

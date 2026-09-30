@@ -589,13 +589,21 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                                             <span class="text-sm font-bold text-white">${libelle}</span>
                                             <span class="ml-2">${inputHtml}</span>
                                         </div>
-                                        ${r && r.groupe ? `
-                                            <span class="text-xs font-black px-2 py-1 rounded-full text-white" style="background-color: ${COULEURS_GROUPES[r.groupe]}">
-                                                ${LIBELLES_GROUPES[r.groupe]}
-                                            </span>
-                                        ` : `
-                                            <span class="text-xs font-black px-2 py-1 rounded-full bg-slate-600 text-white">Non évalué</span>
-                                        `}
+                                        <div class="flex items-center gap-2 flex-shrink-0">
+                                            ${r && r.groupe ? `
+                                                <span class="text-xs font-black px-2 py-1 rounded-full text-white" style="background-color: ${COULEURS_GROUPES[r.groupe]}">
+                                                    ${LIBELLES_GROUPES[r.groupe]}
+                                                </span>
+                                            ` : `
+                                                <span class="text-xs font-black px-2 py-1 rounded-full bg-slate-600 text-white">Non évalué</span>
+                                            `}
+                                            ${r ? `
+                                                <button onclick="window.evalSupprimerTest('${testId}')" title="Supprimer cette performance"
+                                                        class="bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white px-2 py-1 rounded-lg text-xs font-black active:scale-95 transition-colors">
+                                                    🗑️
+                                                </button>
+                                            ` : ''}
+                                        </div>
                                     </div>
                                 `;
                             }
@@ -650,9 +658,15 @@ export function templateFicheEleve(eleve, data, modeEdition = false) {
                                         <span class="text-sm text-slate-300 ml-2">${affichageValeur}</span>
                                         ${essaisHtml ? `<span class="text-xs text-slate-500 ml-2">${essaisHtml}</span>` : ''}
                                     </div>
-                                    <span class="text-xs font-black px-2 py-1 rounded-full text-white" style="background-color:${couleur}">
-                                        ${libelleGroupe}
-                                    </span>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                        <span class="text-xs font-black px-2 py-1 rounded-full text-white" style="background-color:${couleur}">
+                                            ${libelleGroupe}
+                                        </span>
+                                        <button onclick="window.evalSupprimerTest('${testId}')" title="Supprimer cette performance"
+                                                class="bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white px-2 py-1 rounded-lg text-xs font-black active:scale-95 transition-colors">
+                                            🗑️
+                                        </button>
+                                    </div>
                                 </div>
                             `;
                         }).join('')}
