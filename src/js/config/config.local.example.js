@@ -21,5 +21,17 @@ window.EPS_ARENA_CONFIG = {
   rne: '0680013V',
 
   // URL de la Realtime Database Firebase de votre projet.
-  firebaseDatabaseURL: 'https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/'
+  firebaseDatabaseURL: 'https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/',
+
+  // ────────────────────────────────────────────────────────────
+  // ARCHIVAGE GRIST (optionnel, pour l'export long terme)
+  // ⚠️ Le token est un secret : rester dans config.local.js,
+  //    ne JAMAIS le mettre dans le code ni dans config.local.example.js.
+  // ────────────────────────────────────────────────────────────
+  // grist: {
+  //   base: 'https://grist.numerique.gouv.fr/api',
+  //   docId: 'xxxxxxxx',
+  //   tableId: 'Resultats',
+  //   token: 'xxxxxxxxxxxxxxxxxxxxxxxx'
+  // }
 };

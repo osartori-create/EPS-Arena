@@ -4,11 +4,18 @@ import { db, ref, onValue, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getLocalMapping, getCurrentClasse } from '../../core/live-engine.js';
 import { getExistingEleves } from '../../services/admin-service.js';
+import { normaliserNatation, archiver } from '../../services/archive-service.js';
 
 let currentUnsubTemps = null;
 let currentUnsubCoups = null;
 let currentUnsubHistorique = null;
 let currentClasse = '';
+
+// Données consolidées (remplies par onValue) — portée module pour
+// être accessibles depuis window.exporterNatationVersGrist.
+let tempsData = {};
+let coupsData = {};
+let historiqueData = {};
 
 // ============================================================
 // BARÈME
@@ -67,6 +74,44 @@ window.exportNatationLiveCSV = function() {
     link.click();
 };
 
+// Archive les résultats consolidés (temps/coups/historique) vers Grist,
+// avec repli en export Excel local si Grist n'est pas configuré.
+window.exporterNatationVersGrist = async function() {
+    const classe = getCurrentClasse();
+    if (!classe) {
+        alert('Sélectionnez une classe.');
+        return;
+    }
+    const eleves = getExistingEleves(classe);
+    const elevesTries = [...eleves].sort((a, b) =>
+        a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom)
+    );
+
+    // Données consolidées (variables de module, remplies par onValue)
+    const data = {
+        temps: tempsData,
+        coups: coupsData,
+        historique: historiqueData
+    };
+
+    const lignes = normaliserNatation(classe, data, elevesTries);
+    if (lignes.length === 0) {
+        alert('Aucun résultat à archiver.');
+        return;
+    }
+
+    try {
+        const resultat = await archiver('Natation', classe, lignes);
+        const message = resultat.cible === 'grist'
+            ? `✅ ${resultat.nb} résultat(s) archivé(s) dans Grist.`
+            : `💾 Grist non configuré/inaccessible — export Excel local (${resultat.nb} ligne(s)) généré.`;
+        alert(message);
+    } catch (err) {
+        console.error('[archive] Erreur :', err);
+        alert('❌ Erreur lors de l\'archivage : ' + err.message);
+    }
+};
+
 // ============================================================
 // RENDU PRINCIPAL
 // ============================================================
@@ -89,9 +134,10 @@ export function renderNatationLive() {
     const coupsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/coups`);
     const historiqueRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/historique`);
 
-    let tempsData = {};
-    let coupsData = {};
-    let historiqueData = {};
+    // Réinitialise les données consolidées à chaque rendu de classe.
+    tempsData = {};
+    coupsData = {};
+    historiqueData = {};
 
     // ✅ CORRECTION : on trie la liste des élèves comme le prof pour retrouver par numéro
     const eleves = getExistingEleves(currentClasse);
@@ -163,10 +209,16 @@ export function renderNatationLive() {
         let html = `
             <div class="flex justify-between items-center mb-4">
                 <h3 class="font-black text-blue-400 uppercase text-sm">🏊 Classement Indice de nage</h3>
-                <button onclick="window.exportNatationLiveCSV()" 
-                        class="bg-indigo-600 px-3 py-1.5 rounded-xl font-black text-xs text-white border-2 border-indigo-400 active:scale-95">
-                    📥 Export CSV
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="window.exporterNatationVersGrist()" 
+                            class="bg-emerald-600 px-3 py-1.5 rounded-xl font-black text-xs text-white border-2 border-emerald-400 active:scale-95">
+                        🗄️ Archiver Grist
+                    </button>
+                    <button onclick="window.exportNatationLiveCSV()" 
+                            class="bg-indigo-600 px-3 py-1.5 rounded-xl font-black text-xs text-white border-2 border-indigo-400 active:scale-95">
+                        📥 Export CSV
+                    </button>
+                </div>
             </div>
             <div class="space-y-2 max-h-[70vh] overflow-y-auto pr-2">
         `;
