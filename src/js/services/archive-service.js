@@ -71,6 +71,82 @@ export function sauverGristConfigLocal(cfg) {
     localStorage.setItem('eps_arena_grist', JSON.stringify(cfg));
 }
 
+/**
+ * Ouvre une fenêtre de saisie de la configuration Grist, puis l'enregistre
+ * en localStorage (jamais dans le code). Retourne la config ou null si annulé.
+ *
+ * Indispensable sur GitHub Pages : config.local.js étant gitignoré,
+ * c'est cette saisie (stockée côté navigateur) qui alimente l'archivage.
+ */
+export function demanderConfigGrist() {
+    return new Promise((resolve) => {
+        const existing = getGristConfig() || {};
+
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4 overflow-y-auto';
+        overlay.innerHTML = `
+            <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-black text-white">🗄️ Configuration Grist</h3>
+                    <button id="grist-config-annuler" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">✖</button>
+                </div>
+                <p class="text-xs text-slate-400 mb-4">
+                    Renseigne une seule fois le document Grist cible. Ces informations
+                    restent dans le navigateur (localStorage), jamais dans le code.
+                </p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Base API</label>
+                        <input id="grist-config-base" value="${existing.base || DEFAULT_GRIST_BASE}"
+                               class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Identifiant du document (docId)</label>
+                        <input id="grist-config-docid" value="${existing.docId || ''}"
+                               placeholder="ex: 7a1b2c3d"
+                               class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Table (tableId)</label>
+                        <input id="grist-config-tableid" value="${existing.tableId || 'Resultats'}"
+                               class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Jeton d'accès (token)</label>
+                        <input id="grist-config-token" type="password" value="${existing.token || ''}"
+                               placeholder="colle ici ton jeton d'accès personnel"
+                               class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-sm">
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button id="grist-config-sauver" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-sm active:scale-95">💾 Enregistrer</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const fermer = () => { overlay.remove(); resolve(null); };
+        overlay.querySelector('#grist-config-annuler').onclick = fermer;
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) fermer(); });
+
+        overlay.querySelector('#grist-config-sauver').onclick = () => {
+            const cfg = {
+                base: overlay.querySelector('#grist-config-base').value.trim() || DEFAULT_GRIST_BASE,
+                docId: overlay.querySelector('#grist-config-docid').value.trim(),
+                tableId: overlay.querySelector('#grist-config-tableid').value.trim() || 'Resultats',
+                token: overlay.querySelector('#grist-config-token').value.trim()
+            };
+            if (!cfg.docId) {
+                alert('Le docId est obligatoire.');
+                return;
+            }
+            sauverGristConfigLocal(cfg);
+            overlay.remove();
+            resolve(cfg);
+        };
+    });
+}
+
 // ------------------------------------------------------------------
 // NORMALISATION — lignes « élève × résultat »
 // ------------------------------------------------------------------
@@ -295,7 +371,14 @@ export async function archiverVersGrist(lignes, cfg) {
  * @returns {Promise<{cible:'grist'|'local', nb:number}>}
  */
 export async function archiver(nomModule, classe, lignes) {
-    const cfg = getGristConfig();
+    let cfg = getGristConfig();
+
+    // Si Grist n'est pas (complètement) configuré, propose une saisie unique
+    // stockée en localStorage — fonctionne aussi sur GitHub Pages, sans
+    // versionner le token. Si l'utilisateur annule, on bascule en export local.
+    if (!cfg || !cfg.docId || !cfg.token) {
+        cfg = await demanderConfigGrist();
+    }
 
     if (cfg && cfg.docId && cfg.token) {
         try {
