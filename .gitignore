@@ -1,0 +1,32 @@
+# ============================================================
+# SECRETS / CONFIGURATION LOCALE — À NE JAMAIS VERSIONNER
+# ============================================================
+# Fichier de configuration local (URL Firebase, RNE, token Grist...)
+config.local.js
+src/js/config/config.local.js
+src/js/config/config.local.*.js
+*.local.js
+
+# Variables d'environnement
+.env
+.env.*
+!.env.example
+
+# ============================================================
+# DÉPENDANCES
+# ============================================================
+node_modules/
+
+# ============================================================
+# FICHIERS SYSTÈME
+# ============================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# BUILDS / LOGS
+# ============================================================
+dist/
+build/
+*.log
