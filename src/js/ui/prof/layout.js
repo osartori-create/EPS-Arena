@@ -1,6 +1,5 @@
 // src/js/ui/prof/layout.js
-import { db } from '../../core/firebase-service.js';
-import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+import { db, ref, onValue } from '../../core/firebase-service.js';
 import { 
     initIntervalTimer, 
     startTimer, 

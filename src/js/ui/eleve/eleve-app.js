@@ -1,7 +1,5 @@
 // src/js/ui/eleve/eleve-app.js
-import { getEtab } from '../../core/firebase-service.js';
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
-import { getDatabase, ref, onValue, push } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+import { getEtab, db, ref, onValue, push } from '../../core/firebase-service.js';
 import { getPerformancePath } from '../../core/firebase-service.js';
 import { calculateClimbingPoints, BAREME } from '../../modules/escalade/escalade-calculations.js';
 import { BAREME_ESCALADE } from '../../config/constants.js';
@@ -17,9 +15,7 @@ import { initGrillesKiosk, cleanupGrillesKiosk } from '../../modules/grilles/gri
 import { initDemiFondKiosk, cleanupDemiFondKiosk } from '../../modules/demi-fond/demifond-kiosk.js';
 import { initSuiviKiosk, cleanupSuiviKiosk } from '../../modules/escalade/escalade-voies-kiosk.js';
 
-const firebaseConfig = { databaseURL: "https://eps-arena-default-rtdb.europe-west1.firebasedatabase.app/" };
-const app = initializeApp(firebaseConfig);
-export const db = getDatabase(app);
+export { db };
 
 let selectedClass = "";
 let selectedCode = "";

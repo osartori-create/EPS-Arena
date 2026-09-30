@@ -2,8 +2,7 @@
 import { getDB, getSelectedClass, getSelectedCode, resetToLogin } from '../../ui/eleve/eleve-app.js';
 import { calculateClimbingPoints } from '../escalade/escalade-calculations.js';
 import { BAREME } from '../escalade/escalade-calculations.js';
-import { getPerformancePath } from '../../core/firebase-service.js';
-import { ref, push } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+import { getPerformancePath, ref, push } from '../../core/firebase-service.js';
 import { showFeedback } from '../../ui/eleve/eleve-actions.js';
 
 export function initEscaladeKiosk(selectedClass, selectedCode) {

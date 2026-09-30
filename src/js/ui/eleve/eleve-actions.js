@@ -1,6 +1,5 @@
 import { getDB, getSelectedClass, resetToLogin } from './eleve-app.js';
-import { getPerformancePath } from '../../core/firebase-service.js';
-import { ref, onValue } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+import { getPerformancePath, ref, onValue } from '../../core/firebase-service.js';
 
 export function showFeedback(message, delay = 5000) {
     const feedbackDiv = document.createElement('div');
