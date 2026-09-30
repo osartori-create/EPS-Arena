@@ -1,5 +1,6 @@
 // src/js/modules/tournoi/variantes/atp/atp-core.js
-// Logique ATP : barème, calcul des points, recalcul complet, tri du classement
+// Logique ATP : barème, calcul des points, recalcul complet, tri du classement,
+// série de victoires, matrice de confrontations et suggestions de matchs.
 
 export const POINTS_INITIAUX = 100;
 
@@ -23,12 +24,6 @@ export function getPoints(joueur) {
 // ============================================================
 // AJUSTEMENTS MANUELS (bonus/malus saisis par le prof dans le live)
 // ============================================================
-/**
- * Applique des ajustements manuels de points, stockés en Firebase sous
- * `tournoi/atp/ajustements/{code}` (nombre positif ou négatif).
- * @param {Object} joueursMap - résultat de recalculerTout()
- * @param {Object} ajustements - { code: delta }
- */
 export function appliquerAjustements(joueursMap, ajustements = {}) {
     Object.keys(ajustements || {}).forEach(code => {
         const j = joueursMap[String(code)];
@@ -47,7 +42,6 @@ export function getPalier(ecart, bareme = BAREME_DEFAUT) {
     for (const p of bareme) {
         if (ecart >= p.ecartMin && ecart <= p.ecartMax) return p;
     }
-    // Hors bornes : on clampe sur l'extrême
     if (ecart < bareme[0].ecartMin) return bareme[0];
     return bareme[bareme.length - 1];
 }
@@ -55,12 +49,6 @@ export function getPalier(ecart, bareme = BAREME_DEFAUT) {
 // ============================================================
 // CALCUL D'UN MATCH (points AVANT match)
 // ============================================================
-/**
- * @param {Object} joueurV - état du vainqueur AVANT match
- * @param {Object} joueurP - état du perdant AVANT match
- * @param {Array} bareme
- * @returns {Object} { ecart, ptsV, ptsP, palier }
- */
 export function calculerMatch(joueurV, joueurP, bareme = BAREME_DEFAUT) {
     const ptsVAvant = getPoints(joueurV);
     const ptsPAvant = getPoints(joueurP);
@@ -72,12 +60,6 @@ export function calculerMatch(joueurV, joueurP, bareme = BAREME_DEFAUT) {
 // ============================================================
 // RECALCUL COMPLET (rejouer tous les matchs dans l'ordre)
 // ============================================================
-/**
- * @param {Array<string>} codes - Liste des codesAutoEval à initialiser
- * @param {Object} historique - { pushId: { codeV, codeP, scoreV, scoreP, timestamp } }
- * @param {Array} bareme
- * @returns {Object} joueursMap - { code: { points, victoires, ... } }
- */
 export function recalculerTout(codes, historique, bareme = BAREME_DEFAUT) {
     const joueurs = {};
     codes.forEach(code => {
@@ -88,7 +70,9 @@ export function recalculerTout(codes, historique, bareme = BAREME_DEFAUT) {
             matchesJoues: 0,
             pointsMarques: 0,
             pointsEncaisses: 0,
-            diffPoints: 0
+            diffPoints: 0,
+            serieActuelle: 0,
+            meilleureSerie: 0
         };
     });
 
@@ -109,6 +93,11 @@ export function recalculerTout(codes, historique, bareme = BAREME_DEFAUT) {
         p.defaites++;
         v.matchesJoues++;
         p.matchesJoues++;
+
+        // Série de victoires (ordre chronologique)
+        v.serieActuelle++;
+        p.serieActuelle = 0;
+        if (v.serieActuelle > v.meilleureSerie) v.meilleureSerie = v.serieActuelle;
 
         const scV = Number(m.scoreV) || 0;
         const scP = Number(m.scoreP) || 0;
@@ -136,6 +125,8 @@ export function trierClassement(joueursMap, elevesMap = {}) {
             defaites: j.defaites || 0,
             matchesJoues: j.matchesJoues || 0,
             diffPoints: j.diffPoints || 0,
+            serieActuelle: j.serieActuelle || 0,
+            meilleureSerie: j.meilleureSerie || 0,
             eleve: elevesMap[String(code)] || null
         };
     });
@@ -151,6 +142,69 @@ export function trierClassement(joueursMap, elevesMap = {}) {
 
     arr.forEach((item, idx) => { item.rang = idx + 1; });
     return arr;
+}
+
+// ============================================================
+// MATRICE DE CONFRONTATIONS
+// ============================================================
+export function creeMatriceConfrontations(historique) {
+    const matrix = {};
+    Object.values(historique || {}).forEach(m => {
+        if (!m || !m.codeV || !m.codeP) return;
+        const a = String(m.codeV);
+        const b = String(m.codeP);
+        const c1 = a < b ? a : b;
+        const c2 = a < b ? b : a;
+        if (!matrix[c1]) matrix[c1] = {};
+        matrix[c1][c2] = (matrix[c1][c2] || 0) + 1;
+    });
+    return matrix;
+}
+
+export function getConfrontations(matrix, codeA, codeB) {
+    const a = String(codeA);
+    const b = String(codeB);
+    const c1 = a < b ? a : b;
+    const c2 = a < b ? b : a;
+    return matrix?.[c1]?.[c2] || 0;
+}
+
+// ============================================================
+// SUGGESTIONS DE MATCHS
+// ============================================================
+export function suggererMatchs(joueursMap, historique, absents = new Set()) {
+    const matrix = creeMatriceConfrontations(historique);
+    const codes = Object.keys(joueursMap || {}).filter(c => !absents.has(c));
+    const suggestions = [];
+
+    for (let i = 0; i < codes.length; i++) {
+        for (let j = i + 1; j < codes.length; j++) {
+            const cA = codes[i];
+            const cB = codes[j];
+            const count = getConfrontations(matrix, cA, cB);
+            const diffPts = Math.abs((joueursMap[cA]?.points || 0) - (joueursMap[cB]?.points || 0));
+
+            let raison = '';
+            let priorite = 0;
+
+            if (count === 0) {
+                raison = '🆕 Jamais affrontés';
+                priorite = 1000 - diffPts;
+            } else if (count === 1) {
+                raison = '🔄 Affrontés 1 fois seulement';
+                priorite = 500 - diffPts;
+            } else if (diffPts <= 10) {
+                raison = '⚖️ Points proches';
+                priorite = 200 - count * 20 - diffPts;
+            } else {
+                continue;
+            }
+
+            suggestions.push({ codeA: cA, codeB: cB, raison, priorite });
+        }
+    }
+
+    return suggestions.sort((a, b) => b.priorite - a.priorite);
 }
 
 // ============================================================

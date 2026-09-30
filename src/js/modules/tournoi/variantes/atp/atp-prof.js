@@ -5,7 +5,8 @@ import { getExistingEleves } from '../../../../services/admin-service.js';
 import {
     recalculerTout, trierClassement, genererSnapshot,
     calculerMatch, BAREME_DEFAUT, POINTS_INITIAUX,
-    getMedaille, formatEcart, getPalier
+    getMedaille, formatEcart, getPalier,
+    creeMatriceConfrontations, suggererMatchs
 } from './atp-core.js';
 import {
     initTournoiCore, cleanupTournoiCore,
@@ -19,6 +20,8 @@ let currentMatchs = {};
 let currentConfig = {};
 let currentJoueursMap = {};
 let unsubs = [];
+let absents = new Set();      // ensemble de codes absents
+let notesEleves = {};         // { code: note }
 
 // ============================================================
 // UTILITAIRES
@@ -26,6 +29,30 @@ let unsubs = [];
 function getATPBasePath(classe) {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     return `etablissements/0680013V/profs/${profCode}/${classe}/tournoi/atp`;
+}
+
+// ============================================================
+// ÉTAT LOCAL (présence + notes, stockés en localStorage)
+// ============================================================
+function getAbsentsKey(classe) {
+    return `eps_arena_atp_absents_${classe}`;
+}
+
+function getNotesKey(classe) {
+    return `eps_arena_atp_notes_${classe}`;
+}
+
+function chargerEtatLocal() {
+    absents = new Set(JSON.parse(localStorage.getItem(getAbsentsKey(currentClasse)) || '[]'));
+    notesEleves = JSON.parse(localStorage.getItem(getNotesKey(currentClasse)) || '{}');
+}
+
+function sauverAbsents() {
+    localStorage.setItem(getAbsentsKey(currentClasse), JSON.stringify(Array.from(absents)));
+}
+
+function sauverNotes() {
+    localStorage.setItem(getNotesKey(currentClasse), JSON.stringify(notesEleves));
 }
 
 function getBareme(config) {
@@ -98,6 +125,7 @@ function recalculerEtRendre() {
     const codes = currentEleves.map(e => String(e.codeAutoEval)).filter(Boolean);
     const bareme = getBareme(currentConfig);
     currentJoueursMap = recalculerTout(codes, currentMatchs, bareme);
+    chargerEtatLocal();
     rendreProf();
 }
 
@@ -180,14 +208,19 @@ async function rendreProf() {
         html += `
             <div class="flex items-center gap-3 bg-slate-900 p-2 rounded-xl border-2 ${couleur}">
                 <div class="text-2xl min-w-[42px] text-center font-black text-slate-300">${getMedaille(item.rang)}</div>
-                <div class="atp-photo w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg" data-id="${eleve ? eleve.id : ''}">👤</div>
+                <div class="atp-photo w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg cursor-pointer" data-id="${eleve ? eleve.id : ''}" onclick="window.atpOuvrirProfil('${item.code}')">👤</div>
                 <div class="flex-1 min-w-0">
-                    <div class="font-bold text-white text-sm truncate">${eleve ? eleve.prenom + ' ' + eleve.nom : 'Code ' + item.code}</div>
+                    <div class="font-bold text-white text-sm truncate cursor-pointer hover:underline" onclick="window.atpOuvrirProfil('${item.code}')">${eleve ? eleve.prenom + ' ' + eleve.nom : 'Code ' + item.code}</div>
                     <div class="text-[10px] text-slate-500">#${item.code} · ${item.victoires}V-${item.defaites}D · diff ${formatEcart(item.diffPoints)}</div>
+                    ${item.serieActuelle >= 3 ? `<div class="text-[10px] text-orange-400 font-bold mt-0.5">🔥 Série : ${item.serieActuelle} victoires</div>` : ''}
+                    ${absents.has(item.code) ? '<span class="text-[10px] text-red-400 font-bold ml-1">🚫</span>' : ''}
                 </div>
-                <div class="text-right">
-                    <div class="text-2xl font-black ${item.points >= 100 ? 'text-emerald-400' : 'text-red-400'}">${item.points}</div>
-                    <div class="text-[9px] text-slate-500 uppercase">pts</div>
+                <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                    <div class="text-right">
+                        <div class="text-2xl font-black ${item.points >= 100 ? 'text-emerald-400' : 'text-red-400'}">${item.points}</div>
+                        <div class="text-[9px] text-slate-500 uppercase">pts</div>
+                    </div>
+                    <button onclick="window.atpToggleAbsent('${item.code}')" class="px-2 py-1 rounded-lg text-[10px] font-black ${absents.has(item.code) ? 'bg-red-600 text-white' : 'bg-slate-700 text-slate-300'}">${absents.has(item.code) ? '🚫 Absent' : '✅ Présent'}</button>
                 </div>
             </div>
         `;
@@ -248,11 +281,199 @@ async function rendreProf() {
     }
 
     html += `</div></div></div>`;
+
+    // ============================================================
+    // SUGGESTIONS DE MATCHS + MATRICE DE CONFRONTATIONS
+    // ============================================================
+    const suggestions = suggererMatchs(currentJoueursMap, currentMatchs, absents);
+
+    html += `
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <h4 class="font-black text-blue-400 text-sm uppercase mb-3">💡 Suggestions de matchs</h4>
+                <div class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+    `;
+
+    if (suggestions.length === 0) {
+        html += `<p class="text-slate-500 text-sm text-center py-6">Tous les duos ont déjà joué. Il n'y a plus de match à suggérer.</p>`;
+    } else {
+        suggestions.slice(0, 10).forEach(s => {
+            const eA = elevesMap[String(s.codeA)];
+            const eB = elevesMap[String(s.codeB)];
+            const nomA = eA ? `${eA.prenom} ${eA.nom}` : `Code ${s.codeA}`;
+            const nomB = eB ? `${eB.prenom} ${eB.nom}` : `Code ${s.codeB}`;
+            html += `
+                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-bold text-white truncate">${nomA} <span class="text-slate-500">vs</span> ${nomB}</div>
+                        <div class="text-[10px] text-blue-400 mt-0.5">${s.raison}</div>
+                    </div>
+                    <button onclick="window.atpPreparerSuggestion('${s.codeA}','${s.codeB}')" class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-lg text-xs font-black text-white flex-shrink-0">Utiliser</button>
+                </div>
+            `;
+        });
+    }
+
+    html += `</div></div>`;
+
+    // Matrice de confrontations
+    const matrix = creeMatriceConfrontations(currentMatchs);
+    const codesActifs = currentEleves
+        .filter(e => e.codeAutoEval)
+        .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''))
+        .map(e => String(e.codeAutoEval));
+
+    html += `
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <h4 class="font-black text-white text-sm uppercase mb-3">📊 Confrontations</h4>
+                <div class="overflow-x-auto">
+                    <table class="text-xs border-collapse w-full">
+                        <thead>
+                            <tr>
+                                <th class="p-2 text-slate-400 sticky left-0 bg-slate-800 text-left">Élève</th>
+                                ${codesActifs.map(c => `<th class="p-2 text-center text-slate-400">${c}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+
+    for (const cA of codesActifs) {
+        const eA = elevesMap[cA];
+        html += `<tr class="border-t border-slate-700">
+            <td class="p-2 font-bold text-white whitespace-nowrap sticky left-0 bg-slate-800">${eA ? eA.prenom : '#' + cA}</td>`;
+        for (const cB of codesActifs) {
+            if (cA === cB) {
+                html += `<td class="p-2 text-center bg-slate-800 text-slate-600">-</td>`;
+            } else {
+                const count = getConfrontationsFromMatrix(matrix, cA, cB);
+                const bg = count === 0 ? 'bg-slate-900' : count >= 3 ? 'bg-orange-900' : 'bg-amber-900';
+                html += `<td class="p-2 text-center ${bg} ${count === 0 ? 'text-slate-600' : 'text-white font-black'}">${count}</td>`;
+            }
+        }
+        html += `</tr>`;
+    }
+
+    html += `</tbody></table></div></div></div>`;
+
     container.innerHTML = html;
 
     // Chargement des photos en arrière-plan (non bloquant).
     chargerPhotosProf();
 }
+
+// ============================================================
+// Présence / absence (exclut des suggestions)
+// ============================================================
+window.atpToggleAbsent = function(code) {
+    if (absents.has(code)) absents.delete(code);
+    else absents.add(code);
+    sauverAbsents();
+    rendu();
+};
+
+function getConfrontationsFromMatrix(matrix, cA, cB) {
+    const a = String(cA);
+    const b = String(cB);
+    const c1 = a < b ? a : b;
+    const c2 = a < b ? b : a;
+    return matrix?.[c1]?.[c2] || 0;
+}
+
+// ============================================================
+// Utiliser une suggestion → pré-remplit la saisie manuelle
+// ============================================================
+window.atpPreparerSuggestion = function(codeA, codeB) {
+    // Par défaut le vainqueur = celui qui a le plus de points.
+    const ptsA = currentJoueursMap[String(codeA)]?.points || POINTS_INITIAUX;
+    const ptsB = currentJoueursMap[String(codeB)]?.points || POINTS_INITIAUX;
+    const codeV = ptsA >= ptsB ? codeA : codeB;
+    const codeP = codeV === codeA ? codeB : codeA;
+
+    window.atpOpenSaisieManuelle(null, { codeV, codeP, scoreV: '', scoreP: '' });
+    // Pré-remplir les scores à blanc (déjà fait) ; on laisse le prof saisir.
+};
+
+// ============================================================
+// Rendu de secours (utilisé par atpToggleAbsent)
+// ============================================================
+function rendu() {
+    recalculerEtRendre();
+}
+
+// ============================================================
+// PROFIL ÉLÈVE (stats détaillées + note enseignant)
+// ============================================================
+window.atpOuvrirProfil = async function(code) {
+    const eleve = currentEleves.find(e => String(e.codeAutoEval) === String(code));
+    const item = currentJoueursMap[String(code)] || {};
+    const nom = eleve ? `${eleve.prenom} ${eleve.nom}` : `Code ${code}`;
+
+    const n = Number(item.meilleureSerie) || 0;
+    const serieAct = Number(item.serieActuelle) || 0;
+    const total = Number(item.matchesJoues) || 0;
+    const v = Number(item.victoires) || 0;
+    const d = Number(item.defaites) || 0;
+    const taux = total > 0 ? Math.round((v / total) * 100) : 0;
+    const pts = Number(item.points) || 0;
+
+    let photoUrl = null;
+    if (eleve) { try { photoUrl = await getPhotoUrl(eleve.id); } catch (e) {} }
+    const photoHtml = photoUrl
+        ? `<img src="${photoUrl}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-500">`
+        : `<div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-2xl">👤</div>`;
+
+    const modal = document.createElement('div');
+    modal.id = 'atp-modal-profil';
+    modal.className = 'fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4';
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md">
+            <div class="flex items-center gap-4 mb-4">
+                ${photoHtml}
+                <div>
+                    <h3 class="text-xl font-black text-white">${nom}</h3>
+                    <p class="text-xs text-slate-400">#${code}</p>
+                </div>
+                <button onclick="document.getElementById('atp-modal-profil').remove()" class="ml-auto bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white">✕</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">Points</div><div class="text-xl font-black ${pts >= 100 ? 'text-emerald-400' : 'text-red-400'}">${pts}</div></div>
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">V/D</div><div class="text-xl font-black text-white">${v}/{d}</div></div>
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">Taux vict.</div><div class="text-xl font-black text-yellow-400">${taux}%</div></div>
+                <div class="bg-slate-800 p-3 rounded-xl text-center"><div class="text-[10px] text-slate-400 uppercase">Meill. série</div><div class="text-xl font-black text-orange-400">${n}</div></div>
+            </div>
+
+            <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 mb-3">
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-400">Matchs joués</span><span class="font-black text-white">${total}</span>
+                </div>
+                <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-400">Série en cours</span><span class="font-black ${serieAct >= 3 ? 'text-orange-400' : 'text-white'}">${serieAct} ${serieAct >= 3 ? '🔥' : ''}</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-400">Diff de points</span><span class="font-black text-white">${formatEcart(item.diffPoints || 0)}</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="text-xs font-bold text-slate-400 uppercase block mb-1">📝 Note enseignant</label>
+                <textarea id="atp-note-profil" rows="4" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-sm">${notesEleves[String(code)] || ''}</textarea>
+            </div>
+
+            <button onclick="window.atpSauverNote('${code}')" class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-black text-white text-sm active:scale-95">💾 Enregistrer la note</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+};
+
+window.atpSauverNote = function(code) {
+    const ta = document.getElementById('atp-note-profil');
+    if (!ta) return;
+    notesEleves[String(code)] = ta.value;
+    sauverNotes();
+    alert('✅ Note enregistrée !');
+};
 
 async function chargerPhotosProf() {
     const placeholders = document.querySelectorAll('#tournoi-prof-container .atp-photo[data-id]');
