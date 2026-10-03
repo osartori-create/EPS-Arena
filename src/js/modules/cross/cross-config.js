@@ -151,6 +151,15 @@ export function saveElevesCross(classe, eleves) {
  * Attribue un codeAutoEval aux élèves CROSS qui n'en ont pas (équivalent
  * de migrerCodesAutoEval de l'administration, mais dans l'espace isolé).
  */
+export function setVmaEleveCross(classe, eleveId, vma) {
+    const eleves = getExistingElevesCross(classe);
+    const eleve = eleves.find(el => el.id === eleveId);
+    if (!eleve) return false;
+    eleve.vma = parseFloat(vma) || 0;
+    saveElevesCross(classe, eleves);
+    return true;
+}
+
 export function migrerCodesAutoEvalCross(classeName) {
     const eleves = getExistingElevesCross(classeName);
     if (eleves.length === 0) return false;

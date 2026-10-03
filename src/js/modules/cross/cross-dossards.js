@@ -248,38 +248,43 @@ async function dessinerDossard(doc, eleve, x0, y0) {
     const zoneW = DOS_W - barCodeLatW - 8;
     const centreX = zoneX + zoneW / 2;
 
-    let cursorY = y0 + 4;
+    // ---- MISE EN PAGE COMPACTE (hauteur totale garantie ≤ 141 mm) ----
+    // Chaque dossier tient strictement dans la moitié de page, même avec
+    // la voiture agrandie + la ligne VMA. Les hauteurs sont figées pour
+    // éviter tout débordement sur le dossier suivant.
+    let cursorY = y0 + 3;
 
     // ---- Pictogramme selon la VMA ----
-    // VMA >= 12 : voiture de course ; VMA >= 10 : coureur.
+    // VMA >= 12 : voiture de course (agrandie) ; VMA >= 10 : coureur.
     let picto = null;
+    let imgSize = 20;
     if (vma >= VMA_SEUIL_VOITURE) {
         picto = await genererImageVoiture();
+        imgSize = 32;
     } else if (vma >= VMA_SEUIL_COUREUR) {
         picto = await genererImageCoureur();
+        imgSize = 20;
     }
     if (picto) {
-        const imgSize = 20;
         doc.addImage(picto, 'PNG', centreX - imgSize / 2, cursorY, imgSize, imgSize);
     }
-    // Espace réservé même sans picto pour garder un alignement identique
-    cursorY += 21;
+    cursorY += imgSize;
 
     // ---- Numéro géant ----
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(110);
+    doc.setFontSize(90);
     doc.setTextColor(0, 0, 0);
-    doc.text(`#${eleve.dossard}`, centreX, cursorY + 42, { align: 'center' });
-    cursorY += 46;
+    doc.text(`#${eleve.dossard}`, centreX, cursorY + 35, { align: 'center' });
+    cursorY += 39;
 
     // ---- Nom Prénom ----
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setTextColor(20, 20, 20);
     doc.text(`${eleve.prenom} ${eleve.nom}`, centreX, cursorY + 5, { align: 'center' });
-    cursorY += 10;
+    cursorY += 7;
 
     // ---- Code-barres horizontal JUSTE SOUS LE NOM ----
-    const barH = 22;
+    const barH = 18;
     const barW = Math.min(zoneW - 40, 120);
     const barX = centreX - barW / 2;
 
@@ -289,36 +294,45 @@ async function dessinerDossard(doc, eleve, x0, y0) {
     } catch (err) {
         console.warn('[Dossards] Erreur code-barres bas :', err);
     }
-    cursorY += barH + 1;
+    cursorY += barH + 2;
 
     // ---- Numéro humain SOUS le code-barres (12 chiffres sans la clé) ----
     doc.setFont('courier', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
     doc.text(eanSansCle, centreX, cursorY + 3, { align: 'center' });
-    cursorY += 9;
+    cursorY += 8;
 
     // ---- Classe + Catégorie ----
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.setTextColor(80, 80, 80);
     const cat = getCategorieCourse(eleve);
     doc.text(`Classe ${eleve.classe}  ·  ${cat.label}`, centreX, cursorY + 4, { align: 'center' });
-    cursorY += 9;
+    cursorY += 8;
+
+    // ---- VMA (juste avant le contrat) ----
+    if (eleve.statut !== 'inapte') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(30, 30, 30);
+        doc.text(vma > 0 ? `VMA : ${vma.toFixed(1)} km/h` : 'VMA : —', centreX, cursorY + 4, { align: 'center' });
+        cursorY += 6;
+    }
 
     // ---- Contrat ou mention inapte ----
     if (eleve.statut === 'inapte') {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.setTextColor(180, 30, 30);
-        doc.text('Inapte, doit se rendre à l\'arrivée où une tâche lui sera confiée.', centreX, cursorY + 7, { align: 'center' });
+        doc.text('Inapte, doit se rendre à l\'arrivée où une tâche lui sera confiée.', centreX, cursorY + 5, { align: 'center' });
     } else {
         const contrat = getContratLignes(vma);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
         doc.setTextColor(90, 90, 90);
-        doc.text(contrat.ligne1, centreX, cursorY + 4, { align: 'center' });
-        doc.text(contrat.ligne2, centreX, cursorY + 11, { align: 'center' });
+        doc.text(contrat.ligne1, centreX, cursorY + 3.5, { align: 'center' });
+        doc.text(contrat.ligne2, centreX, cursorY + 9, { align: 'center' });
     }
 }
 

@@ -6,7 +6,8 @@ import {
     getClassesParticipantes, setClassesParticipantes,
     getTousLesElevesCross, setDossardPourEleve, getDossardByEleveId,
     getStatutsCross, setStatutsCross, getDossards,
-    viderDonneesCross, sauvegarderDonneesCross
+    viderDonneesCross, sauvegarderDonneesCross,
+    setVmaEleveCross
 } from './cross-config.js';
 import { importCSVEtablissement, importExcelDossards, importExcelListeEleves, genererDossardsAuto } from './cross-import.js';
 import { getNiveauFromClasse } from './cross-core.js';
@@ -138,7 +139,14 @@ function renderRow(e) {
             <td class="p-2 font-bold text-white">${e.nom}</td>
             <td class="p-2 text-slate-200">${e.prenom}</td>
             <td class="p-2 text-center text-slate-400">${e.sexe || '?'}</td>
-            <td class="p-2 text-center text-emerald-400 font-bold">${e.vma || '—'}</td>
+            <td class="p-2 text-center">
+                <input type="number"
+                       id="vma-${e.eleveId}"
+                       value="${e.vma ?? ''}"
+                       min="0" max="25" step="0.1"
+                       onchange="window.crossPrepSetVma('${e.eleveId}', this.value)"
+                       class="w-20 bg-slate-900 border border-slate-600 rounded-lg p-2 text-center text-white font-black focus:border-emerald-400">
+            </td>
             <td class="p-2 text-center">
                 <select onchange="window.crossPrepSetStatut('${e.eleveId}', this.value)" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white">
                     <option value="present" ${e.statut==='present'?'selected':''}>Présent</option>
@@ -149,6 +157,19 @@ function renderRow(e) {
         </tr>
     `;
 }
+
+// ============================================================
+// SAISIE MANUELLE DE LA VMA
+// ============================================================
+window.crossPrepSetVma = (eleveId, vma) => {
+    const classes = getClassesParticipantes();
+    let modifie = false;
+    for (const classe of classes) {
+        if (setVmaEleveCross(classe, eleveId, vma)) modifie = true;
+    }
+    // Rafraîchir sans perdre le focus globalement.
+    if (modifie) refreshCross();
+};
 
 // ============================================================
 // ACTIONS GLOBALES
