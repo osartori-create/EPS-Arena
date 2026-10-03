@@ -940,76 +940,20 @@ function _genererEleveSimule(usedIds) {
 }
 
 window.crossSimulerCrossComplet = async function() {
-    if (!confirm('🌊 GÉNÉRATION D\'UN CROSS COMPLET\n\nCela va :\n- Générer des élèves fictifs dans plusieurs classes\n- Attribuer des dossards\n- Simuler des arrivées sur les 4 courses\n\n⚠️ Les données cross actuelles seront REMPLACÉES.\n\nContinuer ?')) return;
+    if (!confirm('🌊 SIMULATION SUR TES VRAIS ÉLÈVES\n\nCela va :\n- Conserver tes élèves et dossards actuels\n- Générer des temps d\'arrivée fictifs (corrélés à leur VMA)\n- Remplacer les arrivées existantes des 4 courses\n\n⚠️ Aucune donnée locale ne sera modifiée.\n\nContinuer ?')) return;
 
-    const nbClassesParNiveau = Math.min(10, parseInt(prompt('Nombre de classes PAR NIVEAU (max 10) ?\n\n→ 8 = configuration réaliste d\'un collège\n→ Total = 4 × ce nombre', '8')) || 8);
-    const nbParClasse = Math.min(30, parseInt(prompt('Élèves par classe (max 30) ?', '25')) || 25);
-
-    const nbTotalClasses = nbClassesParNiveau * 4;
-    const nbTotalEleves = nbTotalClasses * nbParClasse;
-
-    console.log(`🌊 Simulation : ${nbTotalClasses} classes × ${nbParClasse} élèves = ${nbTotalEleves} élèves`);
-
-    // --- Sauvegarde préalable de toutes les données CROSS ---
-    const cleSauvegarde = sauvegarderDonneesCross('Avant simulation cross complet');
-    console.log(`💾 Sauvegarde CROSS réalisée : ${cleSauvegarde}`);
-
-    // --- Construction des classes : 601 à 60X, puis 501 à 50X, etc. ---
-    const niveaux = ['6', '5', '4', '3'];
-    const classes = [];
-    for (const niveau of niveaux) {
-        for (let i = 1; i <= nbClassesParNiveau; i++) {
-            classes.push(`${niveau}0${i}`);   // 601, 602, ... puis 501, 502...
-        }
-    }
-    console.log(`Classes : ${classes.join(', ')}`);
-
-    // --- Nettoyage des données cross ---
-    localStorage.removeItem('eps_arena_cross_dossards');
-    localStorage.removeItem('eps_arena_cross_dossards_inv');
-    localStorage.removeItem('eps_arena_cross_statuts');
-    localStorage.removeItem('eps_arena_cross_classes');
-
-    // --- Génération des élèves + dossards ---
-    const usedIds = new Set();
-    const elevesParClasse = {};
-    const dossards = {};
-    const invDossards = {};
-    let dossardCourant = 1;
-
-    // Attribution des dossards par ordre alphabétique global (classe puis nom)
-    for (const classe of classes) {
-        const eleves = [];
-        for (let i = 0; i < nbParClasse; i++) {
-            const e = _genererEleveSimule(usedIds);
-            e.codeAutoEval = i + 1;
-            eleves.push(e);
-        }
-        // Tri alphabétique interne
-        eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
-        eleves.forEach((e, idx) => { e.codeAutoEval = idx + 1; });
-        elevesParClasse[classe] = eleves;
+    const elevesReels = getTousLesElevesCross();
+    const elevesDispos = elevesReels.filter(e => e.statut === 'present' && e.dossard);
+    if (elevesDispos.length === 0) {
+        alert('❌ Aucun élève présent avec dossard.\n\nImporte d\'abord tes élèves puis génère les dossards dans l\'onglet Préparation.');
+        return;
     }
 
-    // Attribution des dossards (ordre : classe puis nom)
-    for (const classe of classes) {
-        for (const e of elevesParClasse[classe]) {
-            dossards[String(dossardCourant)] = e.id;
-            invDossards[e.id] = String(dossardCourant);
-            dossardCourant++;
-        }
-    }
+    console.log(`🌊 Simulation sur ${elevesDispos.length} vrais élèves`);
 
-    // --- Sauvegarde locale (espace isolé CROSS) ---
-    for (const [classe, eleves] of Object.entries(elevesParClasse)) {
-        saveElevesCross(classe, eleves);
-    }
-    localStorage.setItem('eps_arena_cross_dossards', JSON.stringify(dossards));
-    localStorage.setItem('eps_arena_cross_dossards_inv', JSON.stringify(invDossards));
-    localStorage.setItem('eps_arena_cross_classes', JSON.stringify(classes));
-    localStorage.setItem('eps_arena_cross_statuts', JSON.stringify({}));
-
-    console.log(`✅ ${nbTotalEleves} élèves et ${dossardCourant - 1} dossards sauvegardés`);
+    // Sauvegarde de sécurité (n'altère pas les données locales).
+    const cleSauvegarde = sauvegarderDonneesCross('Avant simulation sur vrais élèves');
+    console.log(`💾 Sauvegarde CROSS : ${cleSauvegarde}`);
 
     // --- Simulation Firebase ---
     const COURSES_SIM = [
@@ -1038,26 +982,20 @@ window.crossSimulerCrossComplet = async function() {
     const statsCourses = [];
 
     for (const course of COURSES_SIM) {
-        // Sélection des élèves de cette course
-        const elevesCourse = [];
-        for (const [classe, eleves] of Object.entries(elevesParClasse)) {
-            const niveau = classe.charAt(0);
-            if (!course.niveaux.includes(niveau)) continue;
-            for (const e of eleves) {
-                if (e.sexe !== course.sexe) continue;
-                const dossard = invDossards[e.id];
-                elevesCourse.push({ ...e, dossard, niveau });
-            }
-        }
+        // Sélection des vrais élèves de cette course.
+        const elevesCourse = elevesDispos
+            .filter(e => e.sexe === course.sexe && course.niveaux.includes(getNiveauFromClasse(e.classe)))
+            .map(e => ({ ...e, niveau: getNiveauFromClasse(e.classe) }));
 
         if (elevesCourse.length === 0) continue;
 
-        // Calcul des temps (corrélés à la VMA avec bruit réaliste)
+        // Temps fictifs corrélés à la VMA (VMA absente → base 11).
         elevesCourse.forEach(e => {
-            const baseFactor = 0.78 + (e.vma - 10) / 40;
+            const vma = parseFloat(e.vma) || 11;
+            const baseFactor = 0.78 + (vma - 10) / 40;
             const bruit = (Math.random() - 0.5) * 0.15;
             const facteur = Math.max(0.68, Math.min(0.95, baseFactor + bruit));
-            const vCible = e.vma * facteur;
+            const vCible = vma * facteur;
             const tempsSec = (DISTANCE_CONTRAT_M / 1000) / vCible * 3600;
             e.tempsMs = Math.round(tempsSec * 1000);
         });
@@ -1115,7 +1053,7 @@ window.crossSimulerCrossComplet = async function() {
         console.warn('⚠️ Transmission config échouée :', err);
     }
 
-    alert(`🌊 Simulation terminée !\n\n📊 Bilan :\n- ${nbTotalClasses} classes (${nbClassesParNiveau} par niveau)\n- ${nbTotalEleves} élèves\n- ${dossardCourant - 1} dossards attribués\n- ${totalArrivees} arrivées simulées\n\n${statsCourses.join('\n')}\n\n💾 Une sauvegarde des données CROSS a été automatiquement créée avant la simulation.\n\nVa dans Cross → Course pour voir le résultat.`);
+    alert(`🌊 Simulation terminée !\n\n📊 Bilan :\n- ${elevesDispos.length} vrais élèves avec dossard\n- ${totalArrivees} arrivées fictives simulées\n\n${statsCourses.join('\n')}\n\n💾 Une sauvegarde CROSS de sécurité a été créée avant la simulation.\n\nVa dans Cross → Course pour voir le résultat.`);
 
     // Rafraîchir l'interface
     const c = document.getElementById('cross-content');

@@ -300,27 +300,28 @@ function render() {
 
     container.innerHTML = `
         <style>
-            .cross-podium-body { background: #0f172a; min-height: 100vh; }
+            .cross-podium-body { background: #f8fafc; min-height: 100vh; }
             .cross-podium-card {
-                background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-                border: 2px solid #334155;
+                background: #ffffff;
+                border: 2px solid #d1d5db;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.06);
             }
-            .cross-medal-gold   { background: linear-gradient(180deg, #facc15, #d97706); }
+            .cross-medal-gold   { background: linear-gradient(180deg, #fbbf24, #d97706); }
             .cross-medal-silver { background: linear-gradient(180deg, #cbd5e1, #64748b); }
-            .cross-medal-bronze { background: linear-gradient(180deg, #d97706, #92400e); }
+            .cross-medal-bronze { background: linear-gradient(180deg, #f59e0b, #92400e); }
             .cross-step { transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
         </style>
 
         <div class="cross-podium-body flex flex-col">
             <!-- Bandeau course + chrono -->
-            <div class="bg-slate-900 border-b-4 border-emerald-500 p-6 flex justify-between items-center flex-wrap gap-4">
+            <div class="bg-white border-b-4 border-emerald-500 p-6 flex justify-between items-center flex-wrap gap-4 shadow-sm">
                 <div>
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Cross</div>
-                    <div class="text-4xl font-black text-white">${niveauxLabel} ${sexeLabel}</div>
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Cross</div>
+                    <div class="text-4xl font-black text-gray-900">${niveauxLabel} ${sexeLabel}</div>
                 </div>
                 <div class="text-right">
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Chrono</div>
-                    <div id="cross-kiosk-chrono" class="text-6xl font-mono font-black ${enCours ? 'text-emerald-400' : 'text-slate-600'}">${chronoStr}</div>
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Chrono</div>
+                    <div id="cross-kiosk-chrono" class="text-6xl font-mono font-black ${enCours ? 'text-emerald-600' : 'text-gray-400'}">${chronoStr}</div>
                 </div>
             </div>
 
@@ -336,8 +337,8 @@ function renderAttente() {
     return `
         <div class="flex flex-col items-center justify-center py-32">
             <div class="text-8xl mb-6 animate-pulse">⏳</div>
-            <div class="text-4xl font-black text-slate-400">En attente du départ...</div>
-            <div class="text-xl text-slate-500 mt-3">Le prof va lancer la course</div>
+            <div class="text-4xl font-black text-gray-700">En attente du départ...</div>
+            <div class="text-xl text-gray-500 mt-3">Le prof va lancer la course</div>
         </div>
     `;
 }
@@ -375,12 +376,12 @@ function renderDerniersArrivees(parNiveau) {
     return `
         <style>
             .recent-block { margin-top: 24px; max-width: 1000px; margin-left: auto; margin-right: auto; }
-            .recent-title { color:#64748b; font-weight:900; text-transform:uppercase; font-size:0.7rem; letter-spacing:0.05em; margin-bottom:8px; }
+            .recent-title { color:#4b5563; font-weight:900; text-transform:uppercase; font-size:0.7rem; letter-spacing:0.05em; margin-bottom:8px; }
             .recent-list { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:6px; }
-            .recent-row { display:flex; gap:10px; align-items:center; padding:8px 12px; background:#1e293b; border-radius:10px; border-left:4px solid #334155; }
-            .recent-dossard { font-family:monospace; font-weight:900; color:#facc15; }
-            .recent-nom { color:#e2e8f0; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-            .recent-classe { margin-left:auto; color:#94a3b8; font-weight:900; }
+            .recent-row { display:flex; gap:10px; align-items:center; padding:8px 12px; background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; border-left:4px solid #9ca3af; }
+            .recent-dossard { font-family:monospace; font-weight:900; color:#d97706; }
+            .recent-nom { color:#111827; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .recent-classe { margin-left:auto; color:#6b7280; font-weight:900; }
         </style>
         <div class="recent-block">
             <div class="recent-title">🕒 Derniers arrivés (${derniers.length})</div>
@@ -395,8 +396,8 @@ function renderPodiumNiveau(niveau, arrives) {
     return `
         <div class="cross-podium-card rounded-3xl p-6">
             <div class="text-center mb-6">
-                <div class="text-5xl font-black text-white">${niveau}e</div>
-                <div class="text-xs uppercase text-slate-500 font-bold tracking-widest mt-1">${arrives.length} arrivant${arrives.length > 1 ? 's' : ''}</div>
+                <div class="text-5xl font-black text-gray-900">${niveau}e</div>
+                <div class="text-xs uppercase text-gray-500 font-bold tracking-widest mt-1">${arrives.length} arrivant${arrives.length > 1 ? 's' : ''}</div>
             </div>
 
             <!-- Podium 2-1-3 -->
@@ -429,9 +430,9 @@ function renderMarche(eleve, medaille, place, hauteurPx) {
         <div class="flex flex-col items-center cross-step" style="width: 30%;">
             <div class="text-5xl mb-2">${medalEmoji}</div>
             <div class="text-center mb-2 min-h-[80px]">
-                <div class="text-4xl font-black text-white leading-tight">#${eleve.dossard}</div>
-                ${libelle ? `<div class="text-base font-bold text-white leading-tight mt-1">${libelle}</div>` : ''}
-                <div class="text-sm font-bold text-slate-400 uppercase">${eleve.classe}</div>
+                <div class="text-4xl font-black text-gray-900 leading-tight">#${eleve.dossard}</div>
+                ${libelle ? `<div class="text-base font-bold text-gray-700 leading-tight mt-1">${libelle}</div>` : ''}
+                <div class="text-sm font-bold text-gray-500 uppercase">${eleve.classe}</div>
             </div>
             <div class="w-full rounded-t-xl ${bgClass} flex flex-col items-center justify-end text-white pb-3 shadow-xl"
                  style="height: ${hauteurPx}px;">

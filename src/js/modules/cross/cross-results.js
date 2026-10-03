@@ -96,16 +96,16 @@ function render(container) {
     container.innerHTML = `
         <div class="space-y-4">
             <!-- Sélecteur de course + actions -->
-            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <div class="bg-white p-4 rounded-2xl border border-gray-300 shadow-sm">
                 <div class="flex justify-between items-center mb-3 flex-wrap gap-3">
-                    <h3 class="font-black text-blue-400 uppercase text-sm">📊 Résultats & modifications</h3>
+                    <h3 class="font-black text-blue-700 uppercase text-sm">📊 Résultats & modifications</h3>
                     <div class="flex gap-2 flex-wrap">
                         <button onclick="window.crossResultsExportExcel()"
-                                class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95">
+                                class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-500 active:scale-95">
                             📥 Export Excel
                         </button>
                         <button onclick="window.crossResultsResetModifs()"
-                                class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-500 active:scale-95">
+                                class="bg-red-600 hover:bg-red-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-500 active:scale-95">
                             🗑️ Effacer les modifs
                         </button>
                     </div>
@@ -114,8 +114,8 @@ function render(container) {
                     ${COURSES_DEFAUT.map(c => `
                         <button onclick="window.crossResultsSelect('${c.id}')"
                                 class="p-3 rounded-xl font-black text-sm border-2 active:scale-95 transition-all ${c.id === currentCourseId
-                                    ? 'bg-blue-600 border-blue-400 text-white'
-                                    : 'bg-slate-900 border-slate-700 text-slate-300'}">
+                                    ? 'bg-blue-600 border-blue-500 text-white'
+                                    : 'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'}">
                             ${c.label}
                         </button>
                     `).join('')}
@@ -123,12 +123,12 @@ function render(container) {
             </div>
 
             <!-- Tableau -->
-            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+            <div class="bg-white p-4 rounded-2xl border border-gray-300 shadow-sm">
                 <div id="cross-results-tableau" class="overflow-x-auto"></div>
             </div>
 
-            <p class="text-xs text-slate-500 text-center">
-                💡 Clique sur <strong class="text-slate-300">✏️</strong> pour modifier un élève · Les modifications sont prises en compte dans le classement
+            <p class="text-xs text-gray-600 text-center">
+                💡 Clique sur <strong class="text-gray-800">✏️</strong> pour modifier un élève · Les modifications sont prises en compte dans le classement
             </p>
         </div>
     `;
@@ -258,9 +258,9 @@ function renderTableau() {
     let bandeauAlerte = '';
     if (nbIncoherents > 0) {
         bandeauAlerte = `
-            <div class="bg-red-900/40 border-2 border-red-500 p-3 rounded-xl mb-4 text-center">
-                <p class="text-red-300 font-bold">⚠️ ${nbIncoherents} temps incohérent(s) détecté(s)</p>
-                <p class="text-xs text-red-400 mt-1">
+            <div class="bg-red-50 border-2 border-red-500 p-3 rounded-xl mb-4 text-center">
+                <p class="text-red-700 font-bold">⚠️ ${nbIncoherents} temps incohérent(s) détecté(s)</p>
+                <p class="text-xs text-red-600 mt-1">
                     Le GO a probablement été relancé après l'enregistrement des arrivées.
                     Fais un <strong>Reset</strong> de la course concernée, ou relance une simulation.
                 </p>
@@ -281,8 +281,8 @@ function renderTableau() {
         html += `
             <div>
                 <div class="text-center mb-3">
-                    <div class="text-3xl font-black text-white">${niveau}e</div>
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">
+                    <div class="text-3xl font-black text-gray-900">${niveau}e</div>
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">
                         ${nbClassables} classé${nbClassables > 1 ? 's' : ''} · ${liste.length - nbClassables} exclu${liste.length - nbClassables > 1 ? 's' : ''}
                     </div>
                 </div>
@@ -290,7 +290,7 @@ function renderTableau() {
                 <div class="overflow-x-auto">
                     <table class="w-full text-xs">
                         <thead>
-                            <tr class="text-slate-500 uppercase text-[10px] border-b border-slate-700">
+                            <tr class="text-gray-500 uppercase text-[10px] border-b-2 border-gray-300">
                                 <th class="text-left p-1.5">Rang</th>
                                 <th class="text-left p-1.5">Dossard</th>
                                 <th class="text-left p-1.5">Nom</th>
@@ -307,7 +307,7 @@ function renderTableau() {
         `;
 
         if (liste.length === 0) {
-            html += `<tr><td colspan="10" class="text-center text-slate-500 py-6">Aucune arrivée</td></tr>`;
+            html += `<tr><td colspan="10" class="text-center text-gray-500 py-6">Aucune arrivée</td></tr>`;
         } else {
             liste.forEach(item => {
                 const statut = STATUTS[item.statutVisuel] || STATUTS.normal;
@@ -324,21 +324,21 @@ function renderTableau() {
                 const medaille = item.rangNiveau === 1 ? '🥇' : item.rangNiveau === 2 ? '🥈' : item.rangNiveau === 3 ? '🥉' : '';
 
                 html += `
-                    <tr class="border-b border-slate-800" style="${rowStyle}">
-                        <td class="p-1.5 font-black text-yellow-400">${medaille} ${item.rangNiveau || '—'}</td>
-                        <td class="p-1.5 font-mono text-white">#${item.dossard}</td>
-                        <td class="p-1.5 text-white">
+                    <tr class="border-b border-gray-200" style="${rowStyle}">
+                        <td class="p-1.5 font-black text-amber-600">${medaille} ${item.rangNiveau || '—'}</td>
+                        <td class="p-1.5 font-mono text-gray-900">#${item.dossard}</td>
+                        <td class="p-1.5 text-gray-900">
                             ${item.eleve.prenom} ${item.eleve.nom}
-                            ${item.commentaire ? `<div class="text-[10px] text-slate-400 italic">💬 ${item.commentaire}</div>` : ''}
+                            ${item.commentaire ? `<div class="text-[10px] text-gray-500 italic">💬 ${item.commentaire}</div>` : ''}
                         </td>
-                        <td class="p-1.5 text-slate-400">${item.eleve.classe}</td>
-                        <td class="p-1.5 text-right font-mono ${item.incoherent ? 'text-red-400' : 'text-emerald-400'}">${tempsAffiche}</td>
-                        <td class="p-1.5 text-right font-mono">${item.pourcentageVMA !== null ? item.pourcentageVMA.toFixed(1) + '%' : '—'}</td>
-                        <td class="p-1.5 text-center font-black">${item.ptsMotricite}</td>
-                        <td class="p-1.5 text-center font-black">${item.ptsPerformance}</td>
-                        <td class="p-1.5 text-center font-black text-base ${item.penalitePoints > 0 ? 'text-orange-400' : 'text-emerald-400'}">
+                        <td class="p-1.5 text-gray-600">${item.eleve.classe}</td>
+                        <td class="p-1.5 text-right font-mono ${item.incoherent ? 'text-red-600' : 'text-emerald-600'}">${tempsAffiche}</td>
+                        <td class="p-1.5 text-right font-mono text-gray-900">${item.pourcentageVMA !== null ? item.pourcentageVMA.toFixed(1) + '%' : '—'}</td>
+                        <td class="p-1.5 text-center font-black text-gray-900">${item.ptsMotricite}</td>
+                        <td class="p-1.5 text-center font-black text-gray-900">${item.ptsPerformance}</td>
+                        <td class="p-1.5 text-center font-black text-base ${item.penalitePoints > 0 ? 'text-orange-600' : 'text-emerald-600'}">
                             ${item.noteFinale}
-                            ${item.penalitePoints > 0 ? `<span class="text-[9px] text-orange-300">(-${item.penalitePoints})</span>` : ''}
+                            ${item.penalitePoints > 0 ? `<span class="text-[9px] text-orange-500">(-${item.penalitePoints})</span>` : ''}
                         </td>
                         <td class="p-1.5 text-center">
                             <button onclick="window.crossResultsOuvrirModif('${item.dossard}')"
