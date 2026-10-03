@@ -5,11 +5,11 @@ import {
     getCrossConfig, setCrossConfig,
     getClassesParticipantes, setClassesParticipantes,
     getTousLesElevesCross, setDossardPourEleve, getDossardByEleveId,
-    getStatutsCross, setStatutsCross, getDossards
+    getStatutsCross, setStatutsCross, getDossards,
+    viderDonneesCross, sauvegarderDonneesCross
 } from './cross-config.js';
-import { importCSVEtablissement, importExcelDossards, genererDossardsAuto } from './cross-import.js';
+import { importCSVEtablissement, importExcelDossards, importExcelListeEleves, genererDossardsAuto } from './cross-import.js';
 import { getNiveauFromClasse } from './cross-core.js';
-import { getPhotoUrl } from '../../services/admin-service.js';
 
 let filtreClasse = '';
 let filtreStatut = '';
@@ -53,6 +53,9 @@ async function render(container) {
                     </button>
                     <button onclick="window.crossPrepImporterDossards()" class="bg-indigo-600 hover:bg-indigo-500 px-3 py-2 rounded-xl font-black text-xs text-white">
                         📥 Import Excel dossards
+                    </button>
+                    <button onclick="window.crossPrepImporterListeExcel()" class="bg-sky-600 hover:bg-sky-500 px-3 py-2 rounded-xl font-black text-xs text-white">
+                        📇 Import Excel liste élèves
                     </button>
                     <button onclick="window.crossPrepGenererDossards()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-xl font-black text-xs text-white">
                         🎫 Générer dossards auto
@@ -184,6 +187,23 @@ window.crossPrepImporterDossards = () => {
     input.click();
 };
 
+window.crossPrepImporterListeExcel = () => {
+    const input = document.createElement('input');
+    input.type = 'file'; input.accept = '.xlsx,.xls';
+    input.onchange = async (ev) => {
+        const file = ev.target.files[0]; if (!file) return;
+        try {
+            const res = await importExcelListeEleves(file);
+            alert(`✅ Liste importée.\n${Object.keys(res.classes).length} classe(s) · ${res.totalEleves} élève(s) · ${res.nbInaptes} inapte(s).`);
+            refreshCross();
+        } catch (err) {
+            console.error(err);
+            alert('❌ Erreur d\'import : ' + err.message);
+        }
+    };
+    input.click();
+};
+
 window.crossPrepGenererDossards = () => {
     const classes = getClassesParticipantes();
     if (classes.length === 0) return alert('Importe d\'abord un CSV établissement.');
@@ -205,10 +225,10 @@ window.crossPrepSetFiltreClasse = (v) => { filtreClasse = v; refreshCross(); };
 window.crossPrepSetFiltreStatut = (v) => { filtreStatut = v; refreshCross(); };
 
 window.crossPrepReset = () => {
-    if (!confirm('⚠️ Effacer TOUTES les données Cross locales (dossards, statuts) ?')) return;
+    if (!confirm('⚠️ Effacer TOUTES les données Cross locales (config, classes, élèves, dossards, statuts) ?\n\nLes sauvegardes automatiques ne seront PAS supprimées. Tu pourras restaurer via l\'onglet Dossards → ♻️ Restaurer.')) return;
     if (!confirm('✅ Dernière confirmation ?')) return;
-    ['eps_arena_cross_config', 'eps_arena_cross_classes', 'eps_arena_cross_dossards',
-     'eps_arena_cross_dossards_inv', 'eps_arena_cross_statuts'].forEach(k => localStorage.removeItem(k));
+    sauvegarderDonneesCross('Avant reset manuel');
+    viderDonneesCross();
     refreshCross();
 };
 

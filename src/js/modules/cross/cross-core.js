@@ -8,10 +8,11 @@
 // CONSTANTES MÉTIER
 // ============================================================
 
-// Distance utilisée pour le calcul du %VMA (contrat bienveillant)
-export const DISTANCE_CONTRAT_M = 2500;
+// Distance virtuelle de contrat (un peu supérieure au 2300 m réel pour
+// compenser le temps consommé entre l'arrivée et le scan du code-barres).
+export const DISTANCE_CONTRAT_M = 2400;
 
-// Distance annoncée aux élèves (dossard, affichage)
+// Distance affichée aux élèves (identique à la distance virtuelle).
 export const DISTANCE_AFFICHEE_M = 2400;
 
 // Barème motricité : %VMA tenu → points /13
@@ -142,7 +143,7 @@ export function generateEan13(numero) {
 // ============================================================
 
 /**
- * %VMA tenu par un élève sur la distance CONTRAT (2500 m).
+ * %VMA tenu par un élève sur la distance CONTRAT (2400 m).
  * Formule : (distance_km / temps_h) / vma × 100
  *         = (DISTANCE_CONTRAT_M × 3.6) / (temps_s × VMA)
  *

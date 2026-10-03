@@ -5,12 +5,11 @@ import { db, ref, onValue, push, set, remove } from '../../core/firebase-service
 import {
     getCrossBasePath, getCrossConfig,
     getClassesParticipantes, getStatutsCross,
-    KEYS
+    KEYS, getExistingElevesCross
 } from './cross-config.js';
 import {
     normaliserScan, getNiveauFromClasse, formatTemps, getMedaille, COURSES_DEFAUT
 } from './cross-core.js';
-import { getExistingEleves } from '../../services/admin-service.js';
 import { startScanListener, stopScanListener, refocusScanInput } from './cross-scan.js';
 
 let currentCourseId = null;
@@ -120,7 +119,7 @@ function chargerMappingEleves() {
 
     Object.entries(dossards).forEach(([dossard, eleveId]) => {
         for (const classe of classes) {
-            const eleves = getExistingEleves(classe);
+            const eleves = getExistingElevesCross(classe);
             const e = eleves.find(x => x.id === eleveId);
             if (e) {
                 tousLesEleves[dossard] = {
@@ -186,12 +185,13 @@ function render(container) {
                     Scanne le QR code avec l'iPad, ou clique sur "Copier" et envoie l'URL par message.
                 </p>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
                     ${renderCarteKiosk('🏆 Podium', `eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}`, 'podium')}
                     ${renderCarteKiosk('📋 Classement', `eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}`, 'classement')}
                     ${renderCarteKiosk('🏫 Par classe', `eleve.html?mode=cross-classe&prof=${profCode}`, 'classe')}
                     ${renderCarteKiosk('🎫 Consultation', `eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}`, 'consult')}
                     ${renderCarteKiosk('⏱️ Clic backup', `eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}`, 'clic')}
+                    ${renderCarteKiosk('📺 TV défilant', `eleve.html?mode=cross-tv&course=${currentCourseId}&prof=${profCode}`, 'tv')}
                 </div>
             </div>
 
@@ -665,7 +665,8 @@ function genererQRCodes() {
         classement: new URL(`eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
         classe:     new URL(`eleve.html?mode=cross-classe&prof=${profCode}`, window.location.href).href,
         consult:    new URL(`eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
-        clic:       new URL(`eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}`, window.location.href).href
+        clic:       new URL(`eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
+        tv:         new URL(`eleve.html?mode=cross-tv&course=${currentCourseId}&prof=${profCode}`, window.location.href).href
     };
 
     Object.entries(urls).forEach(([id, url]) => {

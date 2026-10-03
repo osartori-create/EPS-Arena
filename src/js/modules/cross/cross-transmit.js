@@ -3,9 +3,8 @@
 // pour que les iPads kiosks puissent l'afficher
 
 import { db, ref, set } from '../../core/firebase-service.js';
-import { getCrossBasePath, getDossards, getStatutsCross, getClassesParticipantes } from './cross-config.js';
+import { getCrossBasePath, getDossards, getStatutsCross, getClassesParticipantes, getExistingElevesCross } from './cross-config.js';
 import { COURSES_DEFAUT } from './cross-core.js';
-import { getExistingEleves } from '../../services/admin-service.js';
 
 export async function transmettreCrossConfig() {
     const basePath = getCrossBasePath();
@@ -20,7 +19,7 @@ export async function transmettreCrossConfig() {
     Object.entries(dossards).forEach(([dossard, eleveId]) => {
         let trouve = null;
         for (const classe of classes) {
-            const list = getExistingEleves(classe);
+            const list = getExistingElevesCross(classe);
             const e = list.find(x => x.id === eleveId);
             if (e) { trouve = { ...e, classe }; break; }
         }

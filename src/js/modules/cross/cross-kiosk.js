@@ -8,11 +8,15 @@
 
 import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
-import { COURSES_DEFAUT, getNiveauFromClasse, formatTemps, getMedaille, calculerNoteEleve } from './cross-core.js';
+import { COURSES_DEFAUT, getNiveauFromClasse, formatTemps, getMedaille, calculerNoteEleve, DISTANCE_CONTRAT_M } from './cross-core.js';
+import { loadRosterLocal, sauverRosterLocal, effacerRosterLocal, ROSTER_LOCAL_KEY } from './cross-config.js';
 
 let currentCourseId = null;
 let currentProfCode = 'DEFAULT';
 let currentMode = 'cross-podium';
+let rosterLocal = {};
+let tvTimer = null;
+let tvScrollTimer = null;
 
 let unsubGo = null;
 let unsubArrivees = null;
@@ -62,6 +66,8 @@ export function initCrossKiosk(mode, params) {
         activity.appendChild(container);
     }
 
+    chargerRosterLocal();
+    assurerBoutonRoster();
     chargerConfig();
 
          switch (currentMode) {
@@ -70,6 +76,7 @@ export function initCrossKiosk(mode, params) {
         case 'cross-classe':     initClasse(container); break;
         case 'cross-consult':    initConsult(container); break;
         case 'cross-clic':       initClic(container); break;
+        case 'cross-tv':         initTv(container); break;
         default:
             container.innerHTML = `<p class="text-red-400 p-8">Mode inconnu : ${currentMode}</p>`;
     }
@@ -107,6 +114,89 @@ if (header) header.style.display = 'none';
         }
     });
 }
+
+// ============================================================
+// ROSTER LOCAL + RENDU PAR MODE
+// ============================================================
+function chargerRosterLocal() {
+    rosterLocal = loadRosterLocal();
+}
+
+function nomPourDossard(dossard) {
+    const r = rosterLocal[String(dossard)];
+    if (!r) return '';
+    return `${(r.prenom || '').trim()} ${(r.nom || '').trim()}`.trim();
+}
+
+function renderCurrentMode() {
+    const container = document.getElementById('cross-kiosk-container');
+    if (!container) return;
+    switch (currentMode) {
+        case 'cross-podium': render(); break;
+        case 'cross-classement': renderClassement(); break;
+        case 'cross-classe': renderClasse(window._arriveesParCourse); break;
+        case 'cross-consult': renderConsult(); break;
+        case 'cross-clic': renderClic(); break;
+        case 'cross-tv': renderTv(); break;
+    }
+}
+
+function rechargerModeActif() {
+    const container = document.getElementById('cross-kiosk-container');
+    if (!container) return;
+    switch (currentMode) {
+        case 'cross-podium': initPodium(container); break;
+        case 'cross-classement': initClassement(container); break;
+        case 'cross-classe': initClasse(container); break;
+        case 'cross-consult': initConsult(container); break;
+        case 'cross-clic': initClic(container); break;
+        case 'cross-tv': initTv(container); break;
+    }
+}
+
+function assurerBoutonRoster() {
+    let btn = document.getElementById('cross-roster-btn');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'cross-roster-btn';
+        btn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;background:#0891b2;color:#fff;font-weight:900;padding:8px 12px;border-radius:10px;font-size:12px;border:2px solid #22d3ee;';
+        document.body.appendChild(btn);
+    }
+    const hasRoster = Object.keys(rosterLocal).length > 0;
+    btn.textContent = hasRoster ? `📇 ${Object.keys(rosterLocal).length} noms` : '📇 Charger roster';
+    btn.onclick = () => {
+        if (hasRoster) {
+            if (!confirm('Retirer le roster local (noms masqués) ?')) return;
+            effacerRosterLocal();
+            rosterLocal = {};
+            btn.textContent = '📇 Charger roster';
+            rechargerModeActif();
+        } else {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json,application/json';
+            input.onchange = (ev) => {
+                const file = ev.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        sauverRosterLocal(data);
+                        rosterLocal = loadRosterLocal();
+                        btn.textContent = `📇 ${Object.keys(rosterLocal).length} noms`;
+                        rechargerModeActif();
+                    } catch (err) {
+                        alert('❌ Fichier roster invalide : ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+    };
+}
+
 // ============================================================
 // CHARGEMENT CONFIG
 // ============================================================
@@ -125,14 +215,14 @@ function chargerConfig() {
                 coursesMap = data;
             }
         }
-        render();
+        renderCurrentMode();
     });
 
     // Chargement des élèves (dossard → { classe, sexe, vma, statut })
     if (unsubConfig) unsubConfig();
     unsubConfig = onValue(ref(db, `${basePath}/config/eleves`), snap => {
         elevesMap = snap.val() || {};
-        render();
+        renderCurrentMode();
     });
 }
 
@@ -193,7 +283,8 @@ function render() {
         if (!parNiveau[niveau]) return;
         parNiveau[niveau].push({
             dossard: arr.dossard,
-            classe: eleve.classe
+            classe: eleve.classe,
+            timestamp: arr.timestamp
             // ✅ plus de nom/prenom
         });
     });
@@ -235,7 +326,7 @@ function render() {
 
             <!-- Zone podiums -->
             <div class="flex-1 p-6">
-                ${enCours ? renderPodiums(parNiveau, course) : renderAttente()}
+                ${enCours ? renderPodiums(parNiveau, course) + renderDerniersArrivees(parNiveau) : renderAttente()}
             </div>
         </div>
     `;
@@ -257,6 +348,43 @@ function renderPodiums(parNiveau, course) {
     return `
         <div class="grid grid-cols-1 md:grid-cols-${niveaux.length} gap-6 max-w-7xl mx-auto">
             ${niveaux.map(n => renderPodiumNiveau(n, parNiveau[n] || [])).join('')}
+        </div>
+    `;
+}
+
+function renderDerniersArrivees(parNiveau) {
+    const flat = [];
+    Object.entries(parNiveau).forEach(([niveau, liste]) => {
+        liste.forEach(item => flat.push({ ...item, niveau }));
+    });
+    flat.sort((a, b) => a.timestamp - b.timestamp);
+    const derniers = flat.slice(-20).reverse();
+    if (derniers.length === 0) return '';
+
+    const rows = derniers.map(item => {
+        const libelle = nomPourDossard(item.dossard);
+        return `
+            <div class="recent-row">
+                <span class="recent-dossard">#${item.dossard}</span>
+                ${libelle ? `<span class="recent-nom">${libelle}</span>` : ''}
+                <span class="recent-classe">${item.classe}</span>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <style>
+            .recent-block { margin-top: 24px; max-width: 1000px; margin-left: auto; margin-right: auto; }
+            .recent-title { color:#64748b; font-weight:900; text-transform:uppercase; font-size:0.7rem; letter-spacing:0.05em; margin-bottom:8px; }
+            .recent-list { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:6px; }
+            .recent-row { display:flex; gap:10px; align-items:center; padding:8px 12px; background:#1e293b; border-radius:10px; border-left:4px solid #334155; }
+            .recent-dossard { font-family:monospace; font-weight:900; color:#facc15; }
+            .recent-nom { color:#e2e8f0; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .recent-classe { margin-left:auto; color:#94a3b8; font-weight:900; }
+        </style>
+        <div class="recent-block">
+            <div class="recent-title">🕒 Derniers arrivés (${derniers.length})</div>
+            <div class="recent-list">${rows}</div>
         </div>
     `;
 }
@@ -295,12 +423,14 @@ function renderMarche(eleve, medaille, place, hauteurPx) {
         `;
     }
 
-    // ✅ RGPD : affiche uniquement dossard + classe (pas de nom)
+    // Dossard + nom (le nom est lu depuis le roster local, jamais Firebase).
+    const libelle = nomPourDossard(eleve.dossard);
     return `
         <div class="flex flex-col items-center cross-step" style="width: 30%;">
             <div class="text-5xl mb-2">${medalEmoji}</div>
-            <div class="text-center mb-2 min-h-[60px]">
+            <div class="text-center mb-2 min-h-[80px]">
                 <div class="text-4xl font-black text-white leading-tight">#${eleve.dossard}</div>
+                ${libelle ? `<div class="text-base font-bold text-white leading-tight mt-1">${libelle}</div>` : ''}
                 <div class="text-sm font-bold text-slate-400 uppercase">${eleve.classe}</div>
             </div>
             <div class="w-full rounded-t-xl ${bgClass} flex flex-col items-center justify-end text-white pb-3 shadow-xl"
@@ -329,7 +459,7 @@ function demarrerChrono() {
 // MODE CONSULTATION — Flux live par niveau (20 dernières arrivées)
 // ============================================================
 const CONSULT_LIMIT = 20;
-const DISTANCE_CONSULT_M = 2500;
+const DISTANCE_CONSULT_M = DISTANCE_CONTRAT_M;   // 2400 m
 
 function initConsult(container) {
     const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
@@ -385,7 +515,7 @@ function renderConsult() {
         const niveau = getNiveauFromClasse(eleve.classe);
         if (!parNiveau[niveau]) return;
 
-        // Calcule vitesse sur 2500 m
+        // Calcule vitesse sur la distance de contrat (2400 m)
         let vitesseKmh = null;
         if (goTimestamp && arr.timestamp > goTimestamp) {
             const tempsS = (arr.timestamp - goTimestamp) / 1000;
@@ -487,11 +617,12 @@ function renderConsultColonne(niveau, arrives, enCours) {
                 vitClass = 'consult-row--no-time';
             }
 
+            const libelle = nomPourDossard(e.dossard);
             return `
                 <div class="consult-row ${isRecent ? 'consult-row--recent' : ''} ${!e.vitesse ? 'consult-row--no-time' : ''}">
                     <span class="consult-dossard">#${e.dossard}</span>
                     <span class="consult-classe">${e.classe}</span>
-                    <span></span>
+                    <span class="text-white text-xs">${libelle || ''}</span>
                     <span class="consult-vit ${vitClass}">${vitHtml}</span>
                 </div>
             `;
@@ -728,12 +859,14 @@ function renderClassement() {
                                                        : item.rangNiveau === 2 ? '🥈'
                                                        : item.rangNiveau === 3 ? '🥉' : '';
 
+                                        const libelle = nomPourDossard(item.dossard);
+
                                         return `
                                             <div class="cl-row ${rowCls}">
                                                 <span class="text-base font-black text-yellow-400 flex items-center gap-1">
                                                     ${medaille}${medaille ? '' : item.rangNiveau}
                                                 </span>
-                                                <span class="cl-num text-base text-white">#${item.dossard}</span>
+                                                <span class="cl-num text-base text-white">#${item.dossard}${libelle ? ` <span class="block text-xs font-bold text-slate-300">${libelle}</span>` : ''}</span>
                                                 <span class="font-bold text-slate-300">${item.classe}</span>
                                                 <span class="cl-num text-sm text-emerald-400 text-right">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--'}</span>
                                                 <span class="cl-num text-sm ${pctColor} text-right">${item.pourcentageVMA !== null ? item.pourcentageVMA.toFixed(1) + '%' : '—'}</span>
@@ -1100,6 +1233,134 @@ function renderClic() {
                     </p>
                 </div>
             ` : ''}
+        </div>
+    `;
+}
+
+// ============================================================
+// MODE TV — défilement vertical continu (type TV ATP)
+// ============================================================
+function initTv(container) {
+    const basePath = `${getEtab()}/profs/${currentProfCode}/cross`;
+
+    if (unsubGo) unsubGo();
+    unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
+        const go = snap.val();
+        goTimestamp = go?.timestamp || null;
+        demarrerChronoTv();
+    });
+
+    if (unsubArrivees) unsubArrivees();
+    unsubArrivees = onValue(ref(db, `${basePath}/courses/${currentCourseId}/arrivees`), snap => {
+        arrivees = snap.val() || {};
+        renderTv();
+    });
+
+    renderTv();
+}
+
+function demarrerChronoTv() {
+    if (tvTimer) clearInterval(tvTimer);
+    const update = () => {
+        const el = document.getElementById('cross-tv-chrono');
+        if (el && goTimestamp) el.textContent = formatTemps(Math.floor((Date.now() - goTimestamp) / 1000));
+    };
+    update();
+    tvTimer = setInterval(update, 500);
+}
+
+function renderTv() {
+    const container = document.getElementById('cross-kiosk-container');
+    if (!container) return;
+
+    const course = coursesMap[currentCourseId] || COURSES_DEFAUT.find(c => c.id === currentCourseId);
+    if (!course) {
+        container.innerHTML = `<div class="text-center py-20 text-slate-400 text-2xl">⏳ En attente de la configuration...</div>`;
+        return;
+    }
+
+    const arriveesTriees = Object.entries(arrivees)
+        .map(([id, a]) => ({ id, ...a }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+    const parNiveau = {};
+    course.niveaux.forEach(n => { parNiveau[n] = []; });
+    const vus = new Set();
+    arriveesTriees.forEach(arr => {
+        if (vus.has(arr.dossard)) return;
+        vus.add(arr.dossard);
+        const eleve = elevesMap[String(arr.dossard)];
+        if (!eleve) return;
+        if (eleve.statut && eleve.statut !== 'present') return;
+        const niveau = getNiveauFromClasse(eleve.classe);
+        if (!parNiveau[niveau]) return;
+        const tempsSec = goTimestamp ? Math.max(0, Math.round((arr.timestamp - goTimestamp) / 1000)) : null;
+        const libelle = nomPourDossard(arr.dossard);
+        parNiveau[niveau].push({ dossard: arr.dossard, classe: eleve.classe, tempsSec, libelle });
+    });
+
+    const niveauxLabel = course.niveaux.map(n => `${n}e`).join(' + ');
+    const sexeLabel = course.sexe === 'F' ? 'Filles' : 'Garçons';
+    const enCours = !!goTimestamp;
+    const chronoStr = enCours ? formatTemps(Math.floor((Date.now() - goTimestamp) / 1000)) : '--:--';
+
+    const renderRows = () => {
+        const out = [];
+        course.niveaux.forEach(niveau => {
+            out.push(`<div class="tv-niveau-title">${niveau}e — ${parNiveau[niveau].length} arrivant${parNiveau[niveau].length > 1 ? 's' : ''}</div>`);
+            if (parNiveau[niveau].length === 0) {
+                out.push(`<div class="tv-row tv-row--empty">En attente...</div>`);
+            } else {
+                parNiveau[niveau].forEach((item, idx) => {
+                    const place = idx + 1;
+                    const medaille = place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : `${place}.`;
+                    out.push(`
+                        <div class="tv-row">
+                            <span class="tv-place">${medaille}</span>
+                            <span class="tv-dossard">#${item.dossard}</span>
+                            <span class="tv-nom">${item.libelle || ''}</span>
+                            <span class="tv-classe">${item.classe}</span>
+                            <span class="tv-temps">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--:--'}</span>
+                        </div>
+                    `);
+                });
+            }
+        });
+        return out.join('');
+    };
+
+    const rowsHtml = renderRows();
+
+    container.innerHTML = `
+        <style>
+            .tv-body { background:#0f172a; min-height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+            .tv-header { background:#0f172a; border-bottom:4px solid #22c55e; padding:16px 24px; display:flex; justify-content:space-between; align-items:center; }
+            .tv-liste { flex:1; overflow:hidden; position:relative; padding:16px; }
+            .tv-scroller { display:flex; flex-direction:column; gap:6px; animation:crossTvScroll 60s linear infinite; }
+            .tv-row { display:grid; grid-template-columns:60px 90px 1fr 90px 110px; align-items:center; gap:10px; padding:12px 16px; background:#1e293b; border-radius:12px; border-left:4px solid #334155; }
+            .tv-niveau-title { font-weight:900; color:#38bdf8; text-transform:uppercase; font-size:1.2rem; margin-top:14px; }
+            .tv-place { font-weight:900; color:#facc15; font-size:1.3rem; }
+            .tv-dossard { font-family:monospace; font-weight:900; color:#fff; font-size:1.3rem; }
+            .tv-nom { color:#e2e8f0; font-size:1.1rem; }
+            .tv-classe { color:#94a3b8; font-weight:900; text-align:center; }
+            .tv-temps { font-family:monospace; font-weight:900; color:#22c55e; text-align:right; }
+            .tv-row--empty { color:#475569; border-left-color:#334155; }
+            @keyframes crossTvScroll { 0% { transform:translateY(0); } 100% { transform:translateY(-50%); } }
+        </style>
+        <div class="tv-body">
+            <div class="tv-header">
+                <div>
+                    <div class="text-xs uppercase tracking-widest font-bold text-slate-500">Cross · Consultation TV</div>
+                    <div class="text-3xl font-black text-white">${niveauxLabel} ${sexeLabel}</div>
+                </div>
+                <div id="cross-tv-chrono" class="text-5xl font-mono font-black ${enCours ? 'text-emerald-400' : 'text-slate-600'}">${chronoStr}</div>
+            </div>
+            <div class="tv-liste">
+                <div class="tv-scroller" id="cross-tv-scroller">
+                    ${rowsHtml}
+                    ${rowsHtml}
+                </div>
+            </div>
         </div>
     `;
 }

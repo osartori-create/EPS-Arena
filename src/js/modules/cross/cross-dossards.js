@@ -6,10 +6,13 @@ import { getEtab } from '../../core/firebase-service.js';
 import {
     getTousLesElevesCross, setDossardPourEleve, getProchainDossardLibre,
     getStatutsCross, getClassesParticipantes,
-    setClassesParticipantes
+    setClassesParticipantes,
+    getExistingElevesCross, saveElevesCross,
+    sauvegarderDonneesCross, restaurerSauvegardeCross,
+    listerSauvegardesCross,
+    genererRosterJSON
 } from './cross-config.js';
 import { COURSES_DEFAUT, getNiveauFromClasse, generateEan13, DISTANCE_CONTRAT_M } from './cross-core.js';
-import { getExistingEleves, saveEleves } from '../../services/admin-service.js';
 
 const Papa = window.Papa;
 
@@ -20,8 +23,14 @@ const ECART = 5;
 const DOS_W = A4_W - 2 * MARGE;      // = 200 mm
 const DOS_H = (A4_H - 2 * MARGE - ECART) / 2;  // = 141 mm
 
-// Seuil d'affichage du pictogramme coureur
-const VMA_SEUIL_COUREUR = 12;
+// Seuils d'affichage des pictogrammes
+const VMA_SEUIL_COUREUR = 10;   // coureur
+const VMA_SEUIL_VOITURE = 12;   // voiture de course
+
+// Un dossard est imprimable s'il a un numéro ET qu'il n'est ni absent ni abandon.
+function estImprimable(e) {
+    return (e.statut === 'present' || e.statut === 'inapte') && !!e.dossard;
+}
 
 // ============================================================
 // POINT D'ENTRÉE
@@ -33,7 +42,9 @@ export function initCrossDossards(container) {
     const eleves = getTousLesElevesCross();
 
     const nbPresent = eleves.filter(e => e.statut === 'present').length;
-    const nbAvecDossard = eleves.filter(e => e.dossard && e.statut === 'present').length;
+    const nbInaptes = eleves.filter(e => e.statut === 'inapte').length;
+    const nbAvecDossard = eleves.filter(e => estImprimable(e)).length;
+    const nbSansDossard = eleves.filter(e => (e.statut === 'present' || e.statut === 'inapte') && !e.dossard).length;
     const nbPages = Math.ceil(nbAvecDossard / 2);
 
     container.innerHTML = `
@@ -57,6 +68,14 @@ export function initCrossDossards(container) {
         class="bg-rose-600 hover:bg-rose-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-rose-400 active:scale-95">
     🌊 Simuler un cross complet
 </button>
+                    <button onclick="window.crossRestaurerSauvegarde()"
+                            class="bg-emerald-700 hover:bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95">
+                        ♻️ Restaurer
+                    </button>
+                    <button onclick="window.crossExporterRoster()"
+                            class="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-cyan-400 active:scale-95">
+                        📦 Exporter roster
+                    </button>
                     <input type="file" id="crossDossardsCSVInput" class="hidden" accept=".csv" onchange="window.crossDossardsTraiterCSV(event)">
                 </div>
             </div>
@@ -72,7 +91,7 @@ export function initCrossDossards(container) {
                 </div>
                 <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
                     <div class="text-[10px] uppercase text-slate-400 font-bold">Sans dossard</div>
-                    <div class="text-2xl font-black ${nbPresent - nbAvecDossard > 0 ? 'text-amber-400' : 'text-slate-500'}">${nbPresent - nbAvecDossard}</div>
+                    <div class="text-2xl font-black ${nbSansDossard > 0 ? 'text-amber-400' : 'text-slate-500'}">${nbSansDossard}</div>
                 </div>
                 <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 text-center">
                     <div class="text-[10px] uppercase text-slate-400 font-bold">Pages A4</div>
@@ -143,8 +162,7 @@ window.crossDossardsUpdateCompteur = function() {
         : null;
 
     const selectionnes = eleves.filter(e => {
-        if (e.statut !== 'present') return false;
-        if (!e.dossard) return false;
+        if (!estImprimable(e)) return false;
         if (classesChoisies && !classesChoisies.includes(e.classe)) return false;
         return true;
     });
@@ -170,8 +188,7 @@ window.crossDossardsGenererPDF = async function() {
         : null;
 
     let liste = eleves.filter(e => {
-        if (e.statut !== 'present') return false;
-        if (!e.dossard) return false;
+        if (!estImprimable(e)) return false;
         if (classesChoisies && !classesChoisies.includes(e.classe)) return false;
         return true;
     });
@@ -233,13 +250,17 @@ async function dessinerDossard(doc, eleve, x0, y0) {
 
     let cursorY = y0 + 4;
 
-    // ---- Pictogramme coureur si VMA >= 12 (20 mm, centré) ----
-    if (vma >= VMA_SEUIL_COUREUR) {
-        const img = await genererImageCoureur();
-        if (img) {
-            const imgSize = 20;
-            doc.addImage(img, 'PNG', centreX - imgSize / 2, cursorY, imgSize, imgSize);
-        }
+    // ---- Pictogramme selon la VMA ----
+    // VMA >= 12 : voiture de course ; VMA >= 10 : coureur.
+    let picto = null;
+    if (vma >= VMA_SEUIL_VOITURE) {
+        picto = await genererImageVoiture();
+    } else if (vma >= VMA_SEUIL_COUREUR) {
+        picto = await genererImageCoureur();
+    }
+    if (picto) {
+        const imgSize = 20;
+        doc.addImage(picto, 'PNG', centreX - imgSize / 2, cursorY, imgSize, imgSize);
     }
     // Espace réservé même sans picto pour garder un alignement identique
     cursorY += 21;
@@ -285,20 +306,27 @@ async function dessinerDossard(doc, eleve, x0, y0) {
     doc.text(`Classe ${eleve.classe}  ·  ${cat.label}`, centreX, cursorY + 4, { align: 'center' });
     cursorY += 9;
 
-    // ---- Contrat (2 lignes) ----
-    const contrat = getContratLignes(vma);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(90, 90, 90);
-    doc.text(contrat.ligne1, centreX, cursorY + 4, { align: 'center' });
-    doc.text(contrat.ligne2, centreX, cursorY + 11, { align: 'center' });
+    // ---- Contrat ou mention inapte ----
+    if (eleve.statut === 'inapte') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(180, 30, 30);
+        doc.text('Inapte, doit se rendre à l\'arrivée où une tâche lui sera confiée.', centreX, cursorY + 7, { align: 'center' });
+    } else {
+        const contrat = getContratLignes(vma);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(90, 90, 90);
+        doc.text(contrat.ligne1, centreX, cursorY + 4, { align: 'center' });
+        doc.text(contrat.ligne2, centreX, cursorY + 11, { align: 'center' });
+    }
 }
 
 // ============================================================
 // TEXTE DU CONTRAT (2 LIGNES) AVEC TEMPS CIBLE
 // ============================================================
 function getContratLignes(vma) {
-    const distanceM = DISTANCE_CONTRAT_M;  // 2500 m
+    const distanceM = DISTANCE_CONTRAT_M;  // 2400 m
 
     if (!vma || vma <= 0) {
         return {
@@ -399,6 +427,33 @@ function genererImageCoureur() {
 }
 
 // ============================================================
+// PICTOGRAMME VOITURE DE COURSE (emoji rendu via canvas)
+// ============================================================
+let _cacheVoiture = null;
+function genererImageVoiture() {
+    if (_cacheVoiture) return Promise.resolve(_cacheVoiture);
+
+    return new Promise((resolve) => {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 256, 256);
+            ctx.font = '220px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('🏎️', 128, 138);
+            _cacheVoiture = canvas.toDataURL('image/png');
+            resolve(_cacheVoiture);
+        } catch (err) {
+            console.warn('[Dossards] Emoji voiture non disponible :', err);
+            resolve(null);
+        }
+    });
+}
+
+// ============================================================
 // CATÉGORIE DE COURSE
 // ============================================================
 function getCategorieCourse(eleve) {
@@ -491,7 +546,7 @@ function traiterDonneesCSV(rows, headers) {
     });
 
     Object.entries(parClasse).forEach(([classe, elevesCSV]) => {
-        const existants = getExistingEleves(classe);
+        const existants = getExistingElevesCross(classe);
         const map = {};
         existants.forEach(e => {
             const cle = `${(e.nom || '').toUpperCase()}|${(e.prenom || '').toUpperCase()}`;
@@ -535,7 +590,7 @@ function traiterDonneesCSV(rows, headers) {
             }
         });
 
-        saveEleves(classe, existants);
+        saveElevesCross(classe, existants);
     });
 
     const actuelles = getClassesParticipantes();
@@ -556,7 +611,7 @@ function traiterDonneesCSV(rows, headers) {
 function attribuerDossardsManquants() {
     const eleves = getTousLesElevesCross();
     const sansDossard = eleves
-        .filter(e => e.statut === 'present' && !e.dossard)
+        .filter(e => (e.statut === 'present' || e.statut === 'inapte') && !e.dossard)
         .sort((a, b) => {
             if (a.classe !== b.classe) return a.classe.localeCompare(b.classe);
             return `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`);
@@ -581,7 +636,8 @@ window.crossDossardsDonneesBidons = function() {
     const prenomsF = ['Emma', 'Léa', 'Chloé', 'Manon', 'Camille', 'Sarah', 'Louise', 'Jade', 'Alice', 'Lina', 'Rose', 'Anna', 'Inès', 'Zoé', 'Mila'];
     const noms = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefebvre', 'Michel', 'Garcia'];
 
-    const elevesExistants = getExistingEleves(classe);
+    sauvegarderDonneesCross('Avant ajout données bidons');
+    const elevesExistants = getExistingElevesCross(classe);
     const nouveaux = [];
 
     for (let i = 0; i < nb; i++) {
@@ -616,7 +672,7 @@ window.crossDossardsDonneesBidons = function() {
         }
     });
 
-    saveEleves(classe, tous);
+    saveElevesCross(classe, tous);
 
     const actuelles = getClassesParticipantes();
     if (!actuelles.includes(classe)) {
@@ -637,6 +693,64 @@ function normaliserNom(str) {
     if (!str) return '';
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
 }
+
+// ============================================================
+// EXPORT DU ROSTER LOCAL (dossard → nom/prénom/classe)
+// ============================================================
+window.crossExporterRoster = function() {
+    const payload = genererRosterJSON();
+    if (payload.nbDossards === 0) {
+        alert('❌ Aucun élève avec dossard à exporter.\n\nGénère d\'abord les dossards dans l\'onglet Préparation.');
+        return;
+    }
+
+    const json = JSON.stringify(payload, null, 2);
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+    const filename = `roster_cross_${stamp}.json`;
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+    alert(`✅ Roster exporté : ${filename}\n\n${payload.nbDossards} dossard(s) avec nom/prénom/classe.\n\nCharge ce fichier sur les iPads de course (mode kiosk Cross).`);
+};
+
+// ============================================================
+// RESTAURATION D'UNE SAUVEGARDE CROSS
+// ============================================================
+window.crossRestaurerSauvegarde = function() {
+    const sauvegardes = listerSauvegardesCross();
+    if (sauvegardes.length === 0) {
+        alert('♻️ Aucune sauvegarde CROSS disponible pour le moment.\n\nLes sauvegardes sont créées automatiquement avant chaque simulation ou ajout de données bidons.');
+        return;
+    }
+
+    const lignes = sauvegardes.map((s, i) => `${i + 1}. ${s.dateLisible} — ${s.label || 'Sauvegarde'}`).join('\n');
+    const choix = prompt(`♻️ Sauvegardes CROSS disponibles (de la plus récente à la plus ancienne) :\n\n${lignes}\n\nTape le numéro de la sauvegarde à restaurer, ou Annuler pour ne rien faire.`);
+    if (choix === null) return;
+
+    const index = parseInt(choix, 10) - 1;
+    if (isNaN(index) || index < 0 || index >= sauvegardes.length) {
+        alert('❌ Numéro invalide. Aucune restauration effectuée.');
+        return;
+    }
+
+    const cible = sauvegardes[index];
+    if (!confirm(`♻️ Restaurer la sauvegarde du ${cible.dateLisible} ?\n\n"${cible.label || 'Sauvegarde'}"\n\nLes données CROSS actuelles seront remplacées par cette sauvegarde.\nContinuer ?`)) return;
+
+    const nb = restaurerSauvegardeCross(cible.key);
+    alert(`✅ Sauvegarde restaurée avec succès (${nb} clé(s) restaurée(s)).`);
+    const c = document.getElementById('cross-content');
+    if (c) initCrossDossards(c);
+};
+
 // ============================================================
 // GÉNÉRATION D'UN CROSS COMPLET (élèves + dossards + arrivées)
 // ============================================================
@@ -715,6 +829,10 @@ window.crossSimulerCrossComplet = async function() {
 
     console.log(`🌊 Simulation : ${nbTotalClasses} classes × ${nbParClasse} élèves = ${nbTotalEleves} élèves`);
 
+    // --- Sauvegarde préalable de toutes les données CROSS ---
+    const cleSauvegarde = sauvegarderDonneesCross('Avant simulation cross complet');
+    console.log(`💾 Sauvegarde CROSS réalisée : ${cleSauvegarde}`);
+
     // --- Construction des classes : 601 à 60X, puis 501 à 50X, etc. ---
     const niveaux = ['6', '5', '4', '3'];
     const classes = [];
@@ -761,9 +879,9 @@ window.crossSimulerCrossComplet = async function() {
         }
     }
 
-    // --- Sauvegarde locale ---
+    // --- Sauvegarde locale (espace isolé CROSS) ---
     for (const [classe, eleves] of Object.entries(elevesParClasse)) {
-        saveEleves(classe, eleves);
+        saveElevesCross(classe, eleves);
     }
     localStorage.setItem('eps_arena_cross_dossards', JSON.stringify(dossards));
     localStorage.setItem('eps_arena_cross_dossards_inv', JSON.stringify(invDossards));
@@ -819,7 +937,7 @@ window.crossSimulerCrossComplet = async function() {
             const bruit = (Math.random() - 0.5) * 0.15;
             const facteur = Math.max(0.68, Math.min(0.95, baseFactor + bruit));
             const vCible = e.vma * facteur;
-            const tempsSec = (2500 / 1000) / vCible * 3600;
+            const tempsSec = (DISTANCE_CONTRAT_M / 1000) / vCible * 3600;
             e.tempsMs = Math.round(tempsSec * 1000);
         });
 
@@ -876,7 +994,7 @@ window.crossSimulerCrossComplet = async function() {
         console.warn('⚠️ Transmission config échouée :', err);
     }
 
-    alert(`🌊 Simulation terminée !\n\n📊 Bilan :\n- ${nbTotalClasses} classes (${nbClassesParNiveau} par niveau)\n- ${nbTotalEleves} élèves\n- ${dossardCourant - 1} dossards attribués\n- ${totalArrivees} arrivées simulées\n\n${statsCourses.join('\n')}\n\nVa dans Cross → Course pour voir le résultat.`);
+    alert(`🌊 Simulation terminée !\n\n📊 Bilan :\n- ${nbTotalClasses} classes (${nbClassesParNiveau} par niveau)\n- ${nbTotalEleves} élèves\n- ${dossardCourant - 1} dossards attribués\n- ${totalArrivees} arrivées simulées\n\n${statsCourses.join('\n')}\n\n💾 Une sauvegarde des données CROSS a été automatiquement créée avant la simulation.\n\nVa dans Cross → Course pour voir le résultat.`);
 
     // Rafraîchir l'interface
     const c = document.getElementById('cross-content');
