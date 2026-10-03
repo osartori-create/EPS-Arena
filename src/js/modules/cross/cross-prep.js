@@ -7,7 +7,7 @@ import {
     getTousLesElevesCross, setDossardPourEleve, getDossardByEleveId,
     getStatutsCross, setStatutsCross, getDossards,
     viderDonneesCross, sauvegarderDonneesCross,
-    setVmaEleveCross
+    setVmaEleveCross, ajouterEleveCross
 } from './cross-config.js';
 import { importCSVEtablissement, importExcelDossards, importExcelListeEleves, genererDossardsAuto } from './cross-import.js';
 import { getNiveauFromClasse } from './cross-core.js';
@@ -60,6 +60,9 @@ async function render(container) {
                     </button>
                     <button onclick="window.crossPrepGenererDossards()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-xl font-black text-xs text-white">
                         🎫 Générer dossards auto
+                    </button>
+                    <button onclick="window.crossPrepAjouterReserve()" class="bg-fuchsia-600 hover:bg-fuchsia-500 px-3 py-2 rounded-xl font-black text-xs text-white">
+                        ➕ Élève réserve
                     </button>
                     <button onclick="window.crossPrepReset()" class="bg-red-600 hover:bg-red-500 px-3 py-2 rounded-xl font-black text-xs text-white">
                         🗑️ Reset
@@ -157,6 +160,54 @@ function renderRow(e) {
         </tr>
     `;
 }
+
+// ============================================================
+// AJOUT D'UN ÉLÈVE RÉSERVE (nom + sexe + classe + dossard)
+// ============================================================
+window.crossPrepAjouterReserve = () => {
+    const classe = prompt('Classe de l\'élève (ex : 604) ?');
+    if (classe === null) return;
+    if (!classe.trim()) return alert('⚠️ La classe est obligatoire.');
+
+    const nom = prompt('Nom de famille ?');
+    if (nom === null) return;
+    if (!nom.trim()) return alert('⚠️ Le nom est obligatoire.');
+
+    const prenom = prompt('Prénom ?');
+    if (prenom === null) return;
+    if (!prenom.trim()) return alert('⚠️ Le prénom est obligatoire.');
+
+    const sexe = prompt('Sexe ? (M pour garçon, F pour fille)', 'M');
+    if (sexe === null) return;
+    const sexeN = (String(sexe).trim().toUpperCase() === 'F') ? 'F' : 'M';
+
+    const vma = prompt('VMA (optionnelle, ex : 10.3) ?', '');
+    if (vma === null) return;
+
+    const dossard = prompt('N° de dossard de réserve (optionnel, laisse vide pour auto) ?', '');
+    if (dossard === null) return;
+
+    try {
+        const eleve = ajouterEleveCross({
+            classe: classe.trim(),
+            nom: nom.trim(),
+            prenom: prenom.trim(),
+            sexe: sexeN,
+            vma: parseFloat(vma) || 0,
+            dossard: dossard.trim() ? parseInt(dossard, 10) : null
+        });
+        if (!eleve) {
+            alert('❌ Élève non ajouté (champs obligatoires manquants).');
+            return;
+        }
+        const d = dossard && dossard.trim() ? dossard.trim() : getDossardByEleveId(eleve.id) || 'auto';
+        alert(`✅ ${eleve.prenom} ${eleve.nom} ajouté(e) à la classe ${classe.trim()}.\n\nDossard n° ${d}.\n\nL'élève apparaîtra dans les classements.`);
+        refreshCross();
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur : ' + err.message);
+    }
+};
 
 // ============================================================
 // SAISIE MANUELLE DE LA VMA

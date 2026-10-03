@@ -160,6 +160,90 @@ export function setVmaEleveCross(classe, eleveId, vma) {
     return true;
 }
 
+function normaliserPourId(str) {
+    if (!str) return '';
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
+}
+
+/**
+ * Ajoute un élève « réserve » dans l'espace isolé du CROSS et lui affecte
+ * un dossard (fourni ou prochain libre). Idéal pour intégrer un nouvel
+ * élève / une erreur de liste aux classements en milieu de course.
+ *
+ * @param {Object} p
+ * @param {string} p.classe
+ * @param {string} p.nom
+ * @param {string} p.prenom
+ * @param {string} p.sexe           'M' | 'F'
+ * @param {number|string} [p.vma]
+ * @param {number|string} [p.dossard] numéro de dossard de réserve (sinon auto)
+ * @returns {Object|null} l'élève créé (ou existant si doublon nom+prénom).
+ */
+export function ajouterEleveCross({ classe, nom, prenom, sexe, vma, dossard }) {
+    if (!classe || !nom || !prenom) return null;
+
+    const base = `${normaliserPourId(nom)}_${normaliserPourId(prenom).charAt(0)}`;
+
+    // IDs déjà utilisés dans toutes les classes CROSS.
+    const usedIds = new Set();
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(ELEVES_CROSS_PREFIX)) {
+            getExistingElevesCross(k.replace(ELEVES_CROSS_PREFIX, '')).forEach(el => usedIds.add(el.id));
+        }
+    }
+
+    let id = base;
+    let suffixe = 1;
+    while (usedIds.has(id)) {
+        id = `${base}${suffixe}`;
+        suffixe++;
+    }
+
+    const eleves = getExistingElevesCross(classe);
+
+    // Antidoublon dans la même classe.
+    const existant = eleves.find(el =>
+        normaliserPourId(el.nom) === normaliserPourId(nom) &&
+        normaliserPourId(el.prenom) === normaliserPourId(prenom)
+    );
+    if (existant) return existant;
+
+    const eleve = {
+        id,
+        nom,
+        prenom,
+        sexe: (sexe === 'F' ? 'F' : 'M'),
+        dateNaissance: '',
+        vma: parseFloat(vma) || 0,
+        palier: 0,
+        longueur: null,
+        sprint30: null,
+        force: 0,
+        commentaire: ''
+    };
+
+    eleves.push(eleve);
+    saveElevesCross(classe, eleves);
+    migrerCodesAutoEvalCross(classe);
+
+    // Ajoute la classe aux participants si nécessaire.
+    const classes = getClassesParticipantes();
+    if (!classes.includes(classe)) {
+        setClassesParticipantes([...classes, classe]);
+    }
+
+    // Affectation du dossard.
+    if (dossard) {
+        setDossardPourEleve(eleve.id, parseInt(dossard, 10));
+    } else {
+        const libre = getProchainDossardLibre();
+        setDossardPourEleve(eleve.id, libre);
+    }
+
+    return eleve;
+}
+
 export function migrerCodesAutoEvalCross(classeName) {
     const eleves = getExistingElevesCross(classeName);
     if (eleves.length === 0) return false;

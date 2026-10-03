@@ -126,10 +126,16 @@ export function initCrossDossards(container) {
                             ${nbAvecDossard} dossards · ${nbPages} pages
                         </span>
                     </div>
-                    <button onclick="window.crossDossardsGenererPDF()"
-                            class="w-full md:w-auto bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-black text-sm uppercase text-white border-2 border-emerald-400 active:scale-95">
-                        📄 Générer le PDF
-                    </button>
+                    <div class="flex gap-2 flex-wrap w-full md:w-auto">
+                        <button onclick="window.crossDossardsGenererPDF()"
+                                class="bg-emerald-600 hover:bg-emerald-500 px-6 py-3 rounded-xl font-black text-sm uppercase text-white border-2 border-emerald-400 active:scale-95">
+                            📄 Générer le PDF
+                        </button>
+                        <button onclick="window.crossDossardsGenererPDFReserves()"
+                                class="bg-slate-600 hover:bg-slate-500 px-6 py-3 rounded-xl font-black text-sm uppercase text-white border-2 border-slate-400 active:scale-95">
+                            🛟 Réserves
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -335,6 +341,107 @@ async function dessinerDossard(doc, eleve, x0, y0) {
         doc.text(contrat.ligne2, centreX, cursorY + 9, { align: 'center' });
     }
 }
+
+// ============================================================
+// DOSSARDS DE RÉSERVE (vierges, imprimables à l'avance)
+// ============================================================
+async function dessinerDossardReserve(doc, numero, x0, y0) {
+    const ean = generateEan13(numero);
+    const eanSansCle = ean.slice(0, -1);
+
+    // Cadre de coupe fin gris
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.2);
+    doc.rect(x0, y0, DOS_W, DOS_H);
+
+    // ---- Code-barres vertical à GAUCHE ----
+    const barCodeLatW = 14;
+    try {
+        const eanImg = await genererImageCodeBarres(ean, true);
+        doc.addImage(eanImg, 'PNG', x0 + 2, y0 + 4, barCodeLatW - 4, DOS_H - 8);
+    } catch (err) {
+        console.warn('[Dossards] Erreur code-barres réserve :', err);
+    }
+
+    const zoneX = x0 + barCodeLatW + 4;
+    const zoneW = DOS_W - barCodeLatW - 8;
+    const centreX = zoneX + zoneW / 2;
+
+    let cursorY = y0 + 10;
+
+    // ---- Mention RÉSERVE ----
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(200, 30, 30);
+    doc.text('RÉSERVE', centreX, cursorY, { align: 'center' });
+    cursorY += 8;
+
+    // ---- Numéro géant ----
+    doc.setFontSize(100);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`#${numero}`, centreX, cursorY + 42, { align: 'center' });
+    cursorY += 48;
+
+    // ---- Ligne vierge Nom / Prénom ----
+    const lineW = Math.min(zoneW - 30, 120);
+    const lineY = cursorY + 8;
+    doc.setDrawColor(120, 120, 120);
+    doc.setLineWidth(0.3);
+    doc.line(centreX - lineW / 2, lineY, centreX + lineW / 2, lineY);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text('Nom / Prénom à compléter', centreX, lineY - 2, { align: 'center' });
+    cursorY += 22;
+
+    // ---- Code-barres horizontal ----
+    const barH = 20;
+    const barW = Math.min(zoneW - 40, 120);
+    const barX = centreX - barW / 2;
+    try {
+        const eanImg = await genererImageCodeBarres(ean, false);
+        doc.addImage(eanImg, 'PNG', barX, cursorY, barW, barH);
+    } catch (err) {
+        console.warn('[Dossards] Erreur code-barres réserve bas :', err);
+    }
+    cursorY += barH + 2;
+
+    // ---- Numéro humain SOUS le code-barres ----
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(eanSansCle, centreX, cursorY + 3, { align: 'center' });
+}
+
+window.crossDossardsGenererPDFReserves = async function() {
+    if (!window.jspdf || !window.JsBarcode) {
+        alert('❌ Librairie jsPDF ou JsBarcode non chargée.\nVérifie le CDN dans maitre.html.');
+        return;
+    }
+
+    const nb = parseInt(prompt('Combien de dossards de réserve ?', '20')) || 20;
+    if (nb <= 0) return;
+
+    // Les réserves commencent après le dernier dossard attribué.
+    const premier = getProchainDossardLibre();
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+    for (let i = 0; i < nb; i += 2) {
+        if (i > 0) doc.addPage();
+
+        await dessinerDossardReserve(doc, premier + i, MARGE, MARGE);
+        if (i + 1 < nb) {
+            await dessinerDossardReserve(doc, premier + i + 1, MARGE, MARGE + DOS_H + ECART);
+        }
+    }
+
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    doc.save(`dossards_cross_reserves_${dateStr}.pdf`);
+
+    alert(`✅ ${nb} dossards de réserve générés (n° ${premier} à ${premier + nb - 1}).\n\nRemplis le nom à la main si besoin, puis affecte le numéro au nouvel élève dans l'application.`);
+};
 
 // ============================================================
 // TEXTE DU CONTRAT (2 LIGNES) AVEC TEMPS CIBLE
