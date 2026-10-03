@@ -370,66 +370,66 @@ window.crossResultsOuvrirModif = function(dossard) {
 
     const overlay = document.createElement('div');
     overlay.id = 'cross-modif-modal';
-    overlay.className = 'fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4';
+    overlay.className = 'fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4';
     overlay.innerHTML = `
-        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-3">
+        <div class="bg-white p-6 rounded-3xl border-2 border-gray-300 w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-200 pb-3">
                 <div>
-                    <h3 class="text-xl font-black text-white">${eleve.prenom} ${eleve.nom}</h3>
-                    <p class="text-xs text-slate-400">Dossard #${dossard} · Classe ${eleve.classe} · ${eleve.sexe === 'F' ? 'Fille' : 'Garçon'}</p>
-                    ${tempsBrut !== null ? `<p class="text-xs text-slate-500 mt-1">Temps brut : ${formatTemps(tempsBrut)}</p>` : ''}
+                    <h3 class="text-xl font-black text-gray-900">${eleve.prenom} ${eleve.nom}</h3>
+                    <p class="text-xs text-gray-600">Dossard #${dossard} · Classe ${eleve.classe} · ${eleve.sexe === 'F' ? 'Fille' : 'Garçon'}</p>
+                    ${tempsBrut !== null ? `<p class="text-xs text-gray-500 mt-1">Temps brut : ${formatTemps(tempsBrut)}</p>` : ''}
                 </div>
                 <button onclick="document.getElementById('cross-modif-modal').remove()"
-                        class="bg-slate-700 px-3 py-1.5 rounded-lg text-xs font-black text-white">✖</button>
+                        class="bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded-lg text-xs font-black text-gray-700">✖</button>
             </div>
 
             <div class="space-y-4">
                 <!-- Temps modifié -->
                 <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase block mb-1">
+                    <label class="text-xs font-bold text-gray-700 uppercase block mb-1">
                         Temps modifié manuellement (mm:ss)
                     </label>
                     <input type="text" id="modif-temps" placeholder="ex: 12:34"
                            value="${modif.tempsModifie ? formatTemps(Math.round(modif.tempsModifie / 1000)) : ''}"
-                           class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-center text-lg font-mono">
-                    <p class="text-[10px] text-slate-500 mt-1">Utilise ce champ pour corriger un scan manqué. Laisse vide si tu ne modifies pas le temps.</p>
+                           class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 text-center text-lg font-mono">
+                    <p class="text-[10px] text-gray-500 mt-1">Utilise ce champ pour corriger un scan manqué. Laisse vide si tu ne modifies pas le temps.</p>
                 </div>
 
                 <!-- Pénalité secondes -->
                 <div>
-                    <label class="text-xs font-bold text-orange-400 uppercase block mb-1">
+                    <label class="text-xs font-bold text-orange-600 uppercase block mb-1">
                         Pénalité de temps (secondes ajoutées)
                     </label>
                     <input type="number" id="modif-penSec" placeholder="ex: 30" min="0" max="600"
                            value="${modif.penaliteSecondes || ''}"
-                           class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-center text-lg font-mono">
-                    <p class="text-[10px] text-slate-500 mt-1">Ex : 30 = +30 secondes au temps.</p>
+                           class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 text-center text-lg font-mono">
+                    <p class="text-[10px] text-gray-500 mt-1">Ex : 30 = +30 secondes au temps.</p>
                 </div>
 
                 <!-- Pénalité points -->
                 <div>
-                    <label class="text-xs font-bold text-orange-400 uppercase block mb-1">
+                    <label class="text-xs font-bold text-orange-600 uppercase block mb-1">
                         Pénalité de points (retrait sur /20)
                     </label>
                     <input type="number" id="modif-penPts" placeholder="ex: 2" min="0" max="20"
                            value="${modif.penalitePoints || ''}"
-                           class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-center text-lg font-mono">
+                           class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 text-center text-lg font-mono">
                 </div>
 
                 <!-- Statut -->
                 <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase block mb-1">Statut</label>
+                    <label class="text-xs font-bold text-gray-700 uppercase block mb-1">Statut</label>
                     <div class="grid grid-cols-3 gap-2">
                         <button onclick="window.crossResultsSetStatut('normal')" id="modif-statut-normal"
-                                class="p-3 rounded-xl font-black text-sm border-2 ${(modif.statut || 'normal') === 'normal' ? 'bg-slate-600 border-slate-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}">
+                                class="p-3 rounded-xl font-black text-sm border-2 ${(modif.statut || 'normal') === 'normal' ? 'bg-gray-600 border-gray-500 text-white' : 'bg-gray-100 border-gray-300 text-gray-600'}">
                             ✅ Normal
                         </button>
                         <button onclick="window.crossResultsSetStatut('abandon')" id="modif-statut-abandon"
-                                class="p-3 rounded-xl font-black text-sm border-2 ${modif.statut === 'abandon' ? 'bg-red-600 border-red-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}">
+                                class="p-3 rounded-xl font-black text-sm border-2 ${modif.statut === 'abandon' ? 'bg-red-600 border-red-500 text-white' : 'bg-gray-100 border-gray-300 text-gray-600'}">
                             🚫 Abandon
                         </button>
                         <button onclick="window.crossResultsSetStatut('blessure')" id="modif-statut-blessure"
-                                class="p-3 rounded-xl font-black text-sm border-2 ${modif.statut === 'blessure' ? 'bg-pink-600 border-pink-400 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}">
+                                class="p-3 rounded-xl font-black text-sm border-2 ${modif.statut === 'blessure' ? 'bg-pink-600 border-pink-500 text-white' : 'bg-gray-100 border-gray-300 text-gray-600'}">
                             🤕 Blessure
                         </button>
                     </div>
@@ -438,21 +438,21 @@ window.crossResultsOuvrirModif = function(dossard) {
 
                 <!-- Commentaire -->
                 <div>
-                    <label class="text-xs font-bold text-slate-400 uppercase block mb-1">Commentaire</label>
+                    <label class="text-xs font-bold text-gray-700 uppercase block mb-1">Commentaire</label>
                     <textarea id="modif-commentaire" rows="2" placeholder="Note libre..."
-                              class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-sm">${modif.commentaire || ''}</textarea>
+                              class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-gray-900 text-sm">${modif.commentaire || ''}</textarea>
                 </div>
             </div>
 
             <div class="flex gap-3 mt-6">
                 ${modif.timestamp ? `
                     <button onclick="window.crossResultsSupprimerModif('${dossard}')"
-                            class="bg-red-700 hover:bg-red-600 px-4 py-3 rounded-xl font-black text-sm text-white">
+                            class="bg-red-600 hover:bg-red-500 px-4 py-3 rounded-xl font-black text-sm text-white">
                         🗑️ Effacer
                     </button>
                 ` : ''}
                 <button onclick="window.crossResultsFermerModif()"
-                        class="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-black text-white">Annuler</button>
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 py-3 rounded-xl font-black text-gray-700">Annuler</button>
                 <button onclick="window.crossResultsSauvegarderModif('${dossard}')"
                         class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-black text-white">💾 Enregistrer</button>
             </div>
@@ -468,10 +468,10 @@ window.crossResultsSetStatut = function(statut) {
         const btn = document.getElementById(`modif-statut-${s}`);
         if (!btn) return;
         if (s === statut) {
-            const colors = { normal: 'bg-slate-600 border-slate-400', abandon: 'bg-red-600 border-red-400', blessure: 'bg-pink-600 border-pink-400' };
+            const colors = { normal: 'bg-gray-600 border-gray-500', abandon: 'bg-red-600 border-red-500', blessure: 'bg-pink-600 border-pink-500' };
             btn.className = `p-3 rounded-xl font-black text-sm border-2 ${colors[s]} text-white`;
         } else {
-            btn.className = 'p-3 rounded-xl font-black text-sm border-2 bg-slate-800 border-slate-700 text-slate-400';
+            btn.className = 'p-3 rounded-xl font-black text-sm border-2 bg-gray-100 border-gray-300 text-gray-600';
         }
     });
 };

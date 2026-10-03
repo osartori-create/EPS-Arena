@@ -100,10 +100,10 @@ export function appliquerModif(tempsBrut, modif) {
  * Labels et couleurs des statuts.
  */
 export const STATUTS = {
-    normal:   { label: 'Normal',      emoji: '✅', couleur: '#64748b', bg: '#1e293b' },
-    penalite: { label: 'Pénalité',    emoji: '⚠️', couleur: '#f59e0b', bg: '#78350f30' },
-    abandon:  { label: 'Abandon',     emoji: '🚫', couleur: '#ef4444', bg: '#7f1d1d30' },
-    blessure: { label: 'Blessure',    emoji: '🤕', couleur: '#ec4899', bg: '#83184330' }
+    normal:   { label: 'Normal',      emoji: '✅', couleur: '#9ca3af', bg: '#ffffff' },
+    penalite: { label: 'Pénalité',    emoji: '⚠️', couleur: '#d97706', bg: '#fef3c7' },
+    abandon:  { label: 'Abandon',     emoji: '🚫', couleur: '#dc2626', bg: '#fee2e2' },
+    blessure: { label: 'Blessure',    emoji: '🤕', couleur: '#db2777', bg: '#fce7f3' }
 };
 
 /**

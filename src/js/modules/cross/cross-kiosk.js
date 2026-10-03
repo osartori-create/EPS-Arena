@@ -68,6 +68,7 @@ export function initCrossKiosk(mode, params) {
 
     chargerRosterLocal();
     assurerBoutonRoster();
+    assurerSelecteurCourse();
     chargerConfig();
 
          switch (currentMode) {
@@ -153,6 +154,92 @@ function rechargerModeActif() {
         case 'cross-tv': initTv(container); break;
     }
 }
+
+const VUES_DISPONIBLES = [
+    { id: 'cross-podium',     label: '🏆 Podium' },
+    { id: 'cross-classement', label: '📋 Classement' },
+    { id: 'cross-classe',     label: '🏫 Par classe' },
+    { id: 'cross-tv',         label: '📺 TV' }
+];
+
+function assurerSelecteurCourse() {
+    if (!document.getElementById('cross-course-selector-style')) {
+        const st = document.createElement('style');
+        st.id = 'cross-course-selector-style';
+        st.textContent = `
+            .cross-toolbar { position:fixed; top:10px; left:10px; z-index:9998; display:flex; flex-direction:column; gap:8px; max-width:78vw; }
+            .cross-toolbar-row { display:flex; gap:6px; flex-wrap:wrap; }
+            .cross-toolbar-label { font-size:10px; font-weight:900; text-transform:uppercase; color:#64748b; margin-bottom:2px; }
+            .cross-course-btn, .cross-vue-btn { padding:8px 10px; border-radius:10px; font-weight:900; font-size:12px; border:2px solid #cbd5e1; background:#ffffff; color:#0f172a; cursor:pointer; white-space:nowrap; }
+            .cross-course-btn--actif { background:#2563eb; color:#ffffff; border-color:#1d4ed8; }
+            .cross-vue-btn--actif { background:#0f766e; color:#ffffff; border-color:#115e59; }
+        `;
+        document.head.appendChild(st);
+    }
+
+    let bar = document.getElementById('cross-course-selector');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'cross-course-selector';
+        bar.className = 'cross-toolbar';
+        document.body.appendChild(bar);
+    }
+
+    bar.innerHTML = `
+        <div>
+            <div class="cross-toolbar-label">Courses</div>
+            <div class="cross-toolbar-row">
+                ${COURSES_DEFAUT.map(c => `
+                    <button data-course="${c.id}" class="cross-course-btn ${c.id === currentCourseId ? 'cross-course-btn--actif' : ''}">${c.label}</button>
+                `).join('')}
+            </div>
+        </div>
+        <div>
+            <div class="cross-toolbar-label">Affichage</div>
+            <div class="cross-toolbar-row">
+                ${VUES_DISPONIBLES.map(v => `
+                    <button data-vue="${v.id}" class="cross-vue-btn ${v.id === currentMode ? 'cross-vue-btn--actif' : ''}">${v.label}</button>
+                `).join('')}
+            </div>
+        </div>
+    `;
+
+    bar.querySelectorAll('.cross-course-btn').forEach(btn => {
+        btn.onclick = () => window.crossKioskChangerCourse(btn.dataset.course);
+    });
+    bar.querySelectorAll('.cross-vue-btn').forEach(btn => {
+        btn.onclick = () => window.crossKioskChangerVue(btn.dataset.vue);
+    });
+}
+
+window.crossKioskChangerVue = function(vueId) {
+    if (!vueId || vueId === currentMode) return;
+    currentMode = vueId;
+
+    try {
+        const params = new URLSearchParams(window.location.search);
+        params.set('mode', vueId);
+        window.history.replaceState(null, '', window.location.pathname + '?' + params.toString());
+    } catch (e) { /* ignore */ }
+
+    rechargerModeActif();
+    assurerSelecteurCourse();
+};
+
+window.crossKioskChangerCourse = function(courseId) {
+    if (!courseId || courseId === currentCourseId) return;
+    currentCourseId = courseId;
+
+    // Met à jour l'URL sans recharger (pratique si l'utilisateur recharge l'iPad).
+    try {
+        const params = new URLSearchParams(window.location.search);
+        params.set('course', courseId);
+        window.history.replaceState(null, '', window.location.pathname + '?' + params.toString());
+    } catch (e) { /* ignore */ }
+
+    rechargerModeActif();
+    assurerSelecteurCourse();
+};
 
 function assurerBoutonRoster() {
     let btn = document.getElementById('cross-roster-btn');
@@ -327,7 +414,7 @@ function render() {
 
             <!-- Zone podiums -->
             <div class="flex-1 p-6">
-                ${enCours ? renderPodiums(parNiveau, course) + renderDerniersArrivees(parNiveau) : renderAttente()}
+                ${enCours ? renderPodiums(parNiveau, course) + renderClassementCategorie(parNiveau, course) : renderAttente()}
             </div>
         </div>
     `;
@@ -353,39 +440,53 @@ function renderPodiums(parNiveau, course) {
     `;
 }
 
-function renderDerniersArrivees(parNiveau) {
-    const flat = [];
-    Object.entries(parNiveau).forEach(([niveau, liste]) => {
-        liste.forEach(item => flat.push({ ...item, niveau }));
-    });
-    flat.sort((a, b) => a.timestamp - b.timestamp);
-    const derniers = flat.slice(-20).reverse();
-    if (derniers.length === 0) return '';
-
-    const rows = derniers.map(item => {
-        const libelle = nomPourDossard(item.dossard);
+function renderClassementCategorie(parNiveau, course) {
+    const blocs = course.niveaux.map(niveau => {
+        const liste = parNiveau[niveau] || [];
+        let rows = '';
+        if (liste.length === 0) {
+            rows = `<div class="cat-row cat-row--empty">En attente...</div>`;
+        } else {
+            rows = liste.map((item, idx) => {
+                const place = idx + 1;
+                const medaille = place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : `${place}.`;
+                const libelle = nomPourDossard(item.dossard);
+                const temps = goTimestamp ? formatTemps(Math.max(0, Math.round((item.timestamp - goTimestamp) / 1000))) : '--:--';
+                return `
+                    <div class="cat-row">
+                        <span class="cat-place">${medaille}</span>
+                        <span class="cat-dossard">#${item.dossard}</span>
+                        <span class="cat-nom">${libelle || ''}</span>
+                        <span class="cat-classe">${item.classe}</span>
+                        <span class="cat-temps">${temps}</span>
+                    </div>
+                `;
+            }).join('');
+        }
         return `
-            <div class="recent-row">
-                <span class="recent-dossard">#${item.dossard}</span>
-                ${libelle ? `<span class="recent-nom">${libelle}</span>` : ''}
-                <span class="recent-classe">${item.classe}</span>
+            <div class="cat-col">
+                <div class="cat-title">${niveau}e — ${liste.length} arrivant${liste.length > 1 ? 's' : ''}</div>
+                ${rows}
             </div>
         `;
     }).join('');
 
     return `
         <style>
-            .recent-block { margin-top: 24px; max-width: 1000px; margin-left: auto; margin-right: auto; }
-            .recent-title { color:#4b5563; font-weight:900; text-transform:uppercase; font-size:0.7rem; letter-spacing:0.05em; margin-bottom:8px; }
-            .recent-list { display:grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap:6px; }
-            .recent-row { display:flex; gap:10px; align-items:center; padding:8px 12px; background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; border-left:4px solid #9ca3af; }
-            .recent-dossard { font-family:monospace; font-weight:900; color:#d97706; }
-            .recent-nom { color:#111827; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-            .recent-classe { margin-left:auto; color:#6b7280; font-weight:900; }
+            .cat-block { margin-top: 24px; max-width: 1100px; margin-left: auto; margin-right: auto; }
+            .cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+            .cat-col { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+            .cat-title { font-weight: 900; color: #2563eb; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; margin-bottom: 8px; }
+            .cat-row { display: grid; grid-template-columns: 46px 70px 1fr 60px 70px; align-items: center; gap: 6px; padding: 6px 8px; background: #ffffff; border-bottom: 1px solid #f1f5f9; border-left: 3px solid #e5e7eb; font-size: 0.85rem; }
+            .cat-row--empty { color: #9ca3af; padding: 12px; text-align: center; }
+            .cat-place { font-weight: 900; color: #d97706; }
+            .cat-dossard { font-family: monospace; font-weight: 900; color: #111827; }
+            .cat-nom { color: #1f2937; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .cat-classe { color: #6b7280; font-weight: 900; text-align: center; }
+            .cat-temps { font-family: monospace; font-weight: 900; color: #16a34a; text-align: right; }
         </style>
-        <div class="recent-block">
-            <div class="recent-title">🕒 Derniers arrivés (${derniers.length})</div>
-            <div class="recent-list">${rows}</div>
+        <div class="cat-block">
+            <div class="cat-grid">${blocs}</div>
         </div>
     `;
 }
@@ -543,7 +644,7 @@ function renderConsult() {
 
     container.innerHTML = `
         <style>
-            .consult-body { background: #0f172a; min-height: 100vh; }
+            .consult-body { background: #f8fafc; min-height: 100vh; }
             .consult-col { display: flex; flex-direction: column; }
             .consult-row {
                 display: grid;
@@ -551,42 +652,43 @@ function renderConsult() {
                 align-items: center;
                 gap: 8px;
                 padding: 8px 14px;
-                background: #1e293b;
+                background: #ffffff;
+                border: 1px solid #e5e7eb;
                 border-radius: 12px;
                 margin-bottom: 6px;
-                border-left: 4px solid #334155;
+                border-left: 4px solid #cbd5e1;
                 transition: all 0.3s ease;
             }
             .consult-row--recent {
-                border-left-color: #22c55e;
-                background: linear-gradient(90deg, #14532d30 0%, #1e293b 60%);
+                border-left-color: #16a34a;
+                background: #ecfdf5;
                 animation: consultPulse 1s ease-out;
             }
             .consult-row--no-time { opacity: 0.5; }
             @keyframes consultPulse {
-                0% { transform: scale(0.95); background: #22c55e40; }
-                100% { transform: scale(1); background: #14532d30; }
+                0% { transform: scale(0.95); background: #bbf7d0; }
+                100% { transform: scale(1); background: #ecfdf5; }
             }
-            .consult-dossard { font-family: monospace; font-weight: 900; color: #facc15; font-size: 1.4rem; }
-            .consult-classe  { font-weight: 900; color: #94a3b8; font-size: 1.2rem; text-align: center; }
-            .consult-vit     { font-weight: 900; color: #22c55e; font-size: 1.3rem; text-align: right; font-family: monospace; }
-            .consult-vit--slow { color: #f59e0b; }
-            .consult-vit--very-slow { color: #ef4444; }
+            .consult-dossard { font-family: monospace; font-weight: 900; color: #d97706; font-size: 1.4rem; }
+            .consult-classe  { font-weight: 900; color: #6b7280; font-size: 1.2rem; text-align: center; }
+            .consult-vit     { font-weight: 900; color: #16a34a; font-size: 1.3rem; text-align: right; font-family: monospace; }
+            .consult-vit--slow { color: #d97706; }
+            .consult-vit--very-slow { color: #dc2626; }
             .consult-empty { color: #475569; text-align: center; padding: 40px 0; font-style: italic; }
         </style>
 
         <div class="consult-body flex flex-col">
             <!-- Bandeau titre + chrono -->
-            <div class="bg-slate-900 border-b-4 border-emerald-500 px-6 py-3 flex justify-between items-center flex-wrap gap-3">
+            <div class="bg-white border-b-4 border-emerald-500 px-6 py-3 flex justify-between items-center flex-wrap gap-3 shadow-sm">
                 <div class="flex items-center gap-4">
                     <div>
-                        <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Cross</div>
-                        <div class="text-3xl font-black text-white">${niveauxLabel} ${sexeLabel}</div>
+                        <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Cross</div>
+                        <div class="text-3xl font-black text-gray-900">${niveauxLabel} ${sexeLabel}</div>
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Chrono</div>
-                    <div id="cross-consult-chrono" class="text-5xl font-mono font-black ${enCours ? 'text-emerald-400' : 'text-slate-600'}">${chronoStr}</div>
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Chrono</div>
+                    <div id="cross-consult-chrono" class="text-5xl font-mono font-black ${enCours ? 'text-emerald-600' : 'text-gray-400'}">${chronoStr}</div>
                 </div>
             </div>
 
@@ -623,17 +725,17 @@ function renderConsultColonne(niveau, arrives, enCours) {
                 <div class="consult-row ${isRecent ? 'consult-row--recent' : ''} ${!e.vitesse ? 'consult-row--no-time' : ''}">
                     <span class="consult-dossard">#${e.dossard}</span>
                     <span class="consult-classe">${e.classe}</span>
-                    <span class="text-white text-xs">${libelle || ''}</span>
+                    <span class="text-gray-700 text-xs">${libelle || ''}</span>
                     <span class="consult-vit ${vitClass}">${vitHtml}</span>
                 </div>
             `;
         }).join('');
 
     return `
-        <div class="consult-col bg-slate-900/50 rounded-2xl p-3">
+        <div class="consult-col bg-white rounded-2xl p-3 border border-gray-200">
             <div class="text-center mb-3">
-                <div class="text-4xl font-black text-white">${niveau}e</div>
-                <div class="text-xs uppercase text-slate-500 font-bold tracking-widest mt-1">
+                <div class="text-4xl font-black text-gray-900">${niveau}e</div>
+                <div class="text-xs uppercase text-gray-500 font-bold tracking-widest mt-1">
                     ${arrives.length} / ${CONSULT_LIMIT} affiché${arrives.length > 1 ? 's' : ''}
                 </div>
             </div>
@@ -758,22 +860,23 @@ function renderClassement() {
 
     container.innerHTML = `
         <style>
-            .cl-body { background: #0f172a; min-height: 100vh; width: 100%; }
+            .cl-body { background: #f8fafc; min-height: 100vh; width: 100%; }
             .cl-row {
                 display: grid;
-                grid-template-columns: 60px 75px 70px 80px 70px 55px 55px 65px;
+                grid-template-columns: 55px minmax(140px, 1fr) 65px 70px 65px 50px 50px 55px;
                 align-items: center;
                 gap: 6px;
                 padding: 8px 12px;
-                background: #1e293b;
+                background: #ffffff;
+                border: 1px solid #e5e7eb;
                 border-radius: 8px;
                 margin-bottom: 4px;
-                border-left: 4px solid #334155;
+                border-left: 4px solid #cbd5e1;
                 font-size: 0.85rem;
             }
-            .cl-row--top { border-left-color: #facc15; background: linear-gradient(90deg, #78350f20 0%, #1e293b 60%); }
+            .cl-row--top { border-left-color: #f59e0b; background: #fffbeb; }
             .cl-row--header {
-                background: #0f172a;
+                background: #f1f5f9;
                 border-left-color: transparent;
                 color: #64748b;
                 font-weight: 900;
@@ -783,25 +886,25 @@ function renderClassement() {
             }
             .cl-num { font-family: ui-monospace, monospace; font-weight: 900; }
             @media (max-width: 900px) {
-                .cl-row { grid-template-columns: 40px 60px 45px 60px 60px 45px 45px 55px; gap: 4px; padding: 6px 8px; font-size: 0.72rem; }
+                .cl-row { grid-template-columns: 40px minmax(110px,1fr) 45px 55px 55px 40px 40px 50px; gap: 4px; padding: 6px 8px; font-size: 0.72rem; }
             }
         </style>
 
         <div class="cl-body flex flex-col">
-            <div class="bg-slate-900 border-b-4 border-emerald-500 px-6 py-4 flex justify-between items-center">
+            <div class="bg-white border-b-4 border-emerald-500 px-6 py-4 flex justify-between items-center shadow-sm">
                 <div>
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Cross · Classement</div>
-                    <div class="text-3xl font-black text-white">${niveauxLabel} ${sexeLabel}</div>
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Cross · Classement</div>
+                    <div class="text-3xl font-black text-gray-900">${niveauxLabel} ${sexeLabel}</div>
                 </div>
                 <div class="text-right">
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Chrono</div>
-                    <div id="cross-classement-chrono" class="text-4xl font-mono font-black ${enCours ? 'text-emerald-400' : 'text-slate-600'}">${chronoStr}</div>
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Chrono</div>
+                    <div id="cross-classement-chrono" class="text-4xl font-mono font-black ${enCours ? 'text-emerald-600' : 'text-gray-400'}">${chronoStr}</div>
                 </div>
             </div>
 
             <div class="p-4 flex-1 overflow-y-auto">
                 ${Object.values(parNiveau).every(l => l.length === 0) ? `
-                    <div class="text-center py-20 text-slate-500 text-2xl">⏳ En attente des premiers arrivés...</div>
+                    <div class="text-center py-20 text-gray-500 text-2xl">⏳ En attente des premiers arrivés...</div>
                 ` : `
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
 
@@ -810,8 +913,8 @@ function renderClassement() {
                             return `
                                 <div>
                                     <div class="text-center mb-3">
-                                        <div class="text-4xl font-black text-white">${niveau}e</div>
-                                        <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">
+                                        <div class="text-4xl font-black text-gray-900">${niveau}e</div>
+                                        <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">
                                             ${liste.length} arrivant${liste.length > 1 ? 's' : ''}
                                         </div>
                                     </div>
@@ -828,33 +931,33 @@ function renderClassement() {
                                     </div>
 
                                     ${liste.length === 0 ? `
-                                        <div class="text-center py-8 text-slate-500 text-sm">En attente...</div>
+                                        <div class="text-center py-8 text-gray-500 text-sm">En attente...</div>
                                     ` : liste.map(item => {
                                         const isTop = item.rangNiveau <= 3;
                                         const rowCls = isTop ? 'cl-row--top' : '';
 
-                                        const pctColor = item.pourcentageVMA === null ? 'text-slate-500'
-                                            : item.pourcentageVMA >= 75 ? 'text-emerald-400'
-                                            : item.pourcentageVMA >= 70 ? 'text-lime-400'
-                                            : item.pourcentageVMA >= 60 ? 'text-yellow-400'
-                                            : item.pourcentageVMA >= 50 ? 'text-orange-400'
-                                            : 'text-red-400';
+                                        const pctColor = item.pourcentageVMA === null ? 'text-gray-500'
+                                            : item.pourcentageVMA >= 75 ? 'text-emerald-600'
+                                            : item.pourcentageVMA >= 70 ? 'text-lime-600'
+                                            : item.pourcentageVMA >= 60 ? 'text-yellow-600'
+                                            : item.pourcentageVMA >= 50 ? 'text-orange-600'
+                                            : 'text-red-600';
 
-                                        const motColor = item.ptsMotricite >= 13 ? 'text-emerald-400'
-                                            : item.ptsMotricite >= 10 ? 'text-lime-400'
-                                            : item.ptsMotricite >= 6  ? 'text-yellow-400'
-                                            : item.ptsMotricite >= 3  ? 'text-orange-400'
-                                            : 'text-red-400';
+                                        const motColor = item.ptsMotricite >= 13 ? 'text-emerald-600'
+                                            : item.ptsMotricite >= 10 ? 'text-lime-600'
+                                            : item.ptsMotricite >= 6  ? 'text-yellow-600'
+                                            : item.ptsMotricite >= 3  ? 'text-orange-600'
+                                            : 'text-red-600';
 
-                                        const perfColor = item.ptsPerformance >= 5 ? 'text-emerald-400'
-                                            : item.ptsPerformance >= 3 ? 'text-yellow-400'
-                                            : 'text-orange-400';
+                                        const perfColor = item.ptsPerformance >= 5 ? 'text-emerald-600'
+                                            : item.ptsPerformance >= 3 ? 'text-yellow-600'
+                                            : 'text-orange-600';
 
-                                        const noteColor = item.noteTotale >= 16 ? 'text-emerald-400'
-                                            : item.noteTotale >= 12 ? 'text-lime-400'
-                                            : item.noteTotale >= 8  ? 'text-yellow-400'
-                                            : item.noteTotale >= 4  ? 'text-orange-400'
-                                            : 'text-red-400';
+                                        const noteColor = item.noteTotale >= 16 ? 'text-emerald-600'
+                                            : item.noteTotale >= 12 ? 'text-lime-600'
+                                            : item.noteTotale >= 8  ? 'text-yellow-600'
+                                            : item.noteTotale >= 4  ? 'text-orange-600'
+                                            : 'text-red-600';
 
                                         const medaille = item.rangNiveau === 1 ? '🥇'
                                                        : item.rangNiveau === 2 ? '🥈'
@@ -864,12 +967,12 @@ function renderClassement() {
 
                                         return `
                                             <div class="cl-row ${rowCls}">
-                                                <span class="text-base font-black text-yellow-400 flex items-center gap-1">
+                                                <span class="text-base font-black text-amber-600 flex items-center gap-1">
                                                     ${medaille}${medaille ? '' : item.rangNiveau}
                                                 </span>
-                                                <span class="cl-num text-base text-white">#${item.dossard}${libelle ? ` <span class="block text-xs font-bold text-slate-300">${libelle}</span>` : ''}</span>
-                                                <span class="font-bold text-slate-300">${item.classe}</span>
-                                                <span class="cl-num text-sm text-emerald-400 text-right">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--'}</span>
+                                                <span class="cl-num text-base text-gray-900">#${item.dossard}${libelle ? ` <span class="block text-xs font-bold text-gray-700 truncate">${libelle}</span>` : ''}</span>
+                                                <span class="font-bold text-gray-600">${item.classe}</span>
+                                                <span class="cl-num text-sm text-emerald-600 text-right">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--'}</span>
                                                 <span class="cl-num text-sm ${pctColor} text-right">${item.pourcentageVMA !== null ? item.pourcentageVMA.toFixed(1) + '%' : '—'}</span>
                                                 <span class="text-center font-black ${motColor}">${item.ptsMotricite}</span>
                                                 <span class="text-center font-black ${perfColor}">${item.ptsPerformance}</span>
@@ -882,10 +985,10 @@ function renderClassement() {
                         }).join('')}
 
                     </div>
-                    <p class="text-center text-xs text-slate-500 mt-6 max-w-3xl mx-auto">
-                        <strong class="text-slate-400">Mot.</strong> = points motricité /13 ·
-                        <strong class="text-slate-400">Perf.</strong> = points performance /7 ·
-                        <strong class="text-slate-400">/20</strong> = motricité + performance
+                    <p class="text-center text-xs text-gray-500 mt-6 max-w-3xl mx-auto">
+                        <strong class="text-gray-600">Mot.</strong> = points motricité /13 ·
+                        <strong class="text-gray-600">Perf.</strong> = points performance /7 ·
+                        <strong class="text-gray-600">/20</strong> = motricité + performance
                     </p>
                 `}
             </div>
@@ -1060,23 +1163,24 @@ function renderClasse(arriveesParCourse) {
     // ============================================================
     container.innerHTML = `
         <style>
-            .classe-body { background: #0f172a; min-height: 100vh; width: 100%; }
+            .classe-body { background: #f8fafc; min-height: 100vh; width: 100%; }
             .classe-row {
                 display: grid;
                 grid-template-columns: 90px 130px 90px 140px 140px 140px 1fr;
                 align-items: center;
                 gap: 16px;
                 padding: 14px 24px;
-                background: #1e293b;
+                background: #ffffff;
+                border: 1px solid #e5e7eb;
                 border-radius: 12px;
                 margin-bottom: 8px;
-                border-left: 4px solid #334155;
+                border-left: 4px solid #cbd5e1;
             }
-            .classe-row--gold   { border-left-color: #facc15; background: linear-gradient(90deg, #78350f30 0%, #1e293b 60%); }
-            .classe-row--silver { border-left-color: #94a3b8; }
-            .classe-row--bronze { border-left-color: #d97706; }
+            .classe-row--gold   { border-left-color: #f59e0b; background: #fffbeb; }
+            .classe-row--silver { border-left-color: #9ca3af; background: #f9fafb; }
+            .classe-row--bronze { border-left-color: #d97706; background: #fff7ed; }
             .classe-row--header {
-                background: #0f172a;
+                background: #f1f5f9;
                 border-left-color: transparent;
                 color: #64748b;
                 font-weight: 900;
@@ -1085,9 +1189,9 @@ function renderClasse(arriveesParCourse) {
                 letter-spacing: 0.1em;
             }
             .classe-avg { font-family: ui-monospace, monospace; font-weight: 900; font-size: 1.5rem; }
-            .classe-avg--global  { color: #22c55e; }
-            .classe-avg--filles  { color: #ec4899; }
-            .classe-avg--garcons { color: #3b82f6; }
+            .classe-avg--global  { color: #16a34a; }
+            .classe-avg--filles  { color: #db2777; }
+            .classe-avg--garcons { color: #2563eb; }
             @media (max-width: 900px) {
                 .classe-row { grid-template-columns: 60px 90px 60px 100px 100px 100px 1fr; gap: 8px; padding: 10px 14px; }
                 .classe-avg { font-size: 1.1rem; }
@@ -1095,21 +1199,21 @@ function renderClasse(arriveesParCourse) {
         </style>
 
         <div class="classe-body flex flex-col">
-            <div class="bg-slate-900 border-b-4 border-emerald-500 px-6 py-4 flex justify-between items-center">
+            <div class="bg-white border-b-4 border-emerald-500 px-6 py-4 flex justify-between items-center shadow-sm">
                 <div>
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Cross · Classement par classe</div>
-                    <div class="text-3xl font-black text-white">
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Cross · Classement par classe</div>
+                    <div class="text-3xl font-black text-gray-900">
                         ${classement.length} classe${classement.length > 1 ? 's' : ''} classée${classement.length > 1 ? 's' : ''}
                     </div>
                 </div>
                 <div class="text-right">
-                    <div class="text-xs uppercase text-slate-500 font-bold tracking-widest">Arrivées totales</div>
-                    <div class="text-4xl font-mono font-black ${enCours ? 'text-emerald-400' : 'text-slate-600'}">${totalArrivees}</div>
+                    <div class="text-xs uppercase text-gray-500 font-bold tracking-widest">Arrivées totales</div>
+                    <div class="text-4xl font-mono font-black ${enCours ? 'text-emerald-600' : 'text-gray-400'}">${totalArrivees}</div>
                 </div>
             </div>
 
             <div class="p-4 md:p-6 flex-1 overflow-y-auto w-full">
-                ${classement.length === 0 ? `<div class="text-center py-20 text-slate-500 text-2xl">⏳ En attente des résultats...</div>` : `
+                ${classement.length === 0 ? `<div class="text-center py-20 text-gray-500 text-2xl">⏳ En attente des résultats...</div>` : `
                     <div class="w-full">
                         <div class="classe-row classe-row--header">
                             <span>Rang</span>
@@ -1130,9 +1234,9 @@ function renderClasse(arriveesParCourse) {
 
                             return `
                                 <div class="classe-row ${cls}">
-                                    <span class="text-2xl font-black text-yellow-400">${medaille}</span>
-                                    <span class="text-2xl font-black text-white">${c.classe}</span>
-                                    <span class="text-center text-sm font-bold text-slate-400">${c.niveau}e</span>
+                                    <span class="text-2xl font-black text-amber-600">${medaille}</span>
+                                    <span class="text-2xl font-black text-gray-900">${c.classe}</span>
+                                    <span class="text-center text-sm font-bold text-gray-500">${c.niveau}e</span>
                                     <span class="classe-avg classe-avg--global text-center">${fmtMoy(c.moyenne)}</span>
                                     <span class="classe-avg classe-avg--filles text-center">
                                         ${fmtMoy(c.moyenneF)}
@@ -1143,17 +1247,17 @@ function renderClasse(arriveesParCourse) {
                                         <span class="block text-[10px] text-slate-500 font-normal">${c.nbM} garçons</span>
                                     </span>
                                     <span class="text-right text-sm">
-                                        <span class="text-white font-bold">${c.nbClasses}</span>
-                                        ${c.nbAbsents > 0 ? `<span class="text-red-400 ml-1" title="Absents">(${c.nbAbsents}A)</span>` : ''}
-                                        ${c.nbInaptes > 0 ? `<span class="text-amber-400 ml-1" title="Inaptes">(${c.nbInaptes}I)</span>` : ''}
+                                        <span class="text-gray-900 font-bold">${c.nbClasses}</span>
+                                        ${c.nbAbsents > 0 ? `<span class="text-red-600 ml-1" title="Absents">(${c.nbAbsents}A)</span>` : ''}
+                                        ${c.nbInaptes > 0 ? `<span class="text-amber-600 ml-1" title="Inaptes">(${c.nbInaptes}I)</span>` : ''}
                                     </span>
                                 </div>
                             `;
                         }).join('')}
                     </div>
-                    <p class="text-center text-xs text-slate-500 mt-6 max-w-2xl mx-auto">
+                    <p class="text-center text-xs text-gray-500 mt-6 max-w-2xl mx-auto">
                         Moyenne = rang moyen dans la catégorie de niveau.
-                        <strong class="text-slate-400">Plus petit = meilleur.</strong>
+                        <strong class="text-gray-600">Plus petit = meilleur.</strong>
                         Les colonnes Filles/Garçons affinent selon le sexe.
                     </p>
                 `}
@@ -1306,55 +1410,75 @@ function renderTv() {
     const chronoStr = enCours ? formatTemps(Math.floor((Date.now() - goTimestamp) / 1000)) : '--:--';
 
     const renderRows = () => {
-        const out = [];
-        course.niveaux.forEach(niveau => {
-            out.push(`<div class="tv-niveau-title">${niveau}e — ${parNiveau[niveau].length} arrivant${parNiveau[niveau].length > 1 ? 's' : ''}</div>`);
-            if (parNiveau[niveau].length === 0) {
-                out.push(`<div class="tv-row tv-row--empty">En attente...</div>`);
-            } else {
-                parNiveau[niveau].forEach((item, idx) => {
-                    const place = idx + 1;
-                    const medaille = place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : `${place}.`;
-                    out.push(`
-                        <div class="tv-row">
-                            <span class="tv-place">${medaille}</span>
-                            <span class="tv-dossard">#${item.dossard}</span>
-                            <span class="tv-nom">${item.libelle || ''}</span>
-                            <span class="tv-classe">${item.classe}</span>
-                            <span class="tv-temps">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--:--'}</span>
-                        </div>
-                    `);
-                });
+        const niveaux = course.niveaux;
+        const listes = niveaux.map(niveau => parNiveau[niveau] || []);
+        const maxRows = Math.max(0, ...listes.map(l => l.length));
+
+        let html = `
+            <div class="tvs-row tvs-row--header">
+                <span class="tvs-place">Place</span>
+                ${niveaux.map(niveau => `<span class="tvs-head-cell">${niveau}e</span>`).join('')}
+            </div>
+        `;
+
+        if (maxRows === 0) {
+            html += `<div class="tvs-row tvs-row--empty">En attente des premiers arrivés...</div>`;
+        } else {
+            for (let i = 0; i < maxRows; i++) {
+                const place = i + 1;
+                const medaille = place === 1 ? '🥇' : place === 2 ? '🥈' : place === 3 ? '🥉' : `${place}.`;
+
+                html += `
+                    <div class="tvs-row">
+                        <span class="tvs-place">${medaille}</span>
+                        ${listes.map(liste => {
+                            const item = liste[i];
+                            if (!item) return `<span class="tvs-cell tvs-cell--empty">—</span>`;
+                            return `
+                                <span class="tvs-cell">
+                                    <span class="tvs-dossard">#${item.dossard}</span>
+                                    <span class="tvs-nom">${item.libelle || ''}</span>
+                                    <span class="tvs-classe">${item.classe}</span>
+                                    <span class="tvs-temps">${item.tempsSec !== null ? formatTemps(item.tempsSec) : '--:--'}</span>
+                                </span>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
             }
-        });
-        return out.join('');
+        }
+
+        return html;
     };
 
     const rowsHtml = renderRows();
 
     container.innerHTML = `
         <style>
-            .tv-body { background:#0f172a; min-height:100vh; overflow:hidden; display:flex; flex-direction:column; }
-            .tv-header { background:#0f172a; border-bottom:4px solid #22c55e; padding:16px 24px; display:flex; justify-content:space-between; align-items:center; }
+            .tv-body { background:#f8fafc; min-height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+            .tv-header { background:#ffffff; border-bottom:4px solid #16a34a; padding:16px 24px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
             .tv-liste { flex:1; overflow:hidden; position:relative; padding:16px; }
             .tv-scroller { display:flex; flex-direction:column; gap:6px; animation:crossTvScroll 60s linear infinite; }
-            .tv-row { display:grid; grid-template-columns:60px 90px 1fr 90px 110px; align-items:center; gap:10px; padding:12px 16px; background:#1e293b; border-radius:12px; border-left:4px solid #334155; }
-            .tv-niveau-title { font-weight:900; color:#38bdf8; text-transform:uppercase; font-size:1.2rem; margin-top:14px; }
-            .tv-place { font-weight:900; color:#facc15; font-size:1.3rem; }
-            .tv-dossard { font-family:monospace; font-weight:900; color:#fff; font-size:1.3rem; }
-            .tv-nom { color:#e2e8f0; font-size:1.1rem; }
-            .tv-classe { color:#94a3b8; font-weight:900; text-align:center; }
-            .tv-temps { font-family:monospace; font-weight:900; color:#22c55e; text-align:right; }
-            .tv-row--empty { color:#475569; border-left-color:#334155; }
+            .tvs-row { display:grid; grid-template-columns: 54px 1fr 1fr; gap:8px; align-items:center; }
+            .tvs-row--header { font-weight:900; text-transform:uppercase; color:#64748b; font-size:0.7rem; letter-spacing:0.03em; padding:0 4px; }
+            .tvs-row--empty { color:#9ca3af; padding:12px; text-align:center; }
+            .tvs-head-cell { text-align:center; }
+            .tvs-place { font-weight:900; color:#d97706; font-size:1.2rem; }
+            .tvs-cell { display:flex; gap:8px; align-items:center; background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:8px 12px; }
+            .tvs-cell--empty { color:#9ca3af; justify-content:center; }
+            .tvs-dossard { font-family:monospace; font-weight:900; color:#111827; font-size:1.2rem; }
+            .tvs-nom { color:#1f2937; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+            .tvs-classe { color:#6b7280; font-weight:900; text-align:center; }
+            .tvs-temps { font-family:monospace; font-weight:900; color:#16a34a; text-align:right; margin-left:auto; }
             @keyframes crossTvScroll { 0% { transform:translateY(0); } 100% { transform:translateY(-50%); } }
         </style>
         <div class="tv-body">
             <div class="tv-header">
                 <div>
-                    <div class="text-xs uppercase tracking-widest font-bold text-slate-500">Cross · Consultation TV</div>
-                    <div class="text-3xl font-black text-white">${niveauxLabel} ${sexeLabel}</div>
+                    <div class="text-xs uppercase tracking-widest font-bold text-gray-500">Cross · Consultation TV</div>
+                    <div class="text-3xl font-black text-gray-900">${niveauxLabel} ${sexeLabel}</div>
                 </div>
-                <div id="cross-tv-chrono" class="text-5xl font-mono font-black ${enCours ? 'text-emerald-400' : 'text-slate-600'}">${chronoStr}</div>
+                <div id="cross-tv-chrono" class="text-5xl font-mono font-black ${enCours ? 'text-emerald-600' : 'text-gray-400'}">${chronoStr}</div>
             </div>
             <div class="tv-liste">
                 <div class="tv-scroller" id="cross-tv-scroller">
