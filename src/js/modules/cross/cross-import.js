@@ -108,9 +108,13 @@ export function importCSVEtablissement(file) {
     });
 }
 
+function normaliserNom(str) {
+    if (!str) return '';
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
+}
+
 function normalizeId(nom, prenom) {
-    const clean = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
-    return `${clean(nom)}_${clean(prenom).charAt(0)}`;
+    return `${normaliserNom(nom)}_${normaliserNom(prenom).charAt(0)}`;
 }
 
 // ============================================================
