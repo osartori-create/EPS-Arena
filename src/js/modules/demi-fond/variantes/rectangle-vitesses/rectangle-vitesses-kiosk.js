@@ -231,3 +231,13 @@ export function cleanupRectangleVitessesKiosk() {
         configListener = null;
     }
 }
+
+window.retourMenuDemiFond = function() {
+    cleanupRectangleVitessesKiosk();
+    const container = document.getElementById('demi-fond-module');
+    if (container) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+    }
+    if (typeof window.resetToLogin === 'function') window.resetToLogin();
+};
