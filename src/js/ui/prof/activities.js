@@ -582,7 +582,14 @@ window.switchDiscipline = async function(disc) {
                     return coModule?.renderLive ? coModule.renderLive() : import('../../modules/co/co-live.js').then(m => m.renderCOLive(window.lastLiveData || {}));
                 },
                 'multi': () => import('../../modules/multi/multi-live.js').then(m => m.renderMultiLive(window.lastLiveData || {})),
-                'natation': () => import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive()),
+                'natation': () => {
+                    const classe = document.getElementById('selectClasse')?.value;
+                    const mode = classe ? (localStorage.getItem(`eps_arena_natation_mode_${classe}`) || 'indice') : 'indice';
+                    if (mode === 'koh-lanta') {
+                        return import('../../modules/natation/natation-koh-lanta-live.js').then(m => m.renderNatationKohLantaLive());
+                    }
+                    return import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive());
+                },
                 'relais': () => import('../../modules/relais/relais-live.js').then(m => m.renderRelaisLive()),
                 'demi-fond': () => import('../../modules/demi-fond/demifond-live.js').then(m => m.renderDemiFondLive()),
                 'ppg': () => import('../../modules/ppg/ppg-live.js').then(m => m.renderPPGLive()),
@@ -640,7 +647,14 @@ window.switchDiscipline = async function(disc) {
                             return coModule?.renderTV ? coModule.renderTV() : Promise.resolve();
                         },
                         'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
-                        'natation': () => import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV()),
+                        'natation': () => {
+                            const classe = document.getElementById('selectClasse')?.value;
+                            const mode = classe ? (localStorage.getItem(`eps_arena_natation_mode_${classe}`) || 'indice') : 'indice';
+                            if (mode === 'koh-lanta') {
+                                return import('../../modules/natation/natation-koh-lanta-tv.js').then(m => m.renderNatationKohLantaTV());
+                            }
+                            return import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV());
+                        },
                         'relais': () => import('../../modules/relais/relais-tv.js').then(m => m.renderRelaisTV()),
                         'demi-fond': () => import('../../modules/demi-fond/demifond-tv.js').then(m => m.renderDemiFondTV()),
                         'ppg': () => import('../../modules/ppg/ppg-tv.js').then(m => m.renderPPGTV()),

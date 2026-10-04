@@ -200,6 +200,44 @@ export function normaliserNatation(classe, data, elevesTries) {
  * @param {object} montees - objet { cle: { groupe, role, voie_num, couleur, cotation, hauteur, points, reussie, timestamp } }
  * @returns {Array<object>}
  */
+/**
+ * Normalise les résultats du mode « Koh Lanta » (natation) en lignes génériques.
+ * @param {string} classe
+ * @param {object} historique - { numero: [ { tempsMs, coups, meduses, tunnelType, remontees, remorquage, score, timestamp } ] }
+ * @param {Array}  elevesTries - liste d'élèves triée (index = numero-1)
+ * @returns {Array<object>}
+ */
+export function normaliserKohLanta(classe, historique, elevesTries) {
+    const lignes = [];
+    for (const [numero, essais] of Object.entries(historique || {})) {
+        if (!Array.isArray(essais) || essais.length === 0) continue;
+        const index = parseInt(numero, 10) - 1;
+        const eleve = elevesTries[index];
+
+        for (const e of essais) {
+            lignes.push({
+                etablissement: getRNE(),
+                prof: getProfCode(),
+                classe,
+                activite: 'natation-koh-lanta',
+                eleve_id: eleve ? eleve.id : null,
+                nom: eleve ? eleve.nom : '',
+                prenom: eleve ? eleve.prenom : '',
+                numero,
+                temps_ms: e.tempsMs ?? null,
+                coups: e.coups ?? null,
+                meduses: e.meduses ?? null,
+                tunnel_type: e.tunnelType ?? '',
+                remontees: e.remontees ?? null,
+                remorquage: e.remorquage ?? '',
+                score: e.score ?? null,
+                horodatage: new Date(e.timestamp || Date.now()).toISOString()
+            });
+        }
+    }
+    return lignes;
+}
+
 export function normaliserEscalade(classe, montees = {}) {
     const lignes = [];
     for (const m of Object.values(montees)) {

@@ -249,14 +249,19 @@ function assurerBoutonRoster() {
         btn.style.cssText = 'position:fixed;top:10px;right:10px;z-index:9999;background:#0891b2;color:#fff;font-weight:900;padding:8px 12px;border-radius:10px;font-size:12px;border:2px solid #22d3ee;';
         document.body.appendChild(btn);
     }
-    const hasRoster = Object.keys(rosterLocal).length > 0;
-    btn.textContent = hasRoster ? `📇 ${Object.keys(rosterLocal).length} noms` : '📇 Charger roster';
+    const majTexteBouton = () => {
+        const nb = Object.keys(rosterLocal).length;
+        btn.textContent = nb > 0 ? `📇 ${nb} noms` : '📇 Charger roster';
+    };
+    majTexteBouton();
+
     btn.onclick = () => {
-        if (hasRoster) {
+        const nb = Object.keys(rosterLocal).length;
+        if (nb > 0) {
             if (!confirm('Retirer le roster local (noms masqués) ?')) return;
             effacerRosterLocal();
             rosterLocal = {};
-            btn.textContent = '📇 Charger roster';
+            majTexteBouton();
             rechargerModeActif();
         } else {
             const input = document.createElement('input');
@@ -271,7 +276,7 @@ function assurerBoutonRoster() {
                         const data = JSON.parse(e.target.result);
                         sauverRosterLocal(data);
                         rosterLocal = loadRosterLocal();
-                        btn.textContent = `📇 ${Object.keys(rosterLocal).length} noms`;
+                        majTexteBouton();
                         rechargerModeActif();
                     } catch (err) {
                         alert('❌ Fichier roster invalide : ' + err.message);

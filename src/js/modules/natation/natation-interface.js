@@ -10,6 +10,7 @@ let currentClasse = '';
 let elevesData = [];
 let tempsData = {};
 let coupsData = {};
+let modeNatation = 'indice';
 let tempsUnsubscribe = null;
 let coupsUnsubscribe = null;
 
@@ -91,6 +92,9 @@ export function initNatationInterface() {
         return;
     }
 
+    const savedMode = localStorage.getItem(`eps_arena_natation_mode_${currentClasse}`);
+    if (savedMode === 'indice' || savedMode === 'koh-lanta') modeNatation = savedMode;
+
     elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     elevesData.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
     elevesData.forEach((e, idx) => { e.numero = idx + 1; });
@@ -148,7 +152,7 @@ function createHeader() {
 
     const title = document.createElement('h3');
     title.className = 'font-black text-blue-400 uppercase text-sm';
-    title.textContent = '🏊 Natation – Indice de nage (25m)';
+    title.textContent = modeNatation === 'koh-lanta' ? '🏝️ Natation – Koh Lanta' : '🏊 Natation – Indice de nage';
 
     const right = document.createElement('div');
     right.className = 'flex gap-2 flex-wrap';
@@ -156,6 +160,35 @@ function createHeader() {
     // Distance
     const distGroup = document.createElement('div');
     distGroup.className = 'flex items-center gap-2';
+
+    // Mode de l'activité Natation
+    const modeGroup = document.createElement('div');
+    modeGroup.className = 'flex items-center gap-2';
+    const modeLabel = document.createElement('label');
+    modeLabel.className = 'text-xs font-bold text-slate-400';
+    modeLabel.textContent = 'Mode';
+    const modeSelect = document.createElement('select');
+    modeSelect.id = 'natation-mode';
+    modeSelect.className = 'bg-slate-900 border border-slate-600 rounded p-1 text-white text-center text-xs font-bold';
+    const optIndice = document.createElement('option');
+    optIndice.value = 'indice';
+    optIndice.textContent = '🏊 Indice de nage';
+    const optKohLanta = document.createElement('option');
+    optKohLanta.value = 'koh-lanta';
+    optKohLanta.textContent = '🏝️ Koh Lanta';
+    modeSelect.appendChild(optIndice);
+    modeSelect.appendChild(optKohLanta);
+    modeSelect.value = modeNatation;
+    modeSelect.onchange = () => {
+        modeNatation = modeSelect.value;
+        if (currentClasse) localStorage.setItem(`eps_arena_natation_mode_${currentClasse}`, modeNatation);
+        title.textContent = modeNatation === 'koh-lanta' ? '🏝️ Natation – Koh Lanta' : '🏊 Natation – Indice de nage';
+        distGroup.style.display = modeNatation === 'koh-lanta' ? 'none' : '';
+    };
+    distGroup.style.display = modeNatation === 'koh-lanta' ? 'none' : '';
+    modeGroup.appendChild(modeLabel);
+    modeGroup.appendChild(modeSelect);
+    right.appendChild(modeGroup);
     const distLabel = document.createElement('label');
     distLabel.className = 'text-xs font-bold text-slate-400';
     distLabel.textContent = 'Distance (m)';
@@ -516,6 +549,8 @@ export async function transmettreNatationConfig() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const baseProf = `${getEtab()}/profs/${profCode}`;
     const distance = parseInt(document.getElementById('natation-distance')?.value) || 25;
+    const mode = document.getElementById('natation-mode')?.value || modeNatation;
+    if (currentClasse) localStorage.setItem(`eps_arena_natation_mode_${currentClasse}`, mode);
 
     // ✅ On conserve le mapping local : il permet au prof de retrouver un élève
     // à partir de son numéro (au cas où l'ordre change côté iPad)
@@ -527,6 +562,7 @@ export async function transmettreNatationConfig() {
 
     const configData = {
         activite: 'natation',
+        mode: mode,
         distance: distance,
         nbEleves: elevesData.length
     };
@@ -544,7 +580,7 @@ export async function transmettreNatationConfig() {
 
     try {
         await set(ref(db, `${baseProf}/${classe}/natation/config`), configData);
-        await set(ref(db, `${baseProf}/${classe}/config`), { activite: 'natation' });
+        await set(ref(db, `${baseProf}/${classe}/config`), { activite: 'natation', mode: mode });
         await set(ref(db, `${baseProf}/active_classes/${classe}`), true);
         alert(`✅ Configuration Natation transmise aux iPads !\n🏊 Indice de nage enregistré pour ${nbIndicesEcrits} élève(s) (critère Multi disponible).`);
     } catch (e) {
@@ -560,10 +596,12 @@ export function exportNatationConfig() {
     const classe = currentClasse || getCurrentClasse();
     if (!classe) return alert('Sélectionnez une classe.');
     const distance = document.getElementById('natation-distance')?.value || '25';
+    const mode = document.getElementById('natation-mode')?.value || modeNatation;
     const data = {
         version: 2,
         classe,
         activite: 'natation',
+        mode: mode,
         distance: parseInt(distance, 10),
         date: new Date().toISOString().slice(0,10).replace(/-/g,''),
         temps: tempsData,
@@ -604,6 +642,11 @@ export function importNatationConfig(event) {
             if (data.distance) {
                 const distInput = document.getElementById('natation-distance');
                 if (distInput) distInput.value = data.distance;
+            }
+            if (data.mode === 'indice' || data.mode === 'koh-lanta') {
+                localStorage.setItem(`eps_arena_natation_mode_${data.classe}`, data.mode);
+                const modeSelect = document.getElementById('natation-mode');
+                if (modeSelect) modeSelect.value = data.mode;
             }
             alert('✅ Données Natation importées avec succès !');
             if (currentClasse === data.classe) {

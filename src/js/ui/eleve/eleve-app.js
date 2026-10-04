@@ -10,6 +10,7 @@ import { initOrientShowKiosk } from '../../modules/eleve/orientshow-kiosk.js';
 import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 import { initNatationKiosk } from '../../modules/natation/natation-kiosk.js';
+import { initNatationKohLantaKiosk } from '../../modules/natation/natation-koh-lanta-kiosk.js';
 import { initRelaisKiosk, cleanupRelaisKiosk } from '../../modules/relais/relais-kiosk.js';
 import { initGrillesKiosk, cleanupGrillesKiosk } from '../../modules/grilles/grilles-kiosk.js';
 import { initDemiFondKiosk, cleanupDemiFondKiosk } from '../../modules/demi-fond/demifond-kiosk.js';
@@ -444,7 +445,12 @@ function showLoginNatation() {
     if (natationModule) {
         natationModule.classList.remove('hidden');
         natationModule.style.display = 'block';
-        initNatationKiosk(selectedClass);
+        const mode = currentConfig && currentConfig.mode;
+        if (mode === 'koh-lanta') {
+            initNatationKohLantaKiosk(selectedClass);
+        } else {
+            initNatationKiosk(selectedClass);
+        }
     } else {
         console.warn('Conteneur natation-module introuvable');
     }
@@ -779,7 +785,12 @@ function selectCode(code) {
             natationModule.classList.remove('hidden');
             natationModule.style.display = 'block';
             masquerElementsCO();
-            initNatationKiosk(selectedClass);
+            const mode = currentConfig && currentConfig.mode;
+            if (mode === 'koh-lanta') {
+                initNatationKohLantaKiosk(selectedClass);
+            } else {
+                initNatationKiosk(selectedClass);
+            }
         }
     }
     else if (currentConfig.activite === 'relais') {
