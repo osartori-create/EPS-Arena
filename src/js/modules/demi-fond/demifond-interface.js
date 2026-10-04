@@ -40,6 +40,11 @@ export function initDemiFondInterface() {
                 <div class="text-xl mb-1">🔗 Enchaînement (durées libres)</div>
                 <div class="text-[10px] font-normal opacity-80">Plusieurs séries avec durées et repos personnalisables (ex. 6e : 9 min + 6 min)</div>
             </button>
+            <button onclick="window.demifondSetSousModule('rectangle-vitesses')" id="dmfSubMod-rectangle-vitesses"
+                    class="p-4 rounded-xl font-black text-sm border-2 text-left active:scale-95 transition-all">
+                <div class="text-xl mb-1">🟦 Rectangle des vitesses</div>
+                <div class="text-[10px] font-normal opacity-80">Mesurer et travailler les allures (plots/5m, séquences 18s, voix + bips)</div>
+            </button>
         </div>
     `;
     container.appendChild(selector);
@@ -52,10 +57,12 @@ export function initDemiFondInterface() {
     // Marquer la sélection
     const btn3x5 = document.getElementById('dmfSubMod-3x5min');
     const btnEnch = document.getElementById('dmfSubMod-enchainement');
+    const btnRect = document.getElementById('dmfSubMod-rectangle-vitesses');
     const classeActive = 'p-4 rounded-xl font-black text-sm border-2 border-blue-500 bg-blue-900/40 text-white text-left active:scale-95 transition-all ring-2 ring-blue-400';
     const classeInactive = 'p-4 rounded-xl font-black text-sm border-2 text-left active:scale-95 transition-all';
     if (btn3x5) btn3x5.className = sousModule === '3x5min' ? classeActive : classeInactive;
     if (btnEnch) btnEnch.className = sousModule === 'enchainement' ? classeActive : classeInactive;
+    if (btnRect) btnRect.className = sousModule === 'rectangle-vitesses' ? classeActive : classeInactive;
 
     // Charger le sous-module
     chargerSousModule(sousModule, subContainer);
@@ -72,6 +79,13 @@ function chargerSousModule(sousModule, container) {
     } else if (sousModule === 'enchainement') {
         import('./variantes/enchainement/enchainement-interface.js').then(m => {
             m.initEnchainementInterface(container);
+        }).catch(err => {
+            console.error('[DemiFond] Erreur chargement sous-module:', err);
+            container.innerHTML = `<p class="text-red-400">❌ Erreur de chargement : ${err.message}</p>`;
+        });
+    } else if (sousModule === 'rectangle-vitesses') {
+        import('./variantes/rectangle-vitesses/rectangle-vitesses-interface.js').then(m => {
+            m.initRectangleVitessesInterface(container);
         }).catch(err => {
             console.error('[DemiFond] Erreur chargement sous-module:', err);
             container.innerHTML = `<p class="text-red-400">❌ Erreur de chargement : ${err.message}</p>`;

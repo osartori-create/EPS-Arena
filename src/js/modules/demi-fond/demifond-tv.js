@@ -47,6 +47,15 @@ export function renderDemiFondTV() {
                         console.error('[DemiFond TV] Erreur:', err);
                         container.innerHTML = `<p class="text-red-400 text-center">❌ ${err.message}</p>`;
                     });
+            } else if (sousModule === 'rectangle-vitesses') {
+                import('./variantes/rectangle-vitesses/rectangle-vitesses-tv.js')
+                    .then(m => {
+                        currentUnsub = m.renderRectangleVitessesTV() || null;
+                    })
+                    .catch(err => {
+                        console.error('[DemiFond TV] Erreur:', err);
+                        container.innerHTML = `<p class="text-red-400 text-center">❌ ${err.message}</p>`;
+                    });
             }
         }, { once: true });
     });

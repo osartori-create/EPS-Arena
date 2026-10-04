@@ -790,6 +790,15 @@ window.switchDiscipline = async function(disc) {
     alert(`✅ Module Tournoi (variante "${mode}") activé pour les iPads !`);
 },
             'demi-fond': async () => {
+    const sousModule = localStorage.getItem('eps_arena_demifond_sous_module') || '3x5min';
+    if (sousModule === 'rectangle-vitesses') {
+        if (window.rectangleTransmettre) await window.rectangleTransmettre();
+        return;
+    }
+    if (sousModule === 'enchainement') {
+        if (window.enchainementTransmettre) await window.enchainementTransmettre();
+        return;
+    }
     const m = await import('../../modules/demi-fond/variantes/trois-cinq-min/trois-cinq-min-interface.js');
     // La transmission est gérée par le bouton dédié dans l'interface
     // (on passe par window.troisCinqMinTransmettre)

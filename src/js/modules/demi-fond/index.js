@@ -16,6 +16,9 @@ async function generateTeams(classe) {
     if (sousModule === 'enchainement') {
         const m = await import('./variantes/enchainement/enchainement-interface.js');
         if (m.initEnchainementInterface) { window.enchainementGenererGroupes?.(); }
+    } else if (sousModule === 'rectangle-vitesses') {
+        // Pas de répartition de groupes : le dispositif fonctionne par code élève.
+        console.log('[DemiFond] Rectangle des vitesses : aucune génération de groupes nécessaire.');
     } else {
         const m = await import('./variantes/trois-cinq-min/trois-cinq-min-interface.js');
         if (m.troisCinqMinGenererGroupes) m.troisCinqMinGenererGroupes();
@@ -26,6 +29,8 @@ async function transmettre(classe) {
     const sousModule = localStorage.getItem('eps_arena_demifond_sous_module') || '3x5min';
     if (sousModule === 'enchainement') {
         if (window.enchainementTransmettre) await window.enchainementTransmettre();
+    } else if (sousModule === 'rectangle-vitesses') {
+        if (window.rectangleTransmettre) await window.rectangleTransmettre();
     } else {
         const m = await import('./variantes/trois-cinq-min/trois-cinq-min-interface.js');
         if (m.transmettreTroisCinqMin) await m.transmettreTroisCinqMin();

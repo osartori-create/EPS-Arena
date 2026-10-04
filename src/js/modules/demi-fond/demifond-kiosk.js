@@ -43,6 +43,15 @@ export function initDemiFondKiosk(classe) {
                         console.error('[DemiFond] Erreur chargement kiosque:', err);
                         container.innerHTML = `<p class="text-red-400 text-center">❌ Erreur : ${err.message}</p>`;
                     });
+            } else if (sousModule === 'rectangle-vitesses') {
+                import('./variantes/rectangle-vitesses/rectangle-vitesses-kiosk.js')
+                    .then(m => {
+                        cleanupCurrent = m.initRectangleVitessesKiosk(classe) || null;
+                    })
+                    .catch(err => {
+                        console.error('[DemiFond] Erreur chargement kiosque:', err);
+                        container.innerHTML = `<p class="text-red-400 text-center">❌ Erreur : ${err.message}</p>`;
+                    });
             }
         }, { onlyOnce: true });
     });
