@@ -450,8 +450,17 @@ window.switchDiscipline = async function(disc) {
         // Cacher Live et TV
         const viewLive = document.getElementById('viewLive');
         const viewTV = document.getElementById('viewTV');
-        if (viewLive) viewLive.classList.add('hidden');
-        if (viewTV) viewTV.style.display = 'none';
+        if (viewLive) {
+            viewLive.classList.add('hidden');
+            viewLive.style.display = 'none';
+        }
+        if (viewTV) {
+            viewTV.classList.add('hidden');
+            viewTV.style.display = 'none';
+            viewTV.style.height = '';
+            viewTV.style.padding = '';
+            viewTV.style.overflow = '';
+        }
 
         if (subTab === 'settings') {
             // Afficher la vue de réglages de la discipline courante

@@ -5,12 +5,12 @@
 export const POINTS_INITIAUX = 100;
 
 export const BAREME_DEFAUT = [
-    { ecartMin: -50, ecartMax: -11, ptsV: 1, ptsP: -1, label: 'Outsider net' },
-    { ecartMin: -10, ecartMax: -5,  ptsV: 2, ptsP: -2, label: 'Outsider' },
-    { ecartMin: -4,  ecartMax: -1,  ptsV: 3, ptsP: -3, label: 'Léger outsider' },
-    { ecartMin: 0,   ecartMax: 4,   ptsV: 4, ptsP: -4, label: 'Équilibré' },
-    { ecartMin: 5,   ecartMax: 10,  ptsV: 5, ptsP: -5, label: 'Favori léger' },
-    { ecartMin: 11,  ecartMax: 50,  ptsV: 6, ptsP: -6, label: 'Favori net' }
+    { ecartMin: -50, ecartMax: -11, ptsV: 6, ptsP: -6, label: 'Outsider net' },
+    { ecartMin: -10, ecartMax: -5,  ptsV: 5, ptsP: -5, label: 'Outsider' },
+    { ecartMin: -4,  ecartMax: -1,  ptsV: 4, ptsP: -4, label: 'Léger outsider' },
+    { ecartMin: 0,   ecartMax: 4,   ptsV: 3, ptsP: -3, label: 'Équilibré' },
+    { ecartMin: 5,   ecartMax: 10,  ptsV: 2, ptsP: -2, label: 'Favori léger' },
+    { ecartMin: 11,  ecartMax: 50,  ptsV: 1, ptsP: -1, label: 'Favori net' }
 ];
 
 // ============================================================

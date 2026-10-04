@@ -27,7 +27,7 @@ export function initLayout() {
     window.openTool = function(toolName) {
         document.getElementById('tools-menu').classList.add('hidden');
         if (toolName === 'timer') {
-            document.getElementById('tools-timer').classList.remove('hidden');
+            document.getElementById('tools-timer-container').classList.remove('hidden');
             initIntervalTimer();
         } else if (toolName === 'calculateur') {
             document.getElementById('tools-calculator').classList.remove('hidden');
@@ -36,7 +36,7 @@ export function initLayout() {
     };
 
     window.backToToolsMenu = function() {
-        document.getElementById('tools-timer').classList.add('hidden');
+        document.getElementById('tools-timer-container').classList.add('hidden');
         document.getElementById('tools-calculator').classList.add('hidden');
         document.getElementById('tools-menu').classList.remove('hidden');
     };
@@ -51,8 +51,13 @@ export function initLayout() {
 
     const tvView = document.getElementById('viewTV');
     if (tvView) {
-        if (tabName === 'tv') tvView.style.display = 'block';
-        else tvView.style.display = 'none';
+        if (tabName === 'tv') {
+            tvView.style.display = 'block';
+        } else {
+            tvView.classList.add('hidden');
+            tvView.style.display = 'none';
+            tvView.style.height = '';
+        }
     }
 
     ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5', 'btnTab6'].forEach(id => {
