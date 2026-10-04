@@ -1,5 +1,5 @@
 // src/js/modules/ppg/ppg-live.js
-// Live prof : suivi temps réel de la séance PPG du jour + suivi par élève
+// Live prof : suivi temps réel de la séance PPG du jour + suivi de tous les élèves
 import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves } from '../../services/admin-service.js';
@@ -15,6 +15,7 @@ let currentObservations = {};      // toutes les dates
 let currentBibliotheque = [];
 let currentEleves = [];
 let currentDateAffichee = null;    // date "YYYY-MM-DD" ou null (= aujourd'hui)
+let classeListener = null;
 
 function getProfBasePath() {
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
@@ -51,8 +52,16 @@ export function renderPPGLive() {
     }
 
     currentDateAffichee = getTodayDate();
-    window._ppgSuiviCode = '';
     currentEleves = getExistingEleves(classe);
+
+    // À chaque changement de classe, on recharge le Live avec la bonne classe.
+    if (!classeListener) {
+        const select = document.getElementById('selectClasse');
+        if (select) {
+            classeListener = () => renderPPGLive();
+            select.addEventListener('change', classeListener);
+        }
+    }
 
     unsubs.forEach(u => { try { u(); } catch(e) {} });
     unsubs = [];
@@ -117,27 +126,14 @@ function rendre() {
         </div>
     `;
 
-    // ── Suivi par élève (historique multi-séances) ──
-    const elevesTries = Object.values(elevesMap).sort((a, b) =>
-        (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || '')
-    );
-    const suiviCode = window._ppgSuiviCode || '';
-    const optionsSuivi = elevesTries.map(e => {
-        const code = String(e.codeAutoEval);
-        return `<option value="${code}" ${code === suiviCode ? 'selected' : ''}>${e.prenom} ${e.nom} (#${code})</option>`;
-    }).join('');
-
+    // ── Suivi de tous les élèves (photo + détails + historique) ──
     html += `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
             <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
-                <h4 class="font-black text-white text-sm uppercase">📈 Suivi par élève</h4>
+                <h4 class="font-black text-white text-sm uppercase">📈 Suivi des élèves</h4>
+                <span class="text-xs text-slate-400">${Object.keys(elevesMap).length} élève(s)</span>
             </div>
-            <select id="ppg-live-suivi-select" onchange="window.ppgLiveSuiviChange(this.value)"
-                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-bold text-sm mb-3">
-                <option value="">— Choisir un élève —</option>
-                ${optionsSuivi}
-            </select>
-            <div id="ppg-live-suivi" class="space-y-2"></div>
+            <div id="ppg-live-suivi" class="space-y-2 max-h-[70vh] overflow-y-auto pr-1"></div>
         </div>
     `;
 
@@ -148,7 +144,7 @@ function rendre() {
             </div>
         `;
         container.innerHTML = html;
-        if (window._ppgSuiviCode) rendreSuiviParEleve(window._ppgSuiviCode);
+        rendreSuiviTous(elevesMap);
         return;
     }
 
@@ -208,7 +204,7 @@ function rendre() {
     setTimeout(() => {
         rendreClassement('');
         rendreManquants(totauxParCode, elevesMap);
-        if (window._ppgSuiviCode) rendreSuiviParEleve(window._ppgSuiviCode);
+        rendreSuiviTous(elevesMap);
     }, 50);
 }
 
@@ -297,38 +293,12 @@ async function rendreManquants(totauxParCode, elevesMap) {
 }
 
 // ============================================================
-// SUIVI PAR ÉLÈVE
+// SUIVI DE TOUS LES ÉLÈVES
 // ============================================================
-window.ppgLiveSuiviChange = function(code) {
-    window._ppgSuiviCode = code || '';
-    const container = document.getElementById('ppg-live-suivi');
-    if (!container) return;
-    if (!code) {
-        container.innerHTML = '<p class="text-slate-500 text-sm text-center py-6">Sélectionne un élève pour voir son évolution sur toutes les séances.</p>';
-        return;
-    }
-    rendreSuiviParEleve(code);
-};
-
-async function rendreSuiviParEleve(code) {
-    const container = document.getElementById('ppg-live-suivi');
-    if (!container) return;
-
-    const elevesMap = window._ppgElevesMap || {};
-    const eleve = elevesMap[String(code)];
-    if (!eleve) {
-        container.innerHTML = '<p class="text-red-400 text-sm text-center py-6">Élève introuvable.</p>';
-        return;
-    }
-
-    const photo = await getPhotoUrl(eleve.id);
-    const photoHtml = photo
-        ? `<img src="${photo}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-600">`
-        : `<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
-
+function calculerHistoriqueEleve(code) {
+    const dates = Object.keys(currentObservations).sort();
     const lignes = [];
     let prevTotal = null;
-    const dates = Object.keys(currentObservations).sort();
 
     dates.forEach(date => {
         const obs = (currentObservations[date] || {})[String(code)];
@@ -343,43 +313,85 @@ async function rendreSuiviParEleve(code) {
         const prog = calculerProgression(agg.totalPts, prevTotal);
         prevTotal = agg.totalPts;
 
-        const fleche = prog.tendance === 'hausse' ? '📈'
-            : prog.tendance === 'baisse' ? '📉'
-            : prog.tendance === 'nouveau' ? '🆕'
-            : '➡️';
-
-        const detail = Object.entries(agg.parAtelier).map(([aid, d]) => {
-            const n = d.niveau ? ` N${d.niveau}` : '';
-            return `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:${d.couleur}30;color:${d.couleur}">${d.emoji} ${d.best}${n}</span>`;
-        }).join(' ');
-
-        const dateStr = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' });
-        const deltaAff = prog.deltaPts !== null ? (prog.deltaPts > 0 ? `+${prog.deltaPts}` : `${prog.deltaPts}`) : '—';
-
-        lignes.push(`
-            <div class="flex items-center gap-3 bg-slate-900 p-3 rounded-xl border border-slate-700">
-                <div class="text-xs font-bold text-slate-400 min-w-[110px]">${dateStr}</div>
-                <div class="flex-1 flex flex-wrap gap-1">${detail}</div>
-                <div class="text-right">
-                    <div class="text-xl font-black ${prog.tendance === 'baisse' ? 'text-red-400' : 'text-emerald-400'}">${agg.totalPts} pts</div>
-                    <div class="text-[10px] ${prog.tendance === 'hausse' ? 'text-emerald-400' : prog.tendance === 'baisse' ? 'text-red-400' : 'text-slate-500'}">${fleche} ${deltaAff} pts</div>
-                </div>
-            </div>
-        `);
+        const dateStr = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', {
+            weekday: 'short', day: '2-digit', month: 'short'
+        });
+        lignes.push({ date, dateStr, total: agg.totalPts, prog });
     });
 
-    container.innerHTML = `
-        <div class="flex items-center gap-3 bg-slate-900 p-3 rounded-xl border border-slate-700 mb-3">
-            ${photoHtml}
-            <div>
-                <div class="font-black text-white">${eleve.prenom} ${eleve.nom}</div>
-                <div class="text-xs text-slate-400">#${code} · ${lignes.length} séance(s)</div>
+    return lignes;
+}
+
+function flecheTendance(tendance) {
+    if (tendance === 'hausse') return '📈';
+    if (tendance === 'baisse') return '📉';
+    if (tendance === 'nouveau') return '🆕';
+    return '➡️';
+}
+
+async function rendreSuiviTous(elevesMap) {
+    const container = document.getElementById('ppg-live-suivi');
+    if (!container) return;
+
+    const elevesTries = Object.values(elevesMap).sort((a, b) =>
+        (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || '')
+    );
+
+    let html = '';
+    for (const eleve of elevesTries) {
+        const code = String(eleve.codeAutoEval);
+        const lignes = calculerHistoriqueEleve(code);
+        const nbSeances = lignes.length;
+        const dernier = lignes[lignes.length - 1] || null;
+
+        let recap = '<span class="text-xs text-slate-500 italic">Aucune donnée</span>';
+        if (dernier) {
+            const fleche = flecheTendance(dernier.prog.tendance);
+            const delta = dernier.prog.deltaPts !== null
+                ? (dernier.prog.deltaPts > 0 ? `+${dernier.prog.deltaPts}` : `${dernier.prog.deltaPts}`)
+                : '';
+            const couleur = dernier.prog.tendance === 'baisse' ? 'text-red-400' : 'text-emerald-400';
+            recap = `<span class="font-black ${couleur}">${dernier.total} pts</span>
+                     <span class="text-[10px] text-slate-400">${fleche} ${delta}</span>`;
+        }
+
+        const photo = await getPhotoUrl(eleve.id);
+        const photoHtml = photo
+            ? `<img src="${photo}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-600">`
+            : `<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+
+        const historiqueHtml = lignes.length > 0
+            ? `<div class="space-y-1">${lignes.slice(-15).map(l => {
+                const delta = l.prog.deltaPts !== null
+                    ? (l.prog.deltaPts > 0 ? `+${l.prog.deltaPts}` : `${l.prog.deltaPts}`)
+                    : '';
+                const couleur = l.prog.tendance === 'hausse' ? 'text-emerald-400' : l.prog.tendance === 'baisse' ? 'text-red-400' : 'text-slate-500';
+                return `
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="min-w-[96px] text-slate-400">${l.dateStr}</span>
+                        <span class="font-black text-white">${l.total} pts</span>
+                        <span class="text-[10px] ${couleur}">${flecheTendance(l.prog.tendance)} ${delta}</span>
+                    </div>
+                `;
+            }).join('')}</div>`
+            : '<p class="text-xs text-slate-500 italic">Aucune séance enregistrée.</p>';
+
+        html += `
+            <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                <div class="flex items-center gap-3">
+                    ${photoHtml}
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-white text-sm truncate">${eleve.prenom} ${eleve.nom}</div>
+                        <div class="text-[10px] text-slate-500">#${code} · ${nbSeances} séance(s)</div>
+                    </div>
+                    <div class="text-right">${recap}</div>
+                </div>
+                <div class="mt-2 pt-2 border-t border-slate-700/60">${historiqueHtml}</div>
             </div>
-        </div>
-        ${lignes.length > 0
-            ? `<div class="space-y-2 max-h-[40vh] overflow-y-auto pr-1">${lignes.join('')}</div>`
-            : '<p class="text-slate-500 text-sm text-center py-6">Aucune donnée enregistrée pour cet élève.</p>'}
-    `;
+        `;
+    }
+
+    container.innerHTML = html;
 }
 
 // ============================================================
