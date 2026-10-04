@@ -1,5 +1,5 @@
 // src/js/modules/ppg/ppg-live.js
-// Live prof : suivi temps réel de la séance PPG du jour
+// Live prof : suivi temps réel de la séance PPG du jour + suivi par élève
 import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves } from '../../services/admin-service.js';
@@ -51,6 +51,7 @@ export function renderPPGLive() {
     }
 
     currentDateAffichee = getTodayDate();
+    window._ppgSuiviCode = '';
     currentEleves = getExistingEleves(classe);
 
     unsubs.forEach(u => { try { u(); } catch(e) {} });
@@ -96,13 +97,58 @@ function rendre() {
     const seance = (window._ppgSeances || {})[dateAffichee] || null;
     const obsDuJour = currentObservations[dateAffichee] || {};
     const elevesMap = elevesParCode(currentEleves);
+    window._ppgElevesMap = elevesMap;
+
+    const nbElevesAvecCode = currentEleves.filter(e => e.codeAutoEval).length;
+
+    // En-tête avec navigation de date : TOUJOURS visible, même sans séance le jour affiché.
+    let html = `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+            <div class="flex justify-between items-center flex-wrap gap-3">
+                <div>
+                    <h3 class="font-black text-blue-400 uppercase text-sm">🏋️ PPG — ${new Date(dateAffichee + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' })}</h3>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="window.ppgLiveChangerDate(-1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Précédent</button>
+                    <button onclick="window.ppgLiveAujourdhui()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">Aujourd'hui</button>
+                    <button onclick="window.ppgLiveChangerDate(1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">Suivant →</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // ── Suivi par élève (historique multi-séances) ──
+    const elevesTries = Object.values(elevesMap).sort((a, b) =>
+        (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || '')
+    );
+    const suiviCode = window._ppgSuiviCode || '';
+    const optionsSuivi = elevesTries.map(e => {
+        const code = String(e.codeAutoEval);
+        return `<option value="${code}" ${code === suiviCode ? 'selected' : ''}>${e.prenom} ${e.nom} (#${code})</option>`;
+    }).join('');
+
+    html += `
+        <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+            <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
+                <h4 class="font-black text-white text-sm uppercase">📈 Suivi par élève</h4>
+            </div>
+            <select id="ppg-live-suivi-select" onchange="window.ppgLiveSuiviChange(this.value)"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-white font-bold text-sm mb-3">
+                <option value="">— Choisir un élève —</option>
+                ${optionsSuivi}
+            </select>
+            <div id="ppg-live-suivi" class="space-y-2"></div>
+        </div>
+    `;
 
     if (!seance || !Array.isArray(seance.ateliers) || seance.ateliers.length === 0) {
-        container.innerHTML = `
+        html += `
             <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center">
                 <p class="text-slate-400">Aucune séance configurée pour le ${new Date(dateAffichee + 'T00:00:00').toLocaleDateString('fr-FR')}.</p>
             </div>
         `;
+        container.innerHTML = html;
+        if (window._ppgSuiviCode) rendreSuiviParEleve(window._ppgSuiviCode);
         return;
     }
 
@@ -116,57 +162,44 @@ function rendre() {
         totauxParCode[code] = agregerSeance(obs, ateliersActifs);
     });
 
-    // Stats de saisie
-    const nbElevesAvecCode = currentEleves.filter(e => e.codeAutoEval).length;
     const nbSaisis = Object.keys(totauxParCode).length;
 
-    // Rendu
-    let html = `
+    // Bloc résultats du jour + onglets ateliers
+    html += `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
             <div class="flex justify-between items-center flex-wrap gap-3">
                 <div>
-                    <h3 class="font-black text-blue-400 uppercase text-sm">🏋️ PPG — ${new Date(dateAffichee + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long' })}</h3>
+                    <h3 class="font-black text-blue-400 uppercase text-sm">📊 Résultats du jour</h3>
                     <p class="text-xs text-slate-400">${nbSaisis} / ${nbElevesAvecCode} élèves ont saisi · ${ateliersActifs.length} atelier${ateliersActifs.length > 1 ? 's' : ''}</p>
                 </div>
-                <div class="flex gap-2">
-                    <button onclick="window.ppgLiveChangerDate(-1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">← Précédent</button>
-                    <button onclick="window.ppgLiveAujourdhui()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">Aujourd'hui</button>
-                    <button onclick="window.ppgLiveChangerDate(1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">Suivant →</button>
-                </div>
             </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-    `;
-
-    // Colonne 1-2 : classement du jour
-    html += `
-            <div class="lg:col-span-2 bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
-                    <h4 class="font-black text-white text-sm uppercase">🏆 Classement du jour</h4>
-                </div>
-                <div class="flex gap-2 mb-3 flex-wrap" id="ppg-live-tabs">
-                    <button onclick="window.ppgLiveFiltre('')" data-atelier="" class="ppg-live-tab px-3 py-1.5 rounded-xl font-black text-xs bg-blue-600 text-white">Tous</button>
+            <div class="flex gap-2 mt-3 flex-wrap" id="ppg-live-tabs">
+                <button onclick="window.ppgLiveFiltre('')" data-atelier="" class="ppg-live-tab px-3 py-1.5 rounded-xl font-black text-xs bg-blue-600 text-white">Tous</button>
     `;
     ateliersActifs.forEach(a => {
         html += `<button onclick="window.ppgLiveFiltre('${a.id}')" data-atelier="${a.id}" class="ppg-live-tab px-3 py-1.5 rounded-xl font-black text-xs bg-slate-700 text-slate-300">${a.emoji} ${a.label}</button>`;
     });
-    html += `</div>`;
-    html += `<div id="ppg-live-classement" class="space-y-2 max-h-[65vh] overflow-y-auto pr-1"></div>`;
-    html += `</div>`;
+    html += `</div></div>`;
 
-    // Colonne 3 : pas encore saisi
+    // Classement du jour + manquants
     html += `
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="lg:col-span-2 bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                <div class="flex justify-between items-center mb-3 flex-wrap gap-2">
+                    <h4 class="font-black text-white text-sm uppercase">🏆 Classement du jour</h4>
+                </div>
+                <div id="ppg-live-classement" class="space-y-2 max-h-[65vh] overflow-y-auto pr-1"></div>
+            </div>
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                 <h4 class="font-black text-white text-sm uppercase mb-3">⏳ Pas encore saisi (${nbElevesAvecCode - nbSaisis})</h4>
                 <div id="ppg-live-manquants" class="space-y-2 max-h-[65vh] overflow-y-auto pr-1"></div>
             </div>
+        </div>
     `;
-    html += `</div>`;
 
     container.innerHTML = html;
 
-    // Rendu différé du classement (photos asynchrones)
+    // Rendu différé (photos asynchrones)
     window._ppgAteliersActifs = ateliersActifs;
     window._ppgTotauxParCode = totauxParCode;
     window._ppgElevesMap = elevesMap;
@@ -175,6 +208,7 @@ function rendre() {
     setTimeout(() => {
         rendreClassement('');
         rendreManquants(totauxParCode, elevesMap);
+        if (window._ppgSuiviCode) rendreSuiviParEleve(window._ppgSuiviCode);
     }, 50);
 }
 
@@ -183,7 +217,6 @@ async function rendreClassement(filtreAtelier) {
     if (!container) return;
     const totauxParCode = window._ppgTotauxParCode || {};
     const elevesMap = window._ppgElevesMap || {};
-    const ateliersActifs = window._ppgAteliersActifs || [];
 
     if (Object.keys(totauxParCode).length === 0) {
         container.innerHTML = '<p class="text-slate-500 text-sm text-center py-6">Aucune observation pour cette date.</p>';
@@ -261,6 +294,92 @@ async function rendreManquants(totauxParCode, elevesMap) {
         `;
     }
     container.innerHTML = html;
+}
+
+// ============================================================
+// SUIVI PAR ÉLÈVE
+// ============================================================
+window.ppgLiveSuiviChange = function(code) {
+    window._ppgSuiviCode = code || '';
+    const container = document.getElementById('ppg-live-suivi');
+    if (!container) return;
+    if (!code) {
+        container.innerHTML = '<p class="text-slate-500 text-sm text-center py-6">Sélectionne un élève pour voir son évolution sur toutes les séances.</p>';
+        return;
+    }
+    rendreSuiviParEleve(code);
+};
+
+async function rendreSuiviParEleve(code) {
+    const container = document.getElementById('ppg-live-suivi');
+    if (!container) return;
+
+    const elevesMap = window._ppgElevesMap || {};
+    const eleve = elevesMap[String(code)];
+    if (!eleve) {
+        container.innerHTML = '<p class="text-red-400 text-sm text-center py-6">Élève introuvable.</p>';
+        return;
+    }
+
+    const photo = await getPhotoUrl(eleve.id);
+    const photoHtml = photo
+        ? `<img src="${photo}" class="w-12 h-12 rounded-full object-cover border-2 border-slate-600">`
+        : `<div class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center text-xl">👤</div>`;
+
+    const lignes = [];
+    let prevTotal = null;
+    const dates = Object.keys(currentObservations).sort();
+
+    dates.forEach(date => {
+        const obs = (currentObservations[date] || {})[String(code)];
+        if (!obs) return;
+        const seance = (window._ppgSeances || {})[date];
+        if (!seance || !Array.isArray(seance.ateliers) || seance.ateliers.length === 0) return;
+
+        const ateliers = seance.ateliers
+            .map(id => getAtelierById(id, currentBibliotheque))
+            .filter(Boolean);
+        const agg = agregerSeance(obs, ateliers);
+        const prog = calculerProgression(agg.totalPts, prevTotal);
+        prevTotal = agg.totalPts;
+
+        const fleche = prog.tendance === 'hausse' ? '📈'
+            : prog.tendance === 'baisse' ? '📉'
+            : prog.tendance === 'nouveau' ? '🆕'
+            : '➡️';
+
+        const detail = Object.entries(agg.parAtelier).map(([aid, d]) => {
+            const n = d.niveau ? ` N${d.niveau}` : '';
+            return `<span class="text-[10px] px-1.5 py-0.5 rounded" style="background:${d.couleur}30;color:${d.couleur}">${d.emoji} ${d.best}${n}</span>`;
+        }).join(' ');
+
+        const dateStr = new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short' });
+        const deltaAff = prog.deltaPts !== null ? (prog.deltaPts > 0 ? `+${prog.deltaPts}` : `${prog.deltaPts}`) : '—';
+
+        lignes.push(`
+            <div class="flex items-center gap-3 bg-slate-900 p-3 rounded-xl border border-slate-700">
+                <div class="text-xs font-bold text-slate-400 min-w-[110px]">${dateStr}</div>
+                <div class="flex-1 flex flex-wrap gap-1">${detail}</div>
+                <div class="text-right">
+                    <div class="text-xl font-black ${prog.tendance === 'baisse' ? 'text-red-400' : 'text-emerald-400'}">${agg.totalPts} pts</div>
+                    <div class="text-[10px] ${prog.tendance === 'hausse' ? 'text-emerald-400' : prog.tendance === 'baisse' ? 'text-red-400' : 'text-slate-500'}">${fleche} ${deltaAff} pts</div>
+                </div>
+            </div>
+        `);
+    });
+
+    container.innerHTML = `
+        <div class="flex items-center gap-3 bg-slate-900 p-3 rounded-xl border border-slate-700 mb-3">
+            ${photoHtml}
+            <div>
+                <div class="font-black text-white">${eleve.prenom} ${eleve.nom}</div>
+                <div class="text-xs text-slate-400">#${code} · ${lignes.length} séance(s)</div>
+            </div>
+        </div>
+        ${lignes.length > 0
+            ? `<div class="space-y-2 max-h-[40vh] overflow-y-auto pr-1">${lignes.join('')}</div>`
+            : '<p class="text-slate-500 text-sm text-center py-6">Aucune donnée enregistrée pour cet élève.</p>'}
+    `;
 }
 
 // ============================================================
