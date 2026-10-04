@@ -182,10 +182,8 @@ function createHeader() {
     modeSelect.onchange = () => {
         modeNatation = modeSelect.value;
         if (currentClasse) localStorage.setItem(`eps_arena_natation_mode_${currentClasse}`, modeNatation);
-        title.textContent = modeNatation === 'koh-lanta' ? '🏝️ Natation – Koh Lanta' : '🏊 Natation – Indice de nage';
-        distGroup.style.display = modeNatation === 'koh-lanta' ? 'none' : '';
+        updateModeUI();
     };
-    distGroup.style.display = modeNatation === 'koh-lanta' ? 'none' : '';
     modeGroup.appendChild(modeLabel);
     modeGroup.appendChild(modeSelect);
     right.appendChild(modeGroup);
@@ -220,15 +218,6 @@ function createHeader() {
     };
     right.appendChild(btnOrganisation);
 
-        // ✅ NOUVEAU : Bouton Relais
-    const btnRelais = document.createElement('button');
-    btnRelais.className = 'bg-orange-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-orange-400 active:scale-95';
-    btnRelais.textContent = '🏁 Relais';
-    btnRelais.onclick = async () => {
-        const module = await import('./natation-relais.js');
-        module.openRelaisNatation();
-    };
-    right.appendChild(btnRelais);
     // Bouton Export iDoceo
     const btnExportIdoceo = document.createElement('button');
     btnExportIdoceo.className = 'bg-indigo-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400 active:scale-95';
@@ -261,6 +250,18 @@ function createHeader() {
     right.appendChild(btnTransmettre);
     right.appendChild(btnExport);
     right.appendChild(btnImport);
+
+    function updateModeUI() {
+        const isKoh = modeNatation === 'koh-lanta';
+        title.textContent = isKoh ? '🏝️ Natation – Koh Lanta' : '🏊 Natation – Indice de nage';
+        distGroup.style.display = isKoh ? 'none' : '';
+        btnBareme.style.display = isKoh ? 'none' : '';
+        btnOrganisation.style.display = isKoh ? 'none' : '';
+        btnExportIdoceo.style.display = isKoh ? 'none' : '';
+        const grid = document.getElementById('natation-grid');
+        if (grid) renderGrid(grid);
+    }
+    updateModeUI();
 
     div.appendChild(title);
     div.appendChild(right);
@@ -361,6 +362,11 @@ function createGrid() {
 }
 
 async function renderGrid(container) {
+    if (modeNatation === 'koh-lanta') {
+        container.innerHTML = '<p class="text-slate-500 col-span-full text-center py-8">🏝️ Mode Koh Lanta — les performances sont disponibles dans les onglets « Live » et « TV ».</p>';
+        return;
+    }
+
     const elevesAffiches = elevesData.filter(e => e.numero !== undefined);
     if (elevesAffiches.length === 0) {
         container.innerHTML = '<p class="text-slate-500 col-span-full text-center">Aucun élève importé.</p>';
@@ -582,7 +588,8 @@ export async function transmettreNatationConfig() {
         await set(ref(db, `${baseProf}/${classe}/natation/config`), configData);
         await set(ref(db, `${baseProf}/${classe}/config`), { activite: 'natation', mode: mode });
         await set(ref(db, `${baseProf}/active_classes/${classe}`), true);
-        alert(`✅ Configuration Natation transmise aux iPads !\n🏊 Indice de nage enregistré pour ${nbIndicesEcrits} élève(s) (critère Multi disponible).`);
+        const modeLabel = mode === 'koh-lanta' ? '🏝️ Koh Lanta' : '🏊 Indice de nage';
+        alert(`✅ Mode ${modeLabel} transmis aux iPads !`);
     } catch (e) {
         console.error(e);
         alert('Erreur lors de la transmission.');

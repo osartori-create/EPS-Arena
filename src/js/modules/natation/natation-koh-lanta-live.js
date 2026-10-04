@@ -1,17 +1,26 @@
 // src/js/modules/natation/natation-koh-lanta-live.js
 // Classement Live professeur pour le mode « Koh Lanta ».
 // Tri par score croissant (le plus bas gagne, peut être négatif).
+// Chaque ligne ouvre une fiche détaillée (toutes les réalisations, modifiables).
 
 import { getEtab } from '../../core/firebase-service.js';
-import { db, ref, onValue } from '../../core/firebase-service.js';
+import { db, ref, onValue, set } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
 import { getExistingEleves } from '../../services/admin-service.js';
 import { normaliserKohLanta, archiver } from '../../services/archive-service.js';
-import { calculScoreKohLanta, formatScoreKohLanta, getTunnelInfos, getRemorquageInfos } from './natation-koh-lanta-core.js';
+import {
+    calculScoreKohLanta,
+    formatScoreKohLanta,
+    formatTempsKohLanta,
+    getTunnelCouleur,
+    getTunnelInfos,
+    getRemorquageInfos
+} from './natation-koh-lanta-core.js';
 
 let currentUnsub = null;
 let historiqueData = {};
+let elevesTries = [];
 
 // ============================================================
 // EXPORT CSV
@@ -80,8 +89,13 @@ function buildRows(histo = {}, elevesTries) {
     return rows;
 }
 
+function getEssais(numero) {
+    const essais = historiqueData[numero];
+    return Array.isArray(essais) ? essais : [];
+}
+
 // ============================================================
-// RENDU
+// RENDU PRINCIPAL
 // ============================================================
 export function renderNatationKohLantaLive() {
     const container = document.getElementById('live-content');
@@ -96,12 +110,10 @@ export function renderNatationKohLantaLive() {
     }
 
     historiqueData = {};
+    elevesTries = [...getExistingEleves(classe)].sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const histoRef = ref(db, `${getEtab()}/profs/${profCode}/${classe}/natation-koh-lanta/historique`);
-
-    const eleves = getExistingEleves(classe);
-    const elevesTries = [...eleves].sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
     async function render() {
         const rows = buildRows(historiqueData, elevesTries);
@@ -141,7 +153,8 @@ export function renderNatationKohLantaLive() {
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`;
 
             html += `
-                <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+                <div class="bg-slate-800 p-3 rounded-xl border border-slate-700 flex items-center gap-3 cursor-pointer hover:border-blue-500 transition-all"
+                     onclick="window.ouvrirFicheKohLanta('${r.numero}')">
                     <div class="w-8 text-center font-black text-yellow-400">${medal}</div>
                     ${photoHtml}
                     <div class="flex-1 min-w-0">
@@ -168,3 +181,169 @@ export function renderNatationKohLantaLive() {
         render();
     });
 }
+
+// ============================================================
+// FICHE ÉLÈVE (toutes les réalisations + modification/suppression)
+// ============================================================
+window.ouvrirFicheKohLanta = function(numero) {
+    const index = parseInt(numero, 10) - 1;
+    const eleve = elevesTries[index];
+    if (!eleve) { alert('Élève non trouvé.'); return; }
+
+    const essais = getEssais(numero);
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
+
+    function renderModal() {
+        const essaisNow = getEssais(numero);
+        let blocHistorique = '<p class="text-slate-500 text-center">Aucune réalisation enregistrée.</p>';
+        if (essaisNow.length > 0) {
+            blocHistorique = `<div class="space-y-2 max-h-60 overflow-y-auto">${essaisNow.map((e, idx) => {
+                const s = calculScoreKohLanta(e);
+                const t = getTunnelInfos(e.tunnelType, e.remontees);
+                const r = getRemorquageInfos(e.remorquage);
+                return `
+                    <div class="bg-slate-800 p-2 rounded-lg flex items-center gap-2 text-xs">
+                        <span class="text-slate-400 w-12">Essai ${idx + 1}</span>
+                        <span class="text-yellow-400 font-bold w-24">${formatScoreKohLanta(s)}</span>
+                        <span class="text-slate-300 flex-1 truncate">
+                            ⏱️ ${(e.tempsMs / 1000).toFixed(1)}s · 🍽️ ${e.coups} · 🪼 ${e.meduses} · 🌀 ${t.label} · 🛟 ${r.label}
+                        </span>
+                        <button onclick="window.modifierEssaiKohLanta('${numero}', ${idx})"
+                                class="bg-blue-600 text-white px-2 py-1 rounded font-black">✏️</button>
+                        <button onclick="window.supprimerEssaiKohLanta('${numero}', ${idx})"
+                                class="bg-red-600 text-white px-2 py-1 rounded font-black">🗑️</button>
+                    </div>
+                `;
+            }).join('')}</div>`;
+        }
+
+        modal.innerHTML = `
+            <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-black text-white">${eleve.prenom} ${eleve.nom}</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="bg-slate-700 px-3 py-1.5 rounded-xl font-black text-xs text-white">✖</button>
+                </div>
+                <div class="text-4xl font-black text-yellow-400 text-center mb-4">#${numero}</div>
+                <p class="text-xs font-bold text-slate-400 uppercase mb-2">📊 Toutes les réalisations</p>
+                ${blocHistorique}
+            </div>
+        `;
+    }
+
+    renderModal();
+    document.body.appendChild(modal);
+};
+
+window.modifierEssaiKohLanta = function(numero, index) {
+    const essais = getEssais(numero);
+    if (index < 0 || index >= essais.length) { alert('Essai introuvable.'); return; }
+    const e = essais[index];
+
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h4 class="text-lg font-black text-white text-center mb-4">✏️ Modifier l'essai ${index + 1}</h4>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Temps (secondes)</label>
+                    <input type="number" id="kl-edit-temps" value="${(e.tempsMs / 1000).toFixed(1)}" step="0.1" min="0"
+                           class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-xl font-black text-center">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Coups de bras</label>
+                    <input type="number" id="kl-edit-coups" value="${e.coups}" min="1"
+                           class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-xl font-black text-center">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Méduses touchées</label>
+                    <input type="number" id="kl-edit-meduses" value="${e.meduses ?? 0}" min="0"
+                           class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white text-xl font-black text-center">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Tunnel</label>
+                    <select id="kl-edit-tunnel" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white">
+                        <option value="corde" ${e.tunnelType === 'corde' ? 'selected' : ''}>🪢 Corde (−5s)</option>
+                        <option value="sans-aide" ${e.tunnelType === 'sans-aide' ? 'selected' : ''}>🫧 Sans aide</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Remontées</label>
+                    <select id="kl-edit-remontees" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white">
+                        ${[0, 1, 2, 3, 4].map(n => `<option value="${n}" ${(e.remontees ?? 0) === n ? 'selected' : ''}>${n === 4 ? '4+' : n} remontée${n > 1 ? 's' : ''}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase">Remorquage</label>
+                    <select id="kl-edit-remorquage" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white">
+                        <option value="vert" ${e.remorquage === 'vert' ? 'selected' : ''}>🟢 Cerceau (−5s)</option>
+                        <option value="orange" ${e.remorquage === 'orange' ? 'selected' : ''}>🟠 Mannequin (−10s)</option>
+                        <option value="rouge" ${e.remorquage === 'rouge' ? 'selected' : ''}>🔴 Mannequin + clapot (−15s)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="this.closest('.fixed').remove()" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white text-sm">Annuler</button>
+                <button onclick="window.sauvegarderEssaiKohLanta('${numero}', ${index})" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-sm">💾 Enregistrer</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+};
+
+window.sauvegarderEssaiKohLanta = function(numero, index) {
+    const temps = parseFloat(document.getElementById('kl-edit-temps')?.value.replace(',', '.'));
+    const coups = parseInt(document.getElementById('kl-edit-coups')?.value);
+    const meduses = parseInt(document.getElementById('kl-edit-meduses')?.value);
+    const tunnelType = document.getElementById('kl-edit-tunnel')?.value;
+    const remontees = parseInt(document.getElementById('kl-edit-remontees')?.value);
+    const remorquage = document.getElementById('kl-edit-remorquage')?.value;
+
+    if (isNaN(temps) || temps <= 0 || isNaN(coups) || coups < 1 || isNaN(meduses) || meduses < 0) {
+        alert('Valeurs invalides.');
+        return;
+    }
+
+    const essais = getEssais(numero);
+    if (index < 0 || index >= essais.length) { alert('Essai introuvable.'); return; }
+
+    const nouvelEssai = {
+        ...essais[index],
+        tempsMs: Math.round(temps * 1000),
+        coups,
+        meduses,
+        tunnelType,
+        remontees: tunnelType === 'corde' ? null : remontees,
+        remorquage,
+        score: Math.round(calculScoreKohLanta({
+            tempsMs: Math.round(temps * 1000), coups, meduses, tunnelType,
+            remontees: tunnelType === 'corde' ? null : remontees, remorquage
+        }) * 100) / 100,
+        timestamp: Date.now()
+    };
+    essais[index] = nouvelEssai;
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const histoRef = ref(db, `${getEtab()}/profs/${profCode}/${getCurrentClasse()}/natation-koh-lanta/historique/${numero}`);
+    set(histoRef, essais).then(() => {
+        historiqueData[numero] = essais;
+        document.querySelectorAll('.fixed').forEach(el => el.remove());
+        window.ouvrirFicheKohLanta(numero);
+    }).catch(err => alert('❌ Erreur : ' + err.message));
+};
+
+window.supprimerEssaiKohLanta = function(numero, index) {
+    if (!confirm(`Supprimer l'essai ${index + 1} ?`)) return;
+    const essais = getEssais(numero);
+    if (index < 0 || index >= essais.length) { alert('Essai introuvable.'); return; }
+    essais.splice(index, 1);
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const histoRef = ref(db, `${getEtab()}/profs/${profCode}/${getCurrentClasse()}/natation-koh-lanta/historique/${numero}`);
+    set(histoRef, essais).then(() => {
+        historiqueData[numero] = essais;
+        document.querySelectorAll('.fixed').forEach(el => el.remove());
+        window.ouvrirFicheKohLanta(numero);
+    }).catch(err => alert('❌ Erreur : ' + err.message));
+};

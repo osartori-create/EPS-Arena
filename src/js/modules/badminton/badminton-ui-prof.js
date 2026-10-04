@@ -6,6 +6,11 @@ import { getModesList } from './badminton-registry.js';
 let currentMode = 'terrain';
 let initialized = false;
 
+function getBadmintonModeKey() {
+    const cl = document.getElementById('selectClasse')?.value || 'default';
+    return `eps_arena_badminton_mode_${cl}`;
+}
+
 export function initBadmintonModeSelector(containerId = 'badminton-mode-selector') {
     const container = document.getElementById(containerId);
     if (!container) {
@@ -14,7 +19,7 @@ export function initBadmintonModeSelector(containerId = 'badminton-mode-selector
     }
 
     const modes = getModesList();
-    currentMode = localStorage.getItem('badminton_mode') || 'terrain';
+    currentMode = localStorage.getItem(getBadmintonModeKey()) || 'terrain';
     if (!modes.find(m => m.id === currentMode)) currentMode = 'terrain';
 
     renderSelector(container, modes);
@@ -49,7 +54,7 @@ export function setBadmintonMode(mode) {
         return;
     }
     currentMode = mode;
-    localStorage.setItem('badminton_mode', mode);
+    localStorage.setItem(getBadmintonModeKey(), mode);
 
     document.querySelectorAll('#badminton-mode-selector button').forEach(btn => {
         const isActive = btn.id === `badminton-mode-${mode}`;
@@ -85,5 +90,5 @@ window.setBadmintonMode = setBadmintonMode;
 window.initBadmintonModeSelector = initBadmintonModeSelector;
 
 export function getCurrentBadmintonMode() {
-    return localStorage.getItem('badminton_mode') || 'terrain';
+    return localStorage.getItem(getBadmintonModeKey()) || 'terrain';
 }

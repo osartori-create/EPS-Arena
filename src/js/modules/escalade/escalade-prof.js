@@ -27,6 +27,11 @@ import { registerModule, getModule } from '../registry.js';
 // ============================================================
 let escaladeMode = 'classic';
 
+function getEscaladeModeKey() {
+    const cl = document.getElementById('selectClasse')?.value || 'default';
+    return `eps_arena_escalade_mode_${cl}`;
+}
+
 export function initEscaladeModeSelector() {
     const escView = document.getElementById('viewEscaladeSettings');
     if (!escView) {
@@ -62,12 +67,14 @@ export function initEscaladeModeSelector() {
         setEscaladeMode('suivi');
     });
     
-    // Par défaut, on met le mode classique
-    setEscaladeMode('classic');
+    // Restaurer le mode sauvegardé (par classe), sinon classique.
+    const saved = localStorage.getItem(getEscaladeModeKey());
+    setEscaladeMode(saved === 'bloc' || saved === 'suivi' ? saved : 'classic');
 }
 
 function setEscaladeMode(mode) {
     escaladeMode = mode;
+    localStorage.setItem(getEscaladeModeKey(), mode);
 
     const escView = document.getElementById('viewEscaladeSettings');
     const classicEl = document.getElementById('escalade-classic-block');

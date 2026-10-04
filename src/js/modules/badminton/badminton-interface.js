@@ -4,6 +4,7 @@
 import { getEtab } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { db, ref, set } from '../../core/firebase-service.js';
+import { getCurrentBadmintonMode } from './badminton-ui-prof.js';
 
 const MAX_PAR_TERRAIN = 5;
 
@@ -265,7 +266,7 @@ export function exportBadmintonConfig() {
     const activeClasse = document.getElementById('selectClasse').value;
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
 
-    const mode = localStorage.getItem('badminton_mode') || 'terrain';
+    const mode = getCurrentBadmintonMode();
 
     const date = new Date();
     const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
@@ -306,8 +307,7 @@ export function importBadmintonConfig(event) {
             if (!data.classe || !data.nbTerrains) throw new Error("Format de fichier invalide");
 
             if (data.mode) {
-                localStorage.setItem('badminton_mode', data.mode);
-                if (typeof window.setBadmintonMode === 'function') window.setBadmintonMode(data.mode);
+                localStorage.setItem(`eps_arena_badminton_mode_${data.classe}`, data.mode);
             }
             if (data.terrainType && document.getElementById('badmintonMode')) document.getElementById('badmintonMode').value = data.terrainType;
             if (data.centerSize) document.getElementById('badmintonCenterSize').value = data.centerSize;
@@ -330,6 +330,9 @@ export function importBadmintonConfig(event) {
                 initBadmintonInterface(data.nbTerrains, true);
                 await loadBadmintonAssignments();
             }
+            if (data.mode && typeof window.setBadmintonMode === 'function') {
+                window.setBadmintonMode(data.mode);
+            }
             alert("✅ Configuration Badminton importée !");
         } catch (err) {
             alert("❌ Erreur import : " + err.message);
@@ -349,7 +352,7 @@ export async function transmettreBadmintonConfig() {
     const assignments = JSON.parse(localStorage.getItem(`eps_arena_badminton_assignments_${activeClasse}`) || '{}');
     const localMapping = {};
 
-    const uiMode = localStorage.getItem('badminton_mode') || 'terrain';
+    const uiMode = getCurrentBadmintonMode();
 
     const configData = {
         activite: 'badminton',

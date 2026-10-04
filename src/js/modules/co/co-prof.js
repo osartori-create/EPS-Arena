@@ -28,6 +28,11 @@ function getProfCode() {
     return code;
 }
 
+function getCOModeKey() {
+    const cl = currentClasse || document.getElementById('selectClasse')?.value || 'default';
+    return `eps_arena_co_mode_${cl}`;
+}
+
 // ============================================================
 // SÉLECTEUR DE MODE
 // ============================================================
@@ -79,11 +84,13 @@ export function initCOModeSelector() {
     newBtnClassique.addEventListener('click', () => setCOMode('classique'));
     newBtnOrient.addEventListener('click', () => setCOMode('orientshow'));
 
-    setCOMode('classique');
+    const saved = localStorage.getItem(getCOModeKey());
+    setCOMode(saved === 'orientshow' ? 'orientshow' : 'classique');
 }
 
 function setCOMode(mode) {
     currentMode = mode;
+    localStorage.setItem(getCOModeKey(), mode);
     const containerClassique = document.getElementById('co-classique-container');
     const containerOrientShow = document.getElementById('co-orientshow-container');
 

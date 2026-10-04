@@ -26,6 +26,7 @@ let currentNumero = null;
 let nbEleves = 0;
 let configListener = null;
 let historiqueListener = null;
+let bilanGlobalListener = null;
 
 let chronoRunning = false;
 let chronoStart = 0;
@@ -46,6 +47,10 @@ let tunnelTypeTmp = null;
 let remonteesTmp = null;
 
 let isSaving = false;
+let elevesKiosk = [];
+let modeKiosk = 'juge';
+let bilanNumero = null;
+let bilanGlobal = {};
 
 function zonesComplete() {
     return !!attempt
@@ -240,9 +245,15 @@ export function initNatationKohLantaKiosk(classe) {
     currentClasse = classe;
     currentNumero = null;
     step = 'liste';
+    modeKiosk = 'juge';
+    bilanNumero = null;
+    bilanGlobal = {};
     historiqueEssais = [];
     isSaving = false;
     resetAttempt();
+
+    const elevesRaw = JSON.parse(localStorage.getItem(`eps_arena_eleves_${classe}`) || '[]');
+    elevesKiosk = [...elevesRaw].sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
     const container = document.getElementById('natation-module');
     if (!container) return;
@@ -291,7 +302,186 @@ function render() {
     container.innerHTML = renderChrome();
 }
 
+// ============================================================
+// MODE BILAN (consultation élève)
+// ============================================================
+window.kohLantaBasculerBilan = function() {
+    if (chronoRunning) stopChronoInternal();
+    modeKiosk = 'bilan';
+    bilanNumero = null;
+    bilanGlobal = {};
+    chargerHistoriqueGlobalBilan();
+    render();
+};
+
+window.kohLantaRetourJuge = function() {
+    if (bilanGlobalListener) { bilanGlobalListener(); bilanGlobalListener = null; }
+    bilanNumero = null;
+    bilanGlobal = {};
+    modeKiosk = 'juge';
+    step = 'liste';
+    render();
+};
+
+window.kohLantaChoisirBilan = function(num) {
+    if (!num || num < 1 || num > nbEleves) return;
+    bilanNumero = num;
+    render();
+};
+
+window.kohLantaRetourBilanSelection = function() {
+    bilanNumero = null;
+    render();
+};
+
+function chargerHistoriqueGlobalBilan() {
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const histoRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation-koh-lanta/historique`);
+    if (bilanGlobalListener) bilanGlobalListener();
+    bilanGlobalListener = onValue(histoRef, (snap) => {
+        bilanGlobal = snap.val() || {};
+        render();
+    });
+}
+
+function renderBilanChrome() {
+    const steps = [
+        { id: 'selection', label: 'Nageur' },
+        { id: 'fiche', label: 'Bilan' }
+    ];
+    const currentIdx = bilanNumero === null ? 0 : 1;
+    const stepHtml = steps.map((s, i) => {
+        const isActive = i === currentIdx;
+        const isDone = i < currentIdx;
+        return `
+            <div class="flex-1 text-center px-1">
+                <div class="h-1.5 rounded-full mb-1 ${isActive ? 'bg-yellow-400' : (isDone ? 'bg-emerald-400' : 'bg-emerald-900')}"></div>
+                <span class="text-[10px] font-black ${isActive ? 'text-yellow-300' : 'text-emerald-500'}">${s.label}</span>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="w-full min-h-screen" style="background: linear-gradient(180deg, #7dd3fc 0%, #bae6fd 45%, #fde68a 46%, #fcd34d 100%); color:#78350f; padding:12px; display:flex; flex-direction:column;">
+            <div class="flex items-center justify-between mb-3 px-1">
+                <h2 class="text-2xl md:text-3xl font-black" style="color:#b45309;">🏝️ KOH LANTA</h2>
+                <button onclick="window.kohLantaRetourJuge()"
+                        class="px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95"
+                        style="background:#0ea5e9;">⚖️ Mode Juge</button>
+            </div>
+            <div class="flex gap-1 mb-3 px-1">${stepHtml}</div>
+            ${bilanNumero === null ? renderBilanSelection() : renderBilanFiche()}
+        </div>
+    `;
+}
+
+function renderBilanSelection() {
+    const doneCount = Object.values(bilanGlobal).filter(a => Array.isArray(a) && a.length > 0).length;
+    let cells = '';
+    for (let i = 1; i <= nbEleves; i++) {
+        const hasData = bilanGlobal[i] && Array.isArray(bilanGlobal[i]) && bilanGlobal[i].length > 0;
+        const bg = hasData
+            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+            : 'linear-gradient(135deg, #38bdf8, #0ea5e9)';
+        cells += `
+            <button class="rounded-2xl font-black text-2xl md:text-3xl text-white border-4 active:scale-95 transition-all shadow-lg hover:scale-105 touch-manipulation"
+                    style="background:${bg}; border-color:#fff; min-height:64px;"
+                    onclick="window.kohLantaChoisirBilan(${i})">
+                ${i}${hasData ? ' ✅' : ''}
+            </button>
+        `;
+    }
+
+    return `
+        <div class="flex-1 flex flex-col">
+            <p class="text-lg md:text-xl font-black text-center mb-2" style="color:#78350f;">👤 Mon bilan — choisis ton numéro</p>
+            <p class="text-sm text-center mb-4" style="color:#78350f;">${doneCount} nageur(s) avec au moins un passage</p>
+            <div class="flex-1 grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-3 max-w-6xl mx-auto w-full content-start">${cells}</div>
+        </div>
+    `;
+}
+
+function renderBilanFiche() {
+    const index = parseInt(bilanNumero, 10) - 1;
+    const eleve = elevesKiosk[index] || null;
+    const essais = Array.isArray(bilanGlobal[bilanNumero]) ? bilanGlobal[bilanNumero] : [];
+
+    let body = '';
+    if (essais.length === 0) {
+        body = '<p class="text-center" style="color:#78350f;">Aucun passage enregistré pour l\'instant.</p>';
+    } else {
+        const scores = essais.map(e => calculScoreKohLanta(e));
+        const meilleur = Math.min(...scores);
+        const dernier = scores[scores.length - 1];
+        const progression = scores.length >= 2 ? dernier - meilleur : 0;
+
+        let evolutionHtml = '<div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:10px;">';
+        essais.forEach((e, idx) => {
+            const s = calculScoreKohLanta(e);
+            const min = Math.min(...scores);
+            const max = Math.max(...scores);
+            const span = max > min ? (max - min) : 1;
+            const h = Math.max(24, Math.min(120, 24 + ((s - min) / span) * 96));
+            evolutionHtml += `
+                <div style="flex:1; min-width:56px; text-align:center;">
+                    <div style="font-size:0.7rem; font-weight:900; color:#78350f;">Pass.${idx+1}</div>
+                    <div style="height:${h.toFixed(0)}px; background:#d97706; border-radius:8px 8px 0 0;"></div>
+                    <div style="font-size:0.8rem; font-weight:900; color:#b45309;">${formatScoreKohLanta(s)}</div>
+                </div>
+            `;
+        });
+        evolutionHtml += '</div>';
+
+        body = `
+            <div style="background:rgba(255,255,255,0.75); border-radius:16px; padding:12px; margin-bottom:10px; display:flex; justify-content:space-around; gap:8px; font-weight:900; color:#78350f; flex-wrap:wrap;">
+                <span>🥇 Meilleur : ${formatScoreKohLanta(meilleur)}</span>
+                <span>Dernier : ${formatScoreKohLanta(dernier)}</span>
+                ${scores.length >= 2 ? `<span>${progression > 0 ? '📉 ' + progression.toFixed(1) + ' (à améliorer)' : (progression < 0 ? '📈 ' + Math.abs(progression).toFixed(1) + ' de mieux' : '➡️ Stable')}</span>` : ''}
+            </div>
+            <p class="text-sm font-black mb-2" style="color:#78350f;">📊 Évolution des scores (plus bas = mieux)</p>
+            ${evolutionHtml}
+            <p class="text-sm font-black mb-2" style="color:#78350f;">📋 Détail des passages</p>
+            <div style="display:flex; flex-direction:column; gap:6px; max-height:280px; overflow-y:auto;">
+                ${essais.map((e, idx) => {
+                    const s = calculScoreKohLanta(e);
+                    const t = getTunnelInfos(e.tunnelType, e.remontees);
+                    const r = getRemorquageInfos(e.remorquage);
+                    return `
+                        <div style="background:rgba(255,255,255,0.8); border-radius:12px; padding:8px 10px; font-size:0.85rem; color:#78350f;">
+                            <div style="display:flex; justify-content:space-between; gap:6px; font-weight:900;">
+                                <span>Passage ${idx+1}</span>
+                                <span style="color:#b45309;">Score ${formatScoreKohLanta(s)}</span>
+                            </div>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+                                <span>⏱️ ${(e.tempsMs/1000).toFixed(1)}s</span>
+                                <span>🍽️ ${e.coups} bras</span>
+                                <span>🪼 ${e.meduses}</span>
+                                <span>🌀 ${t.label}</span>
+                                <span>🛟 ${r.label}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    return `
+        <div class="flex-1 flex flex-col">
+            <div class="flex items-center gap-4 mb-4">
+                <button onclick="window.kohLantaRetourBilanSelection()"
+                        class="px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95"
+                        style="background:#0ea5e9;">← Changer</button>
+                <span class="text-2xl md:text-3xl font-black" style="color:#b45309;">#${bilanNumero}${eleve ? ' — ' + eleve.prenom + ' ' + eleve.nom : ''}</span>
+            </div>
+            ${body}
+        </div>
+    `;
+}
+
 function renderChrome() {
+    if (modeKiosk === 'bilan') return renderBilanChrome();
+
     const steps = [
         { id: 'liste', label: 'Nageur' },
         { id: 'course', label: 'Course' },
@@ -314,7 +504,9 @@ function renderChrome() {
         <div class="w-full min-h-screen" style="background: linear-gradient(180deg, #052e2b 0%, #064e3b 100%); color:#eafff7; padding:12px; display:flex; flex-direction:column;">
             <div class="flex items-center justify-between mb-3 px-1">
                 <h2 class="text-2xl md:text-3xl font-black" style="color:#facc15;">🏝️ KOH LANTA</h2>
-                <span class="text-sm font-black px-2 py-1 rounded-lg" style="background:#022c22; color:#6ee7b7;">NATATION</span>
+                <button onclick="window.kohLantaBasculerBilan()"
+                        class="text-sm font-black px-3 py-2 rounded-lg active:scale-95"
+                        style="background:#0ea5e9; color:#ffffff;">👤 Bilan élève</button>
             </div>
             <div class="flex gap-1 mb-3 px-1">${stepHtml}</div>
             ${renderStepContent()}
