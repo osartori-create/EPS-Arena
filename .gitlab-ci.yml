@@ -1,0 +1,14 @@
+# Déploiement GitLab Pages (forge.apps.education.fr)
+# Le projet est 100 % statique : on copie les fichiers dans public/
+# et on publie ce dossier comme artefact Pages.
+pages:
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp -r src libs public/
+    - cp maitre.html eleve.html manifest.json hub-icon.svg icon.svg topo_voies_ensisheim.csv public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
