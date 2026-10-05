@@ -6,7 +6,7 @@ pages:
   script:
     - mkdir -p public
     - cp -r src libs public/
-    - cp maitre.html eleve.html manifest.json hub-icon.svg icon.svg topo_voies_ensisheim.csv public/
+    - cp index.html maitre.html eleve.html manifest.json hub-icon.svg icon.svg topo_voies_ensisheim.csv public/
   artifacts:
     paths:
       - public
