@@ -2,7 +2,7 @@
 // Kiosque observateur - 3x5min R=3'
 
 import { db, ref, onValue, set, push } from '../../../../core/firebase-service.js';
-import { COULEURS_GROUPES, getCouleurGroupe, getBasePath } from '../../demifond-common.js';
+import { COULEURS_GROUPES, getCouleurGroupe, getBasePath, getSessionActivePath, getTroisCinqMinObsPath } from '../../demifond-common.js';
 
 // ============================================================
 // ÉTAT GLOBAL
@@ -35,10 +35,12 @@ let state = {
     tickInterval: null,
     uiRefreshInterval: null,
     bilanCodeActif: null,   // ✅ AJOUT
+    sessionId: null
 };
 
 let configListener = null;
 let sequenceListener = null;
+let sessionListener = null;
 
 // ============================================================
 // INITIALISATION
@@ -66,6 +68,13 @@ export function initTroisCinqMinKiosk(classe) {
     configListener = onValue(ref(db, `${basePath}/config`), (snap) => {
         state.config = snap.val() || null;
         render();
+    });
+
+    // Écoute session active
+    if (sessionListener) sessionListener();
+    sessionListener = onValue(ref(db, getSessionActivePath(classe)), (snap) => {
+        state.sessionId = snap.val() || null;
+        console.log('[DemiFond] Session active :', state.sessionId);
     });
 
     // Écoute séquence
@@ -237,6 +246,7 @@ async function envoyerResultatsCourse(courseNum) {
     state.derniereCourseEnvoyee = courseNum;
 
     const basePath = getBasePath(state.classe);
+    const obsBase = getTroisCinqMinObsPath(state.classe, state.sessionId);
 
     // ✅ SNAPSHOT immédiat (avant tout await) : évite qu'un reset concurrent
     // (preparerNouvelleCourse) ne vide les tableaux pendant l'envoi asynchrone.
@@ -255,7 +265,7 @@ async function envoyerResultatsCourse(courseNum) {
     for (const { code, timestamps, partiel, abandon } of snapshot) {
         if (timestamps.length === 0 && !abandon && !partiel) continue;
         try {
-            await set(ref(db, `${basePath}/observations/course-${courseNum}/${code}`), {
+            await set(ref(db, `${obsBase}/course-${courseNum}/${code}`), {
                 timestamps: timestamps.map(t => t - timestampDebut),
                 partiel,
                 abandon,
@@ -614,6 +624,34 @@ window.dmfKioskFermerAbandon = function() {
 };
 
 // ============================================================
+// AIDE SAISIE PARTIEL : détecte un partiel physiquement impossible
+// ============================================================
+function partielAlerte(code) {
+    const partiel = state.partielsParEleve[code] || 0;
+    const clicks = state.timestampsParEleve[code] || [];
+    const dernierAbs = clicks[clicks.length - 1];
+    const duree = state.config.duree;
+    const pause = state.config.pause;
+    const courseDebut = (state.courseNum - 1) * (duree + pause) * 1000;
+    const finCourse = courseDebut + duree * 1000;
+
+    let tempsRestant = duree * 1000;
+    if (dernierAbs && state.timestampDebut) {
+        const dernierRel = dernierAbs - state.timestampDebut;
+        tempsRestant = Math.max(0, finCourse - dernierRel);
+    }
+
+    const distanceParPlot = state.config.tour / state.config.plots;
+    const distancePartiel = partiel * distanceParPlot;
+    const vitesse = tempsRestant > 0
+        ? (distancePartiel / (tempsRestant / 1000)) * 3.6
+        : 999;
+
+    const incoherent = partiel > 0 && vitesse > 24;
+    return { incoherent, vitesse, tempsRestant };
+}
+
+// ============================================================
 // ÉCRAN 4 : PAUSE + SAISIE PARTIELS
 // ============================================================
 function renderPause(container) {
@@ -645,9 +683,10 @@ function renderPause(container) {
 
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-slate-700 mb-4">
                 <h3 class="font-black text-white text-lg mb-1">📝 Saisie des plots partiels</h3>
-                <p class="text-slate-400 text-sm mb-4">
-                    Pour chaque élève, indique combien de plots supplémentaires il a parcourus dans son dernier tour
-                    (0 = il venait de finir un tour, ${state.config.plots || 8} = il était presque au bout).
+                <p class="text-slate-400 text-sm mb-2">
+                    <strong class="text-white">Partiel = plots parcourus APRÈS le dernier clic.</strong><br>
+                    Si le coureur venait de franchir la ligne quand tu as cliqué, le partiel est <strong class="text-amber-300">0</strong>,
+                    pas ${state.config.plots || 8} (sinon le tour est compté deux fois).
                 </p>
                 <div class="space-y-3">
     `;
@@ -655,9 +694,10 @@ function renderPause(container) {
     elevesActifs.forEach(code => {
         const nbTours = (state.timestampsParEleve[code] || []).length;
         const partiel = state.partielsParEleve[code] || 0;
+        const alerte = partielAlerte(code);
 
         html += `
-            <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+            <div class="bg-slate-900 p-3 rounded-xl border ${alerte.incoherent ? 'border-red-500' : 'border-slate-700'}">
                 <div class="flex justify-between items-center mb-2">
                     <div>
                         <span class="font-black text-2xl" style="color:${couleur.bg};">${code}</span>
@@ -668,6 +708,11 @@ function renderPause(container) {
                         <span id="dmf-partiel-${code}" class="text-xl font-black text-white w-8 text-center">${partiel}</span>
                     </div>
                 </div>
+                ${alerte.incoherent ? `
+                    <p class="text-[11px] text-red-400 font-bold mb-2">
+                        ⚠️ Partiel incohérent : ${partiel} plots dans les derniers ${Math.max(0, Math.round(alerte.tempsRestant / 1000))} s ≈ ${alerte.vitesse.toFixed(0)} km/h. Mets 0 si le coureur venait de franchir la ligne.
+                    </p>
+                ` : ''}
                 <div class="flex gap-1">
                     ${listePlots().map(n => `
                         <button onclick="window.dmfKioskSetPartiel('${code}', ${n})"
@@ -713,8 +758,9 @@ function renderSaisieFinale(container) {
 
             <div class="bg-slate-800 p-4 rounded-2xl border-2 border-slate-700 mb-4">
                 <h3 class="font-black text-white text-lg mb-1">📝 Saisie des plots partiels — Course 3</h3>
-                <p class="text-slate-400 text-sm mb-4">
-                    Pour chaque élève, indique combien de plots supplémentaires il a parcourus dans son dernier tour.
+                <p class="text-slate-400 text-sm mb-2">
+                    <strong class="text-white">Partiel = plots parcourus APRÈS le dernier clic.</strong><br>
+                    Si le coureur venait de franchir la ligne quand tu as cliqué, le partiel est <strong class="text-amber-300">0</strong>.
                 </p>
                 <div class="space-y-3">
     `;
@@ -725,9 +771,10 @@ function renderSaisieFinale(container) {
         elevesActifs.forEach(code => {
             const nbTours = (state.timestampsParEleve[code] || []).length;
             const partiel = state.partielsParEleve[code] || 0;
+            const alerte = partielAlerte(code);
 
             html += `
-                <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                <div class="bg-slate-900 p-3 rounded-xl border ${alerte.incoherent ? 'border-red-500' : 'border-slate-700'}">
                     <div class="flex justify-between items-center mb-2">
                         <div>
                             <span class="font-black text-2xl" style="color:${couleur.bg};">${code}</span>
@@ -738,6 +785,11 @@ function renderSaisieFinale(container) {
                             <span class="text-xl font-black text-white w-8 text-center">${partiel}</span>
                         </div>
                     </div>
+                    ${alerte.incoherent ? `
+                        <p class="text-[11px] text-red-400 font-bold mb-2">
+                            ⚠️ Partiel incohérent : ${partiel} plots dans les derniers ${Math.max(0, Math.round(alerte.tempsRestant / 1000))} s ≈ ${alerte.vitesse.toFixed(0)} km/h.
+                        </p>
+                    ` : ''}
                     <div class="flex gap-1">
                         ${listePlots().map(n => `
                             <button onclick="window.dmfKioskSetPartiel('${code}', ${n})"
@@ -875,7 +927,7 @@ async function renderBilanEleve(container, code) {
 
     try {
         const { chargerObservations, calculerBilan, rendreBilanHTML } = await import('./trois-cinq-min-bilan.js');
-        const observations = await chargerObservations(state.classe, code);
+        const observations = await chargerObservations(state.classe, code, state.sessionId);
 
         const vma = state.config?.vmaParCode?.[code] || null;
         const bilan = calculerBilan(observations, state.config, vma);
@@ -1019,6 +1071,7 @@ window.retourMenuDemiFond = function() {
 export function cleanupTroisCinqMinKiosk() {
     if (configListener) { configListener(); configListener = null; }
     if (sequenceListener) { sequenceListener(); sequenceListener = null; }
+    if (sessionListener) { sessionListener(); sessionListener = null; }
     if (state.tickInterval) { clearInterval(state.tickInterval); state.tickInterval = null; }
     if (state.uiRefreshInterval) { clearInterval(state.uiRefreshInterval); state.uiRefreshInterval = null; }
     if (state.feedbackTimeout) { clearTimeout(state.feedbackTimeout); state.feedbackTimeout = null; }

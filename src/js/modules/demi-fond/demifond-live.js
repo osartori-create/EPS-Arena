@@ -5,7 +5,7 @@ import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getLocalMapping } from '../../core/live-engine.js';
 import { getExistingEleves } from '../../services/admin-service.js';
-import { COULEURS_GROUPES, getBasePath, getVMAEleve } from './demifond-common.js';
+import { COULEURS_GROUPES, getBasePath, getVMAEleve, getSessionActivePath, getTroisCinqMinObsPath } from './demifond-common.js';
 import { calculerDistance, calculerVitesse } from './variantes/trois-cinq-min/trois-cinq-min-core.js';
 
 let currentUnsub = null;
@@ -94,10 +94,19 @@ window.exportDemiFondLiveCSV = async function() {
             ? (config.durees || [])
             : Array(nbCourses).fill(config.duree || 300);
 
-        // Lecture de toutes les observations
+        // Session active (pour ne pas exporter les anciennes données écrasées)
+        let sessionId = null;
+        try {
+            const sessionSnap = await new Promise(resolve => onValue(ref(db, getSessionActivePath(classe)), resolve, { onlyOnce: true }));
+            sessionId = sessionSnap.val() || null;
+        } catch (e) {}
+
+        const obsBase = getTroisCinqMinObsPath(classe, sessionId);
+
+        // Lecture de toutes les observations de la session active
         const observations = {};
         for (let i = 1; i <= nbCourses; i++) {
-            const snap = await new Promise(resolve => onValue(ref(db, `${basePath}/observations/course-${i}`), resolve, { onlyOnce: true }));
+            const snap = await new Promise(resolve => onValue(ref(db, `${obsBase}/course-${i}`), resolve, { onlyOnce: true }));
             observations[i] = snap.val() || {};
         }
 

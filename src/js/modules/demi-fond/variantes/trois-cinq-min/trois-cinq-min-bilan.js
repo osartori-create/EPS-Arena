@@ -2,19 +2,19 @@
 // Calcul et rendu du bilan élève (graphique SVG + indicateurs)
 
 import { db, ref, onValue } from '../../../../core/firebase-service.js';
-import { getBasePath, getCouleurGroupe } from '../../demifond-common.js';
+import { getBasePath, getCouleurGroupe, getTroisCinqMinObsPath } from '../../demifond-common.js';
 import { evaluerAllure, evaluerPerformance, calculerDistance, calculerVitesse, calculerRegularite } from './trois-cinq-min-core.js';
 
 // ============================================================
 // CHARGEMENT DES OBSERVATIONS FIREBASE
 // ============================================================
-export async function chargerObservations(classe, code) {
-    const basePath = getBasePath(classe);
+export async function chargerObservations(classe, code, sessionId = null) {
+    const obsBase = getTroisCinqMinObsPath(classe, sessionId);
     const result = { course1: null, course2: null, course3: null };
 
     for (let i = 1; i <= 3; i++) {
         const snap = await new Promise(resolve => {
-            onValue(ref(db, `${basePath}/observations/course-${i}/${code}`), resolve, { onlyOnce: true });
+            onValue(ref(db, `${obsBase}/course-${i}/${code}`), resolve, { onlyOnce: true });
         });
         result[`course${i}`] = snap.val() || null;
     }

@@ -4,7 +4,7 @@
 import { db, ref, onValue } from '../../../../core/firebase-service.js';
 import { getCurrentClasse, getLocalMapping } from '../../../../core/live-engine.js';
 import { getPhotoUrl, getExistingEleves } from '../../../../services/admin-service.js';
-import { getCouleurGroupe, getBasePath } from '../../demifond-common.js';
+import { getCouleurGroupe, getBasePath, getSessionActivePath, getTroisCinqMinObsPath } from '../../demifond-common.js';
 import { calculerDistance, calculerVitesse } from './trois-cinq-min-core.js';
 
 let unsubs = [];
@@ -53,6 +53,7 @@ export function renderTroisCinqMinTV() {
         classe,
         config: null,
         sequence: null,
+        sessionId: null,
         observations: { course1: {}, course2: {}, course3: {} },
         eleves: getExistingEleves(classe),
         mapping: getLocalMapping(classe) || {}
@@ -76,12 +77,25 @@ export function renderTroisCinqMinTV() {
 
     unsubs.push(onValue(ref(db, `${basePath}/config`), snap => { cache.config = snap.val(); checkReady(); }));
     unsubs.push(onValue(ref(db, `${basePath}/commandes/sequence`), snap => { cache.sequence = snap.val(); checkReady(); }));
-    for (let i = 1; i <= 3; i++) {
-        unsubs.push(onValue(ref(db, `${basePath}/observations/course-${i}`), snap => {
-            cache.observations[`course${i}`] = snap.val() || {};
-            checkReady();
-        }));
-    }
+
+    let obsUnsubs = [];
+    const ecouterObservations = (sessionId) => {
+        obsUnsubs.forEach(u => { try { u(); } catch (e) {} });
+        obsUnsubs = [];
+        const obsBase = getTroisCinqMinObsPath(classe, sessionId);
+        for (let i = 1; i <= 3; i++) {
+            obsUnsubs.push(onValue(ref(db, `${obsBase}/course-${i}`), snap => {
+                cache.observations[`course${i}`] = snap.val() || {};
+                checkReady();
+            }));
+        }
+        unsubs.push(...obsUnsubs);
+    };
+
+    unsubs.push(onValue(ref(db, getSessionActivePath(classe)), snap => {
+        cache.sessionId = snap.val() || null;
+        ecouterObservations(cache.sessionId);
+    }));
 
     return () => {
         unsubs.forEach(u => { try { u(); } catch (e) {} });

@@ -6,7 +6,7 @@ import { db, ref, set, onValue } from '../../../../core/firebase-service.js';
 import { getPhotoUrl, getExistingEleves, migrerCodesAutoEval } from '../../../../services/admin-service.js';
 import { getCurrentClasse, getLocalMapping, setLocalMapping } from '../../../../core/live-engine.js';
 import { enregistrerCritereParCodeAutoEval } from '../../../../services/criteria-service.js';
-import { COULEURS_GROUPES, getCouleurGroupe, getGroupesKey, getConfigKey, getBasePath, getVMAEleve } from '../../demifond-common.js';
+import { COULEURS_GROUPES, getCouleurGroupe, getGroupesKey, getConfigKey, getBasePath, getVMAEleve, creerSessionId, getSessionActivePath, getSessionsPath } from '../../demifond-common.js';
 import { DEFAUT_PARAMS, SOUS_MODULE_ID, TITRE_AFFICHE, repartirEnGroupes, calculerDistance, calculerVitesse } from './trois-cinq-min-core.js';
 
 let currentClasse = '';
@@ -72,6 +72,11 @@ function createHeader() {
                         class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-500 active:scale-95"
                         title="Remet tous les élèves dans la réserve">
                     🗑️ Vider les groupes
+                </button>
+                <button onclick="window.troisCinqMinNouvelleSession()"
+                        class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95"
+                        title="Crée une nouvelle séance horodatée sans écraser les précédentes">
+                    🆕 Nouvelle séance
                 </button>
                 <button onclick="window.troisCinqMinExportConfig()"
                         class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400 active:scale-95">
@@ -415,6 +420,35 @@ window.troisCinqMinChangeNbGroupes = function() {
 };
 
 // ============================================================
+// SESSION HORODATÉE
+// ============================================================
+window.troisCinqMinNouvelleSession = async function() {
+    if (!currentClasse) return alert('Sélectionne une classe.');
+    if (!confirm('🆕 Créer une nouvelle séance horodatée ?\nLes observations de la prochaine épreuve ne viendront PAS écraser la précédente.')) return;
+
+    const sessionId = creerSessionId();
+    try {
+        // Enregistre la session dans le registre + la définit comme active.
+        await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}`), {
+            creeeLe: Date.now(),
+            libelleAffichage: sessionId.replace('T', ' à ')
+        });
+        await set(ref(db, getSessionActivePath(currentClasse)), sessionId);
+
+        // Réinitialise la séquence à idle (le GO démarrera cette session).
+        await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
+            etat: 'idle',
+            timestampMaj: Date.now()
+        });
+
+        alert(`✅ Nouvelle séance créée : ${sessionId.replace('T', ' ')}\nLes prochaines données y seront enregistrées sans écraser l'ancienne.`);
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur lors de la création de la séance : ' + err.message);
+    }
+};
+
+// ============================================================
 // SAUVEGARDE / CHARGEMENT
 // ============================================================
 function sauvegarderGroupes(groupes) {
@@ -683,6 +717,21 @@ window.troisCinqMinGo = async function() {
 
     try {
         const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+
+        // S'il n'y a pas de session active, on en crée une automatiquement
+        // pour ne jamais écraser une séance précédente.
+        const sessionActuelle = await new Promise(resolve => {
+            onValue(ref(db, getSessionActivePath(currentClasse)), snap => resolve(snap.val() || null), { onlyOnce: true });
+        });
+        if (!sessionActuelle) {
+            const sessionId = creerSessionId();
+            await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}`), {
+                creeeLe: Date.now(),
+                libelleAffichage: sessionId.replace('T', ' à ')
+            });
+            await set(ref(db, getSessionActivePath(currentClasse)), sessionId);
+        }
+
         await set(ref(db, `${getBasePath(currentClasse)}/config`), configData);
         await set(ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/config`), { activite: 'demi-fond' });
 

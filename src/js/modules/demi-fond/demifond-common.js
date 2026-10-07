@@ -67,6 +67,49 @@ export function getBasePath(classe) {
 }
 
 // ============================================================
+// SESSIONS HORODATÉES (3×5min)
+// ============================================================
+/**
+ * Construit un identifiant de session horodatée, lisible et lisible.
+ * Ex: 2026-10-07T18-30-00 (compatible chemin Firebase).
+ */
+export function creerSessionId(now = new Date()) {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}T${p(now.getHours())}-${p(now.getMinutes())}-${p(now.getSeconds())}`;
+}
+
+/**
+ * Chemin des observations d'une session 3×5min.
+ * @param {string} classe
+ * @param {string} sessionId - identifiant horodaté
+ */
+export function getSessionObsPath(classe, sessionId) {
+    return `${getBasePath(classe)}/sessions/${sessionId}/observations`;
+}
+
+/**
+ * Chemin du nœud "session active" (pointe vers la session en cours).
+ */
+export function getSessionActivePath(classe) {
+    return `${getBasePath(classe)}/sessionActive`;
+}
+
+/**
+ * Chemin du registre des sessions (liste pour le sélecteur Live/CSV).
+ */
+export function getSessionsPath(classe) {
+    return `${getBasePath(classe)}/sessions`;
+}
+
+/**
+ * Chemin des observations de la session active, avec repli sur
+ * l'ancien emplacement (observations/course-n) si aucune session n'est connue.
+ */
+export function getTroisCinqMinObsPath(classe, sessionId) {
+    if (sessionId) return getSessionObsPath(classe, sessionId);
+    return `${getBasePath(classe)}/observations`;
+}
+// ============================================================
 // FORMATAGE
 // ============================================================
 export function formatDuree(sec) {

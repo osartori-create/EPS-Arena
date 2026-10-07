@@ -4,7 +4,7 @@
 import { db, ref, onValue } from '../../../../core/firebase-service.js';
 import { getCurrentClasse, getLocalMapping } from '../../../../core/live-engine.js';
 import { getPhotoUrl, getExistingEleves } from '../../../../services/admin-service.js';
-import { COULEURS_GROUPES, getCouleurGroupe, getBasePath, getVMAEleve } from '../../demifond-common.js';
+import { COULEURS_GROUPES, getCouleurGroupe, getBasePath, getVMAEleve, getSessionActivePath, getTroisCinqMinObsPath } from '../../demifond-common.js';
 import { calculerDistance, calculerVitesse, calculerRegularite } from './trois-cinq-min-core.js';
 import { calculerBilan, genererSVG } from './trois-cinq-min-bilan.js';
 
@@ -39,6 +39,7 @@ export function renderTroisCinqMinLive() {
         classe,
         config: null,
         sequence: null,
+        sessionId: null,
         observations: { course1: {}, course2: {}, course3: {} },
         eleves: getExistingEleves(classe),
         mapping: getLocalMapping(classe) || {}
@@ -66,13 +67,26 @@ export function renderTroisCinqMinLive() {
         checkReady();
     }));
 
-    for (let i = 1; i <= 3; i++) {
-        unsubs.push(onValue(ref(db, `${basePath}/observations/course-${i}`), snap => {
-            cache.observations[`course${i}`] = snap.val() || {};
-            if (ready >= total) render();  // re-render si déjà prêt
-            else checkReady();
-        }));
-    }
+    // Écoute la session active : dès qu'elle change, on relit les observations.
+    let obsUnsubs = [];
+    const ecouterObservations = (sessionId) => {
+        obsUnsubs.forEach(u => { try { u(); } catch (e) {} });
+        obsUnsubs = [];
+        const obsBase = getTroisCinqMinObsPath(classe, sessionId);
+        for (let i = 1; i <= 3; i++) {
+            obsUnsubs.push(onValue(ref(db, `${obsBase}/course-${i}`), snap => {
+                cache.observations[`course${i}`] = snap.val() || {};
+                if (ready >= total) render();
+                else checkReady();
+            }));
+        }
+        unsubs.push(...obsUnsubs);
+    };
+
+    unsubs.push(onValue(ref(db, getSessionActivePath(classe)), snap => {
+        cache.sessionId = snap.val() || null;
+        ecouterObservations(cache.sessionId);
+    }));
 
     return () => {
         unsubs.forEach(u => { try { u(); } catch (e) {} });
