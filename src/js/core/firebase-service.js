@@ -8,11 +8,26 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-app.js";
 import { getDatabase, ref, onValue, push, set, update, remove } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.1.3/firebase-auth.js";
 import { FIREBASE_CONFIG, getRNE, getEtabPath, assurerRNE } from "../config/firebase-config.js";
 
 const app = initializeApp(FIREBASE_CONFIG);
 export const db = getDatabase(app);
 export { ref, onValue, push, set, update, remove };
+
+// Connexion anonyme automatique : sécurise la Realtime Database avec des
+// règles "auth != null" tout en laissant l'accès libre aux kiosks (aucun mot de passe).
+const auth = getAuth(app);
+
+// Top-level await : on attend la fin de l'authentification avant que les
+// autres modules (qui importent firebase-service.js) ne puissent lire/écrire.
+// Cela évite les "PERMISSION_DENIED" transitoires quand les règles exigent auth != null.
+try {
+    await signInAnonymously(auth);
+    console.log('[Firebase] Connexion anonyme réussie');
+} catch (err) {
+    console.warn('[Firebase] Connexion anonyme impossible :', err);
+}
 
 // Ré-export des helpers de configuration (source unique du RNE).
 export { getRNE, getEtabPath, assurerRNE };
