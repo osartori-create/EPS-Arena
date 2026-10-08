@@ -655,7 +655,6 @@ window.switchDiscipline = async function(disc) {
                             const coModule = getModule('co');
                             return coModule?.renderTV ? coModule.renderTV() : Promise.resolve();
                         },
-                        'arcathlon': () => import('../../modules/arcathlon/arcathlon-tv.js').then(m => m.renderArcathlonTV()),
                         'natation': () => {
                             const classe = document.getElementById('selectClasse')?.value;
                             const mode = classe ? (localStorage.getItem(`eps_arena_natation_mode_${classe}`) || 'indice') : 'indice';
