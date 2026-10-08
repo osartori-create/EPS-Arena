@@ -44,7 +44,13 @@ export function getEtabPath() {
 }
 
 export const FIREBASE_CONFIG = {
-    databaseURL: getLocalConfig().firebaseDatabaseURL || DEFAULT_DB_URL
+    apiKey: getLocalConfig().apiKey || 'AIzaSyBdngK5H6AgTr9g2nE9JH52e1pbiIoi7GM',
+    authDomain: getLocalConfig().authDomain || 'eps-arena.firebaseapp.com',
+    databaseURL: getLocalConfig().firebaseDatabaseURL || DEFAULT_DB_URL,
+    projectId: getLocalConfig().projectId || 'eps-arena',
+    storageBucket: getLocalConfig().storageBucket || 'eps-arena.firebasestorage.app',
+    messagingSenderId: getLocalConfig().messagingSenderId || '129576505015',
+    appId: getLocalConfig().appId || '1:129576505015:web:9b495488b2ae94ad43c732'
 };
 
 // ------------------------------------------------------------------
