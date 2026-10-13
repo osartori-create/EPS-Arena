@@ -4,7 +4,7 @@
 import { db, ref, onValue, push, set, remove } from '../../core/firebase-service.js';
 import {
     getCrossBasePath, getCrossConfig,
-    getClassesParticipantes, getStatutsCross,
+    getClassesParticipantes, getStatutsCross, setStatutsCross,
     KEYS, getExistingElevesCross
 } from './cross-config.js';
 import {
@@ -92,6 +92,15 @@ function sonDossardInconnu() {
     jouerSequence([
         { freq: 220, duration: 220, waveform: 'square' }
     ], 0.4);
+}
+
+// Alerte spécifique élève inapte : trois bips descendants
+function sonInapte() {
+    jouerSequence([
+        { freq: 660, duration: 140, waveform: 'square' },
+        { freq: 550, duration: 140, waveform: 'square' },
+        { freq: 440, duration: 180, waveform: 'square' }
+    ], 0.5);
 }
 
 // ============================================================
@@ -448,13 +457,41 @@ async function enregistrerArrivee(dossard) {
         return;
     }
 
-    // 2. Élève absent / inapte
+    // 2. Élève absent / inapte / abandon
     console.log(`🚨 [ARRIVEE] Test statut : "${eleve.statut}" (doit être "present")`);
     if (eleve.statut !== 'present') {
-        console.log(`🚨 [ARRIVEE] REJET 2 : statut ${eleve.statut}`);
-        sonDossardInconnu();
-        afficherToast(`⚠️ ${eleve.prenom} est ${eleve.statut}`, 'amber');
-        return;
+        // Cas particulier : inapte. On prévient, mais on autorise à le classer quand même.
+        if (eleve.statut === 'inapte') {
+            console.log(`🚨 [ARRIVEE] Inapte détecté — demande de confirmation`);
+            sonInapte();
+            const ok = confirm(
+                `⚠️ ${eleve.prenom} ${eleve.nom} est marqué(e) INAPTE.\n\n` +
+                `Veux-tu quand même l'ajouter au classement ?\n\n` +
+                `(Son statut passera à "présent" pour cette course.)`
+            );
+            if (!ok) {
+                afficherToast(`⚠️ Arrivée de ${eleve.prenom} ignorée (inapte)`, 'amber');
+                return;
+            }
+
+            // Requalifie l'élève en "présent" pour qu'il apparaisse dans le classement.
+            setStatutsCross({ ...getStatutsCross(), [eleve.eleveId]: 'present' });
+            eleve.statut = 'present';
+            afficherToast(`⚠️ ${eleve.prenom} ajouté(e) au classement malgré l'inaptitude`, 'amber');
+
+            // Met à jour la config envoyée aux iPads/kiosks pour cohérence du classement.
+            try {
+                const { transmettreCrossConfig } = await import('./cross-transmit.js');
+                await transmettreCrossConfig();
+            } catch (err) {
+                console.warn('[Cross] Retransmission config (inapte) échouée :', err);
+            }
+        } else {
+            console.log(`🚨 [ARRIVEE] REJET 2 : statut ${eleve.statut}`);
+            sonDossardInconnu();
+            afficherToast(`⚠️ ${eleve.prenom} est ${eleve.statut}`, 'amber');
+            return;
+        }
     }
 
     // 3. Vérification course
