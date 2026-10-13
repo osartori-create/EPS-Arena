@@ -8,7 +8,7 @@ import {
     KEYS, getExistingElevesCross
 } from './cross-config.js';
 import {
-    normaliserScan, getNiveauFromClasse, formatTemps, getMedaille, COURSES_DEFAUT
+    normaliserScan, normaliserDossard, trouverCleDossard, getNiveauFromClasse, formatTemps, getMedaille, COURSES_DEFAUT
 } from './cross-core.js';
 import { startScanListener, stopScanListener, refocusScanInput } from './cross-scan.js';
 
@@ -118,11 +118,12 @@ function chargerMappingEleves() {
     const dossards = JSON.parse(localStorage.getItem(KEYS.DOSSARDS) || '{}');
 
     Object.entries(dossards).forEach(([dossard, eleveId]) => {
+        const dossardNorm = normaliserDossard(dossard);
         for (const classe of classes) {
             const eleves = getExistingElevesCross(classe);
             const e = eleves.find(x => x.id === eleveId);
             if (e) {
-                tousLesEleves[dossard] = {
+                tousLesEleves[dossardNorm] = {
                     eleveId: e.id,
                     nom: e.nom,
                     prenom: e.prenom,
@@ -185,13 +186,8 @@ function render(container) {
                     Scanne le QR code avec l'iPad, ou clique sur "Copier" et envoie l'URL par message.
                 </p>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-                    ${renderCarteKiosk('🏆 Podium', `eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}`, 'podium')}
-                    ${renderCarteKiosk('📋 Classement', `eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}`, 'classement')}
-                    ${renderCarteKiosk('🏫 Par classe', `eleve.html?mode=cross-classe&prof=${profCode}`, 'classe')}
-                    ${renderCarteKiosk('🎫 Consultation', `eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}`, 'consult')}
-                    ${renderCarteKiosk('⏱️ Clic backup', `eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}`, 'clic')}
-                    ${renderCarteKiosk('📺 TV défilant', `eleve.html?mode=cross-tv&course=${currentCourseId}&prof=${profCode}`, 'tv')}
+                <div class="flex justify-center">
+                    ${renderCarteKiosk('� Kiosk Cross', `eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}`, 'kiosk')}
                 </div>
             </div>
 
@@ -355,7 +351,7 @@ function afficherArrivees() {
 
     if (countEl) {
         arriveesTriees.forEach(arr => {
-            const eleve = tousLesEleves[String(arr.dossard)];
+            const eleve = tousLesEleves[normaliserDossard(arr.dossard)];
             if (!eleve) return;
             const niveau = getNiveauFromClasse(eleve.classe);
             if (niveau && nbParNiveau[niveau] !== undefined) nbParNiveau[niveau]++;
@@ -380,11 +376,12 @@ function afficherArrivees() {
     course?.niveaux.forEach(n => compteurNiveau[n] = 0);
 
     container.innerHTML = arriveesTriees.map((arr) => {
-        const eleve = tousLesEleves[String(arr.dossard)];
+        const dossardNorm = normaliserDossard(arr.dossard);
+        const eleve = tousLesEleves[dossardNorm];
         if (!eleve) {
             return `
                 <div class="bg-red-900/30 p-3 rounded-lg border border-red-500 text-sm">
-                    <span class="font-black text-red-300">Dossard ${arr.dossard}</span>
+                    <span class="font-black text-red-300">Dossard ${dossardNorm}</span>
                     <span class="text-slate-300 ml-2">— Élève non associé</span>
                 </div>
             `;
@@ -397,7 +394,7 @@ function afficherArrivees() {
         return `
             <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 flex items-center gap-3">
                 <span class="text-xl font-black text-yellow-400 min-w-[40px] text-center">${rangNiveau}</span>
-                <span class="text-xs font-black text-slate-500 bg-slate-800 px-2 py-1 rounded">#${arr.dossard}</span>
+                <span class="text-xs font-black text-slate-500 bg-slate-800 px-2 py-1 rounded">#${dossardNorm}</span>
                 <div class="flex-1">
                     <div class="font-bold text-white">${eleve.prenom} ${eleve.nom}</div>
                     <div class="text-xs text-slate-400">${eleve.classe} · ${eleve.sexe} · ${niveau}e</div>
@@ -416,16 +413,16 @@ function demarrerEcouteScan() {
         console.log('🔍 [SCAN] Brut reçu :', JSON.stringify(brut));
         const candidats = normaliserScan(brut);
         console.log('🔍 [SCAN] Candidats :', candidats);
-        console.log('🔍 [SCAN] Clés tousLesEleves (début) :', Object.keys(tousLesEleves).slice(0, 20));
-        console.log('🔍 [SCAN] tousLesEleves["18"] :', tousLesEleves['18']);
-        for (const dossard of candidats) {
-            console.log(`🔍 [SCAN] Test candidat "${dossard}" :`, tousLesEleves[dossard] ? '✅ trouvé' : '❌ absent');
-            if (tousLesEleves[dossard]) {
-                console.log(`🔍 [SCAN] → enregistrerArrivee(${dossard})`);
-                enregistrerArrivee(dossard);
-                return;
-            }
+
+        // Résout le candidat vers la clé réellement présente dans tousLesEleves
+        // (gère "0000000001779" → "177" et les clés avec zéros de tête).
+        const cle = trouverCleDossard(candidats, tousLesEleves);
+        if (cle) {
+            console.log(`🔍 [SCAN] → enregistrerArrivee(${cle})`);
+            enregistrerArrivee(cle);
+            return;
         }
+
         sonDossardInconnu();
         afficherToast(`⚠️ Dossard "${brut}" inconnu`, 'red');
         console.log('🔍 [SCAN] Aucun candidat trouvé — abandon');
@@ -480,7 +477,7 @@ async function enregistrerArrivee(dossard) {
     }
 
     // 4. Anti-doublon
-    const deja = Object.values(arriveesActuelles).find(a => String(a.dossard) === String(dossard));
+    const deja = Object.values(arriveesActuelles).find(a => normaliserDossard(a.dossard) === normaliserDossard(dossard));
     console.log(`🚨 [ARRIVEE] Test anti-doublon :`, { deja: !!deja, nbArrivees: Object.keys(arriveesActuelles).length });
     if (deja) {
         console.log(`🚨 [ARRIVEE] REJET 4 : déjà scanné`);
@@ -581,14 +578,16 @@ window.crossCourseReset = async () => {
 
 window.crossCourseManualScan = (val) => {
     if (!val) return;
-    const dossard = String(val).replace(/\D/g, '');
-    if (!dossard) return;
-    if (!tousLesEleves[dossard]) {
+    const brut = String(val).replace(/\D/g, '');
+    if (!brut) return;
+
+    const cle = trouverCleDossard([brut].concat(normaliserScan(brut)), tousLesEleves);
+    if (!cle) {
         sonDossardInconnu();
-        afficherToast(`⚠️ Dossard "${dossard}" inconnu`, 'red');
+        afficherToast(`⚠️ Dossard "${brut}" inconnu`, 'red');
         return;
     }
-    enregistrerArrivee(dossard);
+    enregistrerArrivee(cle);
 };
 
 window.crossCourseSupprimer = async (id) => {
@@ -661,12 +660,7 @@ function genererQRCodes() {
     }
     const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
     const urls = {
-        podium:     new URL(`eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
-        classement: new URL(`eleve.html?mode=cross-classement&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
-        classe:     new URL(`eleve.html?mode=cross-classe&prof=${profCode}`, window.location.href).href,
-        consult:    new URL(`eleve.html?mode=cross-consult&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
-        clic:       new URL(`eleve.html?mode=cross-clic&course=${currentCourseId}&prof=${profCode}`, window.location.href).href,
-        tv:         new URL(`eleve.html?mode=cross-tv&course=${currentCourseId}&prof=${profCode}`, window.location.href).href
+        kiosk: new URL(`eleve.html?mode=cross-podium&course=${currentCourseId}&prof=${profCode}`, window.location.href).href
     };
 
     Object.entries(urls).forEach(([id, url]) => {

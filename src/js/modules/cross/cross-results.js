@@ -2,7 +2,7 @@
 // Onglet Résultats : tableau complet, modifications prof, export Excel
 
 import { getEtab } from '../../core/firebase-service.js';
-import { COURSES_DEFAUT, getNiveauFromClasse, formatTemps, calculerNoteEleve } from './cross-core.js';
+import { COURSES_DEFAUT, getNiveauFromClasse, normaliserDossard, formatTemps, calculerNoteEleve } from './cross-core.js';
 import { getTousLesElevesCross, KEYS } from './cross-config.js';
 import {
     listenModifications, sauvegarderModification, supprimerModification,
@@ -38,7 +38,7 @@ export function initCrossResults(container) {
     Object.entries(dossards).forEach(([dossard, eleveId]) => {
         const e = elevesMap[eleveId];
         if (e) {
-            tousLesEleves[String(dossard)] = {
+            tousLesEleves[normaliserDossard(dossard)] = {
                 eleveId,
                 nom: e.nom,
                 prenom: e.prenom,
@@ -147,15 +147,16 @@ function renderTableau() {
     const vus = new Set();
 
     Object.values(arrivees).forEach(arr => {
-        if (vus.has(arr.dossard)) return;
-        vus.add(arr.dossard);
-        const eleve = tousLesEleves[String(arr.dossard)];
+        const dossard = normaliserDossard(arr.dossard);
+        if (vus.has(dossard)) return;
+        vus.add(dossard);
+        const eleve = tousLesEleves[dossard];
         if (!eleve) return;
         let tempsBrut = goTimestamp ? (arr.timestamp - goTimestamp) : null;
         // Détection temps négatif (GO relancé après les arrivées)
         if (tempsBrut !== null && tempsBrut < 0) tempsBrut = -1;
         elevesArrives.push({
-            dossard: String(arr.dossard),
+            dossard,
             eleve,
             tempsBrut
         });
@@ -365,7 +366,7 @@ window.crossResultsOuvrirModif = function(dossard) {
     if (!eleve) return;
 
     const modif = modifications[dossard] || {};
-    const arrivee = Object.values(arrivees).find(a => String(a.dossard) === String(dossard));
+    const arrivee = Object.values(arrivees).find(a => normaliserDossard(a.dossard) === normaliserDossard(dossard));
     const tempsBrut = arrivee && goTimestamp ? Math.round((arrivee.timestamp - goTimestamp) / 1000) : null;
 
     const overlay = document.createElement('div');
@@ -588,9 +589,10 @@ async function construireLignesCourse(courseId) {
     const vus = new Set();
     const items = [];
     Object.values(arrivees).sort((a, b) => a.timestamp - b.timestamp).forEach(a => {
-        if (vus.has(a.dossard)) return;
-        vus.add(a.dossard);
-        const eleve = tousLesEleves[String(a.dossard)];
+        const dossard = normaliserDossard(a.dossard);
+        if (vus.has(dossard)) return;
+        vus.add(dossard);
+        const eleve = tousLesEleves[dossard];
         if (!eleve) return;
         const niveau = getNiveauFromClasse(eleve.classe);
         if (!course.niveaux.includes(niveau)) return;
@@ -599,12 +601,12 @@ async function construireLignesCourse(courseId) {
         // ✅ Détection temps négatif : GO relancé après les arrivées
         if (tempsBrut !== null && tempsBrut < 0) tempsBrut = -1;
 
-        const modif = modifs[a.dossard] || null;
+        const modif = modifs[dossard] || null;
         const applique = appliquerModif(tempsBrut, modif);
         const statutVisuel = getStatutVisuel(modif);
 
         items.push({
-            dossard: a.dossard,
+            dossard,
             eleve,
             niveau,
             tempsBrut,

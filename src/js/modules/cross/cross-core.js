@@ -104,23 +104,86 @@ export function normaliserScan(brut) {
         if (!candidats.includes(stripped)) candidats.push(stripped);
     };
 
-    // 1. Valeur brute (sans les zéros de tête)
+    // 1. PRIORITÉ : on essaie d'abord SANS la clé de contrôle EAN-13.
+    //    Un code-barres "0000000001779" (12 chiffres utiles + clé "9") doit
+    //    être résolu en "177", PAS en "1779". C'est le cas le plus fréquent.
+    if (digits.length >= 11) {
+        add(digits.slice(0, -1));
+    }
+
+    // 2. Valeur brute complète (si jamais le dossard est réellement long).
     //    "000000000185" → "185"
     add(digits);
 
-    // 2. Retire 1, 2 puis 3 chiffres de la fin (clé de contrôle)
-    //    "000000000185" → "00000000018" → "18"  ← C'EST CELUI QU'ON VEUT
-    for (let n = 1; n <= 3 && n < digits.length; n++) {
+    // 3. Retire 2 puis 3 chiffres de la fin (clé + éventuel suffixe).
+    for (let n = 2; n <= 3 && n < digits.length; n++) {
         add(digits.slice(0, -n));
     }
 
-    // 3. Essaie les derniers 12, 11 puis 10 chiffres
-    //    (utile si le scanner ajoute un préfixe exotique)
+    // 4. Essaie les 12, 11 puis 10 derniers chiffres
+    //    (utile si le scanner ajoute un préfixe exotique).
     if (digits.length > 12) add(digits.slice(-12));
     if (digits.length > 11) add(digits.slice(-11));
     if (digits.length > 10) add(digits.slice(-10));
 
     return candidats;
+}
+
+/**
+ * Normalise un numéro de dossard en chaîne numérique sans zéro de tête.
+ * Gère aussi le code EAN-13 (12 chiffres utiles + clé de contrôle) :
+ * la clé de contrôle (13e chiffre) est retirée avant de supprimer les zéros.
+ * Ex : "0177" → "177", "177" → "177", " 177 " → "177",
+ *      "0000000001779" → "177" (et non "1779").
+ */
+export function normaliserDossard(dossard) {
+    if (dossard == null) return '0';
+
+    let digits = String(dossard).trim().replace(/\D/g, '');
+    if (!digits) return '0';
+
+    // EAN-13 : 12 chiffres utiles + clé de contrôle → on retire la clé.
+    if (digits.length === 13) digits = digits.slice(0, -1);
+
+    // Retire les zéros de tête.
+    digits = digits.replace(/^0+/, '');
+
+    return digits || '0';
+}
+
+/**
+ * Résout un dossard parmi une série de candidats du scan vers la clé
+ * réellement présente dans le mapping (tousLesEleves / dossards).
+ * - 1er passage : correspondance exacte (rapide).
+ * - 2e passage : correspondance tolérante (ignore zéros de tête/espaces,
+ *   corrige "0000000001779" → "177" même si la clé est "0177").
+ *
+ * @param {string[]} candidats  - résultats de normaliserScan()
+ * @param {Object} mapDossards  - { dossard: objet } (tousLesEleves ou dossards)
+ * @returns {string|null} la clé trouvée, ou null.
+ */
+export function trouverCleDossard(candidats, mapDossards) {
+    if (!mapDossards) return null;
+
+    // 1) Correspondance exacte.
+    for (const c of candidats) {
+        if (Object.prototype.hasOwnProperty.call(mapDossards, c) && mapDossards[c]) {
+            return c;
+        }
+    }
+
+    // 2) Correspondance tolérante.
+    const norm = new Map();
+    for (const cle of Object.keys(mapDossards)) {
+        const n = normaliserDossard(cle);
+        if (!norm.has(n)) norm.set(n, cle);
+    }
+    for (const c of candidats) {
+        const n = normaliserDossard(c);
+        if (norm.has(n)) return norm.get(n);
+    }
+
+    return null;
 }
 
 /**

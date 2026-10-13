@@ -8,7 +8,7 @@
 
 import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
-import { COURSES_DEFAUT, getNiveauFromClasse, formatTemps, getMedaille, calculerNoteEleve, DISTANCE_CONTRAT_M } from './cross-core.js';
+import { COURSES_DEFAUT, getNiveauFromClasse, normaliserDossard, formatTemps, getMedaille, calculerNoteEleve, DISTANCE_CONTRAT_M } from './cross-core.js';
 import { loadRosterLocal, sauverRosterLocal, effacerRosterLocal, ROSTER_LOCAL_KEY } from './cross-config.js';
 
 let currentCourseId = null;
@@ -124,9 +124,24 @@ function chargerRosterLocal() {
 }
 
 function nomPourDossard(dossard) {
-    const r = rosterLocal[String(dossard)];
+    const cle = normaliserDossard(dossard);
+    let r = rosterLocal[String(cle)];
+    if (!r) {
+        for (const [k, v] of Object.entries(rosterLocal)) {
+            if (normaliserDossard(k) === cle) { r = v; break; }
+        }
+    }
     if (!r) return '';
     return `${(r.prenom || '').trim()} ${(r.nom || '').trim()}`.trim();
+}
+
+function lookupEleve(dossard) {
+    const cle = normaliserDossard(dossard);
+    if (elevesMap[cle]) return elevesMap[cle];
+    for (const [k, v] of Object.entries(elevesMap)) {
+        if (normaliserDossard(k) === cle) return v;
+    }
+    return null;
 }
 
 function renderCurrentMode() {
@@ -366,15 +381,16 @@ function render() {
 
     const vus = new Set();
         arriveesTriees.forEach(arr => {
-        if (vus.has(arr.dossard)) return;
-        vus.add(arr.dossard);
-        const eleve = elevesMap[String(arr.dossard)];
+        const dossard = normaliserDossard(arr.dossard);
+        if (vus.has(dossard)) return;
+        vus.add(dossard);
+        const eleve = lookupEleve(dossard);
         if (!eleve) return;
         if (eleve.statut && eleve.statut !== 'present') return;
         const niveau = getNiveauFromClasse(eleve.classe);
         if (!parNiveau[niveau]) return;
         parNiveau[niveau].push({
-            dossard: arr.dossard,
+            dossard,
             classe: eleve.classe,
             timestamp: arr.timestamp
             // ✅ plus de nom/prenom
@@ -614,9 +630,10 @@ function renderConsult() {
 
     const vus = new Set();
     arriveesTriees.forEach(arr => {
-        if (vus.has(arr.dossard)) return;
-        vus.add(arr.dossard);
-        const eleve = elevesMap[String(arr.dossard)];
+        const dossard = normaliserDossard(arr.dossard);
+        if (vus.has(dossard)) return;
+        vus.add(dossard);
+        const eleve = lookupEleve(dossard);
         if (!eleve) return;
         if (eleve.statut && eleve.statut !== 'present') return;
         const niveau = getNiveauFromClasse(eleve.classe);
@@ -632,7 +649,7 @@ function renderConsult() {
         }
 
         parNiveau[niveau].push({
-            dossard: arr.dossard,
+            dossard,
             classe: eleve.classe,
             vitesse: vitesseKmh,
             timestamp: arr.timestamp
@@ -812,16 +829,17 @@ function renderClassement() {
 
     const vus = new Set();
     arriveesTriees.forEach(arr => {
-        if (vus.has(arr.dossard)) return;
-        vus.add(arr.dossard);
-        const eleve = elevesMap[String(arr.dossard)];
+        const dossard = normaliserDossard(arr.dossard);
+        if (vus.has(dossard)) return;
+        vus.add(dossard);
+        const eleve = lookupEleve(dossard);
         if (!eleve) return;
         if (eleve.statut && eleve.statut !== 'present') return;
         const niveau = getNiveauFromClasse(eleve.classe);
         if (!parNiveau[niveau]) return;
         const tempsSec = goTimestamp ? Math.floor((arr.timestamp - goTimestamp) / 1000) : null;
         parNiveau[niveau].push({
-            dossard: arr.dossard,
+            dossard,
             classe: eleve.classe,
             sexe: eleve.sexe,
             vma: parseFloat(eleve.vma) || null,
@@ -1077,15 +1095,16 @@ function renderClasse(arriveesParCourse) {
 
         const vus = new Set();
         arriveesTriees.forEach(arr => {
-            if (vus.has(arr.dossard)) return;
-            vus.add(arr.dossard);
-            const eleve = elevesMap[String(arr.dossard)];
+            const dossard = normaliserDossard(arr.dossard);
+            if (vus.has(dossard)) return;
+            vus.add(dossard);
+            const eleve = lookupEleve(dossard);
             if (!eleve) return;
             if (eleve.statut && eleve.statut !== 'present') return;
             const niveau = getNiveauFromClasse(eleve.classe);
             if (!parNiveau[niveau]) return;
             parNiveau[niveau].push({
-                dossard: arr.dossard,
+                dossard,
                 classe: eleve.classe,
                 sexe: eleve.sexe || null
             });
@@ -1397,16 +1416,17 @@ function renderTv() {
     course.niveaux.forEach(n => { parNiveau[n] = []; });
     const vus = new Set();
     arriveesTriees.forEach(arr => {
-        if (vus.has(arr.dossard)) return;
-        vus.add(arr.dossard);
-        const eleve = elevesMap[String(arr.dossard)];
+        const dossard = normaliserDossard(arr.dossard);
+        if (vus.has(dossard)) return;
+        vus.add(dossard);
+        const eleve = lookupEleve(dossard);
         if (!eleve) return;
         if (eleve.statut && eleve.statut !== 'present') return;
         const niveau = getNiveauFromClasse(eleve.classe);
         if (!parNiveau[niveau]) return;
         const tempsSec = goTimestamp ? Math.max(0, Math.round((arr.timestamp - goTimestamp) / 1000)) : null;
-        const libelle = nomPourDossard(arr.dossard);
-        parNiveau[niveau].push({ dossard: arr.dossard, classe: eleve.classe, tempsSec, libelle });
+        const libelle = nomPourDossard(dossard);
+        parNiveau[niveau].push({ dossard, classe: eleve.classe, tempsSec, libelle });
     });
 
     const niveauxLabel = course.niveaux.map(n => `${n}e`).join(' + ');

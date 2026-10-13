@@ -2,6 +2,7 @@
 // Helpers de stockage et chemins — dépend de config/firebase-config.js
 
 import { getEtab } from '../../core/firebase-service.js';
+import { normaliserDossard } from './cross-core.js';
 
 // ============================================================
 // CLÉS DE STOCKAGE
@@ -70,21 +71,40 @@ export function setClassesParticipantes(list) {
 // ============================================================
 export function getDossards() {
     const raw = localStorage.getItem(KEYS.DOSSARDS);
-    return raw ? JSON.parse(raw) : {};
+    const map = raw ? JSON.parse(raw) : {};
+
+    // Normalise les clés (retire zéros de tête + clé EAN-13).
+    // Permet de retrouver "177" même si la clé stockée est "0177" ou "0000000001779".
+    const normalise = {};
+    Object.entries(map).forEach(([dossard, eleveId]) => {
+        const cle = normaliserDossard(dossard);
+        if (!(cle in normalise)) normalise[cle] = eleveId;
+    });
+    return normalise;
 }
 
 export function setDossards(map) {
-    localStorage.setItem(KEYS.DOSSARDS, JSON.stringify(map));
+    // Normalise les clés avant écriture pour ne plus jamais stocker
+    // des codes EAN-13 complets ("0000000001779" → "177").
+    const normalise = {};
+    Object.entries(map).forEach(([dossard, eleveId]) => {
+        const cle = normaliserDossard(dossard);
+        normalise[cle] = eleveId;
+    });
+
+    localStorage.setItem(KEYS.DOSSARDS, JSON.stringify(normalise));
+
     // index inverse
     const inv = {};
-    Object.entries(map).forEach(([dossard, eleveId]) => { inv[eleveId] = dossard; });
+    Object.entries(normalise).forEach(([dossard, eleveId]) => { inv[eleveId] = dossard; });
     localStorage.setItem(KEYS.DOSSARDS_INV, JSON.stringify(inv));
 }
 
 export function getDossardByEleveId(eleveId) {
     const raw = localStorage.getItem(KEYS.DOSSARDS_INV);
     const inv = raw ? JSON.parse(raw) : {};
-    return inv[eleveId] || null;
+    const dossard = inv[eleveId];
+    return dossard ? normaliserDossard(dossard) : null;
 }
 
 export function setDossardPourEleve(eleveId, dossard) {
@@ -93,13 +113,13 @@ export function setDossardPourEleve(eleveId, dossard) {
     Object.keys(map).forEach(d => {
         if (map[d] === eleveId) delete map[d];
     });
-    map[String(dossard)] = eleveId;
+    map[normaliserDossard(dossard)] = eleveId;
     setDossards(map);
 }
 
 export function getEleveIdByDossard(dossard) {
     const map = getDossards();
-    return map[String(dossard)] || null;
+    return map[normaliserDossard(dossard)] || null;
 }
 
 // ============================================================
@@ -358,7 +378,11 @@ export function effacerRosterLocal() {
  * dans une clé versionnée. Appelée avant toute manipulation destructive
  * (simulation de cross complet, réinitialisation, etc.).
  */
-export function sauvegarderDonneesCross(label = '') {
+/**
+ * Collecte toutes les clés CROSS courantes (sans les sauvegardes internes).
+ * Méthode partagée par la sauvegarde locale et l'export fichier.
+ */
+export function collecterDonneesCross() {
     const data = {};
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -368,6 +392,11 @@ export function sauvegarderDonneesCross(label = '') {
             data[key] = localStorage.getItem(key);
         }
     }
+    return data;
+}
+
+export function sauvegarderDonneesCross(label = '') {
+    const data = collecterDonneesCross();
 
     const id = Date.now();
     const cleSauvegarde = `${BACKUP_CROSS_PREFIX}${id}`;
@@ -430,6 +459,78 @@ export function restaurerSauvegardeCross(key) {
 
     let nb = 0;
     Object.entries(backup.data).forEach(([k, v]) => {
+        if (typeof v === 'string') {
+            localStorage.setItem(k, v);
+            nb++;
+        }
+    });
+    return nb;
+}
+
+// ============================================================
+// SAUVEGARDE PORTABLE (export / import fichier JSON)
+// ============================================================
+/**
+ * Exporte l'intégralité des clés CROSS (config, classes, élèves, dossards,
+ * statuts, roster, course active) vers un fichier JSON téléchargeable.
+ * C'est LE moyen pour basculer rapidement d'un ordinateur à un autre.
+ * @returns {number} nombre de clés exportées.
+ */
+export function exporterSauvegardeComplete() {
+    const data = collecterDonneesCross();
+
+    const payload = {
+        type: 'eps-arena-cross-backup',
+        version: 1,
+        dateExport: Date.now(),
+        profCode: getProfCode(),
+        data
+    };
+
+    const json = JSON.stringify(payload, null, 2);
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `cross_backup_${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+
+    return Object.keys(data).length;
+}
+
+/**
+ * Importe une sauvegarde CROSS depuis un fichier JSON.
+ * Sécurité : une sauvegarde locale de l'état courant est d'abord créée,
+ * puis les données CROSS courantes sont remplacées par celles du fichier.
+ * @param {Object} payload - contenu JSON du fichier de sauvegarde.
+ * @returns {number} nombre de clés restaurées.
+ */
+export function importerSauvegardeCompleteFromJSON(payload) {
+    const data = payload && payload.data ? payload.data : payload;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error('Fichier de sauvegarde invalide (format attendu : JSON objet).');
+    }
+
+    // On ne restaure que des clés CROSS légitimes, jamais les sauvegardes internes.
+    const entrees = Object.entries(data).filter(([k]) =>
+        k.startsWith('eps_arena_cross_') && !k.startsWith(BACKUP_CROSS_PREFIX)
+    );
+    if (entrees.length === 0) {
+        throw new Error('Aucune donnée CROSS reconnue dans ce fichier.');
+    }
+
+    // Sauvegarde de sécurité de l'état courant dans le navigateur.
+    sauvegarderDonneesCross('Avant import depuis fichier');
+    viderDonneesCross();
+
+    let nb = 0;
+    entrees.forEach(([k, v]) => {
         if (typeof v === 'string') {
             localStorage.setItem(k, v);
             nb++;

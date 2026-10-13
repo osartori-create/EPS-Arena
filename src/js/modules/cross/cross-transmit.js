@@ -4,7 +4,7 @@
 
 import { db, ref, set } from '../../core/firebase-service.js';
 import { getCrossBasePath, getDossards, getStatutsCross, getClassesParticipantes, getExistingElevesCross } from './cross-config.js';
-import { COURSES_DEFAUT } from './cross-core.js';
+import { COURSES_DEFAUT, normaliserDossard } from './cross-core.js';
 
 export async function transmettreCrossConfig() {
     const basePath = getCrossBasePath();
@@ -26,7 +26,7 @@ export async function transmettreCrossConfig() {
         if (!trouve) return;
 
         // ✅ RGPD : AUCUN nom, AUCUN prénom
-        elevesFirebase[dossard] = {
+        elevesFirebase[normaliserDossard(dossard)] = {
             classe: trouve.classe,
             sexe: trouve.sexe,
             vma: parseFloat(trouve.vma) || null,

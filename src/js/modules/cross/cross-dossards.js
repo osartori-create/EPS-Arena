@@ -10,7 +10,9 @@ import {
     getExistingElevesCross, saveElevesCross,
     sauvegarderDonneesCross, restaurerSauvegardeCross,
     listerSauvegardesCross,
-    genererRosterJSON
+    genererRosterJSON,
+    exporterSauvegardeComplete,
+    importerSauvegardeCompleteFromJSON
 } from './cross-config.js';
 import { COURSES_DEFAUT, getNiveauFromClasse, generateEan13, DISTANCE_CONTRAT_M } from './cross-core.js';
 
@@ -75,6 +77,14 @@ export function initCrossDossards(container) {
                     <button onclick="window.crossExporterRoster()"
                             class="bg-cyan-700 hover:bg-cyan-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-cyan-400 active:scale-95">
                         📦 Exporter roster
+                    </button>
+                    <button onclick="window.crossExporterSauvegarde()"
+                            class="bg-teal-700 hover:bg-teal-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-teal-400 active:scale-95">
+                        💾 Sauvegarde
+                    </button>
+                    <button onclick="window.crossImporterSauvegarde()"
+                            class="bg-lime-700 hover:bg-lime-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-lime-400 active:scale-95">
+                        📥 Charger sauvegarde
                     </button>
                     <input type="file" id="crossDossardsCSVInput" class="hidden" accept=".csv" onchange="window.crossDossardsTraiterCSV(event)">
                 </div>
@@ -841,6 +851,44 @@ window.crossExporterRoster = function() {
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 
     alert(`✅ Roster exporté : ${filename}\n\n${payload.nbDossards} dossard(s) avec nom/prénom/classe.\n\nCharge ce fichier sur les iPads de course (mode kiosk Cross).`);
+};
+
+// ============================================================
+// SAUVEGARDE PORTABLE (export / import fichier JSON, inter-PC)
+// ============================================================
+window.crossExporterSauvegarde = function() {
+    const nb = exporterSauvegardeComplete();
+    if (!nb) {
+        alert('❌ Aucune donnée Cross à sauvegarder.\n\nImporte d\'abord tes élèves dans l\'onglet Préparation.');
+        return;
+    }
+    alert(`✅ Sauvegarde complète exportée (${nb} clé(s)).\n\nTransfère le fichier JSON sur ton autre ordinateur, puis utilise « 📥 Charger sauvegarde » pour tout restaurer (config, classes, élèves, dossards, statuts).`);
+};
+
+window.crossImporterSauvegarde = function() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = (ev) => {
+        const file = ev.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const payload = JSON.parse(e.target.result);
+                if (!confirm('⚠️ Charger cette sauvegarde va REMPLACER les données Cross actuelles de cet ordinateur.\n\nUne sauvegarde locale de sécurité sera d\'abord créée.\nContinuer ?')) return;
+                const nb = importerSauvegardeCompleteFromJSON(payload);
+                alert(`✅ Sauvegarde restaurée (${nb} clé(s)).`);
+                const c = document.getElementById('cross-content');
+                if (c) initCrossDossards(c);
+            } catch (err) {
+                console.error(err);
+                alert('❌ Erreur d\'import : ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
 };
 
 // ============================================================
