@@ -250,11 +250,12 @@ async function dessinerDossard(doc, eleve, x0, y0) {
     doc.setLineWidth(0.2);
     doc.rect(x0, y0, DOS_W, DOS_H);
 
-    // ---- Code-barres vertical à GAUCHE ----
-    const barCodeLatW = 14;
+    // ---- Code-barres vertical à GAUCHE (EAN-13 ~40 mm de lecture, lisible de près) ----
+    const barCodeLatW = 24;
+    const barCodeLatH = 40;
     try {
         const eanImg = await genererImageCodeBarres(ean, true);
-        doc.addImage(eanImg, 'PNG', x0 + 2, y0 + 4, barCodeLatW - 4, DOS_H - 8);
+        doc.addImage(eanImg, 'PNG', x0 + 2, y0 + 4, barCodeLatW - 4, barCodeLatH);
     } catch (err) {
         console.warn('[Dossards] Erreur code-barres latéral :', err);
     }
@@ -299,9 +300,9 @@ async function dessinerDossard(doc, eleve, x0, y0) {
     doc.text(`${eleve.prenom} ${eleve.nom}`, centreX, cursorY + 5, { align: 'center' });
     cursorY += 7;
 
-    // ---- Code-barres horizontal JUSTE SOUS LE NOM ----
-    const barH = 18;
-    const barW = Math.min(zoneW - 40, 120);
+    // ---- Code-barres horizontal JUSTE SOUS LE NOM (EAN-13 40 × 20 mm) ----
+    const barH = 20;
+    const barW = 40;
     const barX = centreX - barW / 2;
 
     try {
@@ -364,11 +365,12 @@ async function dessinerDossardReserve(doc, numero, x0, y0) {
     doc.setLineWidth(0.2);
     doc.rect(x0, y0, DOS_W, DOS_H);
 
-    // ---- Code-barres vertical à GAUCHE ----
-    const barCodeLatW = 14;
+    // ---- Code-barres vertical à GAUCHE (EAN-13 ~40 mm de lecture, lisible de près) ----
+    const barCodeLatW = 24;
+    const barCodeLatH = 40;
     try {
         const eanImg = await genererImageCodeBarres(ean, true);
-        doc.addImage(eanImg, 'PNG', x0 + 2, y0 + 4, barCodeLatW - 4, DOS_H - 8);
+        doc.addImage(eanImg, 'PNG', x0 + 2, y0 + 4, barCodeLatW - 4, barCodeLatH);
     } catch (err) {
         console.warn('[Dossards] Erreur code-barres réserve :', err);
     }
@@ -404,9 +406,9 @@ async function dessinerDossardReserve(doc, numero, x0, y0) {
     doc.text('Nom / Prénom à compléter', centreX, lineY - 2, { align: 'center' });
     cursorY += 22;
 
-    // ---- Code-barres horizontal ----
+    // ---- Code-barres horizontal (EAN-13 40 × 20 mm) ----
     const barH = 20;
-    const barW = Math.min(zoneW - 40, 120);
+    const barW = 40;
     const barX = centreX - barW / 2;
     try {
         const eanImg = await genererImageCodeBarres(ean, false);

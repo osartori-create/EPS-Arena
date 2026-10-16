@@ -1,7 +1,7 @@
 // src/js/modules/cross/cross-course.js
 // Onglet Course : sélection course, GO, scans live, arrêt, reset
 
-import { db, ref, onValue, push, set, remove } from '../../core/firebase-service.js';
+import { db, ref, onValue, push, set, update, remove } from '../../core/firebase-service.js';
 import {
     getCrossBasePath, getCrossConfig,
     getClassesParticipantes, getStatutsCross, setStatutsCross,
@@ -281,10 +281,14 @@ function afficherControles(go) {
     if (!container) return;
 
     const course = COURSES_DEFAUT.find(c => c.id === currentCourseId);
-    const enCours = go && go.timestamp;
+    const goTimestamp = go?.timestamp || null;
+    const goFin = go?.fin || null;
+    const enCours = !!goTimestamp && !goFin;
+    const arretee = !!goTimestamp && !!goFin;
     const nbArrivees = Object.keys(arriveesActuelles).length;
+    const tempsFinal = arretee ? Math.max(0, Math.floor((goFin - goTimestamp) / 1000)) : 0;
 
-    currentGoTimestamp = enCours ? go.timestamp : null;
+    currentGoTimestamp = enCours ? goTimestamp : null;
 
     if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
 
@@ -306,7 +310,21 @@ function afficherControles(go) {
                     ⏹ Arrêter la course
                 </button>
                 <button onclick="window.crossCourseReset()" class="bg-slate-700 hover:bg-slate-600 px-6 py-4 rounded-2xl font-black text-sm text-white">
-                    🗑️ Reset
+                    🗑️ Effacer la course
+                </button>
+            </div>
+        ` : (arretee ? `
+            <div class="text-center py-3 mb-4 bg-slate-900/40 rounded-2xl border-2 border-red-500">
+                <div class="text-xs font-bold text-red-400 uppercase">⏹️ Course arrêtée</div>
+                <div class="text-4xl font-mono font-black text-slate-200 mt-1">${formatTemps(tempsFinal)}</div>
+                <div class="text-xs text-slate-400 mt-1">${nbArrivees} arrivant${nbArrivees > 1 ? 's' : ''} — temps & vitesses conservés</div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="window.crossCourseGo()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-black text-white text-lg">
+                    🚀 Relancer le GO
+                </button>
+                <button onclick="window.crossCourseReset()" class="flex-1 bg-red-600 hover:bg-red-500 py-4 rounded-2xl font-black text-white text-lg">
+                    🗑️ Effacer la course
                 </button>
             </div>
         ` : `
@@ -318,7 +336,7 @@ function afficherControles(go) {
                     🗑️ Effacer les ${nbArrivees} arrivées
                 </button>
             ` : ''}
-        `}
+        `)}
     `;
 
     if (enCours) {
@@ -571,7 +589,7 @@ window.crossCourseGo = async () => {
     // ✅ Vérifier s'il y a déjà des arrivées
     const nbArrivees = Object.keys(arriveesActuelles).length;
     if (nbArrivees > 0) {
-        if (!confirm(`⚠️ Il y a déjà ${nbArrivees} arrivée(s) enregistrée(s) sur cette course.\n\nRelancer un GO va REINITIALISER le chrono, mais les arrivées déjà présentes auront des temps INCOHÉRENTS.\n\nVeux-tu vraiment relancer le GO ?\n\n(Dans le doute : clique ANNULER, puis fais "Reset" si tu veux repartir de zéro.)`)) {
+        if (!confirm(`⚠️ Il y a déjà ${nbArrivees} arrivée(s) enregistrée(s) sur cette course.\n\nRelancer un GO va REINITIALISER le chrono, mais les arrivées déjà présentes auront des temps INCOHÉRENTS.\n\nVeux-tu vraiment relancer le GO ?\n\n(Dans le doute : clique ANNULER, puis fais "Effacer la course" si tu veux repartir de zéro.)`)) {
             return;
         }
     }
@@ -582,19 +600,23 @@ window.crossCourseGo = async () => {
         timestamp: Date.now(),
         profCode: localStorage.getItem('eps_arena_profCode') || 'DEFAULT'
     });
+    // ✅ Réactive la douchette (utile après un "Arrêter" ou un "Effacer la course")
+    demarrerEcouteScan();
     setTimeout(() => refocusScanInput(), 100);
 };
 
 window.crossCourseArreter = async () => {
-    if (!confirm('Arrêter la course en cours ?\n\nLes arrivées sont conservées. Les kiosks élèves basculeront en mode "En attente".')) return;
+    if (!confirm('⏹ Arrêter la course ?\n\nLe chrono sera stoppé mais les arrivées, les temps et les vitesses seront conservés.')) return;
 
     if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
     stopScanListener();
 
     const basePath = getCrossBasePath();
     try {
-        await remove(ref(db, `${basePath}/courses/${currentCourseId}/go`));
-        afficherToast('⏹ Course arrêtée', 'emerald');
+        // ✅ On conserve go.timestamp (référence des temps/vitesses) et on ajoute
+        // uniquement la date de fin pour figer le chrono.
+        await update(ref(db, `${basePath}/courses/${currentCourseId}/go`), { fin: Date.now() });
+        afficherToast('⏹ Course arrêtée — données conservées', 'emerald');
     } catch (err) {
         console.error('[Cross] Erreur arrêt :', err);
         afficherToast('❌ Erreur lors de l\'arrêt', 'red');
@@ -604,7 +626,7 @@ window.crossCourseArreter = async () => {
 };
 
 window.crossCourseReset = async () => {
-    if (!confirm('⚠️ Effacer TOUTES les arrivées de cette course ?')) return;
+    if (!confirm('⚠️ Effacer la course ?\n\nCela supprimera TOUTES les arrivées et le chrono de cette course.')) return;
     if (!confirm('✅ Dernière confirmation ?')) return;
     if (chronoInterval) { clearInterval(chronoInterval); chronoInterval = null; }
     const basePath = getCrossBasePath();

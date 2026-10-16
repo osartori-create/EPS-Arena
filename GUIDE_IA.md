@@ -154,7 +154,7 @@ profs/{profCode}/cross/
 │   └── meta/        → { dateTransmission, nbEleves, nbClasses }
 └── courses/
     ├── course1/
-    │   ├── go/             → { timestamp, profCode }
+    │   ├── go/             → { timestamp, profCode, fin? }  (fin = course arrêtée, chrono figé)
     │   ├── arrivees/       → { pushId: { dossard, timestamp, source } }
     │   ├── clics/          → { pushId: { timestamp } }
     │   └── modifications/  → { dossard: { tempsModifie, penaliteSecondes,

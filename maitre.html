@@ -16,6 +16,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
     <script src="./libs/xlsx.full.min.js"></script>
+    <script src="./libs/cv.js"></script>
+    <script src="./libs/aruco.js"></script>
     <!-- Ajout du CSS spécifique Évaluation -->
     <link rel="stylesheet" href="./src/css/evaluation.css">
     <style>
@@ -99,6 +101,7 @@
         <button id="btnTab5" onclick="switchTab('tools')" class="px-4 py-2 text-slate-500 whitespace-nowrap">🧰 Outils</button>
         <button id="btnTab6" onclick="switchTab('evaluations')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📋 Évaluations</button>
         <button id="btnTab8" onclick="switchTab('cross')" class="px-4 py-2 text-slate-500 whitespace-nowrap">🏃 Cross</button>
+        <button id="btnTab9" onclick="switchTab('scancamera')" class="px-4 py-2 text-slate-500 whitespace-nowrap">📷 Scan Caméra</button>
         <button id="btnTab7" onclick="switchTab('sync')" class="px-4 py-2 text-slate-500 whitespace-nowrap">🔁 Sync</button>
     </nav>
 
@@ -632,6 +635,8 @@
 </div>
 <!-- ONGLET 8 : CROSS -->
 <div id="viewCross" class="hidden space-y-4"></div>
+<!-- ONGLET 9 : SCAN CAMÉRA -->
+<div id="viewScanCamera" class="hidden space-y-4"></div>
     </div> <!-- Fin space-y-6 -->
 
     <script src="./src/js/config/config.local.js"></script>

@@ -24,6 +24,7 @@ let unsubConfig = null;
 let unsubCourses = null;
 
 let goTimestamp = null;
+let goFinTimestamp = null;
 let arrivees = {};
 let elevesMap = {}; // { dossard: { nom, prenom, classe, sexe, vma, statut } }
 let coursesMap = {};
@@ -344,6 +345,7 @@ function initPodium(container) {
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
         const go = snap.val();
         goTimestamp = go?.timestamp || null;
+        goFinTimestamp = go?.fin || null;
         demarrerChrono();
         render();
     });
@@ -399,7 +401,7 @@ function render() {
 
     const enCours = !!goTimestamp;
     const chronoStr = enCours
-        ? formatTemps(Math.floor((Date.now() - goTimestamp) / 1000))
+        ? formatTemps(goElapsedSec())
         : '--:--';
 
     // Détermine le label de la course
@@ -567,6 +569,12 @@ function renderMarche(eleve, medaille, place, hauteurPx) {
 // ============================================================
 // CHRONO LIVE
 // ============================================================
+function goElapsedSec() {
+    if (!goTimestamp) return null;
+    const fin = goFinTimestamp || Date.now();
+    return Math.max(0, Math.floor((fin - goTimestamp) / 1000));
+}
+
 function demarrerChrono() {
     if (chronoInterval) clearInterval(chronoInterval);
     if (!goTimestamp) return;
@@ -574,7 +582,7 @@ function demarrerChrono() {
     chronoInterval = setInterval(() => {
         const el = document.getElementById('cross-kiosk-chrono');
         if (!el || !goTimestamp) return;
-        el.textContent = formatTemps(Math.floor((Date.now() - goTimestamp) / 1000));
+        el.textContent = formatTemps(goElapsedSec());
     }, 500);
 }
 
@@ -591,6 +599,7 @@ function initConsult(container) {
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
         const go = snap.val();
         goTimestamp = go?.timestamp || null;
+        goFinTimestamp = go?.fin || null;
         demarrerChronoConsult();
         renderConsult();
     });
@@ -621,7 +630,7 @@ function renderConsult() {
 
     const enCours = !!goTimestamp;
     const chronoStr = enCours
-        ? formatTemps(Math.floor((Date.now() - goTimestamp) / 1000))
+        ? formatTemps(goElapsedSec())
         : '--:--';
 
     // Pour chaque niveau : garde les CONSULT_LIMIT dernières
@@ -776,7 +785,7 @@ function demarrerChronoConsult() {
     chronoConsultInterval = setInterval(() => {
         const el = document.getElementById('cross-consult-chrono');
         if (!el || !goTimestamp) return;
-        el.textContent = formatTemps(Math.floor((Date.now() - goTimestamp) / 1000));
+        el.textContent = formatTemps(goElapsedSec());
     }, 500);
 }
 // ============================================================
@@ -789,6 +798,7 @@ function initClassement(container) {
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
         const go = snap.val();
         goTimestamp = go?.timestamp || null;
+        goFinTimestamp = go?.fin || null;
         demarrerChronoClassement();
         renderClassement();
     });
@@ -818,7 +828,7 @@ function renderClassement() {
 
     const enCours = !!goTimestamp;
     const chronoStr = enCours
-        ? formatTemps(Math.floor((Date.now() - goTimestamp) / 1000))
+        ? formatTemps(goElapsedSec())
         : '--:--';
 
     // ============================================================
@@ -1026,7 +1036,7 @@ function demarrerChronoClassement() {
     chronoClassementInterval = setInterval(() => {
         const el = document.getElementById('cross-classement-chrono');
         if (!el || !goTimestamp) return;
-        el.textContent = formatTemps(Math.floor((Date.now() - goTimestamp) / 1000));
+        el.textContent = formatTemps(goElapsedSec());
     }, 500);
 }
 
@@ -1300,6 +1310,7 @@ function initClic(container) {
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
         const go = snap.val();
         goTimestamp = go?.timestamp || null;
+        goFinTimestamp = go?.fin || null;
         renderClic();
     });
 
@@ -1319,7 +1330,7 @@ function renderClic() {
     const enCours = !!goTimestamp;
     const nbArrivees = Object.keys(arrivees).length;
     const chronoStr = enCours
-        ? formatTemps(Math.floor((Date.now() - goTimestamp) / 1000))
+        ? formatTemps(goElapsedSec())
         : '--:--';
 
     container.innerHTML = `
@@ -1376,6 +1387,7 @@ function initTv(container) {
     unsubGo = onValue(ref(db, `${basePath}/courses/${currentCourseId}/go`), snap => {
         const go = snap.val();
         goTimestamp = go?.timestamp || null;
+        goFinTimestamp = go?.fin || null;
         demarrerChronoTv();
     });
 
@@ -1392,7 +1404,7 @@ function demarrerChronoTv() {
     if (tvTimer) clearInterval(tvTimer);
     const update = () => {
         const el = document.getElementById('cross-tv-chrono');
-        if (el && goTimestamp) el.textContent = formatTemps(Math.floor((Date.now() - goTimestamp) / 1000));
+        if (el && goTimestamp) el.textContent = formatTemps(goElapsedSec());
     };
     update();
     tvTimer = setInterval(update, 500);
@@ -1432,7 +1444,7 @@ function renderTv() {
     const niveauxLabel = course.niveaux.map(n => `${n}e`).join(' + ');
     const sexeLabel = course.sexe === 'F' ? 'Filles' : 'Garçons';
     const enCours = !!goTimestamp;
-    const chronoStr = enCours ? formatTemps(Math.floor((Date.now() - goTimestamp) / 1000)) : '--:--';
+    const chronoStr = enCours ? formatTemps(goElapsedSec()) : '--:--';
 
     const renderRows = () => {
         const niveaux = course.niveaux;
@@ -1516,7 +1528,7 @@ function renderTv() {
 }
 
 window.crossKioskClic = async () => {
-    if (!goTimestamp) return;
+    if (!goTimestamp || goFinTimestamp) return;
 
     const btn = document.getElementById('clic-btn');
     if (btn) {

@@ -60,6 +60,16 @@ export function initApp() {
         return;  // on ne continue PAS le flux normal
     }
 
+    if (mode === 'scan-camera') {
+        console.log('[eleve] Mode scan caméra détecté :', mode);
+        import('../../modules/scan-camera/scan-camera-kiosk.js').then(m => {
+            m.initScanCameraKiosk(mode, params);
+        }).catch(err => {
+            console.error('Erreur chargement kiosk scan caméra :', err);
+        });
+        return;  // on ne continue PAS le flux normal
+    }
+
     currentConfig = null;
     showWaiting();
 
