@@ -8,7 +8,7 @@ import {
     setDernierNiveauEleve, getDernierNiveauEleve, NIVEAUX, getCouleurNiveau
 } from './grilles-core.js';
 import { importerGrilleXLSX } from './grilles-import.js';
-import { exporterNotesIDoceo, exporterRubriqueIDoceo, exporterGrilleVierge } from './grilles-export.js';
+import { exporterNotesIDoceo, exporterRubriqueIDoceo, exporterGrilleVierge, partagerGrilleJSON } from './grilles-export.js';
 import { getExistingEleves, getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
@@ -115,6 +115,9 @@ function renderBibliotheque(container) {
                             <button onclick="window.grillesExporterVierge('${g.id}')"
                                     class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95"
                                     title="Exporter la grille vierge">⬇️</button>
+                            <button onclick="window.grillesPartager('${g.id}')"
+                                    class="bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-xl font-black text-xs text-white active:scale-95"
+                                    title="Partager la grille (Airdrop)">📤</button>
                             <button onclick="window.grillesSupprimer('${g.id}')"
                                     class="bg-red-900/50 hover:bg-red-800 px-3 py-2 rounded-xl font-black text-xs text-red-300 active:scale-95"
                                     title="Supprimer">🗑️</button>
@@ -184,6 +187,10 @@ function renderPassation(container) {
                 <button onclick="window.grillesToggleVueCompacte()"
                         class="flex-1 min-w-[130px] bg-cyan-700 hover:bg-cyan-600 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
                     <span id="grilles-vue-label">${_vueCompacte ? '📊 Vue détaillée' : '👁️ Vue compacte'}</span>
+                </button>
+                <button onclick="window.grillesPartager('${currentGrille.id}')"
+                        class="bg-emerald-600 hover:bg-emerald-500 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95">
+                    📤 Partager (Airdrop)
                 </button>
                 <button onclick="window.grillesActiver()"
                         class="bg-blue-600 hover:bg-blue-500 px-4 py-3 rounded-xl font-black text-xs uppercase text-white active:scale-95 border-2 border-blue-400">
@@ -510,6 +517,24 @@ window.grillesTraiterImport = async function(event) {
         alert('❌ Erreur d\'import : ' + err.message);
     }
     event.target.value = '';
+};
+
+window.grillesPartager = async function(id) {
+    const grille = getGrille(id);
+    if (!grille) return;
+    try {
+        const res = await partagerGrilleJSON(grille);
+        if (res.mode === 'cancelled') return;
+        if (res.mode === 'share') {
+            // Sur iPad, la feuille de partage (Airdrop) a déjà tout fait.
+            console.log(`📤 Grille partagée : ${res.filename}`);
+        } else {
+            alert(`✅ Grille téléchargée : ${res.filename}\n\nEnvoie-la aux iPads (Airdrop, Nextcloud, clé USB…).`);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('❌ Erreur lors du partage : ' + err.message);
+    }
 };
 
 window.grillesUtiliser = function(id) {

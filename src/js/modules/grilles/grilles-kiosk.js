@@ -4,7 +4,7 @@
 
 import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, onValue, push } from '../../core/firebase-service.js';
-import { NIVEAUX, getCouleurNiveau, getToutesGrilles } from './grilles-core.js';
+import { NIVEAUX, getCouleurNiveau, getToutesGrilles, sauvegarderGrille, parserGrilleJSON } from './grilles-core.js';
 
 let currentClasse = '';
 let currentGrille = null;
@@ -12,6 +12,7 @@ let currentPeriode = '';
 let currentCode = null;
 let currentNotes = {};
 let configListener = null;
+let currentConfig = null;
 
 // ============================================================
 // POINT D'ENTRÉE
@@ -22,6 +23,7 @@ export function initGrillesKiosk(classe) {
     currentPeriode = '';
     currentCode = null;
     currentNotes = {};
+    currentConfig = null;
 
     const container = document.getElementById('grilles-module');
     if (!container) return;
@@ -31,21 +33,77 @@ export function initGrillesKiosk(classe) {
 
     if (configListener) configListener();
     configListener = onValue(configRef, (snap) => {
-        const config = snap.val();
-        if (config && config.actif && config.grilleId) {
-            const grilles = getToutesGrilles();
-            currentGrille = grilles.find(g => g.id === config.grilleId);
-            if (currentGrille) {
-                currentPeriode = config.periode || currentGrille.periodes[0];
-                renderChoixCode(container);
-            } else {
-                container.innerHTML = `<div class="text-center py-10 text-slate-400"><p>⏳ Grille "${config.grilleId}" non trouvée dans cette tablette.</p></div>`;
-            }
-        } else {
-            container.innerHTML = `<div class="text-center py-10 text-slate-400"><p>⏳ En attente de l'activation par le professeur...</p></div>`;
-        }
+        currentConfig = snap.val();
+        appliquerConfig(container);
     });
 }
+
+// ============================================================
+// APPLICATION DE LA CONFIG + IMPORT LOCAL DE LA GRILLE
+// ============================================================
+function appliquerConfig(container) {
+    const config = currentConfig;
+    if (config && config.actif && config.grilleId) {
+        const grilles = getToutesGrilles();
+        currentGrille = grilles.find(g => g.id === config.grilleId);
+        if (currentGrille) {
+            currentPeriode = config.periode || currentGrille.periodes[0];
+            renderChoixCode(container);
+        } else {
+            container.innerHTML = `
+                <div class="text-center py-10 text-slate-400 max-w-md mx-auto">
+                    <p class="mb-4">⏳ Grille "${config.grilleId}" non trouvée dans cette tablette.</p>
+                    <button onclick="window.grillesKioskImporter()"
+                            class="bg-purple-600 hover:bg-purple-500 px-6 py-3 rounded-2xl font-black text-white active:scale-95">
+                        📥 Importer la grille
+                    </button>
+                    <p class="text-xs text-slate-500 mt-3">Reçois la grille par Airdrop puis importe-la ici.</p>
+                </div>
+            `;
+        }
+    } else {
+        container.innerHTML = `
+            <div class="text-center py-10 text-slate-400 max-w-md mx-auto">
+                <p class="mb-4">⏳ En attente de l'activation par le professeur...</p>
+                <button onclick="window.grillesKioskImporter()"
+                        class="bg-purple-600 hover:bg-purple-500 px-6 py-3 rounded-2xl font-black text-white active:scale-95">
+                    📥 Importer la grille
+                </button>
+            </div>
+        `;
+    }
+}
+
+window.grillesKioskImporter = function() {
+    let input = document.getElementById('grilles-kiosk-file-input');
+    if (!input) {
+        input = document.createElement('input');
+        input.type = 'file';
+        input.id = 'grilles-kiosk-file-input';
+        input.accept = '.json';
+        input.className = 'hidden';
+        input.addEventListener('change', window.grillesKioskTraiterImport);
+        document.body.appendChild(input);
+    }
+    input.value = '';
+    input.click();
+};
+
+window.grillesKioskTraiterImport = async function(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    try {
+        const texte = await file.text();
+        const grille = parserGrilleJSON(texte);
+        sauvegarderGrille(grille);
+        appliquerConfig(document.getElementById('grilles-module'));
+        alert(`✅ Grille importée : ${grille.titre || grille.id}`);
+    } catch (err) {
+        console.error(err);
+        alert('❌ Import impossible : ' + err.message);
+    }
+    event.target.value = '';
+};
 
 // ============================================================
 // ÉCRAN 1 : SAISIE DU CODE
@@ -288,4 +346,5 @@ export function cleanupGrillesKiosk() {
     currentGrille = null;
     currentCode = null;
     currentNotes = {};
+    currentConfig = null;
 }

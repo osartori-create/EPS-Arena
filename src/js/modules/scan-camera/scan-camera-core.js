@@ -75,9 +75,9 @@ export function matrixToId(matrix) {
     let id = 0;
     for (let row = 0; row < 5; row++) {
         id <<= 1;
-        id |= matrix[row + 1][1] & 1;
+        id |= matrix[row + 1][2] & 1; // colonne intérieure 1 (donnée bit fort)
         id <<= 1;
-        id |= matrix[row + 1][3] & 1;
+        id |= matrix[row + 1][4] & 1; // colonne intérieure 3 (donnée bit faible)
     }
     return id;
 }

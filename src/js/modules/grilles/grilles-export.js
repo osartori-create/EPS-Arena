@@ -3,6 +3,7 @@
 
 import { getExistingEleves } from '../../services/admin-service.js';
 import { colonnesIdentite, col, exporterVersIDoceo as exporterService } from '../../services/export-service.js';
+import { serialiserGrille } from './grilles-core.js';
 
 const XLSX = window.XLSX;
 
@@ -122,4 +123,39 @@ function calculerNotePourEleve(notes, criteres) {
         sur100: Math.round(noteSur100 * 10) / 10,
         sur20: Math.round(noteSur20 * 10) / 10
     };
+}
+
+/**
+ * Partage d'une grille au format JSON (Web Share API → Airdrop sur iPad,
+ * avec repli en téléchargement classique sur les autres appareils).
+ */
+export async function partagerGrilleJSON(grille) {
+    const { filename, json } = serialiserGrille(grille);
+    const file = new File([json], filename, { type: 'application/json' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+            await navigator.share({
+                files: [file],
+                title: 'Grille EPS-Arena',
+                text: grille.titre || grille.id
+            });
+            return { filename, mode: 'share' };
+        } catch (err) {
+            if (err && err.name === 'AbortError') {
+                return { filename, mode: 'cancelled' };
+            }
+            // Autre erreur → on retombe sur le téléchargement classique.
+        }
+    }
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return { filename, mode: 'download' };
 }

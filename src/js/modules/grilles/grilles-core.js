@@ -151,3 +151,39 @@ export function getCouleurNiveau(valeur) {
 export function getLabelNiveau(valeur) {
     return NIVEAUX.find(n => n.valeur === valeur)?.label || '--';
 }
+
+
+// ============================================================
+// EXPORT / IMPORT D'UNE GRILLE (JSON sans perte, pour Airdrop)
+// ============================================================
+export function serialiserGrille(grille) {
+    const filename = `Grille_${grille.activite}_${grille.niveau}.json`;
+    const payload = {
+        version: 1,
+        type: 'grille',
+        data: grille,
+        exporteLe: Date.now()
+    };
+    return { filename, json: JSON.stringify(payload, null, 2) };
+}
+
+export function parserGrilleJSON(texte) {
+    let obj;
+    try {
+        obj = JSON.parse(texte);
+    } catch (e) {
+        throw new Error('Fichier JSON invalide.');
+    }
+
+    let grille = null;
+    if (obj && obj.type === 'grille' && obj.data && obj.data.id && Array.isArray(obj.data.criteres)) {
+        grille = obj.data;
+    } else if (obj && obj.id && Array.isArray(obj.criteres)) {
+        grille = obj;
+    }
+
+    if (!grille || !grille.id || !Array.isArray(grille.criteres)) {
+        throw new Error('Fichier de grille non reconnu.');
+    }
+    return grille;
+}
