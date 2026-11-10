@@ -9,7 +9,7 @@ export const MOTIFS = [
     { id: 'douleur', label: 'Douleur', icon: '💢' },
     { id: 'fin_maladie', label: 'Fin de maladie', icon: '🤒' },
     { id: 'feminin', label: 'Problème féminin', icon: '🌸' },
-    { id: 'medicale', label: 'Certificat médical', icon: '📄' },
+    { id: 'medicale', label: 'Certificat médical', icon: '🩺' },
 ];
 
 // Zones du corps pour la silhouette (face et dos). Coordonnées SVG 200×380.
