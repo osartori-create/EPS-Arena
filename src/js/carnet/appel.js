@@ -5,6 +5,7 @@
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
 import { getCurrentClasse } from '../core/live-engine.js';
+import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude } from './inaptitude.js';
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
@@ -154,7 +155,10 @@ function render() {
 
                                 const badges = [];
                                 if (absent) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#ef4444; color:#ffffff;">Absent</span>`);
-                                if (inapte) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#8b5cf6; color:#ffffff;">Inapte</span>`);
+                                if (inapte) {
+                                    const lib = libelleInaptitude(getInaptitude(e.id)) || 'Inapte';
+                                    badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#8b5cf6; color:#ffffff;" title="${lib}">${lib}</span>`);
+                                }
                                 if (retard) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#f59e0b; color:#ffffff;">Retard</span>`);
                                 if (oubli) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#3b82f6; color:#ffffff;">Oubli tenue</span>`);
                                 if (badges.length === 0) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#22c55e; color:#ffffff;">Présent</span>`);
@@ -172,7 +176,7 @@ function render() {
                                             <button onclick="window.appelToggleStatut('${e.id}', 'absent')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${absent ? '#ef4444' : '#334155'}; color: #ffffff; ${absent ? 'box-shadow: 0 0 0 2px #ef4444;' : ''}" title="Absent">❌</button>
                                         </td>
                                         <td class="p-2 text-center">
-                                            <button onclick="window.appelToggleStatut('${e.id}', 'inapte')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${inapte ? '#8b5cf6' : '#334155'}; color: #ffffff; ${inapte ? 'box-shadow: 0 0 0 2px #8b5cf6;' : ''}" title="Inapte">🩹</button>
+                                            <button onclick="window.appelOuvrirInaptitude('${e.id}')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${inapte ? '#8b5cf6' : '#334155'}; color: #ffffff; ${inapte ? 'box-shadow: 0 0 0 2px #8b5cf6;' : ''}" title="Inapte">🩹</button>
                                         </td>
                                         <td class="p-2 text-center">
                                             <button onclick="window.appelToggleStatut('${e.id}', 'retard')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${retard ? '#f59e0b' : '#334155'}; color: #ffffff; ${retard ? 'box-shadow: 0 0 0 2px #f59e0b;' : ''}" title="Retard">⏰</button>
@@ -236,6 +240,18 @@ window.appelToggleStatut = function(eleveId, statutId) {
         }
     });
     render();
+};
+
+window.appelOuvrirInaptitude = function(eleveId) {
+    if (!currentClasse) return;
+    const eleve = getExistingEleves(currentClasse).find(e => e.id === eleveId);
+    if (!eleve) return;
+    setClasseInaptitude(currentClasse);
+    ouvrirModalInaptitude(eleve, (data) => {
+        sauvegarderInaptitude(eleveId, data);
+        majEleve(eleveId, (entree) => { entree.inapte = true; });
+        render();
+    });
 };
 
 window.appelChangerDate = function(delta) {
