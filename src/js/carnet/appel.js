@@ -14,7 +14,7 @@ const STORAGE_PREFIX = 'eps_arena_appel_';
 // Présent = aucun flag coché.
 const STATUTS = [
     { id: 'absent', label: 'Absent', icon: '❌', couleur: '#ef4444' },
-    { id: 'inapte', label: 'Inapte', icon: '💊', couleur: '#8b5cf6' },
+    { id: 'inapte', label: 'Inapte', icon: '🤕', couleur: '#8b5cf6' },
     { id: 'retard', label: 'Retard', icon: '⏰', couleur: '#f59e0b' },
     { id: 'oubli_tenue', label: 'Oubli tenue', icon: '👕', couleur: '#3b82f6' },
 ];
@@ -149,7 +149,7 @@ function render() {
                             <tr class="text-xs text-slate-400 uppercase border-b border-slate-700">
                                 <th class="p-2 text-left">Élève</th>
                                 <th class="p-2 text-center" title="Absent">❌</th>
-                                <th class="p-2 text-center" title="Inapte">💊</th>
+                                <th class="p-2 text-center" title="Inapte">🤕</th>
                                 <th class="p-2 text-center" title="Retard">⏰</th>
                                 <th class="p-2 text-center" title="Oubli tenue">👕</th>
                             </tr>
@@ -189,7 +189,7 @@ function render() {
                                             <button onclick="window.appelToggleStatut('${e.id}', 'absent')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${absent ? '#ef4444' : '#334155'}; color: #ffffff; ${absent ? 'box-shadow: 0 0 0 2px #ef4444;' : ''}" title="Absent">❌</button>
                                         </td>
                                         <td class="p-2 text-center">
-                                            <button onclick="window.appelOuvrirInaptitude('${e.id}')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${inapte ? '#8b5cf6' : '#334155'}; color: #ffffff; ${inapte ? 'box-shadow: 0 0 0 2px #8b5cf6;' : ''}" title="Inapte">💊</button>
+                                            <button onclick="window.appelOuvrirInaptitude('${e.id}')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${inapte ? '#8b5cf6' : '#334155'}; color: #ffffff; ${inapte ? 'box-shadow: 0 0 0 2px #8b5cf6;' : ''}" title="Inapte">🤕</button>
                                         </td>
                                         <td class="p-2 text-center">
                                             <button onclick="window.appelToggleStatut('${e.id}', 'retard')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${retard ? '#f59e0b' : '#334155'}; color: #ffffff; ${retard ? 'box-shadow: 0 0 0 2px #f59e0b;' : ''}" title="Retard">⏰</button>

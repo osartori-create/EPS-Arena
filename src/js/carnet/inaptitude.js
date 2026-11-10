@@ -188,7 +188,7 @@ export function ouvrirModalInaptitude(eleve, onSave) {
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl my-8">
             <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
                 <div>
-                    <h2 class="text-xl font-black text-purple-400 uppercase">💊 Inaptitude</h2>
+                    <h2 class="text-xl font-black text-purple-400 uppercase">🤕 Inaptitude</h2>
                     <p class="text-sm font-bold text-white">${eleve.prenom} ${eleve.nom}</p>
                 </div>
                 <button onclick="document.getElementById('inaptitude-modal').remove()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white text-sm">✖</button>
