@@ -115,39 +115,33 @@ export function libelleInaptitude(inapt) {
 function rendererSilhouette() {
     const container = document.getElementById('inapt-silhouette');
     if (!container) return;
-    const vue = window._inaptVue || 'face';
-    const zones = ZONES[vue];
     const selected = window._inaptZone || '';
-    const nom = zones.find(z => z.id === selected)?.label || '';
+    const nom = labelZone(selected);
 
-    container.innerHTML = `
-        <svg viewBox="0 0 200 380" class="w-full max-w-[230px] mx-auto">
+    const renderVue = (vue) => `
+        <svg viewBox="0 0 200 380" class="w-full max-w-[150px]">
             <defs>
-                <linearGradient id="corpsGrad" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="corpsGrad_${vue}" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stop-color="#94a3b8"/>
                     <stop offset="100%" stop-color="#475569"/>
                 </linearGradient>
             </defs>
-            <!-- Corps -->
-            <g fill="url(#corpsGrad)" stroke="#1e293b" stroke-width="1.5">
+            <g fill="url(#corpsGrad_${vue})" stroke="#1e293b" stroke-width="1.5">
                 <circle cx="100" cy="32" r="22"/>
                 <rect x="89" y="49" width="22" height="18" rx="7"/>
                 <ellipse cx="100" cy="130" rx="37" ry="60"/>
                 <ellipse cx="84" cy="196" rx="16" ry="15"/>
                 <ellipse cx="116" cy="196" rx="16" ry="15"/>
             </g>
-            <!-- Bras -->
             <g stroke="#64748b" stroke-width="15" stroke-linecap="round" fill="none">
                 <path d="M64 82 L50 140 L42 190"/>
                 <path d="M136 82 L150 140 L158 190"/>
             </g>
-            <!-- Jambes -->
             <g stroke="#64748b" stroke-width="17" stroke-linecap="round" fill="none">
                 <path d="M84 210 L84 270 L84 340"/>
                 <path d="M116 210 L116 270 L116 340"/>
             </g>
-            <!-- Zones cliquables -->
-            ${zones.map(z => `
+            ${ZONES[vue].map(z => `
                 <ellipse cx="${z.x}" cy="${z.y}" rx="${z.rx}" ry="${z.ry}"
                          fill="${selected === z.id ? '#a78bfa' : 'rgba(255,255,255,0.16)'}"
                          stroke="${selected === z.id ? '#ede9fe' : 'rgba(255,255,255,0.22)'}"
@@ -159,16 +153,16 @@ function rendererSilhouette() {
         </svg>
     `;
 
+    container.innerHTML = `
+        <div class="flex justify-center items-start gap-3">
+            <div class="text-center">${renderVue('face')}<div class="text-[10px] font-black uppercase text-slate-500 mt-1">Face</div></div>
+            <div class="text-center">${renderVue('dos')}<div class="text-[10px] font-black uppercase text-slate-500 mt-1">Dos</div></div>
+        </div>
+    `;
+
     const labelEl = document.getElementById('inapt-zone-label');
     if (labelEl) labelEl.textContent = nom ? `Zone : ${nom}` : 'Clique sur la zone douloureuse';
 }
-
-window.inaptChoisirVue = function(vue) {
-    window._inaptVue = vue;
-    document.getElementById('inapt-vue-face').className = 'flex-1 py-2 rounded-xl font-black text-xs ' + (vue === 'face' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400');
-    document.getElementById('inapt-vue-dos').className = 'flex-1 py-2 rounded-xl font-black text-xs ' + (vue === 'dos' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400');
-    rendererSilhouette();
-};
 
 window.inaptChoisirZone = function(zoneId) {
     window._inaptZone = zoneId;
@@ -216,10 +210,7 @@ export function ouvrirModalInaptitude(eleve, onSave) {
                 </div>
                 <div id="inapt-zone-container" class="hidden">
                     <p class="text-xs text-slate-400 uppercase font-bold">Zone douloureuse</p>
-                    <div class="flex gap-2 mb-2">
-                        <button onclick="window.inaptChoisirVue('face')" id="inapt-vue-face" class="flex-1 py-2 rounded-xl font-black text-xs">Face</button>
-                        <button onclick="window.inaptChoisirVue('dos')" id="inapt-vue-dos" class="flex-1 py-2 rounded-xl font-black text-xs">Dos</button>
-                    </div>
+                    <p class="text-[10px] text-slate-500 mb-2">Face et dos affichés — clique sur la zone douloureuse.</p>
                     <div id="inapt-silhouette" class="bg-slate-800 rounded-2xl p-2"></div>
                     <p id="inapt-zone-label" class="text-center text-xs font-bold text-purple-300 mt-2"></p>
                 </div>
@@ -262,7 +253,6 @@ export function ouvrirModalInaptitude(eleve, onSave) {
     window._inaptType = initial.type;
     window._inaptMotif = initial.motif;
     window._inaptZone = initial.zone;
-    window._inaptVue = 'face';
     window._inaptOnSave = onSave;
 
     document.getElementById('inapt-date-debut').value = initial.dateDebut;
