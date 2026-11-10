@@ -120,18 +120,22 @@ function renderChoixCode(container) {
                 <label class="text-xs font-bold text-slate-400 uppercase block mb-3 text-center">
                     Entre ton code (donné par ton prof)
                 </label>
-                <div id="grilles-code-display" class="bg-slate-950 border-2 border-slate-700 w-40 h-16 rounded-2xl flex items-center justify-center text-4xl font-mono tracking-widest mb-4 text-emerald-400 shadow-inner mx-auto">--</div>
+                <div id="grilles-code-display" style="background:#0f172a;border:2px solid #64748b;color:#34d399;width:10rem;height:4rem;border-radius:1rem;display:flex;align-items:center;justify-content:center;font-size:2.25rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:0.2em;margin:0 auto 1rem auto;box-shadow:inset 0 2px 4px rgba(0,0,0,0.3);">--</div>
                 <div class="grid grid-cols-3 gap-3 max-w-xs mx-auto">
                     ${[1,2,3,4,5,6,7,8,9].map(n => `
                         <button onclick="window.grillesKioskAddCode(${n})"
-                                class="bg-slate-800 w-16 h-16 rounded-xl text-2xl font-black text-white active:bg-blue-600 transition-all">${n}</button>
+                                class="w-16 h-16 rounded-xl text-2xl font-black"
+                                style="background:#334155;color:#ffffff;border:none;box-shadow:0 2px 4px rgba(0,0,0,0.25);">${n}</button>
                     `).join('')}
                     <button onclick="window.grillesKioskClearCode()"
-                            class="bg-red-950 text-red-400 w-16 h-16 rounded-xl text-xs font-black uppercase border border-red-800 active:bg-red-800">Effacer</button>
+                            class="w-16 h-16 rounded-xl text-xs font-black uppercase"
+                            style="background:#7f1d1d;color:#fca5a5;border:1px solid #991b1b;">Effacer</button>
                     <button onclick="window.grillesKioskAddCode(0)"
-                            class="bg-slate-800 w-16 h-16 rounded-xl text-2xl font-black text-white active:bg-blue-600">0</button>
+                            class="w-16 h-16 rounded-xl text-2xl font-black"
+                            style="background:#334155;color:#ffffff;border:none;box-shadow:0 2px 4px rgba(0,0,0,0.25);">0</button>
                     <button onclick="window.grillesKioskValiderCode()"
-                            class="bg-emerald-600 text-white w-16 h-16 rounded-xl text-xs font-black uppercase border-2 border-emerald-400 active:bg-emerald-700">OK</button>
+                            class="w-16 h-16 rounded-xl text-xs font-black uppercase"
+                            style="background:#059669;color:#ffffff;border:2px solid #34d399;">OK</button>
                 </div>
             </div>
 
@@ -224,7 +228,7 @@ function renderEvaluation(container) {
                                                        background-color: ${isSelected ? n.couleur + '40' : '#0f172a'};
                                                        ${isSelected ? 'box-shadow: 0 0 0 2px ' + n.couleur + ';' : ''}">
                                             ${isSelected ? '<div class="text-center text-lg mb-1" style="color:' + n.couleur + '">✓</div>' : ''}
-                                            <div class="text-slate-200">${n.descripteur || '--'}</div>
+                                            <div style="color: ${isSelected ? '#0f172a' : '#e2e8f0'};">${n.descripteur || '--'}</div>
                                         </button>
                                     </td>
                                 `;

@@ -754,8 +754,8 @@ window.grillesVoirContenu = function(id) {
         niveauxOrdre.forEach(n => {
             const desc = (c.niveaux || []).find(x => x.valeur === n.valeur);
             tableHtml += `
-                <td class="p-2 align-top border-l border-slate-700" style="background-color: ${n.couleur}15;">
-                    <div class="text-slate-200 text-[11px] leading-snug">${desc?.descripteur || '--'}</div>
+                <td class="p-2 align-top border-l border-slate-700" style="background-color:#0f172a;background-image:linear-gradient(${n.couleur}33,${n.couleur}33);">
+                    <div class="text-[11px] leading-snug" style="color:#e2e8f0;">${desc?.descripteur || '--'}</div>
                 </td>
             `;
         });
