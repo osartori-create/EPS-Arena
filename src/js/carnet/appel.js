@@ -40,8 +40,24 @@ function ecrireAppel(data) {
 export async function initAppelInterface() {
     currentClasse = getCurrentClasse();
     currentDate = formaterDate(new Date());
+    migrerDonneesAppel();
     await chargerPhotos(getExistingEleves(currentClasse));
     render();
+}
+
+// Convertit les anciennes données (chaînes) vers le nouveau format objet.
+function migrerDonneesAppel() {
+    const appel = lireAppel();
+    let modifie = false;
+    Object.values(appel).forEach(jour => {
+        Object.keys(jour).forEach(eleveId => {
+            if (typeof jour[eleveId] === 'string') {
+                jour[eleveId] = migrerEntree(jour[eleveId]);
+                modifie = true;
+            }
+        });
+    });
+    if (modifie) ecrireAppel(appel);
 }
 
 async function chargerPhotos(eleves) {
@@ -172,10 +188,23 @@ function render() {
     `;
 }
 
+// Migration : ancien format (chaîne simple) → objet { presence, flags }
+function migrerEntree(entree) {
+    if (typeof entree !== 'string') return entree;
+    switch (entree) {
+        case 'absent': return { presence: 'absent' };
+        case 'inapte': return { presence: 'inapte' };
+        case 'retard': return { retard: true };
+        case 'oubli_tenue': return { oubli_tenue: true };
+        default: return {};
+    }
+}
+
 function majEleve(eleveId, mutate) {
     const appel = lireAppel();
     if (!appel[currentDate]) appel[currentDate] = {};
-    const entree = appel[currentDate][eleveId] || {};
+    let entree = appel[currentDate][eleveId] || {};
+    if (typeof entree === 'string') entree = migrerEntree(entree);
     mutate(entree);
     if (Object.keys(entree).length === 0) {
         delete appel[currentDate][eleveId];
