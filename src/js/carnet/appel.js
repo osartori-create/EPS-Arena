@@ -8,10 +8,12 @@ import { getCurrentClasse } from '../core/live-engine.js';
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
+// Statuts d'exception. Par défaut, tous les élèves sont « présent ».
 const STATUTS = [
-    { id: 'present', label: 'Présent', couleur: '#22c55e' },
-    { id: 'absent', label: 'Absent', couleur: '#ef4444' },
-    { id: 'inapte', label: 'Inapte', couleur: '#f59e0b' },
+    { id: 'absent', label: 'Absent', icon: '❌', couleur: '#ef4444' },
+    { id: 'retard', label: 'Retard', icon: '⏰', couleur: '#f59e0b' },
+    { id: 'oubli_tenue', label: 'Oubli tenue', icon: '👕', couleur: '#3b82f6' },
+    { id: 'inapte', label: 'Inapte', icon: '🩹', couleur: '#8b5cf6' },
 ];
 
 let currentClasse = '';
@@ -58,9 +60,9 @@ function render() {
     const appel = lireAppel();
     const statutsDuJour = appel[currentDate] || {};
 
-    const nb = { present: 0, absent: 0, inapte: 0 };
+    const nb = { absent: 0, retard: 0, oubli_tenue: 0, inapte: 0 };
     Object.values(statutsDuJour).forEach(s => { if (nb[s] !== undefined) nb[s]++; });
-    const nonNote = eleves.length - nb.present - nb.absent - nb.inapte;
+    const nbPresent = eleves.length - nb.absent - nb.retard - nb.oubli_tenue - nb.inapte;
 
     const dateFr = new Date(currentDate + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -72,6 +74,7 @@ function render() {
                         <h3 class="font-black text-blue-400 uppercase text-sm">✅ Appel — Présences</h3>
                         <p class="text-xs text-slate-400">Classe ${currentClasse} · ${eleves.length} élèves</p>
                         <p class="text-sm font-bold text-slate-300 mt-1">${dateFr}</p>
+                        <p class="text-[11px] text-slate-500 mt-1">💡 Présent par défaut — marque uniquement les exceptions.</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="window.appelChangerDate(-1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white">←</button>
@@ -81,8 +84,8 @@ function render() {
                 </div>
 
                 <div class="flex gap-2 flex-wrap mb-4">
+                    <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#22c55e; color:#ffffff;">Présent : ${nbPresent}</span>
                     ${STATUTS.map(s => `<span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:${s.couleur}; color:#ffffff;">${s.label} : ${nb[s.id]}</span>`).join('')}
-                    <span class="px-3 py-1 rounded-full text-xs font-black bg-slate-700 text-slate-300">Non noté : ${nonNote}</span>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -90,7 +93,7 @@ function render() {
                         <thead>
                             <tr class="text-xs text-slate-400 uppercase border-b border-slate-700">
                                 <th class="p-2 text-left">Élève</th>
-                                ${STATUTS.map(s => `<th class="p-2 text-center">${s.label}</th>`).join('')}
+                                ${STATUTS.map(s => `<th class="p-2 text-center" title="${s.label}"><span class="block text-base">${s.icon}</span><span class="block text-[9px] mt-0.5">${s.label}</span></th>`).join('')}
                             </tr>
                         </thead>
                         <tbody>
@@ -102,9 +105,10 @@ function render() {
                                         ${STATUTS.map(s => `
                                             <td class="p-2 text-center">
                                                 <button onclick="window.appelSetStatut('${e.id}', '${s.id}')"
-                                                        class="w-10 h-10 rounded-xl font-black transition-all active:scale-95"
-                                                        style="background-color: ${statut === s.id ? s.couleur : '#334155'}; color: #ffffff; ${statut === s.id ? 'box-shadow: 0 0 0 2px ' + s.couleur + ';' : ''}">
-                                                    ${statut === s.id ? '✓' : ''}
+                                                        class="w-10 h-10 rounded-xl text-lg transition-all active:scale-95"
+                                                        style="background-color: ${statut === s.id ? s.couleur : '#334155'}; color: #ffffff; ${statut === s.id ? 'box-shadow: 0 0 0 2px ' + s.couleur + ';' : ''}"
+                                                        title="${s.label}">
+                                                    ${s.icon}
                                                 </button>
                                             </td>
                                         `).join('')}
