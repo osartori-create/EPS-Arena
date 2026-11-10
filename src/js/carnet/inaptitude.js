@@ -5,10 +5,11 @@
 
 const STORAGE_PREFIX = 'eps_arena_inaptitudes_';
 
-export const MOTIFS_PONCTUELS = [
+export const MOTIFS = [
+    { id: 'douleur', label: 'Douleur', icon: '💢' },
     { id: 'fin_maladie', label: 'Fin de maladie', icon: '🤒' },
     { id: 'feminin', label: 'Problème féminin', icon: '🌸' },
-    { id: 'douleur', label: 'Mal à un endroit', icon: '💢' },
+    { id: 'medicale', label: 'Certificat médical', icon: '📄' },
 ];
 
 // Zones du corps pour la silhouette (face et dos). Coordonnées SVG 200×380.
@@ -95,17 +96,15 @@ export function calculerTempsRestant(inapt) {
 
 export function libelleInaptitude(inapt) {
     if (!inapt) return '';
-    if (inapt.type === 'medicale') {
+    const motif = MOTIFS.find(m => m.id === inapt.motif);
+    let s = motif ? motif.label : 'Inapte';
+    if (inapt.motif === 'medicale') {
         const j = calculerTempsRestant(inapt);
-        let s = 'Inapt. médicale';
         if (j !== null && j >= 0) s += ` · ${j} j restants`;
         else if (j !== null && j < 0) s += ' · terminée';
-        if (inapt.commentaire) s += ` — ${inapt.commentaire}`;
-        return s;
     }
-    const motif = MOTIFS_PONCTUELS.find(m => m.id === inapt.motif);
-    let s = motif ? motif.label : 'Inapte';
     if (inapt.zone) s += ` (${labelZone(inapt.zone)})`;
+    if (inapt.commentaire) s += ` — ${inapt.commentaire}`;
     return s;
 }
 
@@ -175,8 +174,7 @@ window.inaptChoisirZone = function(zoneId) {
 export function ouvrirModalInaptitude(eleve, onSave) {
     const existant = getInaptitude(eleve.id) || {};
     const initial = {
-        type: existant.type || 'ponctuelle',
-        motif: existant.motif || 'fin_maladie',
+        motif: existant.motif || 'douleur',
         zone: existant.zone || '',
         dateDebut: existant.dateDebut || formaterDate(new Date()),
         dateFin: existant.dateFin || '',
@@ -187,7 +185,7 @@ export function ouvrirModalInaptitude(eleve, onSave) {
     overlay.id = 'inaptitude-modal';
     overlay.className = 'fixed inset-0 bg-black/70 z-50 flex items-start justify-center p-4 overflow-y-auto';
     overlay.innerHTML = `
-        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-lg my-8">
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-2xl my-8">
             <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
                 <div>
                     <h2 class="text-xl font-black text-purple-400 uppercase">🩹 Inaptitude</h2>
@@ -196,48 +194,42 @@ export function ouvrirModalInaptitude(eleve, onSave) {
                 <button onclick="document.getElementById('inaptitude-modal').remove()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white text-sm">✖</button>
             </div>
 
-            <div class="flex gap-2 mb-4">
-                <button onclick="window.inaptChoisirType('ponctuelle')" id="inapt-tab-ponctuelle" class="flex-1 py-2 rounded-xl font-black text-sm">Ponctuelle (parents)</button>
-                <button onclick="window.inaptChoisirType('medicale')" id="inapt-tab-medicale" class="flex-1 py-2 rounded-xl font-black text-sm">Médicale (médecin)</button>
+            <p class="text-xs text-slate-400 uppercase font-bold mb-2">Motif</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                ${MOTIFS.map(m => `
+                    <button onclick="window.inaptChoisirMotif('${m.id}')" id="inapt-motif-${m.id}" class="p-3 rounded-xl text-left font-bold text-sm">${m.icon} ${m.label}</button>
+                `).join('')}
             </div>
 
-            <div id="inapt-ponctuelle" class="space-y-3">
-                <p class="text-xs text-slate-400 uppercase font-bold">Motif</p>
-                <div class="grid grid-cols-1 gap-2">
-                    ${MOTIFS_PONCTUELS.map(m => `
-                        <button onclick="window.inaptChoisirMotif('${m.id}')" id="inapt-motif-${m.id}" class="flex items-center gap-2 p-3 rounded-xl text-left font-bold text-sm">${m.icon} ${m.label}</button>
-                    `).join('')}
-                </div>
-                <div id="inapt-zone-container" class="hidden">
-                    <p class="text-xs text-slate-400 uppercase font-bold">Zone douloureuse</p>
-                    <p class="text-[10px] text-slate-500 mb-2">Face et dos affichés — clique sur la zone douloureuse.</p>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <div class="sm:w-1/2">
+                    <p class="text-xs text-slate-400 uppercase font-bold mb-2">Zone douloureuse</p>
+                    <p class="text-[10px] text-slate-500 mb-2">Face et dos affichés — clique sur la zone.</p>
                     <div id="inapt-silhouette" class="bg-slate-800 rounded-2xl p-2"></div>
                     <p id="inapt-zone-label" class="text-center text-xs font-bold text-purple-300 mt-2"></p>
                 </div>
-                <div>
-                    <label class="text-xs text-slate-400 uppercase font-bold">Champ libre</label>
-                    <input type="text" id="inapt-commentaire-ponctuelle" placeholder="Remarque éventuelle…" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
-                </div>
-            </div>
-
-            <div id="inapt-medicale" class="space-y-3 hidden">
-                <div>
-                    <label class="text-xs text-slate-400 uppercase font-bold">Date de début</label>
-                    <input type="date" id="inapt-date-debut" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="text-xs text-slate-400 uppercase font-bold">Durée (jours)</label>
-                        <input type="number" id="inapt-duree" min="0" placeholder="ex : 21" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
+                <div class="sm:w-1/2 space-y-3">
+                    <div id="inapt-medicale" class="space-y-2 hidden">
+                        <p class="text-xs text-slate-400 uppercase font-bold">📄 Dates du certificat</p>
+                        <div>
+                            <label class="text-[10px] text-slate-500 uppercase font-bold">Date de début</label>
+                            <input type="date" id="inapt-date-debut" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
+                        </div>
+                        <div class="flex gap-2">
+                            <div class="flex-1">
+                                <label class="text-[10px] text-slate-500 uppercase font-bold">Durée (jours)</label>
+                                <input type="number" id="inapt-duree" min="0" placeholder="ex : 21" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-[10px] text-slate-500 uppercase font-bold">OU date de fin</label>
+                                <input type="date" id="inapt-date-fin" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
+                            </div>
+                        </div>
                     </div>
                     <div>
-                        <label class="text-xs text-slate-400 uppercase font-bold">OU date de fin</label>
-                        <input type="date" id="inapt-date-fin" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
+                        <label class="text-xs text-slate-400 uppercase font-bold">Champ libre</label>
+                        <input type="text" id="inapt-commentaire" placeholder="Remarque éventuelle…" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1">
                     </div>
-                </div>
-                <div>
-                    <label class="text-xs text-slate-400 uppercase font-bold">Commentaire (ex : natation, course, poignet droit)</label>
-                    <textarea id="inapt-commentaire" rows="2" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-1"></textarea>
                 </div>
             </div>
 
@@ -250,27 +242,16 @@ export function ouvrirModalInaptitude(eleve, onSave) {
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
-    window._inaptType = initial.type;
     window._inaptMotif = initial.motif;
     window._inaptZone = initial.zone;
     window._inaptOnSave = onSave;
 
     document.getElementById('inapt-date-debut').value = initial.dateDebut;
     document.getElementById('inapt-commentaire').value = initial.commentaire;
-    document.getElementById('inapt-commentaire-ponctuelle').value = initial.commentaire;
     if (initial.dateFin) document.getElementById('inapt-date-fin').value = initial.dateFin;
 
-    window.inaptChoisirType(initial.type);
-}
-
-window.inaptChoisirType = function(type) {
-    window._inaptType = type;
-    document.getElementById('inapt-ponctuelle').classList.toggle('hidden', type !== 'ponctuelle');
-    document.getElementById('inapt-medicale').classList.toggle('hidden', type !== 'medicale');
-    document.getElementById('inapt-tab-ponctuelle').className = 'flex-1 py-2 rounded-xl font-black text-sm ' + (type === 'ponctuelle' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400');
-    document.getElementById('inapt-tab-medicale').className = 'flex-1 py-2 rounded-xl font-black text-sm ' + (type === 'medicale' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400');
     window.inaptRafraichirMotifs();
-};
+}
 
 window.inaptChoisirMotif = function(motif) {
     window._inaptMotif = motif;
@@ -278,25 +259,22 @@ window.inaptChoisirMotif = function(motif) {
 };
 
 window.inaptRafraichirMotifs = function() {
-    MOTIFS_PONCTUELS.forEach(m => {
+    MOTIFS.forEach(m => {
         const btn = document.getElementById('inapt-motif-' + m.id);
-        if (btn) btn.className = 'flex items-center gap-2 p-3 rounded-xl text-left font-bold text-sm ' + (window._inaptMotif === m.id ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400');
+        if (btn) btn.className = 'p-3 rounded-xl text-left font-bold text-sm ' + (window._inaptMotif === m.id ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400');
     });
-    const zoneC = document.getElementById('inapt-zone-container');
-    if (zoneC) {
-        zoneC.classList.toggle('hidden', window._inaptMotif !== 'douleur');
-        if (window._inaptMotif === 'douleur') rendererSilhouette();
-    }
+    const med = document.getElementById('inapt-medicale');
+    if (med) med.classList.toggle('hidden', window._inaptMotif !== 'medicale');
+    rendererSilhouette();
 };
 
 window.inaptValider = function(eleveId) {
-    const type = window._inaptType;
-    const data = { type, motif: null, zone: '', dateDebut: null, dateFin: null, commentaire: '' };
-    if (type === 'ponctuelle') {
-        data.motif = window._inaptMotif;
+    const motif = window._inaptMotif;
+    const data = { motif, zone: '', dateDebut: null, dateFin: null, commentaire: '' };
+    if (motif === 'douleur' || motif === 'medicale') {
         data.zone = window._inaptZone || '';
-        data.commentaire = document.getElementById('inapt-commentaire-ponctuelle').value.trim();
-    } else {
+    }
+    if (motif === 'medicale') {
         data.dateDebut = document.getElementById('inapt-date-debut').value;
         const duree = parseInt(document.getElementById('inapt-duree').value, 10);
         const dateFin = document.getElementById('inapt-date-fin').value;
@@ -307,8 +285,8 @@ window.inaptValider = function(eleveId) {
             d.setDate(d.getDate() + duree);
             data.dateFin = formaterDate(d);
         }
-        data.commentaire = document.getElementById('inapt-commentaire').value.trim();
     }
+    data.commentaire = document.getElementById('inapt-commentaire').value.trim();
     document.getElementById('inaptitude-modal').remove();
     if (window._inaptOnSave) window._inaptOnSave(data);
 };

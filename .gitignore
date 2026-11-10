@@ -32,3 +32,11 @@ desktop.ini
 dist/
 build/
 *.log
+
+# ============================================================
+# IMAGES DE RÉFÉRENCE (non utilisées par l'app)
+# ============================================================
+bodychart.jpg
+*.jpg
+*.png
+*.jpeg
