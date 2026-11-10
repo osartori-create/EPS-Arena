@@ -20,6 +20,7 @@ const FLAGS = [
 
 let currentClasse = '';
 let currentDate = '';
+const photosCache = {};
 
 function formaterDate(d) {
     const y = d.getFullYear();
@@ -36,13 +37,21 @@ function ecrireAppel(data) {
     localStorage.setItem(STORAGE_PREFIX + currentClasse, JSON.stringify(data));
 }
 
-export function initAppelInterface() {
+export async function initAppelInterface() {
     currentClasse = getCurrentClasse();
     currentDate = formaterDate(new Date());
+    await chargerPhotos(getExistingEleves(currentClasse));
     render();
 }
 
-async function render() {
+async function chargerPhotos(eleves) {
+    await Promise.all(eleves.map(async e => {
+        if (photosCache[e.id] !== undefined) return;
+        try { photosCache[e.id] = await getPhotoUrl(e.id); } catch (err) { photosCache[e.id] = null; }
+    }));
+}
+
+function render() {
     const container = document.getElementById('viewPresences');
     if (!container) return;
 
@@ -62,11 +71,7 @@ async function render() {
     const appel = lireAppel();
     const statutsDuJour = appel[currentDate] || {};
 
-    // Chargement des photos (IndexedDB)
-    const photos = {};
-    await Promise.all(eleves.map(async e => {
-        try { photos[e.id] = await getPhotoUrl(e.id); } catch (err) { photos[e.id] = null; }
-    }));
+    const photos = photosCache;
 
     // Compteurs
     let nbPresent = 0, nbAbsent = 0, nbInapte = 0, nbRetard = 0, nbOubli = 0;
