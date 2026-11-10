@@ -3,17 +3,19 @@
 // ⚠️ Données nominatives → localStorage uniquement (RGPD), jamais Firebase.
 // Clé : eps_arena_appel_<classe>  →  { [date AAAA-MM-JJ]: { [eleveId]: statut } }
 
-import { getExistingEleves } from '../services/admin-service.js';
+import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
 import { getCurrentClasse } from '../core/live-engine.js';
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
-// Statuts d'exception. Par défaut, tous les élèves sont « présent ».
-const STATUTS = [
+// Présence : exclusif (présent par défaut). Flags : cumulables.
+const PRESENCES = [
     { id: 'absent', label: 'Absent', icon: '❌', couleur: '#ef4444' },
+    { id: 'inapte', label: 'Inapte', icon: '🩹', couleur: '#8b5cf6' },
+];
+const FLAGS = [
     { id: 'retard', label: 'Retard', icon: '⏰', couleur: '#f59e0b' },
     { id: 'oubli_tenue', label: 'Oubli tenue', icon: '👕', couleur: '#3b82f6' },
-    { id: 'inapte', label: 'Inapte', icon: '🩹', couleur: '#8b5cf6' },
 ];
 
 let currentClasse = '';
@@ -40,7 +42,7 @@ export function initAppelInterface() {
     render();
 }
 
-function render() {
+async function render() {
     const container = document.getElementById('viewPresences');
     if (!container) return;
 
@@ -60,9 +62,22 @@ function render() {
     const appel = lireAppel();
     const statutsDuJour = appel[currentDate] || {};
 
-    const nb = { absent: 0, retard: 0, oubli_tenue: 0, inapte: 0 };
-    Object.values(statutsDuJour).forEach(s => { if (nb[s] !== undefined) nb[s]++; });
-    const nbPresent = eleves.length - nb.absent - nb.retard - nb.oubli_tenue - nb.inapte;
+    // Chargement des photos (IndexedDB)
+    const photos = {};
+    await Promise.all(eleves.map(async e => {
+        try { photos[e.id] = await getPhotoUrl(e.id); } catch (err) { photos[e.id] = null; }
+    }));
+
+    // Compteurs
+    let nbPresent = 0, nbAbsent = 0, nbInapte = 0, nbRetard = 0, nbOubli = 0;
+    eleves.forEach(e => {
+        const entree = statutsDuJour[e.id];
+        if (entree?.presence === 'absent') nbAbsent++;
+        else if (entree?.presence === 'inapte') nbInapte++;
+        else nbPresent++;
+        if (entree?.retard) nbRetard++;
+        if (entree?.oubli_tenue) nbOubli++;
+    });
 
     const dateFr = new Date(currentDate + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -85,7 +100,10 @@ function render() {
 
                 <div class="flex gap-2 flex-wrap mb-4">
                     <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#22c55e; color:#ffffff;">Présent : ${nbPresent}</span>
-                    ${STATUTS.map(s => `<span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:${s.couleur}; color:#ffffff;">${s.label} : ${nb[s.id]}</span>`).join('')}
+                    <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#ef4444; color:#ffffff;">Absent : ${nbAbsent}</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#8b5cf6; color:#ffffff;">Inapte : ${nbInapte}</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#f59e0b; color:#ffffff;">Retard : ${nbRetard}</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#3b82f6; color:#ffffff;">Oubli tenue : ${nbOubli}</span>
                 </div>
 
                 <div class="overflow-x-auto">
@@ -93,25 +111,51 @@ function render() {
                         <thead>
                             <tr class="text-xs text-slate-400 uppercase border-b border-slate-700">
                                 <th class="p-2 text-left">Élève</th>
-                                ${STATUTS.map(s => `<th class="p-2 text-center" title="${s.label}"><span class="block text-base">${s.icon}</span><span class="block text-[9px] mt-0.5">${s.label}</span></th>`).join('')}
+                                <th class="p-2 text-center" title="Absent">❌</th>
+                                <th class="p-2 text-center" title="Inapte">🩹</th>
+                                <th class="p-2 text-center" title="Retard">⏰</th>
+                                <th class="p-2 text-center" title="Oubli tenue">👕</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${eleves.map(e => {
-                                const statut = statutsDuJour[e.id];
+                                const entree = statutsDuJour[e.id];
+                                const presence = entree?.presence;
+                                const retard = entree?.retard === true;
+                                const oubli = entree?.oubli_tenue === true;
+
+                                const photoHtml = photos[e.id]
+                                    ? `<img src="${photos[e.id]}" class="w-10 h-10 rounded-full object-cover border-2 border-slate-600 shrink-0">`
+                                    : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg shrink-0">👤</div>`;
+
+                                const badges = [];
+                                if (presence === 'absent') badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#ef4444; color:#ffffff;">Absent</span>`);
+                                if (presence === 'inapte') badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#8b5cf6; color:#ffffff;">Inapte</span>`);
+                                if (retard) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#f59e0b; color:#ffffff;">Retard</span>`);
+                                if (oubli) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#3b82f6; color:#ffffff;">Oubli tenue</span>`);
+                                if (badges.length === 0) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#22c55e; color:#ffffff;">Présent</span>`);
+
                                 return `
                                     <tr class="border-b border-slate-800">
-                                        <td class="p-2 font-bold text-white">${e.prenom} ${e.nom}</td>
-                                        ${STATUTS.map(s => `
-                                            <td class="p-2 text-center">
-                                                <button onclick="window.appelSetStatut('${e.id}', '${s.id}')"
-                                                        class="w-10 h-10 rounded-xl text-lg transition-all active:scale-95"
-                                                        style="background-color: ${statut === s.id ? s.couleur : '#334155'}; color: #ffffff; ${statut === s.id ? 'box-shadow: 0 0 0 2px ' + s.couleur + ';' : ''}"
-                                                        title="${s.label}">
-                                                    ${s.icon}
-                                                </button>
-                                            </td>
-                                        `).join('')}
+                                        <td class="p-2">
+                                            <div class="flex items-center gap-2">
+                                                ${photoHtml}
+                                                <div class="font-bold text-white leading-tight">${e.prenom} ${e.nom}</div>
+                                                <div class="flex gap-1 flex-wrap">${badges.join('')}</div>
+                                            </div>
+                                        </td>
+                                        <td class="p-2 text-center">
+                                            <button onclick="window.appelSetPresence('${e.id}', 'absent')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${presence === 'absent' ? '#ef4444' : '#334155'}; color: #ffffff; ${presence === 'absent' ? 'box-shadow: 0 0 0 2px #ef4444;' : ''}" title="Absent">❌</button>
+                                        </td>
+                                        <td class="p-2 text-center">
+                                            <button onclick="window.appelSetPresence('${e.id}', 'inapte')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${presence === 'inapte' ? '#8b5cf6' : '#334155'}; color: #ffffff; ${presence === 'inapte' ? 'box-shadow: 0 0 0 2px #8b5cf6;' : ''}" title="Inapte">🩹</button>
+                                        </td>
+                                        <td class="p-2 text-center">
+                                            <button onclick="window.appelToggleFlag('${e.id}', 'retard')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${retard ? '#f59e0b' : '#334155'}; color: #ffffff; ${retard ? 'box-shadow: 0 0 0 2px #f59e0b;' : ''}" title="Retard">⏰</button>
+                                        </td>
+                                        <td class="p-2 text-center">
+                                            <button onclick="window.appelToggleFlag('${e.id}', 'oubli_tenue')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${oubli ? '#3b82f6' : '#334155'}; color: #ffffff; ${oubli ? 'box-shadow: 0 0 0 2px #3b82f6;' : ''}" title="Oubli tenue">👕</button>
+                                        </td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -123,16 +167,40 @@ function render() {
     `;
 }
 
-window.appelSetStatut = function(eleveId, statut) {
-    if (!currentClasse) return;
+function majEleve(eleveId, mutate) {
     const appel = lireAppel();
     if (!appel[currentDate]) appel[currentDate] = {};
-    if (appel[currentDate][eleveId] === statut) {
+    const entree = appel[currentDate][eleveId] || {};
+    mutate(entree);
+    if (Object.keys(entree).length === 0) {
         delete appel[currentDate][eleveId];
     } else {
-        appel[currentDate][eleveId] = statut;
+        appel[currentDate][eleveId] = entree;
     }
     ecrireAppel(appel);
+}
+
+window.appelSetPresence = function(eleveId, presenceId) {
+    if (!currentClasse) return;
+    majEleve(eleveId, (entree) => {
+        if (entree.presence === presenceId) {
+            delete entree.presence;
+        } else {
+            entree.presence = presenceId;
+        }
+    });
+    render();
+};
+
+window.appelToggleFlag = function(eleveId, flagId) {
+    if (!currentClasse) return;
+    majEleve(eleveId, (entree) => {
+        if (entree[flagId]) {
+            delete entree[flagId];
+        } else {
+            entree[flagId] = true;
+        }
+    });
     render();
 };
 
