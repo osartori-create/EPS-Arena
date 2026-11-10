@@ -8,12 +8,11 @@ import { getCurrentClasse } from '../core/live-engine.js';
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
-// Présence : exclusif (présent par défaut). Flags : cumulables.
-const PRESENCES = [
+// Tous les statuts sont des flags indépendants et cumulables.
+// Présent = aucun flag coché.
+const STATUTS = [
     { id: 'absent', label: 'Absent', icon: '❌', couleur: '#ef4444' },
     { id: 'inapte', label: 'Inapte', icon: '🩹', couleur: '#8b5cf6' },
-];
-const FLAGS = [
     { id: 'retard', label: 'Retard', icon: '⏰', couleur: '#f59e0b' },
     { id: 'oubli_tenue', label: 'Oubli tenue', icon: '👕', couleur: '#3b82f6' },
 ];
@@ -51,8 +50,10 @@ function migrerDonneesAppel() {
     let modifie = false;
     Object.values(appel).forEach(jour => {
         Object.keys(jour).forEach(eleveId => {
-            if (typeof jour[eleveId] === 'string') {
-                jour[eleveId] = migrerEntree(jour[eleveId]);
+            const avant = jour[eleveId];
+            const apres = migrerEntree(avant);
+            if (apres !== avant) {
+                jour[eleveId] = apres;
                 modifie = true;
             }
         });
@@ -93,9 +94,10 @@ function render() {
     let nbPresent = 0, nbAbsent = 0, nbInapte = 0, nbRetard = 0, nbOubli = 0;
     eleves.forEach(e => {
         const entree = statutsDuJour[e.id];
-        if (entree?.presence === 'absent') nbAbsent++;
-        else if (entree?.presence === 'inapte') nbInapte++;
-        else nbPresent++;
+        const n = (entree?.absent ? 1 : 0) + (entree?.inapte ? 1 : 0) + (entree?.retard ? 1 : 0) + (entree?.oubli_tenue ? 1 : 0);
+        if (n === 0) nbPresent++;
+        if (entree?.absent) nbAbsent++;
+        if (entree?.inapte) nbInapte++;
         if (entree?.retard) nbRetard++;
         if (entree?.oubli_tenue) nbOubli++;
     });
@@ -141,7 +143,8 @@ function render() {
                         <tbody>
                             ${eleves.map(e => {
                                 const entree = statutsDuJour[e.id];
-                                const presence = entree?.presence;
+                                const absent = entree?.absent === true;
+                                const inapte = entree?.inapte === true;
                                 const retard = entree?.retard === true;
                                 const oubli = entree?.oubli_tenue === true;
 
@@ -150,8 +153,8 @@ function render() {
                                     : `<div class="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-lg shrink-0">👤</div>`;
 
                                 const badges = [];
-                                if (presence === 'absent') badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#ef4444; color:#ffffff;">Absent</span>`);
-                                if (presence === 'inapte') badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#8b5cf6; color:#ffffff;">Inapte</span>`);
+                                if (absent) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#ef4444; color:#ffffff;">Absent</span>`);
+                                if (inapte) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#8b5cf6; color:#ffffff;">Inapte</span>`);
                                 if (retard) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#f59e0b; color:#ffffff;">Retard</span>`);
                                 if (oubli) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#3b82f6; color:#ffffff;">Oubli tenue</span>`);
                                 if (badges.length === 0) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#22c55e; color:#ffffff;">Présent</span>`);
@@ -166,16 +169,16 @@ function render() {
                                             </div>
                                         </td>
                                         <td class="p-2 text-center">
-                                            <button onclick="window.appelSetPresence('${e.id}', 'absent')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${presence === 'absent' ? '#ef4444' : '#334155'}; color: #ffffff; ${presence === 'absent' ? 'box-shadow: 0 0 0 2px #ef4444;' : ''}" title="Absent">❌</button>
+                                            <button onclick="window.appelToggleStatut('${e.id}', 'absent')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${absent ? '#ef4444' : '#334155'}; color: #ffffff; ${absent ? 'box-shadow: 0 0 0 2px #ef4444;' : ''}" title="Absent">❌</button>
                                         </td>
                                         <td class="p-2 text-center">
-                                            <button onclick="window.appelSetPresence('${e.id}', 'inapte')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${presence === 'inapte' ? '#8b5cf6' : '#334155'}; color: #ffffff; ${presence === 'inapte' ? 'box-shadow: 0 0 0 2px #8b5cf6;' : ''}" title="Inapte">🩹</button>
+                                            <button onclick="window.appelToggleStatut('${e.id}', 'inapte')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${inapte ? '#8b5cf6' : '#334155'}; color: #ffffff; ${inapte ? 'box-shadow: 0 0 0 2px #8b5cf6;' : ''}" title="Inapte">🩹</button>
                                         </td>
                                         <td class="p-2 text-center">
-                                            <button onclick="window.appelToggleFlag('${e.id}', 'retard')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${retard ? '#f59e0b' : '#334155'}; color: #ffffff; ${retard ? 'box-shadow: 0 0 0 2px #f59e0b;' : ''}" title="Retard">⏰</button>
+                                            <button onclick="window.appelToggleStatut('${e.id}', 'retard')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${retard ? '#f59e0b' : '#334155'}; color: #ffffff; ${retard ? 'box-shadow: 0 0 0 2px #f59e0b;' : ''}" title="Retard">⏰</button>
                                         </td>
                                         <td class="p-2 text-center">
-                                            <button onclick="window.appelToggleFlag('${e.id}', 'oubli_tenue')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${oubli ? '#3b82f6' : '#334155'}; color: #ffffff; ${oubli ? 'box-shadow: 0 0 0 2px #3b82f6;' : ''}" title="Oubli tenue">👕</button>
+                                            <button onclick="window.appelToggleStatut('${e.id}', 'oubli_tenue')" class="w-9 h-9 rounded-xl text-lg transition-all active:scale-95" style="background-color: ${oubli ? '#3b82f6' : '#334155'}; color: #ffffff; ${oubli ? 'box-shadow: 0 0 0 2px #3b82f6;' : ''}" title="Oubli tenue">👕</button>
                                         </td>
                                     </tr>
                                 `;
@@ -188,23 +191,32 @@ function render() {
     `;
 }
 
-// Migration : ancien format (chaîne simple) → objet { presence, flags }
+// Migration : anciens formats (chaîne simple, ou objet { presence }) → objet flags.
 function migrerEntree(entree) {
-    if (typeof entree !== 'string') return entree;
-    switch (entree) {
-        case 'absent': return { presence: 'absent' };
-        case 'inapte': return { presence: 'inapte' };
-        case 'retard': return { retard: true };
-        case 'oubli_tenue': return { oubli_tenue: true };
-        default: return {};
+    if (typeof entree === 'string') {
+        switch (entree) {
+            case 'absent': return { absent: true };
+            case 'inapte': return { inapte: true };
+            case 'retard': return { retard: true };
+            case 'oubli_tenue': return { oubli_tenue: true };
+            default: return {};
+        }
     }
+    if (entree && typeof entree === 'object' && entree.presence) {
+        const nouveau = { ...entree };
+        delete nouveau.presence;
+        if (entree.presence === 'absent') nouveau.absent = true;
+        else if (entree.presence === 'inapte') nouveau.inapte = true;
+        return nouveau;
+    }
+    return entree;
 }
 
 function majEleve(eleveId, mutate) {
     const appel = lireAppel();
     if (!appel[currentDate]) appel[currentDate] = {};
     let entree = appel[currentDate][eleveId] || {};
-    if (typeof entree === 'string') entree = migrerEntree(entree);
+    entree = migrerEntree(entree);
     mutate(entree);
     if (Object.keys(entree).length === 0) {
         delete appel[currentDate][eleveId];
@@ -214,25 +226,13 @@ function majEleve(eleveId, mutate) {
     ecrireAppel(appel);
 }
 
-window.appelSetPresence = function(eleveId, presenceId) {
+window.appelToggleStatut = function(eleveId, statutId) {
     if (!currentClasse) return;
     majEleve(eleveId, (entree) => {
-        if (entree.presence === presenceId) {
-            delete entree.presence;
+        if (entree[statutId]) {
+            delete entree[statutId];
         } else {
-            entree.presence = presenceId;
-        }
-    });
-    render();
-};
-
-window.appelToggleFlag = function(eleveId, flagId) {
-    if (!currentClasse) return;
-    majEleve(eleveId, (entree) => {
-        if (entree[flagId]) {
-            delete entree[flagId];
-        } else {
-            entree[flagId] = true;
+            entree[statutId] = true;
         }
     });
     render();
