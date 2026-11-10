@@ -48,6 +48,7 @@ function ecrireAppel(data) {
 export async function initAppelInterface() {
     currentClasse = getCurrentClasse();
     currentDate = formaterDate(new Date());
+    setClasseInaptitude(currentClasse);
     migrerDonneesAppel();
     await chargerPhotos(getExistingEleves(currentClasse));
     render();
