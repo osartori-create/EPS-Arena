@@ -213,16 +213,16 @@ export function ouvrirModalInaptitude(eleve, onSave) {
                         <p class="text-xs text-slate-400 uppercase font-bold">📄 Dates du certificat</p>
                         <div>
                             <label class="text-[10px] text-slate-500 uppercase font-bold">Date de début</label>
-                            <input type="date" id="inapt-date-debut" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
+                            <input type="date" id="inapt-date-debut" onchange="window.inaptDateDebutChange()" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
                         </div>
                         <div class="flex gap-2">
                             <div class="flex-1">
                                 <label class="text-[10px] text-slate-500 uppercase font-bold">Durée (jours)</label>
-                                <input type="number" id="inapt-duree" min="0" placeholder="ex : 21" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
+                                <input type="number" id="inapt-duree" min="0" placeholder="ex : 21" onchange="window.inaptCalcFin()" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
                             </div>
                             <div class="flex-1">
                                 <label class="text-[10px] text-slate-500 uppercase font-bold">OU date de fin</label>
-                                <input type="date" id="inapt-date-fin" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
+                                <input type="date" id="inapt-date-fin" onchange="window.inaptCalcDuree()" class="w-full bg-slate-800 border border-slate-600 rounded p-2 text-white text-sm mt-0.5">
                             </div>
                         </div>
                     </div>
@@ -289,4 +289,37 @@ window.inaptValider = function(eleveId) {
     data.commentaire = document.getElementById('inapt-commentaire').value.trim();
     document.getElementById('inaptitude-modal').remove();
     if (window._inaptOnSave) window._inaptOnSave(data);
+};
+
+// ============================================================
+// SYNCHRO DURÉE ↔ DATE DE FIN
+// ============================================================
+window.inaptCalcDuree = function() {
+    const debut = document.getElementById('inapt-date-debut').value;
+    const fin = document.getElementById('inapt-date-fin').value;
+    const dureeEl = document.getElementById('inapt-duree');
+    if (debut && fin && dureeEl) {
+        const d1 = new Date(debut + 'T12:00:00');
+        const d2 = new Date(fin + 'T12:00:00');
+        const jours = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+        dureeEl.value = jours;
+    }
+};
+
+window.inaptCalcFin = function() {
+    const debut = document.getElementById('inapt-date-debut').value;
+    const duree = parseInt(document.getElementById('inapt-duree').value, 10);
+    const finEl = document.getElementById('inapt-date-fin');
+    if (debut && duree > 0 && finEl) {
+        const d = new Date(debut + 'T12:00:00');
+        d.setDate(d.getDate() + duree);
+        finEl.value = formaterDate(d);
+    }
+};
+
+window.inaptDateDebutChange = function() {
+    const duree = parseInt(document.getElementById('inapt-duree').value, 10);
+    const fin = document.getElementById('inapt-date-fin').value;
+    if (fin) window.inaptCalcDuree();
+    else if (duree > 0) window.inaptCalcFin();
 };
