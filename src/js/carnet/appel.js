@@ -19,6 +19,13 @@ const STATUTS = [
     { id: 'oubli_tenue', label: 'Oubli tenue', icon: '👕', couleur: '#3b82f6' },
 ];
 
+const STATS_FLAGS = [
+    { id: 'absent', label: 'Absences', couleur: '#ef4444' },
+    { id: 'retard', label: 'Retards', couleur: '#f59e0b' },
+    { id: 'oubli_tenue', label: 'Oublis de tenue', couleur: '#3b82f6' },
+    { id: 'inapte', label: 'Inaptitudes', couleur: '#8b5cf6' },
+];
+
 let currentClasse = '';
 let currentDate = '';
 const photosCache = {};
@@ -273,7 +280,7 @@ window.appelChangerDate = function(delta) {
 };
 
 // ============================================================
-// STATISTIQUES : absences par activité
+// STATISTIQUES : absences / retards / oublis de tenue / inaptitudes
 // ============================================================
 window.appelVoirStats = function() {
     if (!currentClasse) return;
@@ -281,7 +288,7 @@ window.appelVoirStats = function() {
     const eleves = getExistingEleves(currentClasse);
     eleves.sort((a, b) => (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || ''));
 
-    // { [eleveId]: { [activite]: nbAbsences } }
+    // { [eleveId]: { [activite]: { absent, retard, oubli_tenue, inapte } } }
     const stats = {};
     const activites = new Set();
     Object.entries(appel).forEach(([date, jour]) => {
@@ -289,13 +296,17 @@ window.appelVoirStats = function() {
             if (!s.activite) return;
             activites.add(s.activite);
             Object.entries(jour).forEach(([eleveId, flags]) => {
-                if (!flags || typeof flags !== 'object' || !flags.absent) return;
+                if (!flags || typeof flags !== 'object') return;
                 if (!stats[eleveId]) stats[eleveId] = {};
-                stats[eleveId][s.activite] = (stats[eleveId][s.activite] || 0) + 1;
+                if (!stats[eleveId][s.activite]) stats[eleveId][s.activite] = {};
+                STATS_FLAGS.forEach(f => {
+                    if (flags[f.id]) stats[eleveId][s.activite][f.id] = (stats[eleveId][s.activite][f.id] || 0) + 1;
+                });
             });
         });
     });
-    const activitesList = [...activites].sort();
+
+    window._statsData = { stats, activites: [...activites].sort(), eleves, classe: currentClasse };
 
     const overlay = document.createElement('div');
     overlay.id = 'appel-stats-modal';
@@ -304,39 +315,60 @@ window.appelVoirStats = function() {
         <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-4xl my-8">
             <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
                 <div>
-                    <h2 class="text-xl font-black text-cyan-400 uppercase">📊 Absences par activité</h2>
+                    <h2 class="text-xl font-black text-cyan-400 uppercase">📊 Statistiques de l'appel</h2>
                     <p class="text-xs text-slate-400">Classe ${currentClasse} · ${eleves.length} élèves</p>
                 </div>
                 <button onclick="document.getElementById('appel-stats-modal').remove()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white text-sm">✖</button>
             </div>
-            ${activitesList.length === 0 ? `
-                <p class="text-slate-500 text-center py-8">Aucune donnée. Définis les activités dans l'emploi du temps puis fais des appels.</p>
-            ` : `
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="text-xs text-slate-400 uppercase border-b border-slate-700">
-                                <th class="p-2 text-left sticky left-0 bg-slate-900">Élève</th>
-                                ${activitesList.map(a => `<th class="p-2 text-center">${a}</th>`).join('')}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${eleves.map(e => `
-                                <tr class="border-b border-slate-800">
-                                    <td class="p-2 font-bold text-white sticky left-0 bg-slate-900 whitespace-nowrap">${e.prenom} ${e.nom}</td>
-                                    ${activitesList.map(a => {
-                                        const n = stats[e.id]?.[a] || 0;
-                                        return `<td class="p-2 text-center ${n > 0 ? 'font-black text-red-400' : 'text-slate-600'}">${n || '—'}</td>`;
-                                    }).join('')}
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `}
+            <div class="flex gap-2 flex-wrap mb-4">
+                ${STATS_FLAGS.map(f => `<button onclick="window.appelStatsAfficher('${f.id}')" id="stats-tab-${f.id}" class="px-3 py-1.5 rounded-xl font-black text-xs text-white">${f.label}</button>`).join('')}
+            </div>
+            <div id="appel-stats-content"></div>
         </div>
     `;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    window.appelStatsAfficher('absent');
+};
+
+window.appelStatsAfficher = function(flagId) {
+    const data = window._statsData;
+    const container = document.getElementById('appel-stats-content');
+    if (!data || !container) return;
+
+    // Mise en évidence de l'onglet actif
+    STATS_FLAGS.forEach(f => {
+        const btn = document.getElementById('stats-tab-' + f.id);
+        if (btn) btn.style.backgroundColor = (f.id === flagId) ? f.couleur : '#1e293b';
+    });
+
+    if (data.activites.length === 0) {
+        container.innerHTML = '<p class="text-slate-500 text-center py-8">Aucune donnée. Définis les activités dans l\'emploi du temps puis fais des appels.</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-slate-400 uppercase border-b border-slate-700">
+                        <th class="p-2 text-left sticky left-0 bg-slate-900">Élève</th>
+                        ${data.activites.map(a => `<th class="p-2 text-center">${a}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.eleves.map(e => `
+                        <tr class="border-b border-slate-800">
+                            <td class="p-2 font-bold text-white sticky left-0 bg-slate-900 whitespace-nowrap">${e.prenom} ${e.nom}</td>
+                            ${data.activites.map(a => {
+                                const n = data.stats[e.id]?.[a]?.[flagId] || 0;
+                                return `<td class="p-2 text-center ${n > 0 ? 'font-black text-red-400' : 'text-slate-600'}">${n || '—'}</td>`;
+                            }).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 };
 
