@@ -7,6 +7,7 @@ import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
 import { getCurrentClasse } from '../core/live-engine.js';
 import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude } from './inaptitude.js';
 import { getSeancesClasseDate } from './planner.js';
+import { getToutesGrilles, getEvaluationsClasse, calculerNoteFinale } from '../modules/grilles/grilles-core.js';
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
@@ -293,6 +294,20 @@ window.appelOuvrirFiche = function(eleveId) {
     });
     const activites = Object.keys(parActivite).sort();
 
+    // Évaluations (grilles)
+    const grilles = getToutesGrilles();
+    const evalsClasse = getEvaluationsClasse(currentClasse);
+    const periodes = [...new Set(grilles.flatMap(g => (g.periodes && g.periodes.length ? g.periodes : ['Début', 'Milieu', 'Fin'])))];
+    const lignesEval = grilles.map(g => ({
+        titre: g.titre || g.id,
+        cellules: periodes.map(per => {
+            const notes = evalsClasse[g.id]?.[per]?.[eleveId]?.notes;
+            if (!notes) return null;
+            const nf = calculerNoteFinale(notes, g.criteres);
+            return nf.sur20 !== null ? nf.sur20 : null;
+        })
+    }));
+
     const photoHtml = photosCache[eleveId]
         ? `<img src="${photosCache[eleveId]}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-600 shrink-0">`
         : `<div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-3xl shrink-0">👤</div>`;
@@ -334,6 +349,28 @@ window.appelOuvrirFiche = function(eleveId) {
                                         const n = parActivite[act][f.id];
                                         return `<td class="p-1.5 text-center ${n > 0 ? 'font-black text-red-400' : 'text-slate-600'}">${n || '—'}</td>`;
                                     }).join('')}
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+
+            <h3 class="text-xs font-black text-slate-400 uppercase mb-2">📊 Évaluations (grilles)</h3>
+            ${grilles.length === 0 ? '<p class="text-xs text-slate-500 mb-4">Aucune grille.</p>' : `
+                <div class="overflow-x-auto mb-4">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="text-slate-400 uppercase border-b border-slate-700">
+                                <th class="p-1.5 text-left">Grille</th>
+                                ${periodes.map(p => `<th class="p-1.5 text-center">${p}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${lignesEval.map(l => `
+                                <tr class="border-b border-slate-800">
+                                    <td class="p-1.5 font-bold text-white">${l.titre}</td>
+                                    ${l.cellules.map(c => `<td class="p-1.5 text-center font-black ${c !== null ? 'text-emerald-400' : 'text-slate-600'}">${c !== null ? c + '/20' : '—'}</td>`).join('')}
                                 </tr>
                             `).join('')}
                         </tbody>
