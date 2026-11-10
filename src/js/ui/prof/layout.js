@@ -12,6 +12,52 @@ import {
 } from '../../modules/commun/timer.js';
 import { initCalculateur } from '../../modules/commun/calculateur.js';
 import '../../services/sync-service.js';
+import { MENU } from './menu.js';
+
+let sidebarCollapsed = localStorage.getItem('eps_arena_sidebar_collapsed') === '1';
+
+function renderSidebar() {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+
+    nav.innerHTML = MENU.map(section => `
+        <div class="mb-2">
+            <div class="sidebar-section-title px-3 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider">${section.section}</div>
+            ${section.items.map(item => `
+                <button onclick="switchTab('${item.view}')" data-view="${item.view}" title="${item.label}"
+                        class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-colors">
+                    <span class="sidebar-icon text-lg leading-none shrink-0">${item.icon}</span>
+                    <span class="sidebar-label whitespace-nowrap">${item.label}</span>
+                </button>
+            `).join('')}
+        </div>
+    `).join('');
+
+    appliquerEtatSidebar();
+    // Vue active par défaut : admin
+    nav.querySelector('.sidebar-item[data-view="admin"]')?.classList.add('sidebar-active');
+}
+
+function appliquerEtatSidebar() {
+    const aside = document.getElementById('sidebar');
+    const title = document.getElementById('sidebarTitle');
+    const footer = document.getElementById('sidebarFooterLabel');
+    if (aside) aside.style.width = sidebarCollapsed ? '4rem' : '15rem';
+    if (title) title.style.display = sidebarCollapsed ? 'none' : '';
+    if (footer) footer.style.display = sidebarCollapsed ? 'none' : '';
+    document.querySelectorAll('#sidebarNav .sidebar-label, #sidebarNav .sidebar-section-title').forEach(el => {
+        el.style.display = sidebarCollapsed ? 'none' : '';
+    });
+    document.querySelectorAll('#sidebarNav .sidebar-item').forEach(el => {
+        el.classList.toggle('justify-center', sidebarCollapsed);
+    });
+}
+
+window.toggleSidebar = function() {
+    sidebarCollapsed = !sidebarCollapsed;
+    localStorage.setItem('eps_arena_sidebar_collapsed', sidebarCollapsed ? '1' : '0');
+    appliquerEtatSidebar();
+};
 
 export function initLayout() {
 
@@ -60,15 +106,10 @@ export function initLayout() {
         }
     }
 
-    ['btnTab1', 'btnTab2', 'btnTab3', 'btnTab4', 'btnTab5', 'btnTab6', 'btnTab7', 'btnTab8', 'btnTab9'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.classList.remove('tab-active', 'text-blue-500');
-            btn.classList.add('text-slate-500');
-        }
+    // Surbrillance de l'item actif dans la barre latérale
+    document.querySelectorAll('#sidebarNav .sidebar-item').forEach(btn => {
+        btn.classList.toggle('sidebar-active', btn.dataset.view === tabName);
     });
-
-    const map = { 'admin': '1', 'activities': '2', 'live': '3', 'tv': '4', 'tools': '5', 'evaluations': '6', 'sync': '7', 'cross': '8', 'scancamera': '9' };
 
     if (tabName !== 'tv') {
         const targetView = document.getElementById('view' + tabName.charAt(0).toUpperCase() + tabName.slice(1));
@@ -77,9 +118,6 @@ export function initLayout() {
             targetView.style.display = '';
         }
     }
-
-    const targetBtn = document.getElementById('btnTab' + map[tabName]);
-    if (targetBtn) targetBtn.classList.add('tab-active', 'text-blue-500');
 
     if (tabName === 'evaluations') {
     import('../../modules/grilles/grilles-interface.js').then(m => {
@@ -158,4 +196,6 @@ if (tabName === 'sync') {
             label.textContent = snap.val() ? "En ligne" : "Hors ligne";
         }
     });
+
+    renderSidebar();
 }
