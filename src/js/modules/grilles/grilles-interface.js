@@ -18,6 +18,8 @@ let currentGrille = null;
 let currentPeriode = 'Début';
 let currentEvaluations = {};
 let _vueCompacte = false;
+let _grillesAutoEvalsData = {};
+let _autoEvalsUnsub = null;
 
 // ============================================================
 // POINT D'ENTRÉE
@@ -29,11 +31,46 @@ export function initGrillesInterface() {
     currentClasse = getCurrentClasse();
     container.innerHTML = '';
 
+    ecouterAutoEvals();
+
     if (currentGrille) {
         renderPassation(container);
     } else {
         renderBibliotheque(container);
     }
+}
+
+// Écoute en continu les auto-évaluations élèves (Firebase) pour les
+// afficher en lecture seule dans la passation.
+function ecouterAutoEvals() {
+    if (!currentClasse) return;
+    if (_autoEvalsUnsub) _autoEvalsUnsub();
+
+    const profCode = localStorage.getItem('eps_arena_profCode') || 'DEFAULT';
+    const path = `${getEtab()}/profs/${profCode}/${currentClasse}/grilles/auto_evaluations`;
+    _autoEvalsUnsub = onValue(ref(db, path), (snap) => {
+        _grillesAutoEvalsData = snap.val() || {};
+        if (currentGrille) {
+            const container = document.getElementById('viewEvaluations');
+            if (container) renderPassation(container);
+        }
+    });
+}
+
+// Retourne la dernière auto-évaluation par code élève, pour la grille
+// et la période en cours.
+function getAutoEvalsParCode() {
+    const map = {};
+    Object.values(_grillesAutoEvalsData).forEach(item => {
+        if (!item || item.grilleId !== currentGrille.id) return;
+        if (item.periode !== currentPeriode) return;
+        const code = String(item.code);
+        const existing = map[code];
+        if (!existing || (item.timestamp || 0) > (existing.timestamp || 0)) {
+            map[code] = item;
+        }
+    });
+    return map;
 }
 
 // ============================================================
@@ -152,6 +189,7 @@ function renderPassation(container) {
     if (!periodes.includes(currentPeriode)) currentPeriode = periodes[0];
 
     const eleveData = currentEvaluations[currentPeriode] || {};
+    const autoEvalsParCode = getAutoEvalsParCode();
 
     let html = `
         <div class="space-y-4">
@@ -255,6 +293,7 @@ function renderPassation(container) {
 
         for (const e of eleves) {
             const notes = eleveData[e.id]?.notes || {};
+            const autoEval = autoEvalsParCode[String(e.codeAutoEval)];
             const noteFinale = calculerNoteFinale(notes, currentGrille.criteres);
 
             html += `<tr class="border-t border-slate-700 hover:bg-slate-700/30">`;
@@ -262,6 +301,7 @@ function renderPassation(container) {
 
             for (const c of currentGrille.criteres) {
                 const val = notes[c.id];
+                const autoVal = autoEval?.notes?.[c.id];
                 const couleur = val !== undefined ? getCouleurNiveau(val) : '#334155';
                 html += `
                     <td class="p-1 text-center">
@@ -271,6 +311,11 @@ function renderPassation(container) {
                                 title="${val !== undefined ? 'Niveau ' + val : 'Non évalué'}">
                             ${val !== undefined ? val : '--'}
                         </button>
+                        ${autoVal !== undefined && autoVal !== null ? `
+                            <div class="mt-1 flex justify-center">
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center font-black text-[11px] text-white" style="background-color: ${getCouleurNiveau(autoVal)};" title="Auto-évaluation de l'élève · ${currentPeriode}">${autoVal}</span>
+                            </div>
+                        ` : ''}
                     </td>
                 `;
             }
@@ -309,6 +354,7 @@ function renderPassation(container) {
 
         for (const e of eleves) {
             const notes = eleveData[e.id]?.notes || {};
+            const autoEval = autoEvalsParCode[String(e.codeAutoEval)];
             const noteFinale = calculerNoteFinale(notes, currentGrille.criteres);
 
             html += `<tr class="border-b border-slate-700/50 hover:bg-slate-700/30">`;
@@ -316,6 +362,7 @@ function renderPassation(container) {
 
             for (const c of currentGrille.criteres) {
                 const val = notes[c.id];
+                const autoVal = autoEval?.notes?.[c.id];
                 html += `
                     <td class="p-2 text-center">
                         <div class="flex justify-center gap-1">
@@ -329,6 +376,12 @@ function renderPassation(container) {
                             `).join('')}
                         </div>
                         ${c.type === 'auto' ? `<button onclick="window.grillesRemplirAuto('${e.id}', '${c.id}')" class="text-[9px] text-emerald-400 hover:text-emerald-300 mt-0.5 font-bold">🤖 Auto</button>` : ''}
+                        ${autoVal !== undefined && autoVal !== null ? `
+                            <div class="mt-1.5 flex items-center justify-center gap-1" title="Auto-évaluation de l'élève · ${currentPeriode}">
+                                <span class="text-[9px] font-black uppercase tracking-wide text-cyan-300">élève</span>
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center font-black text-[11px] text-white" style="background-color: ${getCouleurNiveau(autoVal)};">${autoVal}</span>
+                            </div>
+                        ` : ''}
                     </td>
                 `;
             }
@@ -1296,6 +1349,8 @@ window.grillesFiltrerAutoEvals = function(periode) {
 // CLEANUP
 // ============================================================
 export function cleanupGrillesInterface() {
+    if (_autoEvalsUnsub) { _autoEvalsUnsub(); _autoEvalsUnsub = null; }
+    _grillesAutoEvalsData = {};
     currentGrille = null;
     currentClasse = '';
     currentEvaluations = {};
