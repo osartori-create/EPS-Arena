@@ -181,7 +181,7 @@ function render() {
                                         <td class="p-2">
                                             <div class="flex items-center gap-2">
                                                 ${photoHtml}
-                                                <div class="font-bold text-white leading-tight">${e.prenom} ${e.nom}</div>
+                                                <button onclick="window.appelOuvrirFiche('${e.id}')" class="font-bold text-white leading-tight hover:text-blue-400 cursor-pointer text-left">${e.prenom} ${e.nom}</button>
                                                 <div class="flex gap-1 flex-wrap">${badges.join('')}</div>
                                             </div>
                                         </td>
@@ -265,6 +265,87 @@ window.appelOuvrirInaptitude = function(eleveId) {
         majEleve(eleveId, (entree) => { entree.inapte = true; });
         render();
     });
+};
+
+// ============================================================
+// FICHE ÉLÈVE (carnet)
+// ============================================================
+window.appelOuvrirFiche = function(eleveId) {
+    if (!currentClasse) return;
+    const eleve = getExistingEleves(currentClasse).find(e => e.id === eleveId);
+    if (!eleve) return;
+
+    const appel = lireAppel();
+    const inapt = getInaptitude(eleveId);
+
+    const totaux = { absent: 0, retard: 0, oubli_tenue: 0, inapte: 0 };
+    const parActivite = {};
+    Object.entries(appel).forEach(([date, jour]) => {
+        const flags = jour[eleveId];
+        if (!flags || typeof flags !== 'object') return;
+        STATS_FLAGS.forEach(f => { if (flags[f.id]) totaux[f.id]++; });
+        getSeancesClasseDate(currentClasse, date).seances.forEach(s => {
+            if (!s.activite) return;
+            if (!parActivite[s.activite]) parActivite[s.activite] = { absent: 0, retard: 0, oubli_tenue: 0, inapte: 0 };
+            STATS_FLAGS.forEach(f => { if (flags[f.id]) parActivite[s.activite][f.id]++; });
+        });
+    });
+    const activites = Object.keys(parActivite).sort();
+
+    const photoHtml = photosCache[eleveId]
+        ? `<img src="${photosCache[eleveId]}" class="w-16 h-16 rounded-full object-cover border-2 border-slate-600 shrink-0">`
+        : `<div class="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center text-3xl shrink-0">👤</div>`;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'appel-fiche-modal';
+    overlay.className = 'fixed inset-0 bg-black/70 z-50 flex items-start justify-center p-4 overflow-y-auto';
+    overlay.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-lg my-8">
+            <div class="flex items-center gap-4 mb-4 border-b border-slate-700 pb-4">
+                ${photoHtml}
+                <div class="flex-1 min-w-0">
+                    <h2 class="text-xl font-black text-white leading-tight">${eleve.prenom} ${eleve.nom}</h2>
+                    <p class="text-xs text-slate-400">${eleve.sexe || '—'} · Code élève ${eleve.codeAutoEval ?? '—'}</p>
+                </div>
+                <button onclick="document.getElementById('appel-fiche-modal').remove()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white text-sm shrink-0">✖</button>
+            </div>
+
+            <h3 class="text-xs font-black text-slate-400 uppercase mb-2">Récapitulatif</h3>
+            <div class="flex gap-2 flex-wrap mb-4">
+                ${STATS_FLAGS.map(f => `<span class="px-3 py-1 rounded-full text-xs font-black text-white" style="background-color:${f.couleur};">${f.label} : ${totaux[f.id]}</span>`).join('')}
+            </div>
+
+            <h3 class="text-xs font-black text-slate-400 uppercase mb-2">Détail par activité</h3>
+            ${activites.length === 0 ? '<p class="text-xs text-slate-500 mb-4">Aucune donnée.</p>' : `
+                <div class="overflow-x-auto mb-4">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="text-slate-400 uppercase border-b border-slate-700">
+                                <th class="p-1.5 text-left">Activité</th>
+                                ${STATS_FLAGS.map(f => `<th class="p-1.5 text-center">${f.label}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${activites.map(act => `
+                                <tr class="border-b border-slate-800">
+                                    <td class="p-1.5 font-bold text-white">${act}</td>
+                                    ${STATS_FLAGS.map(f => {
+                                        const n = parActivite[act][f.id];
+                                        return `<td class="p-1.5 text-center ${n > 0 ? 'font-black text-red-400' : 'text-slate-600'}">${n || '—'}</td>`;
+                                    }).join('')}
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `}
+
+            <h3 class="text-xs font-black text-slate-400 uppercase mb-2">🤕 Inaptitude</h3>
+            <p class="text-sm font-bold text-white">${inapt ? libelleInaptitude(inapt) : 'Aucune inaptitude en cours.'}</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 };
 
 window.appelChangerDate = function(delta) {
