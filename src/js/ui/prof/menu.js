@@ -8,6 +8,7 @@ export const MENU = [
         section: 'Ma classe',
         items: [
             { id: 'admin', icon: '👨‍🏫', label: 'Administration', view: 'admin' },
+            { id: 'presences', icon: '✅', label: 'Présences', view: 'presences' },
         ]
     },
     {
