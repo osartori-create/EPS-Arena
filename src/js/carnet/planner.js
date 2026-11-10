@@ -41,6 +41,28 @@ function ecrireCycles(c) { localStorage.setItem(KEY_CYCLES, JSON.stringify(c)); 
 
 function creneauKey(jour, horaire) { return `${jour} ${horaire}`.trim(); }
 
+// Séances (créneaux + activité) d'une classe pour une date donnée.
+export function getSeancesClasseDate(classe, dateISO) {
+    const creneaux = lireCreneaux()[classe] || [];
+    const cycles = lireCycles()[classe] || {};
+    const periodes = lirePeriodes();
+
+    const joursFr = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+    const jour = joursFr[new Date(dateISO + 'T12:00:00').getDay()];
+
+    const periode = periodes.find(p => p.debut && p.fin && dateISO >= p.debut && dateISO <= p.fin);
+
+    const seances = creneaux
+        .filter(c => c.jour === jour)
+        .map(c => {
+            const key = creneauKey(c.jour, c.horaire);
+            const activite = periode ? (cycles[key]?.[periode.id] || '') : '';
+            return { jour: c.jour, horaire: c.horaire, activite };
+        });
+
+    return { jour, periode: periode ? periode.nom : '', seances };
+}
+
 export function initPlannerInterface() {
     currentClasse = getCurrentClasse();
     render();

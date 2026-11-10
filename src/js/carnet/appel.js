@@ -6,6 +6,7 @@
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
 import { getCurrentClasse } from '../core/live-engine.js';
 import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude } from './inaptitude.js';
+import { getSeancesClasseDate } from './planner.js';
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
@@ -104,6 +105,7 @@ function render() {
     });
 
     const dateFr = new Date(currentDate + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const seancesJour = getSeancesClasseDate(currentClasse, currentDate);
 
     container.innerHTML = `
         <div class="space-y-4">
@@ -114,6 +116,9 @@ function render() {
                         <p class="text-xs text-slate-400">Classe ${currentClasse} · ${eleves.length} élèves</p>
                         <p class="text-sm font-bold text-slate-300 mt-1">${dateFr}</p>
                         <p class="text-[11px] text-slate-500 mt-1">💡 Présent par défaut — marque uniquement les exceptions.</p>
+                        <div class="flex gap-1 flex-wrap mt-2">
+                            ${seancesJour.seances.length ? seancesJour.seances.map(s => `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-200">${s.horaire || '—'} · ${s.activite || '—'}</span>`).join('') : `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-400">Aucune séance planifiée ce jour</span>`}
+                        </div>
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="window.appelChangerDate(-1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white">←</button>
