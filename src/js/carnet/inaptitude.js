@@ -14,39 +14,43 @@ export const MOTIFS_PONCTUELS = [
 // Zones du corps pour la silhouette (face et dos). Coordonnées SVG 200×380.
 const ZONES = {
     face: [
-        { id: 'tete', label: 'Tête', x: 100, y: 35, rx: 27, ry: 29 },
-        { id: 'cou', label: 'Cou', x: 100, y: 74, rx: 11, ry: 11 },
-        { id: 'epaule_g', label: 'Épaule gauche', x: 62, y: 96, rx: 21, ry: 13 },
-        { id: 'epaule_d', label: 'Épaule droite', x: 138, y: 96, rx: 21, ry: 13 },
-        { id: 'poitrine', label: 'Poitrine', x: 100, y: 122, rx: 33, ry: 27 },
-        { id: 'ventre', label: 'Ventre', x: 100, y: 165, rx: 30, ry: 25 },
-        { id: 'coude_g', label: 'Coude gauche', x: 49, y: 162, rx: 11, ry: 11 },
-        { id: 'coude_d', label: 'Coude droit', x: 151, y: 162, rx: 11, ry: 11 },
-        { id: 'poignet_g', label: 'Poignet gauche', x: 41, y: 210, rx: 9, ry: 9 },
-        { id: 'poignet_d', label: 'Poignet droit', x: 159, y: 210, rx: 9, ry: 9 },
-        { id: 'hanche_g', label: 'Hanche gauche', x: 80, y: 205, rx: 15, ry: 15 },
-        { id: 'hanche_d', label: 'Hanche droite', x: 120, y: 205, rx: 15, ry: 15 },
-        { id: 'genou_g', label: 'Genou gauche', x: 82, y: 280, rx: 13, ry: 13 },
-        { id: 'genou_d', label: 'Genou droit', x: 118, y: 280, rx: 13, ry: 13 },
-        { id: 'cheville_g', label: 'Cheville gauche', x: 82, y: 348, rx: 9, ry: 9 },
-        { id: 'cheville_d', label: 'Cheville droite', x: 118, y: 348, rx: 9, ry: 9 },
+        { id: 'tete', label: 'Tête', x: 100, y: 32, rx: 22, ry: 22 },
+        { id: 'cou', label: 'Cou', x: 100, y: 58, rx: 11, ry: 11 },
+        { id: 'epaule_g', label: 'Épaule gauche', x: 68, y: 82, rx: 20, ry: 12 },
+        { id: 'epaule_d', label: 'Épaule droite', x: 132, y: 82, rx: 20, ry: 12 },
+        { id: 'poitrine', label: 'Poitrine', x: 100, y: 110, rx: 32, ry: 25 },
+        { id: 'ventre', label: 'Ventre', x: 100, y: 155, rx: 28, ry: 23 },
+        { id: 'coude_g', label: 'Coude gauche', x: 50, y: 140, rx: 10, ry: 10 },
+        { id: 'coude_d', label: 'Coude droit', x: 150, y: 140, rx: 10, ry: 10 },
+        { id: 'poignet_g', label: 'Poignet gauche', x: 42, y: 190, rx: 8, ry: 8 },
+        { id: 'poignet_d', label: 'Poignet droit', x: 158, y: 190, rx: 8, ry: 8 },
+        { id: 'hanche_g', label: 'Hanche gauche', x: 84, y: 195, rx: 14, ry: 14 },
+        { id: 'hanche_d', label: 'Hanche droite', x: 116, y: 195, rx: 14, ry: 14 },
+        { id: 'cuisse_g', label: 'Cuisse gauche', x: 84, y: 245, rx: 15, ry: 26 },
+        { id: 'cuisse_d', label: 'Cuisse droite', x: 116, y: 245, rx: 15, ry: 26 },
+        { id: 'genou_g', label: 'Genou gauche', x: 84, y: 295, rx: 12, ry: 12 },
+        { id: 'genou_d', label: 'Genou droit', x: 116, y: 295, rx: 12, ry: 12 },
+        { id: 'cheville_g', label: 'Cheville gauche', x: 84, y: 348, rx: 8, ry: 8 },
+        { id: 'cheville_d', label: 'Cheville droite', x: 116, y: 348, rx: 8, ry: 8 },
     ],
     dos: [
-        { id: 'nuque', label: 'Nuque', x: 100, y: 74, rx: 11, ry: 11 },
-        { id: 'epaule_g', label: 'Épaule gauche', x: 62, y: 96, rx: 21, ry: 13 },
-        { id: 'epaule_d', label: 'Épaule droite', x: 138, y: 96, rx: 21, ry: 13 },
-        { id: 'dos_haut', label: 'Haut du dos', x: 100, y: 122, rx: 33, ry: 27 },
-        { id: 'lombaire', label: 'Bas du dos (lombaires)', x: 100, y: 165, rx: 30, ry: 25 },
-        { id: 'coude_g', label: 'Coude gauche', x: 49, y: 162, rx: 11, ry: 11 },
-        { id: 'coude_d', label: 'Coude droit', x: 151, y: 162, rx: 11, ry: 11 },
-        { id: 'poignet_g', label: 'Poignet gauche', x: 41, y: 210, rx: 9, ry: 9 },
-        { id: 'poignet_d', label: 'Poignet droit', x: 159, y: 210, rx: 9, ry: 9 },
-        { id: 'fesse_g', label: 'Fesse gauche', x: 80, y: 205, rx: 15, ry: 15 },
-        { id: 'fesse_d', label: 'Fesse droite', x: 120, y: 205, rx: 15, ry: 15 },
-        { id: 'genou_g', label: 'Genou gauche', x: 82, y: 280, rx: 13, ry: 13 },
-        { id: 'genou_d', label: 'Genou droit', x: 118, y: 280, rx: 13, ry: 13 },
-        { id: 'cheville_g', label: 'Cheville gauche', x: 82, y: 348, rx: 9, ry: 9 },
-        { id: 'cheville_d', label: 'Cheville droite', x: 118, y: 348, rx: 9, ry: 9 },
+        { id: 'nuque', label: 'Nuque', x: 100, y: 58, rx: 11, ry: 11 },
+        { id: 'epaule_g', label: 'Épaule gauche', x: 68, y: 82, rx: 20, ry: 12 },
+        { id: 'epaule_d', label: 'Épaule droite', x: 132, y: 82, rx: 20, ry: 12 },
+        { id: 'dos_haut', label: 'Haut du dos', x: 100, y: 110, rx: 32, ry: 25 },
+        { id: 'lombaire', label: 'Bas du dos (lombaires)', x: 100, y: 155, rx: 28, ry: 23 },
+        { id: 'coude_g', label: 'Coude gauche', x: 50, y: 140, rx: 10, ry: 10 },
+        { id: 'coude_d', label: 'Coude droit', x: 150, y: 140, rx: 10, ry: 10 },
+        { id: 'poignet_g', label: 'Poignet gauche', x: 42, y: 190, rx: 8, ry: 8 },
+        { id: 'poignet_d', label: 'Poignet droit', x: 158, y: 190, rx: 8, ry: 8 },
+        { id: 'fesse_g', label: 'Fesse gauche', x: 84, y: 195, rx: 14, ry: 14 },
+        { id: 'fesse_d', label: 'Fesse droite', x: 116, y: 195, rx: 14, ry: 14 },
+        { id: 'cuisse_g', label: 'Cuisse gauche', x: 84, y: 245, rx: 15, ry: 26 },
+        { id: 'cuisse_d', label: 'Cuisse droite', x: 116, y: 245, rx: 15, ry: 26 },
+        { id: 'genou_g', label: 'Genou gauche', x: 84, y: 295, rx: 12, ry: 12 },
+        { id: 'genou_d', label: 'Genou droit', x: 116, y: 295, rx: 12, ry: 12 },
+        { id: 'cheville_g', label: 'Cheville gauche', x: 84, y: 348, rx: 8, ry: 8 },
+        { id: 'cheville_d', label: 'Cheville droite', x: 116, y: 348, rx: 8, ry: 8 },
     ],
 };
 
@@ -118,19 +122,35 @@ function rendererSilhouette() {
 
     container.innerHTML = `
         <svg viewBox="0 0 200 380" class="w-full max-w-[230px] mx-auto">
-            <g fill="#334155">
-                <ellipse cx="100" cy="35" rx="27" ry="29"/>
-                <rect x="88" y="62" width="24" height="20" rx="6"/>
-                <ellipse cx="100" cy="140" rx="38" ry="62"/>
-                <line x1="58" y1="95" x2="41" y2="210" stroke="#334155" stroke-width="13" stroke-linecap="round"/>
-                <line x1="142" y1="95" x2="159" y2="210" stroke="#334155" stroke-width="13" stroke-linecap="round"/>
-                <line x1="82" y1="195" x2="82" y2="348" stroke="#334155" stroke-width="15" stroke-linecap="round"/>
-                <line x1="118" y1="195" x2="118" y2="348" stroke="#334155" stroke-width="15" stroke-linecap="round"/>
+            <defs>
+                <linearGradient id="corpsGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#94a3b8"/>
+                    <stop offset="100%" stop-color="#475569"/>
+                </linearGradient>
+            </defs>
+            <!-- Corps -->
+            <g fill="url(#corpsGrad)" stroke="#1e293b" stroke-width="1.5">
+                <circle cx="100" cy="32" r="22"/>
+                <rect x="89" y="49" width="22" height="18" rx="7"/>
+                <ellipse cx="100" cy="130" rx="37" ry="60"/>
+                <ellipse cx="84" cy="196" rx="16" ry="15"/>
+                <ellipse cx="116" cy="196" rx="16" ry="15"/>
             </g>
+            <!-- Bras -->
+            <g stroke="#64748b" stroke-width="15" stroke-linecap="round" fill="none">
+                <path d="M64 82 L50 140 L42 190"/>
+                <path d="M136 82 L150 140 L158 190"/>
+            </g>
+            <!-- Jambes -->
+            <g stroke="#64748b" stroke-width="17" stroke-linecap="round" fill="none">
+                <path d="M84 210 L84 270 L84 340"/>
+                <path d="M116 210 L116 270 L116 340"/>
+            </g>
+            <!-- Zones cliquables -->
             ${zones.map(z => `
                 <ellipse cx="${z.x}" cy="${z.y}" rx="${z.rx}" ry="${z.ry}"
-                         fill="${selected === z.id ? '#a78bfa' : 'rgba(255,255,255,0.18)'}"
-                         stroke="${selected === z.id ? '#ede9fe' : 'transparent'}"
+                         fill="${selected === z.id ? '#a78bfa' : 'rgba(255,255,255,0.16)'}"
+                         stroke="${selected === z.id ? '#ede9fe' : 'rgba(255,255,255,0.22)'}"
                          stroke-width="2" style="cursor:pointer"
                          onclick="window.inaptChoisirZone('${z.id}')">
                     <title>${z.label}</title>
