@@ -25,6 +25,7 @@ const PERIODES_DEFAUT = [
 const JOURS_ORDRE = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
 let currentClasse = '';
+let currentSemaine = 'A';
 
 export function lirePeriodes() {
     let p = JSON.parse(localStorage.getItem(KEY_PERIODES) || 'null');
@@ -55,6 +56,36 @@ function ecrireCreneaux(c) { localStorage.setItem(KEY_CRENEAUX, JSON.stringify(c
 export function lireCycles() { return JSON.parse(localStorage.getItem(KEY_CYCLES) || '{}'); }
 function ecrireCycles(c) { localStorage.setItem(KEY_CYCLES, JSON.stringify(c)); }
 
+// --- Cycle de semaines (A/B) pour les cours "1 semaine sur 2" ---
+const KEY_CYCLE_SEMAINES = 'eps_arena_cycle_semaines';
+function lireCycleSemaines() {
+    const cfg = JSON.parse(localStorage.getItem(KEY_CYCLE_SEMAINES) || 'null') || { debut: '', nbSemaines: 2 };
+    if (!cfg.debut) {
+        const p = lirePeriodes();
+        if (p.length && p[0].debut) cfg.debut = p[0].debut;
+    }
+    return cfg;
+}
+function ecrireCycleSemaines(cfg) { localStorage.setItem(KEY_CYCLE_SEMAINES, JSON.stringify(cfg)); }
+
+// Semaine du cycle (A/B) pour une date donnée.
+function semainePourDate(dateISO) {
+    const cfg = lireCycleSemaines();
+    if (!cfg.debut || !cfg.nbSemaines || cfg.nbSemaines < 2) return 'A';
+    const d = new Date(dateISO + 'T12:00:00').getTime();
+    const deb = new Date(cfg.debut + 'T12:00:00').getTime();
+    const diff = Math.floor((d - deb) / (7 * 86400000));
+    const idx = ((diff % cfg.nbSemaines) + cfg.nbSemaines) % cfg.nbSemaines;
+    return idx === 0 ? 'A' : 'B';
+}
+
+// Valeur d'activité pour une semaine donnée (chaîne = toutes les semaines, objet = {A,B}).
+function activitePourSemaine(val, semaine) {
+    if (typeof val === 'string') return val;
+    if (val && typeof val === 'object') return val[semaine] || '';
+    return '';
+}
+
 function creneauKey(jour, horaire) { return `${jour} ${horaire}`.trim(); }
 
 // Séances (créneaux + activité) d'une classe pour une date donnée.
@@ -68,11 +99,13 @@ export function getSeancesClasseDate(classe, dateISO) {
 
     const periode = periodes.find(p => p.debut && p.fin && dateISO >= p.debut && dateISO <= p.fin);
 
+    const semaine = semainePourDate(dateISO);
     const seances = creneaux
         .filter(c => c.jour === jour)
         .map(c => {
             const key = creneauKey(c.jour, c.horaire);
-            const activite = periode ? (cycles[key]?.[periode.id] || '') : '';
+            const brut = periode ? (cycles[key]?.[periode.id] || '') : '';
+            const activite = activitePourSemaine(brut, semaine);
             return { jour: c.jour, horaire: c.horaire, activite };
         });
 
@@ -225,9 +258,20 @@ function renderCyclesEditor(classes, creneauxClasse, periodes, activites) {
         <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <h4 class="font-black text-slate-400 uppercase text-sm">Cycles par classe</h4>
-                <select onchange="window.plannerChoisirClasse(this.value)" class="bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-xs font-bold text-white">
-                    ${classes.map(c => `<option value="${c}" ${c === currentClasse ? 'selected' : ''}>Classe ${c}</option>`).join('')}
-                </select>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex rounded-xl overflow-hidden border border-slate-600">
+                        <button onclick="window.plannerSetSemaine('A')" class="px-3 py-1.5 text-xs font-black ${currentSemaine === 'A' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}">Semaine A</button>
+                        <button onclick="window.plannerSetSemaine('B')" class="px-3 py-1.5 text-xs font-black ${currentSemaine === 'B' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400'}">Semaine B</button>
+                    </div>
+                    <select onchange="window.plannerChoisirClasse(this.value)" class="bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-xs font-bold text-white">
+                        ${classes.map(c => `<option value="${c}" ${c === currentClasse ? 'selected' : ''}>Classe ${c}</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mb-4 text-xs">
+                <span class="text-slate-400">1ʳᵉ semaine A le :</span>
+                <input type="date" value="${lireCycleSemaines().debut}" onchange="window.plannerSetCycleDebut(this.value)" class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white">
+                <span class="text-slate-500">les cours « 1 semaine / 2 » alternent A/B à partir de cette date</span>
             </div>
             ${creneauxClasse.length === 0 ? `
                 <p class="text-xs text-slate-500">Aucun créneau pour la classe ${currentClasse}. Vérifie l'import du planner.</p>
@@ -250,9 +294,10 @@ function renderCyclesEditor(classes, creneauxClasse, periodes, activites) {
                                         ${periodes.map(p => `
                                             <td class="p-1 text-center">
                                                 <select onchange="window.plannerSetActivite('${key}', '${p.id}', this.value)" class="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs text-white">
-                                                    <option value="" ${!cell[p.id] ? 'selected' : ''}>—</option>
-                                                    ${activites.map(a => `<option value="${a}" ${cell[p.id] === a ? 'selected' : ''}>${a}</option>`).join('')}
+                                                    <option value="" ${!activitePourSemaine(cell[p.id], currentSemaine) ? 'selected' : ''}>—</option>
+                                                    ${activites.map(a => `<option value="${a}" ${activitePourSemaine(cell[p.id], currentSemaine) === a ? 'selected' : ''}>${a}</option>`).join('')}
                                                 </select>
+                                                ${cell[p.id] && typeof cell[p.id] === 'object' ? `<div class="text-[9px] text-amber-400 font-bold mt-0.5">A:${cell[p.id].A || '—'} · B:${cell[p.id].B || '—'}</div>` : ''}
                                             </td>
                                         `).join('')}
                                     </tr>
@@ -278,9 +323,34 @@ window.plannerSetActivite = function(key, periodeId, activite) {
     const cycles = lireCycles();
     if (!cycles[currentClasse]) cycles[currentClasse] = {};
     if (!cycles[currentClasse][key]) cycles[currentClasse][key] = {};
-    if (activite) cycles[currentClasse][key][periodeId] = activite;
-    else delete cycles[currentClasse][key][periodeId];
+    const cell = cycles[currentClasse][key];
+    const cur = cell[periodeId];
+    const semaine = currentSemaine;
+
+    if (cur && typeof cur === 'object') {
+        if (activite) cur[semaine] = activite; else delete cur[semaine];
+        if (!cur.A && !cur.B) delete cell[periodeId];
+    } else if (cur) {
+        // chaîne (toutes les semaines) → objet { A, B }
+        const o = { A: cur, B: cur };
+        if (activite) o[semaine] = activite; else delete o[semaine];
+        if (!o.A && !o.B) delete cell[periodeId]; else cell[periodeId] = o;
+    } else {
+        if (activite) cell[periodeId] = { [semaine]: activite };
+    }
+    if (Object.keys(cell).length === 0) delete cycles[currentClasse][key];
     ecrireCycles(cycles);
+};
+
+window.plannerSetSemaine = function(s) {
+    currentSemaine = s;
+    render();
+};
+
+window.plannerSetCycleDebut = function(date) {
+    const cfg = lireCycleSemaines();
+    cfg.debut = date;
+    ecrireCycleSemaines(cfg);
 };
 
 window.plannerSetPeriode = function(id, field, value) {
