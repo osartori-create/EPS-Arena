@@ -7,16 +7,20 @@ const KEY = 'eps_arena_unss';
 let filtreRecherche = '';
 let filtreClasse = '';
 let filtreActivite = '';
+let licencieEnCours = '';
 
 function lireUnss() { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
 function ecrireUnss(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
 
-// Retrouve la licence UNSS d'un élève (classe + nom + prénom).
+// Normalise pour comparer (minuscules, sans accents, sans espaces superflus).
+function norm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+
+// Retrouve la licence UNSS d'un élève (classe + nom + prénom, insensible casse/accents).
 export function getLicencieEleve(classe, nom, prenom) {
     return lireUnss().find(l =>
-        String(l.classe) === String(classe) &&
-        (l.nom || '').toLowerCase() === (nom || '').toLowerCase() &&
-        (l.prenom || '').toLowerCase() === (prenom || '').toLowerCase()
+        norm(l.classe) === norm(classe) &&
+        norm(l.nom) === norm(nom) &&
+        norm(l.prenom) === norm(prenom)
     ) || null;
 }
 
@@ -62,9 +66,9 @@ function estRapproche(lic, eleves) {
     const liaisons = lireLiaisons();
     if (Object.values(liaisons).some(idl => String(idl) === String(lic.idLicencie))) return true;
     return eleves.some(e =>
-        String(e.classe) === String(lic.classe) &&
-        (e.nom || '').toLowerCase() === (lic.nom || '').toLowerCase() &&
-        (e.prenom || '').toLowerCase() === (lic.prenom || '').toLowerCase()
+        norm(e.classe) === norm(lic.classe) &&
+        norm(e.nom) === norm(lic.nom) &&
+        norm(e.prenom) === norm(lic.prenom)
     );
 }
 
@@ -198,11 +202,8 @@ function render() {
                     ${nonRapproches.map(l => `
                         <div class="flex items-center gap-2 py-1">
                             <span class="text-sm text-white">${l.prenom} ${l.nom}</span>
-                            <span class="text-xs text-slate-400">(${l.classe})</span>
-                            <select onchange="window.unssLier('${l.idLicencie}', this.value)" class="ml-auto bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white max-w-[260px]">
-                                <option value="">Associer à un élève…</option>
-                                ${eleves.slice().sort((a, b) => String(a.classe).localeCompare(String(b.classe)) || (a.nom || '').localeCompare(b.nom || '')).map(e => `<option value="${e.id}">${e.prenom} ${e.nom} (${e.classe})</option>`).join('')}
-                            </select>
+                            <span class="text-xs text-slate-400">(${l.classe || 'sans classe'})</span>
+                            <button onclick="window.unssOuvrirRapprocher('${l.idLicencie}')" class="ml-auto bg-amber-600 hover:bg-amber-500 px-3 py-1 rounded-lg font-black text-xs text-white">🔗 Rapprocher</button>
                         </div>
                     `).join('')}
                 </div>
@@ -271,4 +272,68 @@ window.unssLier = function(idLicencie, eleveId) {
     if (!eleveId) return;
     lierEleveLicencie(eleveId, idLicencie);
     render();
+};
+
+window.unssOuvrirRapprocher = function(idLicencie) {
+    licencieEnCours = idLicencie;
+    const lic = lireUnss().find(l => String(l.idLicencie) === String(idLicencie));
+    if (!lic) return;
+    const classes = JSON.parse(localStorage.getItem('eps_arena_classes') || '[]');
+    document.getElementById('unss-rap-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'unss-rap-modal';
+    modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-lg font-black text-white">🔗 Rapprocher</h3>
+                    <p class="text-xs text-slate-400">${lic.prenom} ${lic.nom}${lic.classe ? ' · ' + lic.classe : ''}</p>
+                </div>
+                <button onclick="document.getElementById('unss-rap-modal').remove()" class="bg-slate-700 px-3 py-1.5 rounded-lg font-black text-xs text-white">✖</button>
+            </div>
+            <label class="text-xs text-slate-400 block mb-1">1. Classe</label>
+            <select id="unss-rap-classe" onchange="window.unssRapClasse()" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-2">
+                ${classes.map(c => `<option value="${c}" ${c === lic.classe ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+            <label class="text-xs text-slate-400 block mb-1">2. Élève</label>
+            <input id="unss-rap-recherche" placeholder="🔍 Rechercher…" oninput="window.unssRapClasse()" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-2">
+            <div id="unss-rap-liste" class="space-y-1 max-h-72 overflow-y-auto"></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    window.unssRapClasse();
+};
+
+window.unssRapClasse = function() {
+    const classe = document.getElementById('unss-rap-classe')?.value;
+    const q = (document.getElementById('unss-rap-recherche')?.value || '').toLowerCase();
+    const eleves = getAllEleves().filter(e => {
+        if (e.classe !== classe) return false;
+        const nomComplet = (e.prenom + ' ' + e.nom).toLowerCase();
+        const nomInverse = (e.nom + ' ' + e.prenom).toLowerCase();
+        return !q || nomComplet.includes(q) || nomInverse.includes(q);
+    });
+    const cont = document.getElementById('unss-rap-liste');
+    if (!cont) return;
+    if (!eleves.length) {
+        cont.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">Aucun élève dans cette classe.</p>';
+        return;
+    }
+    eleves.sort((a, b) => (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || ''));
+    cont.innerHTML = eleves.map(e => `
+        <button onclick="window.unssRapValider('${e.id}')" class="w-full flex items-center gap-2 text-left px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700">
+            <span class="text-sm text-white font-bold">${e.prenom} ${e.nom}</span>
+            ${e.ine ? `<span class="text-[10px] text-slate-400">INE ${e.ine}</span>` : ''}
+            <span class="text-[10px] text-amber-400 font-black ml-auto">✓ Valider</span>
+        </button>
+    `).join('');
+};
+
+window.unssRapValider = function(eleveId) {
+    if (!licencieEnCours || !eleveId) return;
+    lierEleveLicencie(eleveId, licencieEnCours);
+    document.getElementById('unss-rap-modal')?.remove();
+    render();
+    notifier('✅ Élève rapproché.');
 };
