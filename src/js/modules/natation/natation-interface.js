@@ -93,7 +93,16 @@ export function initNatationInterface() {
     }
 
     const savedMode = localStorage.getItem(`eps_arena_natation_mode_${currentClasse}`);
-    if (savedMode === 'indice' || savedMode === 'koh-lanta') modeNatation = savedMode;
+    if (savedMode === 'indice' || savedMode === 'koh-lanta' || savedMode === 'longue') modeNatation = savedMode;
+
+    // Mode « Longue distance » : interface dédiée (groupes/vagues, sessions…)
+    if (modeNatation === 'longue') {
+        import('./natation-longue-interface.js').then(m => m.initNatationLongueInterface(container)).catch(err => {
+            console.error('[Natation] Erreur chargement Longue distance :', err);
+            container.innerHTML = `<p class="text-red-400">❌ Erreur : ${err.message}</p>`;
+        });
+        return;
+    }
 
     elevesData = JSON.parse(localStorage.getItem(`eps_arena_eleves_${currentClasse}`) || '[]');
     elevesData.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
@@ -176,13 +185,21 @@ function createHeader() {
     const optKohLanta = document.createElement('option');
     optKohLanta.value = 'koh-lanta';
     optKohLanta.textContent = '🏝️ Koh Lanta';
+    const optLongue = document.createElement('option');
+    optLongue.value = 'longue';
+    optLongue.textContent = '🏊 Longue distance';
     modeSelect.appendChild(optIndice);
     modeSelect.appendChild(optKohLanta);
+    modeSelect.appendChild(optLongue);
     modeSelect.value = modeNatation;
     modeSelect.onchange = () => {
         modeNatation = modeSelect.value;
         if (currentClasse) localStorage.setItem(`eps_arena_natation_mode_${currentClasse}`, modeNatation);
-        updateModeUI();
+        if (modeNatation === 'longue') {
+            initNatationInterface();
+        } else {
+            updateModeUI();
+        }
     };
     modeGroup.appendChild(modeLabel);
     modeGroup.appendChild(modeSelect);
@@ -557,6 +574,12 @@ export async function transmettreNatationConfig() {
     const distance = parseInt(document.getElementById('natation-distance')?.value) || 25;
     const mode = document.getElementById('natation-mode')?.value || modeNatation;
     if (currentClasse) localStorage.setItem(`eps_arena_natation_mode_${currentClasse}`, mode);
+
+    if (mode === 'longue') {
+        const m = await import('./natation-longue-interface.js');
+        await m.transmettreNatationLongue();
+        return;
+    }
 
     // ✅ On conserve le mapping local : il permet au prof de retrouver un élève
     // à partir de son numéro (au cas où l'ordre change côté iPad)

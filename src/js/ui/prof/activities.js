@@ -598,6 +598,9 @@ window.switchDiscipline = async function(disc) {
                     if (mode === 'koh-lanta') {
                         return import('../../modules/natation/natation-koh-lanta-live.js').then(m => m.renderNatationKohLantaLive());
                     }
+                    if (mode === 'longue') {
+                        return import('../../modules/natation/natation-longue-live.js').then(m => m.renderNatationLongueLive());
+                    }
                     return import('../../modules/natation/natation-live.js').then(m => m.renderNatationLive());
                 },
                 'relais': () => import('../../modules/relais/relais-live.js').then(m => m.renderRelaisLive()),
@@ -661,6 +664,9 @@ window.switchDiscipline = async function(disc) {
                             const mode = classe ? (localStorage.getItem(`eps_arena_natation_mode_${classe}`) || 'indice') : 'indice';
                             if (mode === 'koh-lanta') {
                                 return import('../../modules/natation/natation-koh-lanta-tv.js').then(m => m.renderNatationKohLantaTV());
+                            }
+                            if (mode === 'longue') {
+                                return import('../../modules/natation/natation-longue-tv.js').then(m => m.renderNatationLongueTV());
                             }
                             return import('../../modules/natation/natation-tv.js').then(m => m.renderNatationTV());
                         },

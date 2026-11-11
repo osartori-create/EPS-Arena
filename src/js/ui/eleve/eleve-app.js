@@ -11,6 +11,7 @@ import { initTournoi } from '../../modules/tournoi/tournoi-dispatcher.js';
 import { initBlocKiosk, cleanupBlocKiosk } from '../../modules/escalade/escalade-kiosk-blocs.js';
 import { initNatationKiosk } from '../../modules/natation/natation-kiosk.js';
 import { initNatationKohLantaKiosk } from '../../modules/natation/natation-koh-lanta-kiosk.js';
+import { initNatationLongueKiosk } from '../../modules/natation/natation-longue-kiosk.js';
 import { initRelaisKiosk, cleanupRelaisKiosk } from '../../modules/relais/relais-kiosk.js';
 import { initGrillesKiosk, cleanupGrillesKiosk } from '../../modules/grilles/grilles-kiosk.js';
 import { initDemiFondKiosk, cleanupDemiFondKiosk } from '../../modules/demi-fond/demifond-kiosk.js';
@@ -458,6 +459,8 @@ function showLoginNatation() {
         const mode = currentConfig && currentConfig.mode;
         if (mode === 'koh-lanta') {
             initNatationKohLantaKiosk(selectedClass);
+        } else if (mode === 'longue') {
+            initNatationLongueKiosk(selectedClass);
         } else {
             initNatationKiosk(selectedClass);
         }
@@ -798,6 +801,8 @@ function selectCode(code) {
             const mode = currentConfig && currentConfig.mode;
             if (mode === 'koh-lanta') {
                 initNatationKohLantaKiosk(selectedClass);
+            } else if (mode === 'longue') {
+                initNatationLongueKiosk(selectedClass);
             } else {
                 initNatationKiosk(selectedClass);
             }
