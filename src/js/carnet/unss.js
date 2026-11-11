@@ -8,12 +8,24 @@ let filtreRecherche = '';
 let filtreClasse = '';
 let filtreActivite = '';
 let licencieEnCours = '';
+let filtreNonRapproches = false;
 
 function lireUnss() { return JSON.parse(localStorage.getItem(KEY) || '[]'); }
 function ecrireUnss(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
 
 // Normalise pour comparer (minuscules, sans accents, sans espaces superflus).
 function norm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+
+// Niveau (premier chiffre) d'un nom de classe : "605" → "6", "6EME BILANGUE" → "6".
+function niveauDeClasse(classe) {
+    const m = String(classe || '').trim().match(/^\d/);
+    return m ? m[0] : '';
+}
+// Niveau (premier chiffre) d'un libellé de niveau : "6ème" → "6", "3EME SEGPA" → "3".
+function niveauDeLibelle(niv) {
+    const m = String(niv || '').trim().match(/\d/);
+    return m ? m[0] : '';
+}
 
 // Retrouve la licence UNSS d'un élève (classe + nom + prénom, insensible casse/accents).
 export function getLicencieEleve(classe, nom, prenom) {
@@ -70,6 +82,25 @@ function estRapproche(lic, eleves) {
         norm(e.nom) === norm(lic.nom) &&
         norm(e.prenom) === norm(lic.prenom)
     );
+}
+
+// État du rapprochement d'un licencié : manuel (liaison) / auto (nom+prénom+classe) / suggéré (niveau) / aucun.
+function statutLiaison(lic, eleves) {
+    const liaisons = lireLiaisons();
+    const eleveIdManuel = Object.keys(liaisons).find(k => String(liaisons[k]) === String(lic.idLicencie));
+    if (eleveIdManuel) {
+        const e = eleves.find(x => x.id === eleveIdManuel);
+        if (e) return { type: 'manuel', eleve: e };
+    }
+    const auto = eleves.find(e => norm(e.classe) === norm(lic.classe) && norm(e.nom) === norm(lic.nom) && norm(e.prenom) === norm(lic.prenom));
+    if (auto) return { type: 'auto', eleve: auto };
+    // suggestion par niveau (quand la classe précise manque ou diffère)
+    const niveau = niveauDeLibelle(lic.niveauClasse) || niveauDeClasse(lic.classe);
+    if (niveau) {
+        const sugg = eleves.find(e => niveauDeClasse(e.classe) === niveau && norm(e.nom) === norm(lic.nom) && norm(e.prenom) === norm(lic.prenom));
+        if (sugg) return { type: 'suggere', eleve: sugg };
+    }
+    return { type: 'aucun', eleve: null };
 }
 
 export function initUnssInterface() {
@@ -135,6 +166,7 @@ function render() {
     }
     if (filtreClasse) liste = liste.filter(l => l.classe === filtreClasse);
     if (filtreActivite) liste = liste.filter(l => l.activitesUnss.toLowerCase().includes(filtreActivite.toLowerCase()));
+    if (filtreNonRapproches) liste = liste.filter(l => !estRapproche(l, eleves));
     liste.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
 
     const badgesActivites = (l) => l.activitesUnss.split(',').map(a => a.trim()).filter(Boolean)
@@ -163,6 +195,7 @@ function render() {
                     <option value="">Toutes les activités</option>
                     ${activites.map(a => `<option value="${a}" ${a === filtreActivite ? 'selected' : ''}>${a}</option>`).join('')}
                 </select>
+                <button onclick="window.unssFiltreNonRapproches()" class="px-3 py-2 rounded-xl font-black text-xs ${filtreNonRapproches ? 'bg-amber-600 text-white' : 'bg-slate-900 text-slate-300 border border-slate-600'}">⚠️ Non rapprochés (${nonRapproches.length})</button>
             </div>
 
             <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 overflow-x-auto">
@@ -175,40 +208,36 @@ function render() {
                             <th class="p-2 text-left">Activités UNSS</th>
                             <th class="p-2 text-center">Licence</th>
                             <th class="p-2 text-center">Parents</th>
-                            <th class="p-2 text-center">Rapproché</th>
+                            <th class="p-2 text-center">Rapprochement</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${liste.map(l => `
+                        ${liste.map(l => {
+                            const s = statutLiaison(l, eleves);
+                            const action = s.type === 'aucun'
+                                ? `<button onclick="window.unssOuvrirRapprocher('${l.idLicencie}')" class="w-full min-h-[44px] bg-amber-600 hover:bg-amber-500 px-3 py-2 rounded-xl font-black text-xs text-white">🔗 Rapprocher</button>`
+                                : s.type === 'suggere'
+                                    ? `<div class="flex flex-col gap-1"><span class="text-[11px] text-yellow-300 font-bold text-center">≈ ${s.eleve.prenom} ${s.eleve.nom} (${s.eleve.classe})</span><button onclick="window.unssConfirmerSuggestion('${l.idLicencie}','${s.eleve.id}')" class="w-full min-h-[40px] bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-xl font-black text-xs text-white">✅ Confirmer</button><button onclick="window.unssOuvrirRapprocher('${l.idLicencie}')" class="w-full min-h-[32px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded-lg font-bold text-[10px] text-slate-200">↺ Choisir un autre</button></div>`
+                                    : s.type === 'manuel'
+                                        ? `<div class="flex flex-col gap-1"><span class="text-[11px] text-emerald-300 font-bold text-center">${s.eleve.prenom} ${s.eleve.nom}</span><button onclick="window.unssDelier('${l.idLicencie}')" class="w-full min-h-[40px] bg-red-700 hover:bg-red-600 px-3 py-2 rounded-xl font-black text-xs text-white">✕ Délier</button></div>`
+                                        : `<span class="inline-block px-2 py-1 rounded-lg text-[11px] text-slate-400 bg-slate-700">auto · ${s.eleve.prenom} ${s.eleve.nom}</span>`;
+                            return `
                             <tr class="border-b border-slate-800 hover:bg-slate-700/30">
-                                <td class="p-2 font-bold text-white">${l.prenom} ${l.nom}</td>
-                                <td class="p-2 text-center text-slate-300">${l.classe}${l.niveauClasse ? ` (${l.niveauClasse})` : ''}</td>
-                                <td class="p-2 text-center text-slate-300">${l.categorie || '—'}</td>
-                                <td class="p-2">${badgesActivites(l) || '<span class="text-slate-500">—</span>'}</td>
-                                <td class="p-2 text-center text-slate-400 text-xs">${l.numLicence || '—'}</td>
-                                <td class="p-2 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-black ${/valid/i.test(l.etatParents) ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}">${l.etatParents || '—'}</span></td>
-                                <td class="p-2 text-center" title="${estRapproche(l, eleves) ? 'Rapproché d\'un élève' : 'Non rapproché'}">${estRapproche(l, eleves) ? '🏟️' : '⚠️'}</td>
+                                <td class="p-3 font-bold text-white">${l.prenom} ${l.nom}</td>
+                                <td class="p-3 text-center text-slate-300">${l.classe}${l.niveauClasse ? ` (${l.niveauClasse})` : ''}</td>
+                                <td class="p-3 text-center text-slate-300">${l.categorie || '—'}</td>
+                                <td class="p-3">${badgesActivites(l) || '<span class="text-slate-500">—</span>'}</td>
+                                <td class="p-3 text-center text-slate-400 text-xs">${l.numLicence || '—'}</td>
+                                <td class="p-3 text-center"><span class="px-2 py-0.5 rounded-full text-[10px] font-black ${/valid/i.test(l.etatParents) ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}">${l.etatParents || '—'}</span></td>
+                                <td class="p-3 min-w-[160px]">${action}</td>
                             </tr>
-                        `).join('')}
+                            `;
+                        }).join('')}
                         ${liste.length === 0 ? '<tr><td colspan="7" class="p-4 text-center text-slate-500">Aucun résultat.</td></tr>' : ''}
                     </tbody>
                 </table>
             </div>
 
-            ${nonRapproches.length ? `
-            <div class="bg-slate-800 p-4 rounded-2xl border-2 border-amber-600">
-                <h4 class="text-xs font-black text-amber-400 uppercase mb-3">🔗 Élèves non rapprochés (${nonRapproches.length})</h4>
-                <div class="space-y-1">
-                    ${nonRapproches.map(l => `
-                        <div class="flex items-center gap-2 py-1">
-                            <span class="text-sm text-white">${l.prenom} ${l.nom}</span>
-                            <span class="text-xs text-slate-400">(${l.classe || 'sans classe'})</span>
-                            <button onclick="window.unssOuvrirRapprocher('${l.idLicencie}')" class="ml-auto bg-amber-600 hover:bg-amber-500 px-3 py-1 rounded-lg font-black text-xs text-white">🔗 Rapprocher</button>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            ` : ''}
         </div>
     `;
 }
@@ -279,6 +308,11 @@ window.unssOuvrirRapprocher = function(idLicencie) {
     const lic = lireUnss().find(l => String(l.idLicencie) === String(idLicencie));
     if (!lic) return;
     const classes = JSON.parse(localStorage.getItem('eps_arena_classes') || '[]');
+    let classePreselect = lic.classe || '';
+    if (!classes.includes(classePreselect)) {
+        const niveau = niveauDeLibelle(lic.niveauClasse) || niveauDeClasse(lic.classe);
+        classePreselect = niveau ? (classes.find(c => niveauDeClasse(c) === niveau) || '') : '';
+    }
     document.getElementById('unss-rap-modal')?.remove();
     const modal = document.createElement('div');
     modal.id = 'unss-rap-modal';
@@ -294,7 +328,7 @@ window.unssOuvrirRapprocher = function(idLicencie) {
             </div>
             <label class="text-xs text-slate-400 block mb-1">1. Classe</label>
             <select id="unss-rap-classe" onchange="window.unssRapClasse()" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-2">
-                ${classes.map(c => `<option value="${c}" ${c === lic.classe ? 'selected' : ''}>${c}</option>`).join('')}
+                ${classes.map(c => `<option value="${c}" ${c === classePreselect ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
             <label class="text-xs text-slate-400 block mb-1">2. Élève</label>
             <input id="unss-rap-recherche" placeholder="🔍 Rechercher…" oninput="window.unssRapClasse()" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-2">
@@ -336,4 +370,24 @@ window.unssRapValider = function(eleveId) {
     document.getElementById('unss-rap-modal')?.remove();
     render();
     notifier('✅ Élève rapproché.');
+};
+
+window.unssConfirmerSuggestion = function(idLicencie, eleveId) {
+    if (!idLicencie || !eleveId) return;
+    lierEleveLicencie(eleveId, idLicencie);
+    render();
+    notifier('✅ Rapprochement confirmé.');
+};
+
+window.unssDelier = function(idLicencie) {
+    const liaisons = lireLiaisons();
+    const eleveId = Object.keys(liaisons).find(k => String(liaisons[k]) === String(idLicencie));
+    if (eleveId) delierEleve(eleveId);
+    render();
+    notifier('Lien retiré.');
+};
+
+window.unssFiltreNonRapproches = function() {
+    filtreNonRapproches = !filtreNonRapproches;
+    render();
 };
