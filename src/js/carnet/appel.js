@@ -6,14 +6,17 @@
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
 import { getCurrentClasse } from '../core/live-engine.js';
 import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude } from './inaptitude.js';
-import { getSeancesClasseDate } from './planner.js';
+import { getSeancesClasseDate, lirePeriodes } from './planner.js';
 import { getToutesGrilles, getEvaluationsClasse, calculerNoteFinale } from '../modules/grilles/grilles-core.js';
+import { exporterVersExcel } from '../services/export-service.js';
+import { lireGroupes } from './groupes.js';
+import { getLicenceParEleve } from './unss.js';
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
 // Tous les statuts sont des flags indépendants et cumulables.
 // Présent = aucun flag coché.
-const STATUTS = [
+export const STATUTS = [
     { id: 'absent', label: 'Absent', icon: '❌', couleur: '#ef4444' },
     { id: 'inapte', label: 'Inapte', icon: '🤕', couleur: '#8b5cf6' },
     { id: 'retard', label: 'Retard', icon: '⏰', couleur: '#f59e0b' },
@@ -29,6 +32,7 @@ const STATS_FLAGS = [
 
 let currentClasse = '';
 let currentDate = '';
+let currentGroupe = '';
 const photosCache = {};
 
 function formaterDate(d) {
@@ -46,9 +50,18 @@ function ecrireAppel(data) {
     localStorage.setItem(STORAGE_PREFIX + currentClasse, JSON.stringify(data));
 }
 
+export function lireAppelClasse(classe) {
+    return JSON.parse(localStorage.getItem(STORAGE_PREFIX + classe) || '{}');
+}
+export function ecrireAppelClasse(classe, data) {
+    localStorage.setItem(STORAGE_PREFIX + classe, JSON.stringify(data));
+}
+
 export async function initAppelInterface() {
     currentClasse = getCurrentClasse();
-    currentDate = formaterDate(new Date());
+    const dateDemandee = localStorage.getItem('eps_arena_appel_date_demandee');
+    currentDate = dateDemandee || formaterDate(new Date());
+    if (dateDemandee) localStorage.removeItem('eps_arena_appel_date_demandee');
     setClasseInaptitude(currentClasse);
     migrerDonneesAppel();
     await chargerPhotos(getExistingEleves(currentClasse));
@@ -88,8 +101,15 @@ function render() {
         return;
     }
 
-    const eleves = getExistingEleves(currentClasse);
+    let eleves = getExistingEleves(currentClasse);
     eleves.sort((a, b) => (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || ''));
+    const groupes = lireGroupes(currentClasse);
+    if (currentGroupe) {
+        const g = groupes.find(x => x.id === currentGroupe);
+        if (g) eleves = eleves.filter(e => g.eleves.includes(e.id));
+    }
+    const unssParEleveId = new Set();
+    eleves.forEach(e => { if (getLicenceParEleve({ ...e, classe: currentClasse })) unssParEleveId.add(e.id); });
 
     if (eleves.length === 0) {
         container.innerHTML = '<p class="text-slate-500 text-center py-10">Aucun élève dans cette classe. Importe d\'abord tes élèves (Administration).</p>';
@@ -130,10 +150,15 @@ function render() {
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
+                        ${groupes.length ? `<select onchange="window.appelFiltreGroupe(this.value)" class="bg-slate-900 border border-slate-600 rounded px-2 py-2 text-xs font-bold text-white">
+                            <option value="">Tous les groupes</option>
+                            ${groupes.map(g => `<option value="${g.id}" ${g.id === currentGroupe ? 'selected' : ''}>${g.nom}</option>`).join('')}
+                        </select>` : ''}
                         <button onclick="window.appelChangerDate(-1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white">←</button>
                         <input type="date" id="appel-date" value="${currentDate}" onchange="window.appelChangerDate(0)" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm font-bold text-white">
                         <button onclick="window.appelChangerDate(1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white">→</button>
                         <button onclick="window.appelVoirStats()" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded-xl font-black text-xs uppercase text-white">📊 Stats</button>
+                        <button onclick="window.appelVoirBilan()" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-xl font-black text-xs uppercase text-white">🧾 Bilan</button>
                     </div>
                 </div>
 
@@ -184,6 +209,7 @@ function render() {
                                             <div class="flex items-center gap-2">
                                                 ${photoHtml}
                                                 <button onclick="window.appelOuvrirFiche('${e.id}')" class="font-bold text-white leading-tight hover:text-blue-400 cursor-pointer text-left">${e.prenom} ${e.nom}</button>
+                                                ${unssParEleveId.has(e.id) ? '<span title="Licencié UNSS" class="text-xs">🏟️</span>' : ''}
                                                 <div class="flex gap-1 flex-wrap">${badges.join('')}</div>
                                             </div>
                                         </td>
@@ -279,6 +305,7 @@ window.appelOuvrirFiche = function(eleveId) {
 
     const appel = lireAppel();
     const inapt = getInaptitude(eleveId);
+    const lic = getLicenceParEleve({ ...eleve, classe: currentClasse });
 
     const totaux = { absent: 0, retard: 0, oubli_tenue: 0, inapte: 0 };
     const parActivite = {};
@@ -380,6 +407,18 @@ window.appelOuvrirFiche = function(eleveId) {
 
             <h3 class="text-xs font-black text-slate-400 uppercase mb-2">🤕 Inaptitude</h3>
             <p class="text-sm font-bold text-white">${inapt ? libelleInaptitude(inapt) : 'Aucune inaptitude en cours.'}</p>
+
+            <h3 class="text-xs font-black text-slate-400 uppercase mb-2">🏟️ UNSS</h3>
+            ${lic ? `
+                <div class="text-sm text-white">
+                    <div class="flex gap-1 flex-wrap mb-1">
+                        ${lic.activitesUnss.split(',').map(a => a.trim()).filter(Boolean).map(a => `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700 text-slate-200">${a}</span>`).join('')}
+                        ${!lic.activitesUnss ? '<span class="text-slate-500">Aucune activité</span>' : ''}
+                    </div>
+                    <p class="text-xs text-slate-300">Licence : ${lic.numLicence || '—'} · Catégorie : ${lic.categorie || '—'}</p>
+                    <p class="text-xs text-slate-300">Parents : ${lic.etatParents || '—'}</p>
+                </div>
+            ` : '<p class="text-sm text-slate-500">Non inscrit à l\'UNSS.</p>'}
         </div>
     `;
     document.body.appendChild(overlay);
@@ -395,6 +434,11 @@ window.appelChangerDate = function(delta) {
         d.setDate(d.getDate() + delta);
         currentDate = formaterDate(d);
     }
+    render();
+};
+
+window.appelFiltreGroupe = function(groupeId) {
+    currentGroupe = groupeId;
     render();
 };
 
@@ -489,5 +533,128 @@ window.appelStatsAfficher = function(flagId) {
             </table>
         </div>
     `;
+};
+
+// ============================================================
+// BILAN DE PÉRIODE : synthèse par élève (absences, retards, oublis, inaptitudes)
+// ============================================================
+function calculerBilan(periode) {
+    const appel = lireAppel();
+    const eleves = getExistingEleves(currentClasse);
+    eleves.sort((a, b) => (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || ''));
+    const bilan = {};
+    eleves.forEach(e => { bilan[e.id] = { absent: 0, retard: 0, oubli_tenue: 0, inapte: 0 }; });
+    Object.entries(appel).forEach(([date, jour]) => {
+        if (periode && (date < periode.debut || date > periode.fin)) return;
+        Object.entries(jour).forEach(([eleveId, flags]) => {
+            if (!flags || typeof flags !== 'object') return;
+            if (!bilan[eleveId]) bilan[eleveId] = { absent: 0, retard: 0, oubli_tenue: 0, inapte: 0 };
+            STATS_FLAGS.forEach(f => {
+                if (flags[f.id]) bilan[eleveId][f.id] += 1;
+            });
+        });
+    });
+    return { eleves, bilan };
+}
+
+window.appelVoirBilan = function() {
+    if (!currentClasse) return;
+    const periodes = lirePeriodes();
+    window._bilanData = { periodes, periodeId: '' };
+
+    const overlay = document.createElement('div');
+    overlay.id = 'appel-bilan-modal';
+    overlay.className = 'fixed inset-0 bg-black/70 z-50 flex items-start justify-center p-4 overflow-y-auto';
+    overlay.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-3xl my-8">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-xl font-black text-emerald-400 uppercase">🧾 Bilan de période</h2>
+                    <p class="text-xs text-slate-400">Classe ${currentClasse} · synthèse des appels</p>
+                </div>
+                <button onclick="document.getElementById('appel-bilan-modal').remove()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white text-sm">✖</button>
+            </div>
+            <div class="flex gap-2 flex-wrap mb-4 items-center">
+                <button onclick="window.appelBilanAfficher('')" id="bilan-tab-all" class="px-3 py-1.5 rounded-xl font-black text-xs text-white">Toute l'année</button>
+                ${periodes.map(p => `<button onclick="window.appelBilanAfficher('${p.id}')" id="bilan-tab-${p.id}" class="px-3 py-1.5 rounded-xl font-black text-xs text-white">${p.nom}</button>`).join('')}
+                <button onclick="window.appelBilanExporter()" class="ml-auto px-4 py-1.5 rounded-xl font-black text-xs text-white bg-emerald-600 hover:bg-emerald-500">📥 Exporter Excel</button>
+            </div>
+            <div id="appel-bilan-content"></div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    window.appelBilanAfficher('');
+};
+
+window.appelBilanAfficher = function(periodeId) {
+    const data = window._bilanData;
+    const container = document.getElementById('appel-bilan-content');
+    if (!data || !container) return;
+    data.periodeId = periodeId;
+    const periode = data.periodes.find(p => p.id === periodeId) || null;
+
+    ['', ...data.periodes.map(p => p.id)].forEach(id => {
+        const btn = document.getElementById('bilan-tab-' + (id || 'all'));
+        if (btn) btn.style.backgroundColor = (id === periodeId) ? '#10b981' : '#1e293b';
+    });
+
+    const { eleves, bilan } = calculerBilan(periode);
+    const total = e => bilan[e.id].absent + bilan[e.id].retard + bilan[e.id].oubli_tenue + bilan[e.id].inapte;
+
+    container.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-xs text-slate-400 uppercase border-b border-slate-700">
+                        <th class="p-2 text-left sticky left-0 bg-slate-900">Élève</th>
+                        ${STATS_FLAGS.map(f => `<th class="p-2 text-center">${f.label}</th>`).join('')}
+                        <th class="p-2 text-center">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${eleves.map(e => `
+                        <tr class="border-b border-slate-800">
+                            <td class="p-2 font-bold text-white sticky left-0 bg-slate-900 whitespace-nowrap">${e.prenom} ${e.nom}</td>
+                            ${STATS_FLAGS.map(f => {
+                                const n = bilan[e.id][f.id] || 0;
+                                return `<td class="p-2 text-center ${n > 0 ? 'font-black text-red-400' : 'text-slate-600'}">${n || '—'}</td>`;
+                            }).join('')}
+                            <td class="p-2 text-center font-black ${total(e) > 0 ? 'text-amber-400' : 'text-slate-600'}">${total(e) || '—'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+};
+
+window.appelBilanExporter = function() {
+    const data = window._bilanData;
+    if (!data) return;
+    const periode = data.periodes.find(p => p.id === data.periodeId) || null;
+    const { eleves, bilan } = calculerBilan(periode);
+
+    const colonnes = [
+        { nom: 'Nom de famille', cle: 'nom' },
+        { nom: 'Prénom', cle: 'prenom' },
+        { nom: 'Absences', cle: 'absent' },
+        { nom: 'Retards', cle: 'retard' },
+        { nom: 'Oublis tenue', cle: 'oubli_tenue' },
+        { nom: 'Inaptitudes', cle: 'inapte' },
+        { nom: 'Total', cle: 'total' },
+    ];
+    const donnees = eleves.map(e => ({
+        nom: e.nom || '',
+        prenom: e.prenom || '',
+        absent: bilan[e.id].absent,
+        retard: bilan[e.id].retard,
+        oubli_tenue: bilan[e.id].oubli_tenue,
+        inapte: bilan[e.id].inapte,
+        total: bilan[e.id].absent + bilan[e.id].retard + bilan[e.id].oubli_tenue + bilan[e.id].inapte,
+    }));
+
+    const suffixe = periode ? periode.nom : 'Annee';
+    exporterVersExcel('Bilan_' + suffixe, currentClasse, [{ nom: 'Bilan', colonnes, donnees }]);
 };
 

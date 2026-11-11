@@ -12,6 +12,9 @@ const KEY_PERIODES = 'eps_arena_periodes';
 const KEY_ACTIVITES = 'eps_arena_activites';
 const KEY_CRENEAUX = 'eps_arena_creneaux';
 const KEY_CYCLES = 'eps_arena_cycles';
+const KEY_COULEURS = 'eps_arena_activites_couleurs';
+
+const PALETTE = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7', '#eab308'];
 
 const PERIODES_DEFAUT = [
     { id: 't1', nom: 'T1', debut: '2026-09-01', fin: '2026-11-22' },
@@ -23,20 +26,33 @@ const JOURS_ORDRE = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'
 
 let currentClasse = '';
 
-function lirePeriodes() {
+export function lirePeriodes() {
     let p = JSON.parse(localStorage.getItem(KEY_PERIODES) || 'null');
     if (!p || p.length === 0) { p = PERIODES_DEFAUT.slice(); ecrirePeriodes(p); }
     return p;
 }
 function ecrirePeriodes(p) { localStorage.setItem(KEY_PERIODES, JSON.stringify(p)); }
 
-function lireActivites() { return JSON.parse(localStorage.getItem(KEY_ACTIVITES) || '[]'); }
+export function lireActivites() { return JSON.parse(localStorage.getItem(KEY_ACTIVITES) || '[]'); }
 function ecrireActivites(a) { localStorage.setItem(KEY_ACTIVITES, JSON.stringify(a)); }
 
-function lireCreneaux() { return JSON.parse(localStorage.getItem(KEY_CRENEAUX) || '{}'); }
+function lireCouleurs() { return JSON.parse(localStorage.getItem(KEY_COULEURS) || '{}'); }
+function ecrireCouleurs(c) { localStorage.setItem(KEY_COULEURS, JSON.stringify(c)); }
+
+// Couleur d'une activité (attribuée automatiquement depuis la palette si absente).
+export function getCouleurActivite(nom) {
+    const couleurs = lireCouleurs();
+    if (!couleurs[nom]) {
+        couleurs[nom] = PALETTE[Object.keys(couleurs).length % PALETTE.length];
+        ecrireCouleurs(couleurs);
+    }
+    return couleurs[nom];
+}
+
+export function lireCreneaux() { return JSON.parse(localStorage.getItem(KEY_CRENEAUX) || '{}'); }
 function ecrireCreneaux(c) { localStorage.setItem(KEY_CRENEAUX, JSON.stringify(c)); }
 
-function lireCycles() { return JSON.parse(localStorage.getItem(KEY_CYCLES) || '{}'); }
+export function lireCycles() { return JSON.parse(localStorage.getItem(KEY_CYCLES) || '{}'); }
 function ecrireCycles(c) { localStorage.setItem(KEY_CYCLES, JSON.stringify(c)); }
 
 function creneauKey(jour, horaire) { return `${jour} ${horaire}`.trim(); }
@@ -178,6 +194,7 @@ function render() {
                 <div class="flex flex-wrap gap-2 mb-3">
                     ${activites.map(a => `
                         <span class="px-3 py-1 rounded-full text-xs font-bold bg-slate-700 text-white flex items-center gap-2">
+                            <button onclick="window.plannerChangerCouleur('${a}')" class="w-3.5 h-3.5 rounded-full shrink-0 border border-white/40" style="background-color:${getCouleurActivite(a)};" title="Changer la couleur"></button>
                             ${a}
                             <button onclick="window.plannerSupprimerActivite('${a}')" class="text-red-300 hover:text-red-200 font-black">✖</button>
                         </span>
@@ -294,5 +311,14 @@ window.plannerAjouterActivite = function() {
 
 window.plannerSupprimerActivite = function(nom) {
     ecrireActivites(lireActivites().filter(x => x !== nom));
+    render();
+};
+
+window.plannerChangerCouleur = function(nom) {
+    const couleurs = lireCouleurs();
+    const actuelle = couleurs[nom];
+    const idx = PALETTE.indexOf(actuelle);
+    couleurs[nom] = PALETTE[(idx + 1) % PALETTE.length];
+    ecrireCouleurs(couleurs);
     render();
 };

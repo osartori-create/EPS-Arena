@@ -12,11 +12,13 @@ import { exporterNotesIDoceo, exporterRubriqueIDoceo, exporterGrilleVierge, part
 import { getExistingEleves, getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
 import { db, ref, onValue } from '../../core/firebase-service.js';
+import { lireGroupes } from '../../carnet/groupes.js';
 
 let currentClasse = '';
 let currentGrille = null;
 let currentPeriode = 'Début';
 let currentEvaluations = {};
+let currentGroupe = '';
 let _vueCompacte = false;
 let _grillesAutoEvalsData = {};
 let _autoEvalsUnsub = null;
@@ -39,6 +41,12 @@ export function initGrillesInterface() {
         renderBibliotheque(container);
     }
 }
+
+window.grillesFiltreGroupe = function(groupeId) {
+    currentGroupe = groupeId;
+    const container = document.getElementById('viewEvaluations');
+    if (container && currentGrille) renderPassation(container);
+};
 
 // Écoute en continu les auto-évaluations élèves (Firebase) pour les
 // afficher en lecture seule dans la passation.
@@ -179,8 +187,13 @@ function renderPassation(container) {
         return;
     }
 
-    const eleves = getExistingEleves(currentClasse);
+    let eleves = getExistingEleves(currentClasse);
     eleves.sort((a, b) => a.nom.localeCompare(b.nom) || a.prenom.localeCompare(b.prenom));
+    const groupes = lireGroupes(currentClasse);
+    if (currentGroupe) {
+        const g = groupes.find(x => x.id === currentGroupe);
+        if (g) eleves = eleves.filter(e => g.eleves.includes(e.id));
+    }
 
     const evaluations = getEvaluationsClasse(currentClasse);
     currentEvaluations = evaluations[currentGrille.id] || {};
@@ -202,7 +215,11 @@ function renderPassation(container) {
                     <h2 class="text-xl font-black text-blue-400">${currentGrille.titre || currentGrille.id}</h2>
                     <p class="text-xs text-slate-400">${currentGrille.criteres.length} critères · ${eleves.length} élèves</p>
                 </div>
-                <div class="flex gap-2 flex-wrap">
+                <div class="flex gap-2 flex-wrap items-center">
+                    ${groupes.length ? `<select onchange="window.grillesFiltreGroupe(this.value)" class="bg-slate-900 border border-slate-600 rounded px-2 py-1.5 text-xs font-bold text-white">
+                        <option value="">Tous les groupes</option>
+                        ${groupes.map(g => `<option value="${g.id}" ${g.id === currentGroupe ? 'selected' : ''}>${g.nom}</option>`).join('')}
+                    </select>` : ''}
                     ${periodes.map(p => `
                         <button onclick="window.grillesSetPeriode('${p}')"
                                 class="${p === currentPeriode ? 'bg-blue-600' : 'bg-slate-700'} px-3 py-1.5 rounded-xl font-black text-xs text-white active:scale-95">
