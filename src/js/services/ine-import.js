@@ -21,6 +21,21 @@ function norm(s) {
 function capPrenom(s) { const t = String(s || '').trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : ''; }
 function majNom(s) { return String(s || '').trim().toUpperCase(); }
 
+// Décode un ArrayBuffer CSV en texte, en gérant les encodages courants des exports SIECLE
+// (UTF-8 avec/sans BOM, UTF-16 LE/BE, Windows-1252).
+function decodeBuffer(buf) {
+    const u8 = new Uint8Array(buf);
+    if (u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) return new TextDecoder('utf-8').decode(buf);
+    if (u8[0] === 0xFF && u8[1] === 0xFE) return new TextDecoder('utf-16le').decode(buf);
+    if (u8[0] === 0xFE && u8[1] === 0xFF) return new TextDecoder('utf-16be').decode(buf);
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch (e) {
+        const t = new TextDecoder('windows-1252').decode(buf);
+        if ((t.match(/\u0000/g) || []).length > 10) return new TextDecoder('utf-16le').decode(buf);
+        return t;
+    }
+}
+
 // Correspondance champs logiques -> libellés de colonnes du CSV institution.
 const COLONNES = {
     ine: ['INE'],
@@ -94,18 +109,20 @@ function statutRow(row, classeCible, all) {
     return { statut: 'nouveau', label: '➕ Nouveau', eleve: null, classe: classeCible };
 }
 
-function parserCSV(texte) {
+function parserCSVBrut(texte) {
     const sep = texte.includes(';') ? ';' : ',';
     const res = Papa.parse(texte, {
         delimiter: sep, header: true, skipEmptyLines: true,
         transformHeader: h => String(h).replace(/^\uFEFF/, '').trim()
     });
     if (res.errors && res.errors.length) throw new Error('Fichier illisible : ' + res.errors[0].message);
-    const headers = res.meta.fields || [];
-    const cols = resoudreColonnes(headers);
-    if (!cols.nom || !cols.prenom || !cols.division) throw new Error('Colonnes obligatoires introuvables (Nom de famille, Prénom 1, Division).');
+    return { headers: res.meta.fields || [], data: res.data };
+}
+
+// Construit les lignes structurées à partir des données brutes et du mapping de colonnes.
+function construireRows(data, cols) {
     const rows = [];
-    res.data.forEach(r => {
+    data.forEach(r => {
         const nom = majNom(r[cols.nom]);
         const prenom = capPrenom(r[cols.prenom]);
         if (!nom || !prenom) return;
@@ -121,6 +138,41 @@ function parserCSV(texte) {
     });
     return rows;
 }
+
+function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+// Champs proposés à l'étape de mapping manuel (ordre d'affichage).
+const CHAMPS = [
+    { key: 'nom', label: 'Nom de famille', requis: true },
+    { key: 'prenom', label: 'Prénom', requis: true },
+    { key: 'division', label: 'Division (classe)', requis: true },
+    { key: 'ine', label: 'INE', requis: false },
+    { key: 'sexe', label: 'Sexe', requis: false },
+    { key: 'naissance', label: 'Date de naissance', requis: false },
+    { key: 'mef', label: 'MEF (libellé classe)', requis: false },
+    { key: 'regime', label: 'Régime', requis: false },
+    { key: 'commune', label: 'Commune de naissance', requis: false },
+    { key: 'r1civ', label: 'Rep. légal 1 — Civilité', admin: true },
+    { key: 'r1nom', label: 'Rep. légal 1 — Nom', admin: true },
+    { key: 'r1usage', label: "Rep. légal 1 — Nom d'usage", admin: true },
+    { key: 'r1prenom', label: 'Rep. légal 1 — Prénom', admin: true },
+    { key: 'r1adresse', label: 'Rep. légal 1 — Adresse', admin: true },
+    { key: 'r1cp', label: 'Rep. légal 1 — Code postal', admin: true },
+    { key: 'r1commune', label: 'Rep. légal 1 — Commune', admin: true },
+    { key: 'r1tel', label: 'Rep. légal 1 — Tél', admin: true },
+    { key: 'r1email', label: 'Rep. légal 1 — Email', admin: true },
+    { key: 'r2civ', label: 'Rep. légal 2 — Civilité', admin: true },
+    { key: 'r2nom', label: 'Rep. légal 2 — Nom', admin: true },
+    { key: 'r2usage', label: "Rep. légal 2 — Nom d'usage", admin: true },
+    { key: 'r2prenom', label: 'Rep. légal 2 — Prénom', admin: true },
+    { key: 'r2adresse', label: 'Rep. légal 2 — Adresse', admin: true },
+    { key: 'r2cp', label: 'Rep. légal 2 — Code postal', admin: true },
+    { key: 'r2commune', label: 'Rep. légal 2 — Commune', admin: true },
+    { key: 'r2tel', label: 'Rep. légal 2 — Tél', admin: true },
+    { key: 'r2email', label: 'Rep. légal 2 — Email', admin: true },
+    { key: 'fnom', label: 'Resp. financier — Nom', admin: true },
+    { key: 'fprenom', label: 'Resp. financier — Prénom', admin: true },
+];
 
 export function openImportINE() {
     const modal = document.createElement('div');
@@ -142,9 +194,11 @@ export function openImportINE() {
                     <input type="file" id="ine-file-input" accept=".csv" class="hidden">
                 </div>
             </div>
+            <div id="ine-mapping" class="hidden"></div>
             <div id="ine-zone2" class="hidden"></div>
             <div class="flex gap-3 mt-6">
                 <button onclick="window.closeImportINE()" class="flex-1 bg-slate-700 py-3 rounded-xl font-black text-white text-sm">Annuler</button>
+                <button id="ine-continuer" onclick="window.ineContinuer()" class="flex-1 bg-blue-600 py-3 rounded-xl font-black text-white text-sm hidden">➡️ Continuer</button>
                 <button id="ine-confirm" onclick="window.ineValider()" class="flex-1 bg-emerald-600 py-3 rounded-xl font-black text-white text-sm hidden">✅ Valider l'import</button>
             </div>
         </div>
@@ -154,14 +208,20 @@ export function openImportINE() {
     const dropZone = document.getElementById('ine-drop-zone');
     const fileInput = document.getElementById('ine-file-input');
     const zone1 = document.getElementById('ine-zone1');
+    const zoneMapping = document.getElementById('ine-mapping');
     const zone2 = document.getElementById('ine-zone2');
+    const continuerBtn = document.getElementById('ine-continuer');
     const confirmBtn = document.getElementById('ine-confirm');
 
     let divisions = [];
     let mapping = {};
+    let headersBruts = [];
+    let dataBruts = [];
+    let colsAuto = {};
 
     window.closeImportINE = () => modal.remove();
     window.ineChoisirClasse = (div, v) => { mapping[div] = v; renderPreview(); };
+    window.ineContinuer = () => continuerMapping();
     window.ineValider = () => valider();
 
     dropZone.addEventListener('click', () => fileInput.click());
@@ -174,28 +234,91 @@ export function openImportINE() {
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const texte = String(e.target.result).replace(/^\uFEFF/, '');
-                const rows = parserCSV(texte);
-                if (!rows.length) { alert('Aucun élève trouvé dans ce fichier.'); return; }
-                const groupes = {};
-                rows.forEach(r => { (groupes[r.division] = groupes[r.division] || []).push(r); });
-                divisions = Object.keys(groupes)
-                    .map(d => ({ division: d, mef: groupes[d][0].mef, rows: groupes[d] }))
-                    .sort((a, b) => a.division.localeCompare(b.division));
-                const classesExistantes = lireClasses();
-                mapping = {};
-                divisions.forEach(d => {
-                    mapping[d.division] = classesExistantes.includes(d.division) ? d.division : '__NEW__' + d.division;
-                });
+                const texte = decodeBuffer(e.target.result).replace(/^\uFEFF/, '').replace(/\u0000/g, '');
+                const brut = parserCSVBrut(texte);
+                if (!brut.data.length) { alert('Aucune donnée trouvée dans ce fichier.'); return; }
+                headersBruts = brut.headers;
+                dataBruts = brut.data;
+                const auto = resoudreColonnes(headersBruts);
+                colsAuto = {};
+                Object.entries(auto).forEach(([f, nom]) => { const i = headersBruts.indexOf(nom); if (i >= 0) colsAuto[f] = i; });
                 zone1.classList.add('hidden');
-                zone2.classList.remove('hidden');
-                confirmBtn.classList.remove('hidden');
-                renderPreview();
+                zoneMapping.classList.remove('hidden');
+                renderMapping();
             } catch (err) {
                 alert('Erreur : ' + err.message);
             }
         };
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
+    }
+
+    function renderMapping() {
+        const opts = (key) => {
+            const selIdx = colsAuto[key];
+            return `<select data-champ="${key}" class="ine-col bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white w-full">
+                <option value="">— Ignorer —</option>
+                ${headersBruts.map((h, idx) => `<option value="${idx}" ${idx === selIdx ? 'selected' : ''}>${esc(h)}</option>`).join('')}
+            </select>`;
+        };
+        const core = CHAMPS.filter(c => !c.admin);
+        const admin = CHAMPS.filter(c => c.admin);
+        zoneMapping.innerHTML = `
+            <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700 mb-4">
+                <h4 class="text-sm font-black text-blue-400 uppercase mb-1">🔗 Association des colonnes</h4>
+                <p class="text-[10px] text-slate-400 mb-3">L'auto-détection est pré-remplie. Corrige à la main si besoin — les champs * sont obligatoires.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    ${core.map(c => `
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-slate-300 w-40 shrink-0">${c.label}${c.requis ? ' *' : ''}</span>
+                            ${opts(c.key)}
+                        </div>`).join('')}
+                </div>
+                <details class="mt-3">
+                    <summary class="text-xs font-bold text-slate-400 cursor-pointer">Contacts administratifs (représentants légaux, resp. financier)</summary>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                        ${admin.map(c => `
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-bold text-slate-300 w-40 shrink-0">${c.label}</span>
+                                ${opts(c.key)}
+                            </div>`).join('')}
+                    </div>
+                </details>
+            </div>
+        `;
+        document.querySelectorAll('.ine-col').forEach(sel => {
+            sel.addEventListener('change', () => {
+                if (sel.value !== '') colsAuto[sel.dataset.champ] = parseInt(sel.value);
+                else delete colsAuto[sel.dataset.champ];
+            });
+        });
+        continuerBtn.classList.remove('hidden');
+    }
+
+    function continuerMapping() {
+        const cols = {};
+        CHAMPS.forEach(c => { if (colsAuto[c.key] !== undefined) cols[c.key] = headersBruts[colsAuto[c.key]]; });
+        const manquants = [];
+        if (!cols.nom) manquants.push('Nom de famille');
+        if (!cols.prenom) manquants.push('Prénom');
+        if (!cols.division) manquants.push('Division');
+        if (manquants.length) { alert('Associe au minimum : ' + manquants.join(', ') + '.'); return; }
+        const rows = construireRows(dataBruts, cols);
+        if (!rows.length) { alert('Aucun élève exploitable (nom + prénom) après association.'); return; }
+        const groupes = {};
+        rows.forEach(r => { const d = r.division || '(sans division)'; (groupes[d] = groupes[d] || []).push(r); });
+        divisions = Object.keys(groupes)
+            .map(d => ({ division: d, mef: groupes[d][0].mef, rows: groupes[d] }))
+            .sort((a, b) => a.division.localeCompare(b.division));
+        const classesExistantes = lireClasses();
+        mapping = {};
+        divisions.forEach(d => {
+            mapping[d.division] = classesExistantes.includes(d.division) ? d.division : '__NEW__' + d.division;
+        });
+        zoneMapping.classList.add('hidden');
+        continuerBtn.classList.add('hidden');
+        zone2.classList.remove('hidden');
+        confirmBtn.classList.remove('hidden');
+        renderPreview();
     }
 
     function renderPreview() {
