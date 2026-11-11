@@ -12,6 +12,7 @@ export const MENU = [
             { id: 'presences', icon: '✅', label: 'Présences', view: 'presences' },
             { id: 'groupes', icon: '🧩', label: 'Groupes', view: 'groupes' },
             { id: 'plan', icon: '🪑', label: 'Plan de classe', view: 'plan' },
+            { id: 'carnet', icon: '📒', label: 'Carnet', view: 'carnet' },
             { id: 'unss', icon: '🏟️', label: 'UNSS', view: 'unss' },
         ]
     },

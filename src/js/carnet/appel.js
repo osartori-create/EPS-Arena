@@ -11,6 +11,7 @@ import { getToutesGrilles, getEvaluationsClasse, calculerNoteFinale } from '../m
 import { exporterVersExcel } from '../services/export-service.js';
 import { lireGroupes } from './groupes.js';
 import { getLicenceParEleve } from './unss.js';
+import './fiche-eleve.js'; // fiche élève tout-en-un (window.ouvrirFicheEleve)
 
 const STORAGE_PREFIX = 'eps_arena_appel_';
 
@@ -299,6 +300,7 @@ window.appelOuvrirInaptitude = function(eleveId) {
 // FICHE ÉLÈVE (carnet)
 // ============================================================
 window.appelOuvrirFiche = function(eleveId) {
+    if (window.ouvrirFicheEleve) { window.ouvrirFicheEleve(eleveId, currentClasse); return; }
     if (!currentClasse) return;
     const eleve = getExistingEleves(currentClasse).find(e => e.id === eleveId);
     if (!eleve) return;
