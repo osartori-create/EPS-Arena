@@ -5,7 +5,7 @@
 //   eps_arena_carnet_champs_<classe>   = [{ id, type, libelle, groupe, ordre, bareme, unite, legende }]
 //   eps_arena_carnet_valeurs_<classe>  = { [eleveId]: { [champId]: valeur } }
 
-import { getExistingEleves } from '../services/admin-service.js';
+import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
 import { getCurrentClasse } from '../core/live-engine.js';
 import './fiche-eleve.js'; // enregistre window.ouvrirFicheEleve
 
@@ -15,6 +15,14 @@ const PREFIX_VALEURS = 'eps_arena_carnet_valeurs_';
 let currentClasse = '';
 let currentGroupe = '';
 let currentValeurs = {};
+const photosCache = {};
+
+async function chargerPhotos(eleves) {
+    await Promise.all(eleves.map(async e => {
+        if (photosCache[e.id] !== undefined) return;
+        try { photosCache[e.id] = await getPhotoUrl(e.id); } catch (err) { photosCache[e.id] = null; }
+    }));
+}
 
 const TYPES = {
     note:   { label: 'Note', icone: '🔢', defaut: { bareme: 20 } },
@@ -256,7 +264,12 @@ function render() {
     const lignes = eleves.map(e => {
         const cells = champsActifs.map(c => cellHtml(e, c)).join('');
         return `<tr class="border-b border-slate-800">
-            <td class="p-2 font-bold text-white text-sm border border-slate-700 sticky left-0 bg-slate-900 whitespace-nowrap cursor-pointer hover:text-blue-400" onclick="window.ouvrirFicheEleve('${e.id}','${escAttr(currentClasse)}')">👤 ${esc(e.prenom)} ${esc(e.nom)}</td>
+            <td class="p-2 border border-slate-700 sticky left-0 bg-slate-900 whitespace-nowrap cursor-pointer hover:bg-slate-700/30" onclick="window.ouvrirFicheEleve('${e.id}','${escAttr(currentClasse)}')">
+                <div class="flex items-center gap-2">
+                    ${photosCache[e.id] ? `<img src="${photosCache[e.id]}" class="w-8 h-8 rounded-full object-cover border border-slate-600 shrink-0">` : `<div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0">👤</div>`}
+                    <span class="font-bold text-white text-sm">${esc(e.prenom)} ${esc(e.nom)}</span>
+                </div>
+            </td>
             ${cells}
         </tr>`;
     }).join('');
@@ -552,9 +565,10 @@ window.carnetModele = function(cle) {
     render();
 };
 
-export function initCarnetInterface() {
+export async function initCarnetInterface() {
     currentClasse = getCurrentClasse();
     currentValeurs = currentClasse ? lireValeurs(currentClasse) : {};
+    if (currentClasse) await chargerPhotos(getExistingEleves(currentClasse));
     render();
 }
 

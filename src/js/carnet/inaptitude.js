@@ -13,7 +13,7 @@ export const MOTIFS = [
 ];
 
 // Zones du corps pour la silhouette (face et dos). Coordonnées SVG 200×380.
-const ZONES = {
+export const ZONES = {
     face: [
         { id: 'tete', label: 'Tête', x: 100, y: 32, rx: 22, ry: 22 },
         { id: 'cou', label: 'Cou', x: 100, y: 58, rx: 11, ry: 11 },
@@ -55,7 +55,7 @@ const ZONES = {
     ],
 };
 
-function labelZone(zoneId) {
+export function labelZone(zoneId) {
     if (!zoneId) return '';
     for (const vue of Object.values(ZONES)) {
         const z = vue.find(x => x.id === zoneId);
@@ -73,8 +73,35 @@ function ecrire(data) { localStorage.setItem(STORAGE_PREFIX + currentClasse, JSO
 
 export function getInaptitude(eleveId) { return lire()[eleveId] || null; }
 
+const KEY_HISTORIQUE = 'eps_arena_inaptitudes_historique_';
+function lireHistorique() { return JSON.parse(localStorage.getItem(KEY_HISTORIQUE + currentClasse) || '{}'); }
+function ecrireHistorique(data) { localStorage.setItem(KEY_HISTORIQUE + currentClasse, JSON.stringify(data)); }
+
+// Pousse une inaptitude levée/remplacée dans l'historique (RGPD : local uniquement).
+function historiser(eleveId, inapt) {
+    if (!inapt || !inapt.motif) return;
+    const hist = lireHistorique();
+    (hist[eleveId] = hist[eleveId] || []).push({ ...inapt, levee: formaterDate(new Date()) });
+    ecrireHistorique(hist);
+}
+
+export function lireInaptitudesClasse(classe) { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + classe) || '{}'); }
+export function lireHistoriqueClasse(classe) { return JSON.parse(localStorage.getItem(KEY_HISTORIQUE + classe) || '{}'); }
+
+export function supprimerInaptitude(eleveId) {
+    const all = lire();
+    const ancienne = all[eleveId] || null;
+    if (ancienne && ancienne.motif) historiser(eleveId, ancienne);
+    delete all[eleveId];
+    ecrire(all);
+}
+
 export function sauvegarderInaptitude(eleveId, data) {
     const all = lire();
+    const ancienne = all[eleveId] || null;
+    if (ancienne && ancienne.motif && JSON.stringify(ancienne) !== JSON.stringify(data)) {
+        historiser(eleveId, ancienne);
+    }
     all[eleveId] = data;
     ecrire(all);
 }
@@ -178,7 +205,8 @@ export function ouvrirModalInaptitude(eleve, onSave) {
         zone: existant.zone || '',
         dateDebut: existant.dateDebut || formaterDate(new Date()),
         dateFin: existant.dateFin || '',
-        commentaire: existant.commentaire || ''
+        commentaire: existant.commentaire || '',
+        nonJustifiee: !!existant.nonJustifiee
     };
 
     const overlay = document.createElement('div');
@@ -200,6 +228,11 @@ export function ouvrirModalInaptitude(eleve, onSave) {
                     <button onclick="window.inaptChoisirMotif('${m.id}')" id="inapt-motif-${m.id}" class="p-3 rounded-xl text-left font-bold text-sm">${m.icon} ${m.label}</button>
                 `).join('')}
             </div>
+
+            <label class="flex items-center gap-2 p-3 rounded-xl border-2 border-red-600 bg-red-900/30 mb-4 cursor-pointer">
+                <input type="checkbox" id="inapt-non-justifiee" class="w-4 h-4 shrink-0">
+                <span class="text-sm font-bold text-white">⚠️ Inaptitude non justifiée (pas de mot des parents)</span>
+            </label>
 
             <div class="flex flex-col sm:flex-row gap-4">
                 <div class="sm:w-1/2">
@@ -249,6 +282,7 @@ export function ouvrirModalInaptitude(eleve, onSave) {
     document.getElementById('inapt-date-debut').value = initial.dateDebut;
     document.getElementById('inapt-commentaire').value = initial.commentaire;
     if (initial.dateFin) document.getElementById('inapt-date-fin').value = initial.dateFin;
+    document.getElementById('inapt-non-justifiee').checked = initial.nonJustifiee;
 
     window.inaptRafraichirMotifs();
 }
@@ -287,6 +321,7 @@ window.inaptValider = function(eleveId) {
         }
     }
     data.commentaire = document.getElementById('inapt-commentaire').value.trim();
+    data.nonJustifiee = !!document.getElementById('inapt-non-justifiee')?.checked;
     document.getElementById('inaptitude-modal').remove();
     if (window._inaptOnSave) window._inaptOnSave(data);
 };

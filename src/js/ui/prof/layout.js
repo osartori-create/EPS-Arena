@@ -124,7 +124,7 @@ export function initLayout() {
 
     // 1. Gestion des onglets (CORRIGÉ : on n'utilise plus el.style.display pour les vues standard)
     window.switchTab = function(tabName) {
-    ['admin', 'activities', 'live', 'tools', 'evaluations', 'carnet', 'sync', 'cross', 'scancamera', 'presences', 'planner', 'calendrier', 'groupes', 'plan', 'unss'].forEach(t => {
+    ['admin', 'activities', 'live', 'tools', 'evaluations', 'carnet', 'inaptitudes', 'sync', 'cross', 'scancamera', 'presences', 'planner', 'calendrier', 'groupes', 'plan', 'unss'].forEach(t => {
         const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
         const el = document.getElementById(viewId);
         if (el) el.classList.add('hidden');
@@ -210,6 +210,11 @@ if (tabName === 'carnet') {
     import('../../carnet/carnet.js').then(m => {
         m.initCarnetInterface();
     }).catch(err => console.error('Erreur init Carnet :', err));
+}
+if (tabName === 'inaptitudes') {
+    import('../../carnet/bilan-inaptitudes.js').then(m => {
+        m.initBilanInaptitudes();
+    }).catch(err => console.error('Erreur init Inaptitudes :', err));
 }
 if (tabName === 'sync') {
     setTimeout(() => {

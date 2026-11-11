@@ -196,9 +196,13 @@ function render() {
 
                                 const badges = [];
                                 if (absent) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#ef4444; color:#ffffff;">Absent</span>`);
+                                const inaptData = getInaptitude(e.id);
                                 if (inapte) {
-                                    const lib = libelleInaptitude(getInaptitude(e.id)) || 'Inapte';
+                                    const lib = libelleInaptitude(inaptData) || 'Inapte';
                                     badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#8b5cf6; color:#ffffff;" title="${lib}">${lib}</span>`);
+                                }
+                                if (inaptData && inaptData.nonJustifiee) {
+                                    badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#dc2626; color:#ffffff;" title="Inaptitude non justifiée — demander le mot des parents">⚠️ À justifier</span>`);
                                 }
                                 if (retard) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#f59e0b; color:#ffffff;">Retard</span>`);
                                 if (oubli) badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#3b82f6; color:#ffffff;">Oubli tenue</span>`);

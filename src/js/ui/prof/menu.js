@@ -13,6 +13,7 @@ export const MENU = [
             { id: 'groupes', icon: '🧩', label: 'Groupes', view: 'groupes' },
             { id: 'plan', icon: '🪑', label: 'Plan de classe', view: 'plan' },
             { id: 'carnet', icon: '📒', label: 'Carnet', view: 'carnet' },
+            { id: 'inaptitudes', icon: '🏥', label: 'Inaptitudes', view: 'inaptitudes' },
             { id: 'unss', icon: '🏟️', label: 'UNSS', view: 'unss' },
         ]
     },
