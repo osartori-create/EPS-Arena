@@ -700,3 +700,11 @@ export function importNatationConfig(event) {
 // EXPOSITION GLOBALE (pour les appels depuis activities.js)
 // ============================================================
 window.exportNatationIDoceo = exportNatationIDoceo;
+
+// Bascule de mode depuis l'interface « Longue distance » : sinon
+// impossible de revenir à « Indice de nage » ou « Koh Lanta ».
+window.natationSetMode = function(mode) {
+    if (currentClasse) localStorage.setItem(`eps_arena_natation_mode_${currentClasse}`, mode);
+    modeNatation = mode;
+    initNatationInterface();
+};

@@ -50,7 +50,16 @@ function createHeader() {
     div.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700';
     div.innerHTML = `
         <div class="flex justify-between items-center flex-wrap gap-2">
-            <h3 class="font-black text-blue-400 uppercase text-sm">🏊 ${TITRE_AFFICHE} — Configuration</h3>
+            <div class="flex items-center gap-2">
+                <h3 class="font-black text-blue-400 uppercase text-sm">🏊 ${TITRE_AFFICHE} — Configuration</h3>
+                <select onchange="window.natationSetMode(this.value)"
+                        class="bg-slate-900 border border-slate-600 rounded p-1 text-white text-xs font-bold"
+                        title="Changer de mode Natation">
+                    <option value="indice">🏊 Indice de nage</option>
+                    <option value="koh-lanta">🏝️ Koh Lanta</option>
+                    <option value="longue" selected>🏊 Longue distance</option>
+                </select>
+            </div>
             <div class="flex flex-wrap gap-2">
                 <button onclick="window.nlGenererGroupes()"
                         class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95"
