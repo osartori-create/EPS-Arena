@@ -29,6 +29,41 @@ function lireAdmin(ine) {
     return all[ine] || null;
 }
 
+// Calcule la valeur d'une colonne "calcul" (valeurs = { champId: valeur } pour UN élève).
+function calculerCarnet(c, champs, vals) {
+    const calc = c.calcul || {};
+    const sources = champs.filter(x => x.groupe === calc.dossier && x.id !== c.id);
+    if (calc.fonction === 'pourcentage') {
+        const statuts = sources.filter(x => x.type === 'statut');
+        if (!statuts.length) return '—';
+        const valides = (calc.valides || '').split(',').map(s => s.trim()).filter(Boolean);
+        let fait = 0;
+        statuts.forEach(x => {
+            const v = vals[x.id];
+            if (v === undefined || v === null || v === '') return;
+            if (!valides.length || valides.some(s => String(s) === String(v))) fait++;
+        });
+        return Math.round(fait / statuts.length * 100) + '%';
+    }
+    if (calc.fonction === 'somme') {
+        let s = 0, n = 0;
+        sources.filter(x => x.type === 'note' || x.type === 'mesure').forEach(x => {
+            const v = parseFloat(vals[x.id]);
+            if (!isNaN(v)) { s += v; n++; }
+        });
+        return n ? String(Math.round(s * 100) / 100) : '—';
+    }
+    let total = 0, n = 0;
+    sources.filter(x => x.type === 'note').forEach(x => {
+        const v = parseFloat(vals[x.id]);
+        if (isNaN(v)) return;
+        const ech = x.echelle || { mode: 'numerique', bareme: x.bareme || 20 };
+        if (ech.mode !== 'numerique') return;
+        total += (v / (ech.bareme || 20)) * 20; n++;
+    });
+    return n ? (Math.round(total / n * 10) / 10) + ' /20' : '—';
+}
+
 export async function ouvrirFicheEleve(eleveId, classe) {
     const eleve = getExistingEleves(classe).find(e => e.id === eleveId);
     if (!eleve) return;
@@ -57,12 +92,15 @@ export async function ouvrirFicheEleve(eleveId, classe) {
     const carnetHtml = champs.length ? champs.map(c => {
         const v = vals[c.id];
         let aff = '—';
-        if (v !== undefined && v !== null && v !== '') {
+        if (c.type === 'calcul') {
+            aff = calculerCarnet(c, champs, vals);
+        } else if (v !== undefined && v !== null && v !== '') {
             if (c.type === 'statut') {
                 const entree = (c.legende || []).find(l => String(l.v) === String(v));
                 aff = entree ? entree.label : v;
             } else if (c.type === 'note') {
-                aff = v + ' / ' + (c.bareme || 20);
+                const ech = c.echelle || { mode: 'numerique', bareme: c.bareme || 20 };
+                aff = (ech.mode === 'liste' || ech.mode === 'lettres') ? v : (v + ' / ' + (ech.bareme || 20));
             } else if (c.type === 'mesure') {
                 aff = v + (c.unite ? ' ' + c.unite : '');
             } else {

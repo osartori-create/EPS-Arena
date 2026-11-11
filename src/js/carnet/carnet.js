@@ -21,6 +21,7 @@ const TYPES = {
     mesure: { label: 'Mesure', icone: '📏', defaut: { unite: '' } },
     statut: { label: 'Statut', icone: '✅', defaut: { legende: [{ v: '0', label: 'Non' }, { v: '1', label: 'En cours' }, { v: '2', label: 'Validé' }] } },
     texte:  { label: 'Texte', icone: '💬', defaut: {} },
+    calcul: { label: 'Calcul', icone: '🧮', defaut: {} },
 };
 
 function lireChamps(classe) { return JSON.parse(localStorage.getItem(PREFIX_CHAMPS + classe) || '[]'); }
@@ -51,6 +52,81 @@ function couleurNote(ratio) {
 }
 
 const COULEURS_STATUT = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+const ECHELLE_LETTRES = [
+    { v: 'A', label: 'A', couleur: '#22c55e' },
+    { v: 'B', label: 'B', couleur: '#84cc16' },
+    { v: 'C', label: 'C', couleur: '#eab308' },
+    { v: 'D', label: 'D', couleur: '#f97316' },
+    { v: 'E', label: 'E', couleur: '#ef4444' },
+    { v: 'F', label: 'F', couleur: '#b91c1c' },
+];
+
+// Échelle effective d'une colonne "note" (compatible avec les anciennes colonnes).
+function echelleNote(champ) {
+    return champ.echelle || { mode: 'numerique', bareme: champ.bareme || 20 };
+}
+
+// Affichage + couleur d'une valeur de note.
+function noteAffichage(champ, v) {
+    const ech = echelleNote(champ);
+    if (ech.mode === 'lettres') {
+        const e = ECHELLE_LETTRES.find(x => x.v === v);
+        return e ? { aff: e.label, couleur: e.couleur } : { aff: '·', couleur: '#64748b' };
+    }
+    if (ech.mode === 'liste') {
+        const vals = ech.valeurs || [];
+        const i = vals.indexOf(v);
+        return i >= 0 ? { aff: v, couleur: COULEURS_STATUT[i % COULEURS_STATUT.length] } : { aff: '·', couleur: '#64748b' };
+    }
+    const num = parseFloat(v);
+    const ok = !isNaN(num) && v !== null && v !== undefined && v !== '';
+    const bareme = ech.bareme || 20;
+    const ratio = ok && bareme ? num / bareme : null;
+    return ok ? { aff: num + ' / ' + bareme, couleur: couleurNote(ratio) } : { aff: '·', couleur: '#64748b' };
+}
+
+// Calcule la valeur d'une colonne "calcul" pour un élève (moyenne / somme / % de documents).
+function calculerChamp(champ, eid) {
+    const calc = champ.calcul || {};
+    const sources = lireChamps(currentClasse).filter(c => c.groupe === calc.dossier && c.id !== champ.id);
+    if (calc.fonction === 'pourcentage') {
+        const statuts = sources.filter(c => c.type === 'statut');
+        if (!statuts.length) return { aff: '·', couleur: '#64748b' };
+        const valides = (calc.valides || '').split(',').map(x => x.trim()).filter(Boolean);
+        let fait = 0;
+        statuts.forEach(c => {
+            const v = getValeur(eid, c.id);
+            if (v === null || v === undefined || v === '') return;
+            if (!valides.length || valides.some(x => String(x) === String(v))) fait++;
+        });
+        const pct = Math.round(fait / statuts.length * 100);
+        const couleur = pct >= 100 ? '#22c55e' : pct >= 50 ? '#3b82f6' : pct > 0 ? '#f59e0b' : '#64748b';
+        return { aff: pct + '%', couleur };
+    }
+    if (calc.fonction === 'somme') {
+        let somme = 0, n = 0;
+        sources.filter(c => c.type === 'note' || c.type === 'mesure').forEach(c => {
+            const v = parseFloat(getValeur(eid, c.id));
+            if (!isNaN(v)) { somme += v; n++; }
+        });
+        return n ? { aff: String(Math.round(somme * 100) / 100), couleur: '#e2e8f0' } : { aff: '·', couleur: '#64748b' };
+    }
+    // moyenne (défaut) : notes numériques normalisées sur 20
+    let total = 0, n = 0;
+    sources.filter(c => c.type === 'note').forEach(c => {
+        const v = parseFloat(getValeur(eid, c.id));
+        if (isNaN(v)) return;
+        const ech = echelleNote(c);
+        if (ech.mode !== 'numerique') return;
+        const bareme = ech.bareme || 20;
+        total += (v / bareme) * 20;
+        n++;
+    });
+    if (!n) return { aff: '·', couleur: '#64748b' };
+    const moy = Math.round((total / n) * 10) / 10;
+    return { aff: moy + ' /20', couleur: couleurNote(moy / 20) };
+}
 
 // Modèles rapides (colonnes pré-remplies).
 const TEMPLATES = {
@@ -98,12 +174,15 @@ function cellHtml(e, champ) {
         </td>`;
     }
     if (champ.type === 'note') {
-        const num = parseFloat(v);
-        const ok = !isNaN(num) && v !== null && v !== undefined && v !== '';
-        const bareme = champ.bareme || 20;
-        const ratio = ok && bareme ? num / bareme : null;
-        return `<td class="p-1 text-center cursor-pointer" id="cell-${eid}-${cid}" onclick="window.carnetCell('${eid}','${cid}','note')" title="${escAttr(champ.libelle)}">
-            <span class="inline-block px-1.5 py-0.5 rounded-lg text-[11px] font-bold" style="color:${couleurNote(ratio)}">${ok ? num + ' / ' + bareme : '·'}</span>
+        const a = noteAffichage(champ, v);
+        return `<td class="p-1 text-center cursor-pointer" id="cell-${eid}-${cid}" onclick="window.carnetNoteEditer('${eid}','${cid}')" title="${escAttr(champ.libelle)}">
+            <span class="inline-block px-1.5 py-0.5 rounded-lg text-[11px] font-bold" style="color:${a.couleur}">${a.aff}</span>
+        </td>`;
+    }
+    if (champ.type === 'calcul') {
+        const a = calculerChamp(champ, eid);
+        return `<td class="p-1 text-center" title="${escAttr(champ.libelle)}">
+            <span class="inline-block px-1.5 py-0.5 rounded-lg text-[11px] font-bold" style="color:${a.couleur}">${a.aff}</span>
         </td>`;
     }
     if (champ.type === 'mesure') {
@@ -231,6 +310,65 @@ window.carnetSave = function(eid, cid, type, val) {
     render();
 };
 
+window.carnetNoteEditer = function(eid, cid) {
+    const champ = getChamp(cid);
+    if (!champ) return;
+    const ech = echelleNote(champ);
+    let zone;
+    if (ech.mode === 'numerique') {
+        zone = `
+            <input id="carnet-note-valeur" type="number" step="any" inputmode="decimal" value="${getValeur(eid, cid) ?? ''}" placeholder="Note sur ${ech.bareme || 20}" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-3 text-2xl text-white mb-2 text-center">
+            <p class="text-[10px] text-slate-500 text-center mb-3">Barème : /${ech.bareme || 20}</p>
+            <div class="flex gap-2">
+                <button onclick="window.carnetNoteValider('${eid}','${cid}')" class="flex-1 bg-blue-600 py-3 rounded-xl font-black text-white">Valider</button>
+                <button onclick="window.carnetNoteEffacer('${eid}','${cid}')" class="bg-red-600 px-4 rounded-xl font-black text-white">Effacer</button>
+            </div>`;
+    } else {
+        const valeurs = ech.mode === 'lettres' ? ECHELLE_LETTRES : (ech.valeurs || []).map((x, i) => ({ v: x, label: x, couleur: COULEURS_STATUT[i % COULEURS_STATUT.length] }));
+        zone = `
+            <div class="grid grid-cols-3 gap-2 mb-3">
+                ${valeurs.map(x => `<button onclick="window.carnetNoteChoisir('${eid}','${cid}','${escAttr(x.v)}')" class="py-3 rounded-xl font-black text-lg border-2" style="background:${x.couleur}22;border-color:${x.couleur};color:${x.couleur}">${esc(x.label)}</button>`).join('')}
+            </div>
+            <button onclick="window.carnetNoteEffacer('${eid}','${cid}')" class="w-full bg-red-600 py-2.5 rounded-xl font-black text-white text-sm">Effacer</button>`;
+    }
+    document.getElementById('carnet-note-modal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'carnet-note-modal';
+    modal.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-black text-white">🔢 ${esc(champ.libelle)}</h3>
+                <button onclick="document.getElementById('carnet-note-modal').remove()" class="bg-slate-700 px-3 py-1.5 rounded-lg font-black text-xs text-white">✖</button>
+            </div>
+            ${zone}
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const inp = document.getElementById('carnet-note-valeur');
+    if (inp) inp.focus();
+};
+
+window.carnetNoteValider = function(eid, cid) {
+    const inp = document.getElementById('carnet-note-valeur');
+    const n = parseFloat(String(inp?.value ?? '').replace(',', '.'));
+    setValeur(eid, cid, isNaN(n) ? null : n);
+    document.getElementById('carnet-note-modal')?.remove();
+    render();
+};
+
+window.carnetNoteChoisir = function(eid, cid, val) {
+    setValeur(eid, cid, val);
+    document.getElementById('carnet-note-modal')?.remove();
+    render();
+};
+
+window.carnetNoteEffacer = function(eid, cid) {
+    setValeur(eid, cid, null);
+    document.getElementById('carnet-note-modal')?.remove();
+    render();
+};
+
 function ajouterChamp(def) {
     const champs = lireChamps(currentClasse);
     champs.push({
@@ -241,6 +379,8 @@ function ajouterChamp(def) {
         bareme: def.type === 'note' ? (def.bareme || 20) : undefined,
         unite: def.type === 'mesure' ? (def.unite || '') : undefined,
         legende: def.type === 'statut' ? (def.legende || TYPES.statut.defaut.legende) : undefined,
+        echelle: def.type === 'note' ? (def.echelle || { mode: 'numerique', bareme: def.bareme || 20 }) : undefined,
+        calcul: def.type === 'calcul' ? (def.calcul || { fonction: 'moyenne', dossier: 'Général', valides: '' }) : undefined,
     });
     ecrireChamps(currentClasse, champs);
     currentGroupe = def.groupe || 'Général';
@@ -261,14 +401,27 @@ window.carnetAjouterColonne = function() {
                 <option value="mesure">📏 Mesure (avec unité)</option>
                 <option value="statut">✅ Statut (badge à légende)</option>
                 <option value="texte">💬 Texte</option>
+                <option value="calcul">🧮 Calcul (moyenne / somme / %)</option>
             </select>
             <label class="text-xs text-slate-400 block mb-1">Libellé</label>
             <input id="carnet-col-libelle" type="text" placeholder="Ex. : Contrôle n°1" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-3">
             <label class="text-xs text-slate-400 block mb-1">Dossier</label>
             <input id="carnet-col-groupe" type="text" placeholder="Général" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-3">
             <div id="carnet-col-opt-note" class="hidden mb-3">
-                <label class="text-xs text-slate-400 block mb-1">Barème</label>
-                <input id="carnet-col-bareme" type="number" value="20" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white">
+                <label class="text-xs text-slate-400 block mb-1">Échelle</label>
+                <select id="carnet-col-echelle" onchange="window.carnetColEchelle()" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-2">
+                    <option value="numerique">Numérique (sur un barème)</option>
+                    <option value="lettres">Lettres (A à F)</option>
+                    <option value="liste">Liste personnalisée</option>
+                </select>
+                <div id="carnet-col-ech-numerique">
+                    <label class="text-xs text-slate-400 block mb-1">Barème</label>
+                    <input id="carnet-col-bareme" type="number" value="20" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white">
+                </div>
+                <div id="carnet-col-ech-liste" class="hidden">
+                    <label class="text-xs text-slate-400 block mb-1">Valeurs (séparées par ;)</label>
+                    <input id="carnet-col-valeurs" type="text" placeholder="Acquis;En cours;Non acquis" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white">
+                </div>
             </div>
             <div id="carnet-col-opt-mesure" class="hidden mb-3">
                 <label class="text-xs text-slate-400 block mb-1">Unité</label>
@@ -278,6 +431,20 @@ window.carnetAjouterColonne = function() {
                 <label class="text-xs text-slate-400 block mb-1">Légende (format : 0=Non;1=Oui)</label>
                 <input id="carnet-col-legende" type="text" value="0=Non;1=En cours;2=Validé" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white">
             </div>
+            <div id="carnet-col-opt-calcul" class="hidden mb-3">
+                <label class="text-xs text-slate-400 block mb-1">Fonction</label>
+                <select id="carnet-col-fonction" onchange="window.carnetColFonction()" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-2">
+                    <option value="moyenne">Moyenne (notes → /20)</option>
+                    <option value="somme">Somme (notes / mesures)</option>
+                    <option value="pourcentage">% de documents rendus</option>
+                </select>
+                <label class="text-xs text-slate-400 block mb-1">Dossier source</label>
+                <select id="carnet-col-dossier" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white mb-2"></select>
+                <div id="carnet-col-opt-valides" class="hidden">
+                    <label class="text-xs text-slate-400 block mb-1">Valeurs « rendu » (séparées par des virgules)</label>
+                    <input id="carnet-col-valides" type="text" placeholder="vide = toute valeur remplie" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-white">
+                </div>
+            </div>
             <div class="flex gap-3 mt-4">
                 <button onclick="document.getElementById('carnet-col-modal').remove()" class="flex-1 bg-slate-700 py-2.5 rounded-xl font-black text-sm text-white">Annuler</button>
                 <button onclick="window.carnetColValider()" class="flex-1 bg-blue-600 py-2.5 rounded-xl font-black text-sm text-white">Ajouter</button>
@@ -285,15 +452,20 @@ window.carnetAjouterColonne = function() {
         </div>
     `;
     document.body.appendChild(modal);
+    const dossiers = [...new Set(lireChamps(currentClasse).map(c => c.groupe || 'Général'))];
+    const selDossier = document.getElementById('carnet-col-dossier');
+    if (selDossier) selDossier.innerHTML = (dossiers.length ? dossiers : ['Général']).map(d => `<option value="${escAttr(d)}">${esc(d)}</option>`).join('');
     window.carnetColType();
 };
 
 window.carnetColType = function() {
     const t = document.getElementById('carnet-col-type')?.value;
-    ['note', 'mesure', 'statut'].forEach(k => {
+    ['note', 'mesure', 'statut', 'calcul'].forEach(k => {
         const el = document.getElementById('carnet-col-opt-' + k);
         if (el) el.classList.toggle('hidden', t !== k);
     });
+    window.carnetColEchelle();
+    window.carnetColFonction();
 };
 
 window.carnetColValider = function() {
@@ -307,8 +479,27 @@ window.carnetColValider = function() {
         const [v, label] = p.split('=');
         return { v: (v || '').trim(), label: (label || v || '').trim() };
     });
-    ajouterChamp({ type, libelle, groupe, bareme, unite, legende: legende.length ? legende : undefined });
+    const echMode = document.getElementById('carnet-col-echelle')?.value || 'numerique';
+    const echValeurs = (document.getElementById('carnet-col-valeurs')?.value || '').split(';').map(x => x.trim()).filter(Boolean);
+    const echelle = { mode: echMode, bareme, valeurs: echValeurs };
+    const calcul = type === 'calcul' ? {
+        fonction: document.getElementById('carnet-col-fonction')?.value || 'moyenne',
+        dossier: document.getElementById('carnet-col-dossier')?.value || 'Général',
+        valides: document.getElementById('carnet-col-valides')?.value || '',
+    } : undefined;
+    ajouterChamp({ type, libelle, groupe, bareme, unite, legende: legende.length ? legende : undefined, echelle, calcul });
     document.getElementById('carnet-col-modal').remove();
+};
+
+window.carnetColEchelle = function() {
+    const m = document.getElementById('carnet-col-echelle')?.value;
+    document.getElementById('carnet-col-ech-numerique')?.classList.toggle('hidden', m !== 'numerique');
+    document.getElementById('carnet-col-ech-liste')?.classList.toggle('hidden', m !== 'liste');
+};
+
+window.carnetColFonction = function() {
+    const f = document.getElementById('carnet-col-fonction')?.value;
+    document.getElementById('carnet-col-opt-valides')?.classList.toggle('hidden', f !== 'pourcentage');
 };
 
 window.carnetRenommer = function(cid) {
