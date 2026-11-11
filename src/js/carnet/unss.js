@@ -212,15 +212,29 @@ function render() {
     `;
 }
 
+function notifier(msg, ok = true) {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);z-index:9999;max-width:90vw;padding:0.6rem 1rem;border-radius:0.75rem;font-weight:700;font-size:0.8rem;color:#fff;box-shadow:0 10px 25px rgba(0,0,0,.4);background:' + (ok ? '#059669' : '#dc2626') + ';';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+}
+window.notifier = notifier;
+
 window.unssImporter = function() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.xlsx,.xls';
-    input.onchange = async () => {
-        if (!input.files[0]) return;
+    const input = document.getElementById('unssFileInput');
+    if (!input) { notifier("Champ d'import introuvable.", false); return; }
+    input.value = ''; // réinitialise pour pouvoir réimporter le même fichier
+    input.click();
+};
+
+window.unssTraiterImport = async function(ev) {
+    const input = ev && ev.target;
+    if (!input || !input.files || !input.files[0]) return;
+    try {
         const buf = await input.files[0].arrayBuffer();
         const nouveaux = parserUnssXLSX(buf);
-        if (nouveaux.length === 0) { alert('Aucun licencié trouvé dans ce fichier.'); return; }
+        if (nouveaux.length === 0) { notifier('Aucun licencié trouvé dans ce fichier.', false); return; }
         const existants = lireUnss();
         const map = new Map();
         const cle = (l) => String(l.idLicencie || l.numLicence || `${l.nom}|${l.prenom}|${l.classe}`);
@@ -234,9 +248,11 @@ window.unssImporter = function() {
         ecrireUnss([...map.values()]);
         filtreRecherche = ''; filtreClasse = ''; filtreActivite = '';
         render();
-        alert(`✅ ${ajoutes} licencié(s) ajouté(s), ${nouveaux.length - ajoutes} mis à jour (${nouveaux.length} au total).`);
-    };
-    input.click();
+        notifier(`✅ ${ajoutes} ajouté(s), ${nouveaux.length - ajoutes} mis à jour (${nouveaux.length} au total).`);
+    } catch (err) {
+        notifier('Erreur lors de la lecture du fichier XLSX.', false);
+        console.error(err);
+    }
 };
 
 window.unssEffacer = function() {

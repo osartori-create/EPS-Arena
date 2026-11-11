@@ -345,20 +345,22 @@ window.calendrierEffacerVacances = function() {
 };
 
 window.calendrierChoisirFichier = function() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.ics,text/calendar';
-    input.onchange = async () => {
-        if (!input.files[0]) return;
-        const texte = await input.files[0].text();
-        const plages = parserICS(texte);
-        if (plages.length === 0) { alert('Aucune vacance trouvée dans ce fichier.'); return; }
-        ecrireVacances(plages);
-        document.getElementById('calendrier-vacances-fallback')?.classList.add('hidden');
-        render();
-        alert(`✅ ${plages.length} plage(s) importée(s) depuis le fichier.`);
-    };
+    const input = document.getElementById('calendrierFileInput');
+    if (!input) { window.notifier("Champ d'import introuvable.", false); return; }
+    input.value = '';
     input.click();
+};
+
+window.calendrierTraiterImport = async function(ev) {
+    const file = ev && ev.target && ev.target.files && ev.target.files[0];
+    if (!file) return;
+    const texte = await file.text();
+    const plages = parserICS(texte);
+    if (plages.length === 0) { window.notifier('Aucune vacance trouvée dans ce fichier.', false); return; }
+    ecrireVacances(plages);
+    document.getElementById('calendrier-vacances-fallback')?.classList.add('hidden');
+    render();
+    window.notifier(`✅ ${plages.length} plage(s) importée(s) depuis le fichier.`);
 };
 
 window.calendrierImporterVacancesTexte = function() {

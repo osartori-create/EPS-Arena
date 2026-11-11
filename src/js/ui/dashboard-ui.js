@@ -1,6 +1,7 @@
 // src/js/ui/dashboard-ui.js
 import { importCSV, importZIP, getPhotoUrl, getExistingEleves, saveEleves, updateStudentForce, updateStudentName } from '../services/admin-service.js';
 import { openImportModal } from '../services/import-service.js';
+import { openImportINE } from '../services/ine-import.js';
 import { migrerCodesAutoEval } from '../services/admin-service.js';
 
 let currentEleves = [];
@@ -410,4 +411,8 @@ window.openImportModal = function() {
         return;
     }
     openImportModal(classe);
+};
+
+window.openImportINE = function() {
+    openImportINE();
 };

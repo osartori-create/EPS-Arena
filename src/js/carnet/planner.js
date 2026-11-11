@@ -129,24 +129,25 @@ function parserPlannerXLSX(buf) {
 }
 
 window.plannerImporterXLSX = function() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.xlsx,.xls';
-    input.onchange = async (ev) => {
-        const file = ev.target.files[0];
-        if (!file) return;
-        try {
-            const buf = await file.arrayBuffer();
-            const creneaux = parserPlannerXLSX(buf);
-            ecrireCreneaux(creneaux);
-            render();
-            alert(`✅ Planner importé : ${Object.keys(creneaux).length} classe(s).`);
-        } catch (err) {
-            console.error(err);
-            alert('❌ Import impossible : ' + err.message);
-        }
-    };
+    const input = document.getElementById('plannerFileInput');
+    if (!input) { window.notifier("Champ d'import introuvable.", false); return; }
+    input.value = '';
     input.click();
+};
+
+window.plannerTraiterImport = async function(ev) {
+    const file = ev && ev.target && ev.target.files && ev.target.files[0];
+    if (!file) return;
+    try {
+        const buf = await file.arrayBuffer();
+        const creneaux = parserPlannerXLSX(buf);
+        ecrireCreneaux(creneaux);
+        render();
+        window.notifier(`✅ Planner importé : ${Object.keys(creneaux).length} classe(s).`);
+    } catch (err) {
+        console.error(err);
+        window.notifier('❌ Import impossible : ' + err.message, false);
+    }
 };
 
 // ============================================================
