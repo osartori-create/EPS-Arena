@@ -436,4 +436,27 @@ export async function uploadManualPhoto(studentId, file, classeName) {
     return true;
 }
 
+// Copie la photo du doublon vers le survivant, uniquement si le survivant n'en a pas déjà une.
+export async function transfererPhoto(survivantId, doublonId) {
+    if (!dbPhotos) return false;
+    const deja = await new Promise(res => {
+        const tx = dbPhotos.transaction("eleves", "readonly");
+        const r = tx.objectStore("eleves").get(survivantId);
+        r.onsuccess = () => res(r.result && r.result.blob);
+        r.onerror = () => res(false);
+    });
+    if (deja) return false;
+    return new Promise(res => {
+        const tx = dbPhotos.transaction("eleves", "readwrite");
+        const r = tx.objectStore("eleves").get(doublonId);
+        r.onsuccess = () => {
+            if (r.result && r.result.blob) {
+                tx.objectStore("eleves").put({ id: survivantId, blob: r.result.blob });
+                res(true);
+            } else res(false);
+        };
+        r.onerror = () => res(false);
+    });
+}
+
 export { getPhotoUrl };

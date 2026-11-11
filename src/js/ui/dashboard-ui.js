@@ -2,6 +2,7 @@
 import { importCSV, importZIP, getPhotoUrl, getExistingEleves, saveEleves, updateStudentForce, updateStudentName } from '../services/admin-service.js';
 import { openImportModal } from '../services/import-service.js';
 import { openImportINE } from '../services/ine-import.js';
+import '../services/merge-eleves.js'; // enregistre window.fusionnerDoublons / window.mergeFusionner
 import { migrerCodesAutoEval } from '../services/admin-service.js';
 
 let currentEleves = [];
