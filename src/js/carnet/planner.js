@@ -69,7 +69,7 @@ function lireCycleSemaines() {
 function ecrireCycleSemaines(cfg) { localStorage.setItem(KEY_CYCLE_SEMAINES, JSON.stringify(cfg)); }
 
 // Semaine du cycle (A/B) pour une date donnée.
-function semainePourDate(dateISO) {
+export function semainePourDate(dateISO) {
     const cfg = lireCycleSemaines();
     if (!cfg.debut || !cfg.nbSemaines || cfg.nbSemaines < 2) return 'A';
     const d = new Date(dateISO + 'T12:00:00').getTime();
@@ -80,7 +80,7 @@ function semainePourDate(dateISO) {
 }
 
 // Valeur d'activité pour une semaine donnée (chaîne = toutes les semaines, objet = {A,B}).
-function activitePourSemaine(val, semaine) {
+export function activitePourSemaine(val, semaine) {
     if (typeof val === 'string') return val;
     if (val && typeof val === 'object') return val[semaine] || '';
     return '';

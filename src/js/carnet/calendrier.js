@@ -2,7 +2,7 @@
 // Calendrier hebdomadaire (vue visuelle de la semaine, avec dates réelles).
 // Filtres par classe et par période. Clic sur une séance → ouvre l'appel (classe + date).
 
-import { lireCreneaux, lireCycles, lirePeriodes, getCouleurActivite } from './planner.js';
+import { lireCreneaux, lireCycles, lirePeriodes, getCouleurActivite, activitePourSemaine, semainePourDate } from './planner.js';
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'];
 
@@ -165,14 +165,15 @@ function render() {
             const key = `${c.jour} ${c.horaire}`.trim();
 
             let activite = '';
+            const semaine = semainePourDate(jourInfo.date);
             if (filtrePeriode) {
                 const pFiltre = periodes.find(p => p.id === filtrePeriode);
                 if (pFiltre && jourInfo.date >= pFiltre.debut && jourInfo.date <= pFiltre.fin) {
-                    activite = cycles[classe]?.[key]?.[filtrePeriode] || '';
+                    activite = activitePourSemaine(cycles[classe]?.[key]?.[filtrePeriode] || '', semaine);
                 }
             } else {
                 const pDate = periodePourDate(jourInfo.date, periodes);
-                activite = pDate ? (cycles[classe]?.[key]?.[pDate.id] || '') : '';
+                activite = pDate ? activitePourSemaine(cycles[classe]?.[key]?.[pDate.id] || '', semaine) : '';
             }
 
             grille[c.horaire][c.jour].cellules.push({ classe, activite });
