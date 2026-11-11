@@ -9,13 +9,14 @@ import { getCurrentClasse } from '../../core/live-engine.js';
 import {
     COULEURS_GROUPES, getGroupesKey, getConfigKey, getStatutsKey,
     getBasePath, setMapping, getElevesNumerotes, getStatuts,
-    creerSessionId, getSessionActivePath
+    creerSessionId, getSessionActivePath, getSessionsPath
 } from './natation-longue-common.js';
 import { DEFAUT_PARAMS, TITRE_AFFICHE, repartirEnGroupes } from './natation-longue-core.js';
 
 let currentClasse = '';
 let currentContainer = null;
 let _profSessionListener = null;
+let _profSessionsListener = null;
 
 // ============================================================
 // INITIALISATION
@@ -37,6 +38,7 @@ export function initNatationLongueInterface(container) {
         restaurerParams();
         loadAffectations();
         ecouterSessionActive();
+        ecouterSessions();
     }, 100);
 }
 
@@ -54,6 +56,11 @@ function createHeader() {
                         class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95"
                         title="Répartit aléatoirement les élèves présents dans les vagues">
                     🔄 Répartition aléatoire
+                </button>
+                <button onclick="window.nlRepartirParNiveau()"
+                        class="bg-cyan-600 hover:bg-cyan-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-cyan-400 active:scale-95"
+                        title="Répartit les élèves par niveau de nage (indice de nage) si les données existent">
+                    🏊 Par niveau
                 </button>
                 <button onclick="window.nlViderGroupes()"
                         class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-500 active:scale-95"
@@ -163,7 +170,13 @@ function createSequenceControls() {
     div.className = 'bg-slate-800 p-4 rounded-2xl border border-slate-700';
     div.innerHTML = `
         <h4 class="font-black text-blue-400 uppercase text-xs mb-3">🎬 Vagues (une couleur = une vague)</h4>
-        <p class="text-slate-400 text-[10px] mb-3">Épreuve en cours : <span id="nlSessionActive" class="font-black text-amber-300">—</span></p>
+        <div class="flex flex-wrap items-center gap-2 mb-3">
+            <label class="text-xs font-bold text-slate-400 uppercase">Épreuve :</label>
+            <select id="nlSessionSelect" onchange="window.nlChoisirSession(this.value)"
+                    class="bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-bold flex-1 min-w-[200px]"></select>
+            <button onclick="window.nlNouvelleSession()"
+                    class="bg-violet-600 hover:bg-violet-500 px-3 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-violet-400 active:scale-95">🆕 Nouvelle</button>
+        </div>
         <div id="nlSequenceButtons" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
     `;
     return div;
@@ -192,10 +205,30 @@ async function ecouterSessionActive() {
     if (_profSessionListener) _profSessionListener();
     if (!currentClasse) return;
     _profSessionListener = onValue(ref(db, getSessionActivePath(currentClasse)), (snap) => {
-        const el = document.getElementById('nlSessionActive');
-        if (el) el.textContent = snap.val() || '— (crée-la avec 🆕 Nouvelle épreuve ou en lançant une vague)';
+        const sid = snap.val() || '';
+        const select = document.getElementById('nlSessionSelect');
+        if (select && sid) select.value = sid;
     });
 }
+
+async function ecouterSessions() {
+    if (_profSessionsListener) _profSessionsListener();
+    if (!currentClasse) return;
+    _profSessionsListener = onValue(ref(db, getSessionsPath(currentClasse)), (snap) => {
+        const sessions = snap.val() || {};
+        const select = document.getElementById('nlSessionSelect');
+        if (!select) return;
+        const ids = Object.keys(sessions).sort().reverse();
+        select.innerHTML = ids.length
+            ? ids.map(id => `<option value="${id}">${id}</option>`).join('')
+            : '<option value="">— aucune épreuve —</option>';
+    });
+}
+
+window.nlChoisirSession = async function(sessionId) {
+    if (!currentClasse || !sessionId) return;
+    await set(ref(db, getSessionActivePath(currentClasse)), sessionId);
+};
 
 // ============================================================
 // GROUPES + RÉSERVES (drag & drop)
@@ -509,6 +542,42 @@ window.nlGenererGroupes = function() {
     loadAffectations();
 };
 
+window.nlRepartirParNiveau = function() {
+    if (!currentClasse) return alert('Sélectionnez une classe.');
+    const statuts = getStatuts(currentClasse);
+    const nbVagues = parseInt(document.getElementById('nlNbVagues')?.value) || DEFAUT_PARAMS.nbVagues;
+    const elevesNumerotes = getElevesNumerotes(currentClasse);
+    const presents = elevesNumerotes.filter(e => !(statuts[e.id] === 'absent' || statuts[e.id] === 'inapte'));
+
+    const avecIndice = presents.filter(e => Number(e.indiceNage) > 0);
+    const sansIndice = presents.filter(e => !(Number(e.indiceNage) > 0));
+
+    if (avecIndice.length === 0) {
+        alert('Aucun indice de nage disponible pour ces élèves.\n\nEnregistre d\'abord des résultats dans le mode « Indice de nage » puis clique « 📡 Transmettre » (l\'indice est alors écrit sur chaque fiche élève).');
+        return;
+    }
+
+    // Du meilleur nageur (indice le plus élevé) au moins bon.
+    avecIndice.sort((a, b) => Number(b.indiceNage) - Number(a.indiceNage));
+
+    // Bandes homogènes : vague 1 = meilleurs, dernière vague = moins bons.
+    const groupesIds = {};
+    COULEURS_GROUPES.forEach(c => { groupesIds[c.id] = []; });
+    const taille = Math.ceil(avecIndice.length / nbVagues);
+    avecIndice.forEach((e, i) => {
+        const idx = Math.min(nbVagues - 1, Math.floor(i / taille));
+        groupesIds[COULEURS_GROUPES[idx].id].push(e.id);
+    });
+
+    saveGroupes(groupesIds);
+    loadAffectations();
+
+    const msg = sansIndice.length > 0
+        ? `\n⚠️ ${sansIndice.length} élève(s) sans indice de nage laissé(s) en réserve (à affecter manuellement).`
+        : '';
+    alert(`🏊 Répartition par niveau effectuée pour ${avecIndice.length} élève(s) sur ${nbVagues} vague(s).${msg}`);
+};
+
 window.nlViderGroupes = function() {
     if (!currentClasse) return;
     if (!confirm('Remettre tous les élèves dans la réserve ?')) return;
@@ -521,6 +590,7 @@ window.nlNouvelleSession = async function() {
     if (!confirm('Créer une nouvelle épreuve horodatée ? Les résultats précédents sont conservés.')) return;
     const sessionId = creerSessionId();
     await set(ref(db, getSessionActivePath(currentClasse)), sessionId);
+    await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}/meta`), { creeLe: Date.now() });
     alert(`✅ Nouvelle épreuve créée : ${sessionId}`);
 };
 
@@ -532,6 +602,7 @@ window.nlLancerVague = async function(couleurId) {
     if (!sessionId) {
         sessionId = creerSessionId();
         await set(sessionRef, sessionId);
+        await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}/meta`), { creeLe: Date.now() });
     }
     await set(ref(db, `${getBasePath(currentClasse)}/commandes/sequence`), {
         etat: 'course',
