@@ -30,6 +30,16 @@ let configListener = null;
 let sequenceListener = null;
 let sessionListener = null;
 
+// Styles injectés une fois : évite le zoom involontaire (double-tap, éclaboussures)
+// et la sélection de texte sur les boutons du kiosk.
+function injecterStyles() {
+    if (document.getElementById('nl-kiosk-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'nl-kiosk-styles';
+    style.textContent = '#natation-module button{ touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }@keyframes nl-blink{0%,49%{opacity:1}50%,100%{opacity:0.25}}.nl-chrono-alerte{animation:nl-blink 1s step-start infinite;}';
+    document.head.appendChild(style);
+}
+
 // ============================================================
 // INITIALISATION
 // ============================================================
@@ -45,6 +55,8 @@ export function initNatationLongueKiosk(classe) {
 
     const container = document.getElementById('natation-module');
     if (!container) return;
+
+    injecterStyles();
 
     const basePath = getBasePath(classe);
 
@@ -194,17 +206,12 @@ function renderCourse(container) {
     });
 
     container.innerHTML = `
-        <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
-            <div class="flex justify-between items-center bg-slate-900/90 backdrop-blur p-4 rounded-2xl mb-4 border-2" style="border-color:${couleur.border};">
-                <div>
-                    <div class="text-[10px] font-bold uppercase text-slate-400">Vague en cours</div>
-                    <div class="text-xl font-black text-white">${couleur.label} · +${distanceParClic} m / passage</div>
-                </div>
-                <div class="text-right">
-                    <div class="text-[10px] font-bold uppercase text-slate-400">Temps restant</div>
-                    <div id="nl-chrono-restant" class="text-3xl font-mono font-black text-yellow-400">${formatDuree(state.config?.duree || 420)}</div>
-                </div>
+        <div class="p-4" style="background:${couleur.bg}10; min-height:100vh; display:flex; flex-direction:column;">
+            <div class="text-center mb-4 rounded-2xl py-3 sticky top-0 z-10" style="background:#ffffff; border:3px solid ${couleur.border};">
+                <div style="color:#64748b; font-size:0.7rem; font-weight:800; text-transform:uppercase;">Temps restant</div>
+                <div id="nl-chrono-restant" style="font-size:4rem; font-weight:900; color:#0f172a; line-height:1; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;">${formatDuree(state.config?.duree || 420)}</div>
             </div>
+            <div class="text-center font-black mb-3" style="color:${couleur.bg}; font-size:1rem;">Vague ${couleur.label} · +${distanceParClic} m / passage</div>
             <div class="grid grid-cols-3 md:grid-cols-4 gap-3">${btns}</div>
             <p class="text-slate-400 text-xs mt-4 text-center">Clique sur le numéro de l'élève à chaque retour au mur (aller-retour = ${distanceParClic} m).</p>
         </div>
@@ -244,6 +251,7 @@ function refreshButtons() {
     if (state.phase !== 'course' || !state.config) return;
     const antiClic = (state.config.antiDoubleClic || 10) * 1000;
     const distanceParClic = state.config.distanceParClic || 50;
+    const couleur = getCouleurGroupe(state.couleur);
 
     state.codes.forEach(num => {
         const btn = document.getElementById(`nl-btn-${num}`);
@@ -259,10 +267,16 @@ function refreshButtons() {
 
         if (bloque) {
             btn.disabled = true;
+            btn.style.background = '#15803d';
+            btn.style.borderColor = '#22c55e';
+            btn.style.color = '#ffffff';
             const restant = Math.ceil((antiClic - ecoule) / 1000);
-            dernier.textContent = `⏱ ${restant}s`;
+            dernier.textContent = `✓ ${restant}s`;
         } else {
             btn.disabled = false;
+            btn.style.background = couleur.bg;
+            btn.style.borderColor = couleur.border;
+            btn.style.color = couleur.text;
             const nb = (state.timestampsParEleve[num] || []).length;
             dernier.textContent = `${nb} passage${nb > 1 ? 's' : ''} · ${nb * distanceParClic} m`;
         }
@@ -272,6 +286,13 @@ function refreshButtons() {
     if (chronoEl && state.timestampDebut) {
         const restant = Math.max(0, state.config.duree - (Date.now() - state.timestampDebut) / 1000);
         chronoEl.textContent = formatDuree(restant);
+        if (restant > 0 && restant <= 30) {
+            chronoEl.style.color = '#dc2626';
+            chronoEl.classList.add('nl-chrono-alerte');
+        } else {
+            chronoEl.style.color = '#0f172a';
+            chronoEl.classList.remove('nl-chrono-alerte');
+        }
     }
 }
 
