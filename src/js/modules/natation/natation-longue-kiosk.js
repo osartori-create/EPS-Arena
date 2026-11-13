@@ -29,6 +29,7 @@ let state = {
 let configListener = null;
 let sequenceListener = null;
 let sessionListener = null;
+let historiqueClics = [];
 
 // Styles injectés une fois : évite le zoom involontaire (double-tap, éclaboussures)
 // et la sélection de texte sur les boutons du kiosk.
@@ -51,6 +52,7 @@ export function initNatationLongueKiosk(classe) {
     state.partielsParEleve = {};
     state.abandonsParEleve = {};
     state.lastClickAt = {};
+    historiqueClics = [];
     state.timestampDebut = null;
 
     const container = document.getElementById('natation-module');
@@ -86,6 +88,7 @@ export function initNatationLongueKiosk(classe) {
             state.partielsParEleve = {};
             state.abandonsParEleve = {};
             state.lastClickAt = {};
+            historiqueClics = [];
             render();
         } else if (seq.etat === 'termine' && seq.vague === state.couleur && state.phase === 'course') {
             state.phase = 'saisie_finale';
@@ -160,6 +163,7 @@ window.nlKioskChoixCouleur = function(couleurId) {
     state.partielsParEleve = {};
     state.abandonsParEleve = {};
     state.lastClickAt = {};
+    historiqueClics = [];
     initAudioContext();
     if (state.sequence && state.sequence.etat === 'course' && state.sequence.vague === couleurId) {
         state.phase = 'course';
@@ -213,6 +217,7 @@ function renderCourse(container) {
             </div>
             <div class="text-center font-black mb-3" style="color:${couleur.bg}; font-size:1rem;">Vague ${couleur.label} · +${distanceParClic} m / passage</div>
             <div class="grid grid-cols-3 md:grid-cols-4 gap-3">${btns}</div>
+            <button onclick="window.nlKioskAnnulerDernier()" class="w-full mt-3 py-3 rounded-xl font-black text-sm border-2 active:scale-95" style="background:#fef3c7; color:#92400e; border-color:#f59e0b;">↩️ Annuler le dernier clic</button>
             <p class="text-slate-400 text-xs mt-4 text-center">Clique sur le numéro de l'élève à chaque retour au mur (aller-retour = ${distanceParClic} m).</p>
         </div>
     `;
@@ -232,8 +237,21 @@ window.nlKioskClickNumero = function(num) {
     state.lastClickAt[num] = Date.now();
     if (!state.timestampsParEleve[num]) state.timestampsParEleve[num] = [];
     state.timestampsParEleve[num].push(Date.now());
+    historiqueClics.push(num);
     playBeep();
     pousserObservation(num);
+    refreshButtons();
+};
+
+window.nlKioskAnnulerDernier = function() {
+    if (state.phase !== 'course') return;
+    const num = historiqueClics.pop();
+    if (num === undefined || num === null) return;
+    const arr = state.timestampsParEleve[num] || [];
+    if (arr.length > 0) arr.pop();
+    state.lastClickAt[num] = 0;
+    pousserObservation(num);
+    playBeep();
     refreshButtons();
 };
 
@@ -317,7 +335,7 @@ function demarrerTicks() {
 function renderSaisieFinale(container) {
     const couleur = getCouleurGroupe(state.couleur);
     const distanceParClic = state.config?.distanceParClic || 50;
-    const elevesActifs = state.codes.filter(c => !state.abandonsParEleve[c]);
+    const elevesActifs = state.codes;
 
     let html = `
         <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
@@ -341,8 +359,6 @@ function renderSaisieFinale(container) {
                 <input type="number" id="nl-partiel-${num}" value="${partiel}" min="0" max="${distanceParClic - 1}" step="5"
                        class="w-20 bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-black">
                 <span class="text-slate-400 text-sm">m</span>
-                <button onclick="window.nlKioskAbandon('${num}')"
-                        class="bg-red-900/40 text-red-300 text-xs px-2 py-1 rounded-lg font-bold border border-red-700 flex-shrink-0">🚫 Abandon</button>
             </div>
         `;
     });
@@ -357,11 +373,6 @@ function renderSaisieFinale(container) {
     container.innerHTML = html;
 }
 
-window.nlKioskAbandon = function(num) {
-    state.abandonsParEleve[num] = 'abandon';
-    pousserObservation(num);
-    render();
-};
 
 window.nlKioskValiderPartiels = function() {
     const distanceParClic = state.config?.distanceParClic || 50;
@@ -387,8 +398,7 @@ function renderBilan(container) {
     const rows = state.codes.map(num => {
         const nb = (state.timestampsParEleve[num] || []).length;
         const partiel = state.partielsParEleve[num] || 0;
-        const abandon = !!state.abandonsParEleve[num];
-        return { num, nb, partiel, distance: nb * distanceParClic + partiel, abandon };
+        return { num, nb, partiel, distance: nb * distanceParClic + partiel };
     }).sort((a, b) => b.distance - a.distance);
 
     let html = `
@@ -401,10 +411,10 @@ function renderBilan(container) {
     `;
     rows.forEach(r => {
         html += `
-            <div class="bg-slate-800 p-3 rounded-xl border-2 flex items-center gap-3" style="border-color:${r.abandon ? '#ef4444' : couleur.border};">
+            <div class="bg-slate-800 p-3 rounded-xl border-2 flex items-center gap-3" style="border-color:${couleur.border};">
                 <div class="text-2xl font-black w-12 text-center" style="color:${couleur.bg};">#${r.num}</div>
-                <div class="flex-1 text-sm text-slate-300">${r.abandon ? '🚫 Abandon' : `${r.nb} passage${r.nb > 1 ? 's' : ''} + ${r.partiel} m`}</div>
-                <div class="text-xl font-black text-yellow-400">${r.abandon ? '—' : r.distance + ' m'}</div>
+                <div class="flex-1 text-sm text-slate-300">${r.nb} passage${r.nb > 1 ? 's' : ''} + ${r.partiel} m</div>
+                <div class="text-xl font-black text-yellow-400">${r.distance} m</div>
             </div>
         `;
     });

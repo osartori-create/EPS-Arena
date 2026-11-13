@@ -216,7 +216,6 @@ window.nlLiveEditer = function(numero) {
                     <label class="text-xs font-bold text-slate-400 uppercase">Statut</label>
                     <select id="nl-modif-statut" class="w-full bg-slate-800 border border-slate-600 rounded-xl p-2 text-white font-black">
                         <option value="">Aucun</option>
-                        <option value="abandon" ${modif.statut === 'abandon' ? 'selected' : ''}>🚫 Abandon</option>
                         <option value="blessure" ${modif.statut === 'blessure' ? 'selected' : ''}>🤕 Blessure</option>
                     </select>
                 </div>

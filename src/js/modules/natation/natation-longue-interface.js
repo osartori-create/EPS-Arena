@@ -11,7 +11,7 @@ import {
     getBasePath, setMapping, getElevesNumerotes, getStatuts,
     creerSessionId, getSessionActivePath, getSessionsPath
 } from './natation-longue-common.js';
-import { DEFAUT_PARAMS, TITRE_AFFICHE, repartirEnGroupes } from './natation-longue-core.js';
+import { DEFAUT_PARAMS, TITRE_AFFICHE } from './natation-longue-core.js';
 
 let currentClasse = '';
 let currentContainer = null;
@@ -61,10 +61,10 @@ function createHeader() {
                 </select>
             </div>
             <div class="flex flex-wrap gap-2">
-                <button onclick="window.nlGenererGroupes()"
+                <button onclick="window.nlAffecterOrdre()"
                         class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400 active:scale-95"
-                        title="Répartit aléatoirement les élèves présents dans les vagues">
-                    🔄 Répartition aléatoire
+                        title="Affecte les élèves présents par numéro croissant (ex. 1-10, 11-20, 21-28)">
+                    🔢 Affecter par ordre
                 </button>
                 <button onclick="window.nlRepartirParNiveau()"
                         class="bg-cyan-600 hover:bg-cyan-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-cyan-400 active:scale-95"
@@ -320,10 +320,10 @@ async function createEleveCard(eleve) {
         ? `<img src="${photoUrl}" class="w-9 h-9 rounded-full object-cover border border-slate-500 flex-shrink-0">`
         : `<div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-sm flex-shrink-0">👤</div>`;
     card.innerHTML = `
+        <div class="w-9 h-9 rounded-full bg-yellow-400 text-black flex items-center justify-center font-black text-base flex-shrink-0 border-2 border-yellow-600">${eleve.numero}</div>
         ${photoHtml}
         <div class="min-w-0 flex-1">
             <div class="text-xs font-bold text-white truncate">${eleve.prenom} ${eleve.nom}</div>
-            <div class="text-[10px] text-yellow-400 font-black">N° ${eleve.numero}</div>
         </div>
     `;
     return card;
@@ -533,22 +533,23 @@ export function importerNatationLongue(event) {
 // ============================================================
 // FONCTIONS GLOBALES (appels depuis les boutons HTML)
 // ============================================================
-window.nlGenererGroupes = function() {
+window.nlAffecterOrdre = function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     const statuts = getStatuts(currentClasse);
     const nbVagues = parseInt(document.getElementById('nlNbVagues')?.value) || DEFAUT_PARAMS.nbVagues;
-    const elevesNumerotes = getElevesNumerotes(currentClasse);
-    const presents = elevesNumerotes.filter(e => !(statuts[e.id] === 'absent' || statuts[e.id] === 'inapte'));
-    const groupesNumeros = repartirEnGroupes(presents.map(e => e.numero), nbVagues);
+    const presents = getElevesNumerotes(currentClasse).filter(e => !(statuts[e.id] === 'absent' || statuts[e.id] === 'inapte'));
 
-    const numToId = {};
-    elevesNumerotes.forEach(e => { numToId[String(e.numero)] = e.id; });
     const groupesIds = {};
-    COULEURS_GROUPES.forEach(c => {
-        groupesIds[c.id] = (groupesNumeros[c.id] || []).map(n => numToId[String(n)]).filter(Boolean);
+    COULEURS_GROUPES.forEach(c => { groupesIds[c.id] = []; });
+    const taille = Math.ceil(presents.length / nbVagues);
+    presents.forEach((e, i) => {
+        const idx = Math.min(nbVagues - 1, Math.floor(i / taille));
+        groupesIds[COULEURS_GROUPES[idx].id].push(e.id);
     });
+
     saveGroupes(groupesIds);
     loadAffectations();
+    alert(`✅ Affectation par ordre croissant : ${presents.length} élève(s) sur ${nbVagues} vague(s).`);
 };
 
 window.nlRepartirParNiveau = function() {
