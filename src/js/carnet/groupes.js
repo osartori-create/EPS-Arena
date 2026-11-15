@@ -3,7 +3,7 @@
 // Données (localStorage, RGPD) : eps_arena_groupes_<classe> = [{ id, nom, couleur, eleves: [eleveId] }]
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/live-engine.js';
+import { getCurrentClasse } from '../core/current-classe.js';
 
 const PREFIX = 'eps_arena_groupes_';
 const PALETTE = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7', '#eab308'];

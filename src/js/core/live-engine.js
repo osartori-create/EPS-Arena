@@ -3,6 +3,7 @@ import { getEtab } from './firebase-service.js';
 import { listenToActivityData, getBadmintonResultsPath, ref, onValue } from './firebase-service.js';
 import { db } from './firebase-service.js';
 import { getPhotoUrl } from '../services/admin-service.js';
+import { getCurrentClasse } from './current-classe.js';
 
 let currentClasse = "";
 let currentUnsub = null;
@@ -48,13 +49,7 @@ function startListening() {
 
 // ----- Fonctions exportées (correctes) -----
 
-export function getCurrentClasse() {
-    let select = document.getElementById('selectClasse');
-    if (!select) {
-        select = document.getElementById('class-select');
-    }
-    return select ? select.value : '';
-}
+export { getCurrentClasse };
 
 export function getConfigData() { return configData; }
 

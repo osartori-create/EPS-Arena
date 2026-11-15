@@ -6,7 +6,7 @@
 //   eps_arena_carnet_valeurs_<classe>  = { [eleveId]: { [champId]: valeur } }
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/live-engine.js';
+import { getCurrentClasse } from '../core/current-classe.js';
 import './fiche-eleve.js'; // enregistre window.ouvrirFicheEleve
 
 const PREFIX_CHAMPS = 'eps_arena_carnet_champs_';

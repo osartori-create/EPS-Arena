@@ -4,7 +4,7 @@
 // Clé : eps_arena_appel_<classe>  →  { [date AAAA-MM-JJ]: { [eleveId]: statut } }
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/live-engine.js';
+import { getCurrentClasse } from '../core/current-classe.js';
 import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude } from './inaptitude.js';
 import { getSeancesClasseDate, lirePeriodes } from './planner.js';
 import { getToutesGrilles, getEvaluationsClasse, calculerNoteFinale } from '../modules/grilles/grilles-core.js';

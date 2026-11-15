@@ -4,7 +4,7 @@
 // Données (localStorage, RGPD) : eps_arena_plans_<classe> = { actif, plans: [{ id, nom, lignes, colonnes, placements, colonnesGroupes }] }
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/live-engine.js';
+import { getCurrentClasse } from '../core/current-classe.js';
 import { lireGroupes, getGroupesEleve, creerGroupe, ajouterElevesGroupe, retirerEleveGroupe, retirerEleveDeTousGroupes, supprimerGroupe } from './groupes.js';
 import { lireAppelClasse, ecrireAppelClasse, STATUTS } from './appel.js';
 

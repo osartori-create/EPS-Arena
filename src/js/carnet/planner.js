@@ -6,7 +6,7 @@
 //   eps_arena_creneaux   = { [classe]: [{ jour, horaire }] }
 //   eps_arena_cycles     = { [classe]: { [creneauKey]: { [periodeId]: activite } } }
 
-import { getCurrentClasse } from '../core/live-engine.js';
+import { getCurrentClasse } from '../core/current-classe.js';
 
 const KEY_PERIODES = 'eps_arena_periodes';
 const KEY_ACTIVITES = 'eps_arena_activites';

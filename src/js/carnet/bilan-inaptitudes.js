@@ -3,7 +3,7 @@
 // Données (localStorage, RGPD) : inaptitudes courantes + historique + appel (flag inapte).
 
 import { getExistingEleves } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/live-engine.js';
+import { getCurrentClasse } from '../core/current-classe.js';
 import { MOTIFS, ZONES, labelZone, lireInaptitudesClasse, lireHistoriqueClasse, supprimerInaptitude, setClasseInaptitude, calculerTempsRestant } from './inaptitude.js';
 
 const KEY_CLASSES = 'eps_arena_classes';
