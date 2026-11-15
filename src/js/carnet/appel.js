@@ -5,7 +5,7 @@
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
 import { getCurrentClasse, onClasseChange } from '../core/current-classe.js';
-import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude } from './inaptitude.js';
+import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude, calculerTempsRestant, libelleTempsRestant } from './inaptitude.js';
 import { getSeancesClasseDate, lirePeriodes } from './planner.js';
 import { getToutesGrilles, getEvaluationsClasse, calculerNoteFinale } from '../modules/grilles/grilles-core.js';
 import { exporterVersExcel } from '../services/export-service.js';
@@ -34,8 +34,11 @@ const STATS_FLAGS = [
 let currentClasse = '';
 let currentDate = '';
 let currentGroupe = '';
+let vueAppel = localStorage.getItem('eps_arena_appel_vue') || 'grille';
+let ficheIndex = 0;
 const photosCache = {};
 let ecouteClasse = false;
+let swipeAttache = false;
 
 function formaterDate(d) {
     const y = d.getFullYear();
@@ -61,6 +64,7 @@ export function ecrireAppelClasse(classe, data) {
 
 async function rechargerClasse() {
     currentClasse = getCurrentClasse();
+    ficheIndex = 0;
     setClasseInaptitude(currentClasse);
     await chargerPhotos(getExistingEleves(currentClasse));
     render();
@@ -74,6 +78,7 @@ export async function initAppelInterface() {
     setClasseInaptitude(currentClasse);
     migrerDonneesAppel();
     await chargerPhotos(getExistingEleves(currentClasse));
+    attacherSwipe();
     render();
     if (!ecouteClasse) {
         ecouteClasse = true;
@@ -103,6 +108,24 @@ async function chargerPhotos(eleves) {
         if (photosCache[e.id] !== undefined) return;
         try { photosCache[e.id] = await getPhotoUrl(e.id); } catch (err) { photosCache[e.id] = null; }
     }));
+}
+
+function attacherSwipe() {
+    if (swipeAttache) return;
+    const container = document.getElementById('viewPresences');
+    if (!container) return;
+    swipeAttache = true;
+    let startX = null;
+    container.addEventListener('touchstart', (ev) => {
+        if (vueAppel !== 'fiche') return;
+        startX = ev.touches[0].clientX;
+    }, { passive: true });
+    container.addEventListener('touchend', (ev) => {
+        if (vueAppel !== 'fiche' || startX === null) return;
+        const dx = ev.changedTouches[0].clientX - startX;
+        startX = null;
+        if (Math.abs(dx) > 50) window.appelFicheNav(dx < 0 ? 1 : -1);
+    }, { passive: true });
 }
 
 function render() {
@@ -172,6 +195,8 @@ function render() {
                         <button onclick="window.appelChangerDate(1)" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white">→</button>
                         <button onclick="window.appelVoirStats()" class="bg-cyan-700 hover:bg-cyan-600 px-3 py-2 rounded-xl font-black text-xs uppercase text-white">📊 Stats</button>
                         <button onclick="window.appelVoirBilan()" class="bg-emerald-700 hover:bg-emerald-600 px-3 py-2 rounded-xl font-black text-xs uppercase text-white">🧾 Bilan</button>
+                        <button onclick="window.appelVoirBilanJour()" class="bg-blue-700 hover:bg-blue-600 px-3 py-2 rounded-xl font-black text-xs uppercase text-white">📋 Bilan du jour</button>
+                        <button onclick="window.appelBasculerVue()" class="bg-slate-600 hover:bg-slate-500 px-3 py-2 rounded-xl font-black text-xs uppercase text-white">${vueAppel === 'fiche' ? '📋 Tableau' : '🃏 Fiche'}</button>
                     </div>
                 </div>
 
@@ -183,6 +208,7 @@ function render() {
                     <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#3b82f6; color:#ffffff;">Oubli tenue : ${nbOubli}</span>
                 </div>
 
+                ${vueAppel === 'fiche' ? renderFicheHTML(eleves, statutsDuJour, photos) : `
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead>
@@ -212,6 +238,11 @@ function render() {
                                 if (inapte) {
                                     const lib = libelleInaptitude(inaptData) || 'Inapte';
                                     badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#8b5cf6; color:#ffffff;" title="${lib}">${lib}</span>`);
+                                }
+                                const joursRestants = inaptData ? calculerTempsRestant(inaptData) : null;
+                                if (!inapte && joursRestants !== null && joursRestants >= 0) {
+                                    const libTemps = libelleTempsRestant(inaptData);
+                                    badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#f59e0b; color:#ffffff;" title="Inaptitude en cours — ${libTemps}">⚠️ ${libTemps}</span>`);
                                 }
                                 if (inaptData && inaptData.nonJustifiee) {
                                     badges.push(`<span class="px-2 py-0.5 rounded-full text-[10px] font-black" style="background-color:#dc2626; color:#ffffff;" title="Inaptitude non justifiée — demander le mot des parents">⚠️ À justifier</span>`);
@@ -248,7 +279,61 @@ function render() {
                         </tbody>
                     </table>
                 </div>
+                `}
             </div>
+        </div>
+    `;
+}
+
+function renderFicheHTML(eleves, statutsDuJour, photos) {
+    if (ficheIndex >= eleves.length) ficheIndex = eleves.length - 1;
+    if (ficheIndex < 0) ficheIndex = 0;
+    const e = eleves[ficheIndex];
+    if (!e) return '<p class="text-slate-500 text-center py-10">Aucun élève.</p>';
+
+    const entree = statutsDuJour[e.id] || {};
+    const absent = entree.absent === true;
+    const inapte = entree.inapte === true;
+    const retard = entree.retard === true;
+    const oubli = entree.oubli_tenue === true;
+    const inaptData = getInaptitude(e.id);
+    const joursRestants = inaptData ? calculerTempsRestant(inaptData) : null;
+    const num = ficheIndex + 1;
+
+    const photoHtml = photos[e.id]
+        ? `<img src="${photos[e.id]}" class="w-44 h-44 md:w-56 md:h-56 rounded-3xl object-cover border-4 border-slate-600 mx-auto">`
+        : `<div class="w-44 h-44 md:w-56 md:h-56 rounded-3xl bg-slate-700 flex items-center justify-center text-7xl mx-auto">👤</div>`;
+
+    const bouton = (id, label, actif, couleur) => `
+        <button onclick="window.appelToggleStatut('${e.id}', '${id}')"
+            class="w-full py-5 rounded-2xl text-lg font-black uppercase transition-all active:scale-95"
+            style="background-color:${actif ? couleur : '#334155'}; color:#fff; ${actif ? 'box-shadow:0 0 0 3px ' + couleur + ';' : ''}">${label}</button>`;
+
+    return `
+        <div class="flex items-stretch gap-3">
+            <button onclick="window.appelFicheNav(-1)" class="bg-slate-700 hover:bg-slate-600 px-4 rounded-2xl font-black text-4xl text-white shrink-0 active:scale-95">‹</button>
+            <div class="flex-1 flex flex-col gap-4 min-w-0">
+                <div class="flex flex-col items-center gap-3 py-2">
+                    ${photoHtml}
+                    <div class="text-3xl md:text-5xl font-black text-white leading-tight text-center">${e.prenom} ${e.nom}</div>
+                    <div class="text-2xl font-black text-blue-400">${num}/${eleves.length}</div>
+                    ${joursRestants !== null && joursRestants >= 0 ? `<div class="px-3 py-1 rounded-full text-sm font-black" style="background-color:#f59e0b; color:#fff;">⚠️ Inapte · ${libelleTempsRestant(inaptData)}</div>` : ''}
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    ${bouton('absent', '❌ Absent', absent, '#ef4444')}
+                    ${bouton('inapte', '🤕 Inapte', inapte, '#8b5cf6')}
+                    ${bouton('retard', '⏰ Retard', retard, '#f59e0b')}
+                    ${bouton('oubli_tenue', '👕 Oubli tenue', oubli, '#3b82f6')}
+                </div>
+                <div class="bg-slate-900/50 p-4 rounded-2xl border border-slate-700">
+                    <label class="text-xs font-black text-slate-400 uppercase block mb-2">💬 Commentaire (50 caractères max)</label>
+                    <input type="text" maxlength="50" value="${entree.commentaire || ''}"
+                        oninput="window.appelMajCommentaire('${e.id}', this.value)"
+                        placeholder="Saisir un commentaire…"
+                        class="w-full bg-slate-900 border border-slate-600 rounded-xl p-3 text-white text-lg font-bold">
+                </div>
+            </div>
+            <button onclick="window.appelFicheNav(1)" class="bg-slate-700 hover:bg-slate-600 px-4 rounded-2xl font-black text-4xl text-white shrink-0 active:scale-95">›</button>
         </div>
     `;
 }
@@ -298,6 +383,27 @@ window.appelToggleStatut = function(eleveId, statutId) {
         }
     });
     render();
+};
+
+window.appelBasculerVue = function() {
+    vueAppel = vueAppel === 'fiche' ? 'grille' : 'fiche';
+    localStorage.setItem('eps_arena_appel_vue', vueAppel);
+    if (vueAppel === 'fiche') ficheIndex = 0;
+    render();
+};
+
+window.appelFicheNav = function(delta) {
+    if (vueAppel !== 'fiche') return;
+    ficheIndex += delta;
+    render();
+};
+
+window.appelMajCommentaire = function(eleveId, texte) {
+    if (!currentClasse) return;
+    const t = (texte || '').slice(0, 50);
+    majEleve(eleveId, (entree) => {
+        if (t) entree.commentaire = t; else delete entree.commentaire;
+    });
 };
 
 window.appelOuvrirInaptitude = function(eleveId) {
@@ -458,6 +564,59 @@ window.appelChangerDate = function(delta) {
 window.appelFiltreGroupe = function(groupeId) {
     currentGroupe = groupeId;
     render();
+};
+
+window.appelVoirBilanJour = function() {
+    if (!currentClasse) return;
+    const appel = lireAppel();
+    const statutsDuJour = appel[currentDate] || {};
+    const eleves = getExistingEleves(currentClasse);
+    eleves.sort((a, b) => (a.nom || '').localeCompare(b.nom || '') || (a.prenom || '').localeCompare(b.prenom || ''));
+
+    let nbPresent = 0, nbAbsent = 0, nbInapte = 0, nbRetard = 0, nbOubli = 0;
+    const absents = [], inaptes = [], retards = [], oublis = [];
+    eleves.forEach(e => {
+        const entree = statutsDuJour[e.id] || {};
+        const n = (entree.absent ? 1 : 0) + (entree.inapte ? 1 : 0) + (entree.retard ? 1 : 0) + (entree.oubli_tenue ? 1 : 0);
+        if (n === 0) nbPresent++;
+        if (entree.absent) { nbAbsent++; absents.push(e); }
+        if (entree.inapte) { nbInapte++; inaptes.push(e); }
+        if (entree.retard) { nbRetard++; retards.push(e); }
+        if (entree.oubli_tenue) { nbOubli++; oublis.push(e); }
+    });
+
+    const liste = (arr) => arr.length ? arr.map(x => `${x.prenom} ${x.nom}`).join(' · ') : '—';
+    const dateFr = new Date(currentDate + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const overlay = document.createElement('div');
+    overlay.id = 'appel-bilan-jour-modal';
+    overlay.className = 'fixed inset-0 bg-black/70 z-50 flex items-start justify-center p-4 overflow-y-auto';
+    overlay.innerHTML = `
+        <div class="bg-slate-900 p-6 rounded-3xl border-2 border-slate-700 w-full max-w-xl my-8">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-xl font-black text-blue-400 uppercase">📋 Bilan du jour</h2>
+                    <p class="text-xs text-slate-400">Classe ${currentClasse} · ${dateFr}</p>
+                </div>
+                <button onclick="document.getElementById('appel-bilan-jour-modal').remove()" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl font-black text-white text-sm">✖</button>
+            </div>
+            <div class="flex gap-2 flex-wrap mb-4">
+                <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#22c55e; color:#fff;">Présents : ${nbPresent}</span>
+                <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#ef4444; color:#fff;">Absents : ${nbAbsent}</span>
+                <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#8b5cf6; color:#fff;">Inaptes : ${nbInapte}</span>
+                <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#f59e0b; color:#fff;">Retards : ${nbRetard}</span>
+                <span class="px-3 py-1 rounded-full text-xs font-black" style="background-color:#3b82f6; color:#fff;">Oublis tenue : ${nbOubli}</span>
+            </div>
+            <div class="space-y-3 text-base">
+                <div><span class="font-black text-red-400">❌ Absents (${nbAbsent}) :</span> <span class="text-white font-bold">${liste(absents)}</span></div>
+                <div><span class="font-black text-violet-400">🤕 Inaptes (${nbInapte}) :</span> <span class="text-white font-bold">${liste(inaptes)}</span></div>
+                <div><span class="font-black text-amber-400">⏰ Retards (${nbRetard}) :</span> <span class="text-white font-bold">${liste(retards)}</span></div>
+                <div><span class="font-black text-blue-400">👕 Oublis tenue (${nbOubli}) :</span> <span class="text-white font-bold">${liste(oublis)}</span></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 };
 
 // ============================================================

@@ -121,14 +121,22 @@ export function calculerTempsRestant(inapt) {
     return Math.round((fin - auj) / (1000 * 60 * 60 * 24));
 }
 
+// Libellé du temps restant : "13 j restants", "dernier jour", "terminée", ou ''.
+export function libelleTempsRestant(inapt) {
+    const j = calculerTempsRestant(inapt);
+    if (j === null) return '';
+    if (j < 0) return 'terminée';
+    if (j === 0) return 'dernier jour';
+    return `${j} j restant${j > 1 ? 's' : ''}`;
+}
+
 export function libelleInaptitude(inapt) {
     if (!inapt) return '';
     const motif = MOTIFS.find(m => m.id === inapt.motif);
     let s = motif ? motif.label : 'Inapte';
     if (inapt.motif === 'medicale') {
-        const j = calculerTempsRestant(inapt);
-        if (j !== null && j >= 0) s += ` · ${j} j restants`;
-        else if (j !== null && j < 0) s += ' · terminée';
+        const t = libelleTempsRestant(inapt);
+        if (t) s += ` · ${t}`;
     }
     if (inapt.zone) s += ` (${labelZone(inapt.zone)})`;
     if (inapt.commentaire) s += ` — ${inapt.commentaire}`;
