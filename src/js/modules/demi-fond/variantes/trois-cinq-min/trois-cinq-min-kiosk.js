@@ -42,6 +42,14 @@ let configListener = null;
 let sequenceListener = null;
 let sessionListener = null;
 
+function injecterStyles() {
+    if (document.getElementById('dmf-kiosk-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'dmf-kiosk-styles';
+    style.textContent = '#demi-fond-module button{ touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }';
+    document.head.appendChild(style);
+}
+
 // ============================================================
 // INITIALISATION
 // ============================================================
@@ -60,6 +68,7 @@ export function initTroisCinqMinKiosk(classe) {
 
     const container = document.getElementById('demi-fond-module');
     if (!container) return;
+    injecterStyles();
 
     const basePath = getBasePath(classe);
 
@@ -368,21 +377,44 @@ window.dmfKioskChoixCouleur = function(couleurId) {
 function renderAttente(container) {
     const couleur = getCouleurGroupe(state.couleur);
 
+    const codesTries = [...state.codes].sort((a, b) => String(a).localeCompare(String(b), 'fr', { numeric: true }));
+    const codesHtml = codesTries.map(code =>
+        `<span class="inline-block rounded-xl font-black text-lg px-3 py-1 m-1" style="background:${couleur.bg}; color:${couleur.text}; border:2px solid ${couleur.border};">${code}</span>`
+    ).join('');
+
     container.innerHTML = `
-        <div class="min-h-[60vh] flex flex-col items-center justify-center p-8"
-             style="background:${couleur.bg}15;">
-            <div class="text-8xl mb-6 animate-pulse">⏳</div>
-            <h2 class="text-3xl font-black text-white mb-3">En attente du signal</h2>
-            <p class="text-slate-300 mb-8">Groupe <span style="color:${couleur.bg}" class="font-black">${couleur.label}</span></p>
-            <div class="bg-slate-800/80 backdrop-blur p-6 rounded-3xl border-2 max-w-md text-center"
-                 style="border-color:${couleur.border};">
-                <p class="text-slate-300 text-sm">Prépare-toi. Le prof va lancer la séquence.</p>
-                <p class="text-slate-400 text-xs mt-2">Tu cliqueras sur le numéro de chaque coureur quand il repassera devant toi.</p>
+        <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
+            <div class="text-center rounded-2xl py-4 mb-4" style="background:#ffffff; border:3px solid ${couleur.border};">
+                <div class="text-4xl mb-1">🏃</div>
+                <div class="text-2xl font-black" style="color:${couleur.bg};">1/2 Fond — Groupe ${couleur.label}</div>
+                <div class="text-sm font-bold mt-1" style="color:#475569;">⏳ En attente du signal du professeur…</div>
             </div>
-            <button onclick="window.dmfKioskRetourChoixCouleur()"
-                    class="mt-8 bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-2xl font-black text-xs uppercase text-white active:scale-95">
-                ← Changer de couleur
-            </button>
+
+            <div class="rounded-2xl p-4 mb-3" style="background:#ffffff; border:2px solid #cbd5e1;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#0f172a;">🎯 Votre rôle : juge</h3>
+                <ul class="space-y-2 text-sm" style="color:#0f172a;">
+                    <li>👆 Clique le numéro du coureur à <strong>chaque tour</strong> (200 m).</li>
+                    <li>✅ Chaque clic = <strong>1 tour</strong>.</li>
+                    <li>📝 En fin de course, note les <strong>plots partiels</strong>.</li>
+                    <li>↩️ En cas d'erreur : <strong>« Annuler le dernier clic »</strong>.</li>
+                </ul>
+            </div>
+
+            <div class="rounded-2xl p-4 mb-3" style="background:#fffbeb; border:2px solid #fcd34d;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#92400e;">⚠️ Consignes pour les coureurs</h3>
+                <ul class="space-y-2 text-sm" style="color:#451a03;">
+                    <li>🏃 Cours les 3 courses <strong>sans t'arrêter</strong>.</li>
+                    <li>📈 <strong>Allure croissante</strong> : pars doucement, accélère, finis vite.</li>
+                    <li>⏱️ Reste <strong>régulier</strong> (temps de tour constants).</li>
+                </ul>
+            </div>
+
+            <div class="rounded-2xl p-4 mb-3" style="background:#ffffff; border:2px solid #cbd5e1;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#0f172a;">👥 Codes du groupe (${codesTries.length})</h3>
+                <div class="flex flex-wrap">${codesHtml}</div>
+            </div>
+
+            <button onclick="window.dmfKioskRetourChoixCouleur()" class="w-full py-3 rounded-2xl font-black text-sm active:scale-95" style="background:#e2e8f0; color:#0f172a; border:2px solid #cbd5e1;">← Changer de couleur</button>
         </div>
     `;
 }

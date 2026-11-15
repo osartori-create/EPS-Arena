@@ -16,6 +16,14 @@ let state = {
 let configListener = null;
 let sequenceListener = null;
 
+function injecterStyles() {
+    if (document.getElementById('dmf-kiosk-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'dmf-kiosk-styles';
+    style.textContent = '#demi-fond-module button{ touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }';
+    document.head.appendChild(style);
+}
+
 export function initEnchainementKiosk(classe) {
     state.classe = classe; state.couleur = null; state.phase = 'choix'; state.courseNum = 1;
     state.timestampsParEleve = {}; state.partielsParEleve = {}; state.abandonsParEleve = {}; state.lastClickAt = {};
@@ -23,6 +31,7 @@ export function initEnchainementKiosk(classe) {
 
     const container = document.getElementById('demi-fond-module');
     if (!container) return;
+    injecterStyles();
 
     const basePath = getBasePath(classe);
     if (configListener) configListener();
@@ -162,7 +171,47 @@ window.enchainementKioskChoixCouleur = function(couleurId) { state.couleur = cou
 
 function renderAttente(container) {
     const couleur = getCouleurGroupe(state.couleur);
-    container.innerHTML = `<div class="min-h-[60vh] flex flex-col items-center justify-center p-8" style="background:${couleur.bg}15;"><div class="text-8xl mb-6 animate-pulse">⏳</div><h2 class="text-3xl font-black text-white mb-3">En attente du signal</h2><p class="text-slate-300 mb-8">Groupe <span style="color:${couleur.bg}" class="font-black">${couleur.label}</span></p><button onclick="window.enchainementKioskRetourChoixCouleur()" class="mt-8 bg-slate-700 px-6 py-3 rounded-2xl font-black text-xs uppercase text-white">← Changer de couleur</button></div>`;
+
+    const codesTries = [...state.codes].sort((a, b) => String(a).localeCompare(String(b), 'fr', { numeric: true }));
+    const codesHtml = codesTries.map(code =>
+        `<span class="inline-block rounded-xl font-black text-lg px-3 py-1 m-1" style="background:${couleur.bg}; color:${couleur.text}; border:2px solid ${couleur.border};">${code}</span>`
+    ).join('');
+
+    container.innerHTML = `
+        <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
+            <div class="text-center rounded-2xl py-4 mb-4" style="background:#ffffff; border:3px solid ${couleur.border};">
+                <div class="text-4xl mb-1">🏃</div>
+                <div class="text-2xl font-black" style="color:${couleur.bg};">1/2 Fond — Groupe ${couleur.label}</div>
+                <div class="text-sm font-bold mt-1" style="color:#475569;">⏳ En attente du signal du professeur…</div>
+            </div>
+
+            <div class="rounded-2xl p-4 mb-3" style="background:#ffffff; border:2px solid #cbd5e1;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#0f172a;">🎯 Votre rôle : juge</h3>
+                <ul class="space-y-2 text-sm" style="color:#0f172a;">
+                    <li>👆 Clique le numéro du coureur à <strong>chaque tour</strong> (200 m).</li>
+                    <li>✅ Chaque clic = <strong>1 tour</strong>.</li>
+                    <li>📝 En fin de série, note les <strong>plots partiels</strong>.</li>
+                    <li>↩️ En cas d'erreur : <strong>« Annuler le dernier clic »</strong>.</li>
+                </ul>
+            </div>
+
+            <div class="rounded-2xl p-4 mb-3" style="background:#fffbeb; border:2px solid #fcd34d;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#92400e;">⚠️ Consignes pour les coureurs</h3>
+                <ul class="space-y-2 text-sm" style="color:#451a03;">
+                    <li>🏃 Cours <strong>sans t'arrêter</strong>.</li>
+                    <li>🏆 <strong>Meilleure performance</strong> : donne le meilleur de toi.</li>
+                    <li>⏱️ Reste <strong>régulier</strong> (temps de tour constants).</li>
+                </ul>
+            </div>
+
+            <div class="rounded-2xl p-4 mb-3" style="background:#ffffff; border:2px solid #cbd5e1;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#0f172a;">👥 Codes du groupe (${codesTries.length})</h3>
+                <div class="flex flex-wrap">${codesHtml}</div>
+            </div>
+
+            <button onclick="window.enchainementKioskRetourChoixCouleur()" class="w-full py-3 rounded-2xl font-black text-sm active:scale-95" style="background:#e2e8f0; color:#0f172a; border:2px solid #cbd5e1;">← Changer de couleur</button>
+        </div>
+    `;
 }
 window.enchainementKioskRetourChoixCouleur = function() { state.couleur = null; state.codes = []; state.phase = 'choix'; render(); };
 

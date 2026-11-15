@@ -797,10 +797,6 @@ window.switchDiscipline = async function(disc) {
 },
             'demi-fond': async () => {
     const sousModule = localStorage.getItem('eps_arena_demifond_sous_module') || '3x5min';
-    if (sousModule === 'rectangle-vitesses') {
-        if (window.rectangleTransmettre) await window.rectangleTransmettre();
-        return;
-    }
     if (sousModule === 'enchainement') {
         if (window.enchainementTransmettre) await window.enchainementTransmettre();
         return;
