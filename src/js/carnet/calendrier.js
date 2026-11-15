@@ -3,12 +3,14 @@
 // Filtres par classe et par période. Clic sur une séance → ouvre l'appel (classe + date).
 
 import { lireCreneaux, lireCycles, lirePeriodes, getCouleurActivite, activitePourSemaine, semainePourDate } from './planner.js';
+import { recupererMeteo, lireMeteoCache } from '../services/meteo-service.js';
 
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'];
 
 let filtreClasse = '';   // '' = toutes les classes
 let filtrePeriode = '';  // '' = toutes les périodes
 let lundiSemaine = getLundi(new Date());
+let meteo = { daily: {}, hourly: {} };
 
 const KEY_VACANCES = 'eps_arena_vacances';
 const KEY_VACANCES_ZONE = 'eps_arena_vacances_zone';
@@ -37,6 +39,33 @@ function periodePourDate(dateISO, periodes) {
 function formatCourt(dateISO) {
     if (!dateISO) return '';
     return new Date(dateISO + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
+// Heure de début d'un créneau "10:00 - 11:00" → "10:00" (arrondi à l'heure).
+function heureDebut(h) {
+    const m = String(h || '').match(/(\d{1,2}):(\d{2})/);
+    if (!m) return '';
+    return `${String(m[1]).padStart(2, '0')}:00`;
+}
+
+// Activités considérées comme « extérieur » (mots-clés, insensible casse/accents).
+const MOTS_EXTERIEUR = ['cross', 'demi-fond', 'demifond', 'orientation', 'course', 'athlet', 'sports co', 'foot', 'rugby', 'hand', 'basket', 'relais', 'arcathlon'];
+
+function estExterieur(activite) {
+    const a = (activite || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return MOTS_EXTERIEUR.some(mot => a.includes(mot));
+}
+
+// Alertes contextuelles à partir de la météo horaire + de l'activité.
+function alertesMeteo(m, activite) {
+    const ext = estExterieur(activite);
+    const alertes = [];
+    if (m.temp >= 30) alertes.push({ label: '⚠️ Chaleur', couleur: 'bg-red-600/90 text-white' });
+    if (m.precip > 60 && ext) alertes.push({ label: '💡 Repli possible', couleur: 'bg-amber-600/90 text-white' });
+    if (m.rafales > 40 && ext) alertes.push({ label: '💨 Vent fort', couleur: 'bg-cyan-600/90 text-white' });
+    if (m.uv >= 7 && ext) alertes.push({ label: '☀️ UV élevé', couleur: 'bg-orange-600/90 text-white' });
+    if (m.temp < 0) alertes.push({ label: '🥶 Froid', couleur: 'bg-blue-600/90 text-white' });
+    return alertes;
 }
 
 function lireVacances() { return JSON.parse(localStorage.getItem(KEY_VACANCES) || '[]'); }
@@ -97,6 +126,13 @@ function parserICS(texte) {
 }
 
 export function initCalendrierInterface() {
+    meteo = lireMeteoCache();
+    render();
+    chargerMeteo();
+}
+
+async function chargerMeteo() {
+    meteo = await recupererMeteo();
     render();
 }
 
@@ -143,12 +179,25 @@ function render() {
         if (vacancesParJour[j.date]) {
             return `<div class="rounded-lg bg-slate-900/40 border border-amber-500/20 px-2 py-3 text-[10px] font-bold text-amber-400/90">🏖️ ${vacancesParJour[j.date]}</div>`;
         }
-        return grille[h][j.nom].cellules.map(item => `
-            <button onclick="window.calendrierOuvrirAppel('${item.classe}', '${j.date}')" class="w-full mb-1.5 rounded-lg px-2 py-1.5 text-left border border-slate-700/60" style="background-color:${item.activite ? getCouleurActivite(item.activite) : '#1e293b'};">
-                <div class="text-[11px] font-black text-white">${item.classe}</div>
-                ${item.activite ? `<div class="text-[10px] font-bold text-white/90 truncate">${item.activite}</div>` : '<div class="text-[10px] text-slate-400">—</div>'}
-            </button>
-        `).join('');
+        const heure = heureDebut(h);
+        const m = (meteo.hourly[j.date] && meteo.hourly[j.date][heure]) || null;
+        const meteoHtml = m
+            ? `<div class="text-[10px] font-bold text-white/90 mt-0.5">${m.emoji} ${m.temp}° · 💧 ${m.precip}% · 💨 ${m.vent} km/h · ☀️ UV ${m.uv}</div>`
+            : '';
+        return grille[h][j.nom].cellules.map(item => {
+            const alertes = m ? alertesMeteo(m, item.activite) : [];
+            const alerteHtml = alertes.length
+                ? `<div class="mt-1 space-y-0.5">${alertes.map(a => `<div class="text-[10px] font-black px-1.5 py-0.5 rounded-md ${a.couleur}">${a.label}</div>`).join('')}</div>`
+                : '';
+            return `
+                <button onclick="window.calendrierOuvrirAppel('${item.classe}', '${j.date}')" class="w-full mb-1.5 rounded-lg px-2 py-1.5 text-left border border-slate-700/60" style="background-color:${item.activite ? getCouleurActivite(item.activite) : '#1e293b'};">
+                    <div class="text-[11px] font-black text-white">${item.classe}</div>
+                    ${item.activite ? `<div class="text-[10px] font-bold text-white/90 truncate">${item.activite}</div>` : '<div class="text-[10px] text-slate-400">—</div>'}
+                    ${meteoHtml}
+                    ${alerteHtml}
+                </button>
+            `;
+        }).join('');
     };
 
     const grille = {};
@@ -233,6 +282,7 @@ function render() {
                                     <div>${j.nom}</div>
                                     <div class="text-[10px] font-bold ${j.date === aujourdhui ? 'text-blue-300' : 'text-slate-500'}">${formatCourt(j.date)}</div>
                                     ${vacancesParJour[j.date] ? `<div class="text-[10px] font-bold text-amber-400 mt-0.5">🏖️ ${vacancesParJour[j.date]}</div>` : ''}
+                                    ${meteo.daily[j.date] ? `<div class="text-[10px] font-bold text-sky-300 mt-0.5 whitespace-nowrap">${meteo.daily[j.date].emoji} ${meteo.daily[j.date].tmin}–${meteo.daily[j.date].tmax}° · 💧 ${meteo.daily[j.date].precip}% · UV ${meteo.daily[j.date].uv}</div>` : ''}
                                 </th>
                             `).join('')}
                         </tr>

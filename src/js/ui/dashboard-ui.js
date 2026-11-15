@@ -5,6 +5,7 @@ import { openImportINE } from '../services/ine-import.js';
 import '../services/merge-eleves.js'; // enregistre window.fusionnerDoublons / window.mergeFusionner
 import { migrerCodesAutoEval } from '../services/admin-service.js';
 import { getRNE } from '../config/firebase-config.js';
+import { lireVille, enregistrerVille } from '../services/meteo-service.js';
 
 let currentEleves = [];
 let activeClasse = "";
@@ -22,6 +23,19 @@ function loadLocalEleves() {
 export function initAdminUI() {
     const rneInput = document.getElementById('rneAffichage');
     if (rneInput) rneInput.value = getRNE();
+
+    const meteoInput = document.getElementById('meteoVille');
+    if (meteoInput) meteoInput.value = lireVille();
+
+    window.enregistrerMeteoVille = function() {
+        const input = document.getElementById('meteoVille');
+        const ville = input ? input.value.trim() : '';
+        enregistrerVille(ville);
+        const statut = document.getElementById('meteoStatut');
+        if (statut) statut.textContent = ville
+            ? "✅ Ville enregistrée. La météo s'affichera dans le calendrier."
+            : 'Ville effacée.';
+    };
 
     const select = document.getElementById('selectClasse');
     if (select) {

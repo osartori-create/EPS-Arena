@@ -160,6 +160,16 @@
                 </div>
             </div>
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
+                <h3 class="font-black text-sky-400 uppercase text-sm w-full">🌦️ Météo du calendrier</h3>
+                <p class="text-xs text-slate-400 w-full">Affiche la météo (Open-Meteo, gratuit) dans le calendrier. Renseigne la ville de l'établissement.</p>
+                <div class="flex gap-2 flex-wrap items-center">
+                    <label for="meteoVille" class="text-xs font-bold uppercase text-slate-400">Ville</label>
+                    <input type="text" id="meteoVille" placeholder="ex : Ensisheim" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 text-xs font-bold text-white w-40">
+                    <button onclick="enregistrerMeteoVille()" class="btn btn-primary text-xs uppercase">💾 Enregistrer</button>
+                    <span id="meteoStatut" class="text-[10px] text-slate-500"></span>
+                </div>
+            </div>
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
                 <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
                 <p class="text-xs text-slate-400 w-full">Les noms et photos restent sur cet appareil (IndexedDB).</p>
                 <div class="flex gap-2 flex-wrap">
