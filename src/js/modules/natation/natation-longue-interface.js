@@ -77,11 +77,6 @@ function createHeader() {
                         title="Répartit les élèves par niveau selon le critère choisi (indice ou distance)">
                     🏊 Par niveau
                 </button>
-                <button onclick="window.nlEnregistrerDistances()"
-                        class="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-amber-400 active:scale-95"
-                        title="Lit la dernière épreuve et écrit la distance de chaque élève sur sa fiche">
-                    📊 Enregistrer les distances
-                </button>
                 <button onclick="window.nlViderGroupes()"
                         class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-500 active:scale-95"
                         title="Remet tous les élèves dans la réserve">
@@ -571,13 +566,20 @@ window.nlAffecterOrdre = function() {
     alert(`✅ Affectation par ordre croissant : ${presents.length} élève(s) sur ${nbVagues} vague(s).`);
 };
 
-window.nlRepartirParNiveau = function() {
+window.nlRepartirParNiveau = async function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     const statuts = getStatuts(currentClasse);
     const nbVagues = parseInt(document.getElementById('nlNbVagues')?.value) || DEFAUT_PARAMS.nbVagues;
     const critere = document.getElementById('nlCritereTri')?.value || 'indice';
     const champ = critere === 'distance' ? 'distanceNatation' : 'indiceNage';
     const label = critere === 'distance' ? 'distance natation' : 'indice de nage';
+
+    if (critere === 'distance') {
+        const nb = await enregistrerDistances(true);
+        if (nb === -1) return alert('Aucune épreuve active. Lance une épreuve avant de trier par distance.');
+        if (nb === 0) return alert('Aucune distance trouvée dans cette épreuve.');
+    }
+
     const elevesNumerotes = getElevesNumerotes(currentClasse);
     const presents = elevesNumerotes.filter(e => !(statuts[e.id] === 'absent' || statuts[e.id] === 'inapte'));
 
@@ -608,13 +610,19 @@ window.nlRepartirParNiveau = function() {
     alert(`🏊 Répartition par niveau (${label}) : ${avecValeur.length} élève(s) sur ${nbVagues} vague(s).${msg}`);
 };
 
-window.nlEnregistrerDistances = async function() {
-    if (!currentClasse) return alert('Sélectionnez une classe.');
+async function enregistrerDistances(silent) {
+    if (!currentClasse) {
+        if (!silent) alert('Sélectionnez une classe.');
+        return -1;
+    }
     const basePath = getBasePath(currentClasse);
 
     const sessionSnap = await new Promise(resolve => onValue(ref(db, getSessionActivePath(currentClasse)), resolve, { onlyOnce: true }));
     const sessionId = sessionSnap.val();
-    if (!sessionId) return alert(`Aucune épreuve active. Lance une épreuve avant d'enregistrer les distances.`);
+    if (!sessionId) {
+        if (!silent) alert(`Aucune épreuve active. Lance une épreuve avant d'enregistrer les distances.`);
+        return -1;
+    }
 
     const configSnap = await new Promise(resolve => onValue(ref(db, `${basePath}/config`), resolve, { onlyOnce: true }));
     const config = configSnap.val() || {};
@@ -637,13 +645,15 @@ window.nlEnregistrerDistances = async function() {
         }
     }
 
-    if (nbEcrits > 0) {
-        loadAffectations();
-        alert(`✅ ${nbEcrits} distance(s) enregistrée(s) sur les fiches (critère « Distance natation »).`);
-    } else {
-        alert('Aucune distance trouvée dans cette épreuve.');
+    if (!silent) {
+        if (nbEcrits > 0) {
+            alert(`✅ ${nbEcrits} distance(s) enregistrée(s) sur les fiches (critère « Distance natation »).`);
+        } else {
+            alert('Aucune distance trouvée dans cette épreuve.');
+        }
     }
-};
+    return nbEcrits;
+}
 
 window.nlViderGroupes = function() {
     if (!currentClasse) return;
