@@ -6,13 +6,14 @@
 //   eps_arena_carnet_valeurs_<classe>  = { [eleveId]: { [champId]: valeur } }
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/current-classe.js';
+import { getCurrentClasse, onClasseChange } from '../core/current-classe.js';
 import './fiche-eleve.js'; // enregistre window.ouvrirFicheEleve
 
 const PREFIX_CHAMPS = 'eps_arena_carnet_champs_';
 const PREFIX_VALEURS = 'eps_arena_carnet_valeurs_';
 
 let currentClasse = '';
+let ecouteClasse = false;
 let currentGroupe = '';
 let currentValeurs = {};
 const photosCache = {};
@@ -570,6 +571,10 @@ export async function initCarnetInterface() {
     currentValeurs = currentClasse ? lireValeurs(currentClasse) : {};
     if (currentClasse) await chargerPhotos(getExistingEleves(currentClasse));
     render();
+    if (!ecouteClasse) {
+        ecouteClasse = true;
+        onClasseChange(() => initCarnetInterface());
+    }
 }
 
 

@@ -3,7 +3,7 @@
 // Données (localStorage, RGPD) : eps_arena_groupes_<classe> = [{ id, nom, couleur, eleves: [eleveId] }]
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/current-classe.js';
+import { getCurrentClasse, onClasseChange } from '../core/current-classe.js';
 
 const PREFIX = 'eps_arena_groupes_';
 const PALETTE = ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#84cc16', '#06b6d4', '#a855f7', '#eab308'];
@@ -12,6 +12,7 @@ let currentClasse = '';
 let groupeOuvert = '';
 
 const photosCache = {};
+let ecouteClasse = false;
 
 // --- Données ---
 export function lireGroupes(classe) {
@@ -95,6 +96,10 @@ export async function initGroupesInterface() {
     currentClasse = getCurrentClasse();
     await chargerPhotos(getExistingEleves(currentClasse));
     render();
+    if (!ecouteClasse) {
+        ecouteClasse = true;
+        onClasseChange(() => initGroupesInterface());
+    }
 }
 
 function render() {

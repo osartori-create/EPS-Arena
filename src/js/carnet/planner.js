@@ -6,7 +6,7 @@
 //   eps_arena_creneaux   = { [classe]: [{ jour, horaire }] }
 //   eps_arena_cycles     = { [classe]: { [creneauKey]: { [periodeId]: activite } } }
 
-import { getCurrentClasse } from '../core/current-classe.js';
+import { getCurrentClasse, onClasseChange } from '../core/current-classe.js';
 
 const KEY_PERIODES = 'eps_arena_periodes';
 const KEY_ACTIVITES = 'eps_arena_activites';
@@ -26,6 +26,7 @@ const JOURS_ORDRE = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'
 
 let currentClasse = '';
 let currentSemaine = 'A';
+let ecouteClasse = false;
 
 export function lirePeriodes() {
     let p = JSON.parse(localStorage.getItem(KEY_PERIODES) || 'null');
@@ -115,6 +116,10 @@ export function getSeancesClasseDate(classe, dateISO) {
 export function initPlannerInterface() {
     currentClasse = getCurrentClasse();
     render();
+    if (!ecouteClasse) {
+        ecouteClasse = true;
+        onClasseChange(() => initPlannerInterface());
+    }
 }
 
 // ============================================================

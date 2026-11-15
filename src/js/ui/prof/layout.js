@@ -123,7 +123,17 @@ export function initLayout() {
     };
 
     // 1. Gestion des onglets (CORRIGÉ : on n'utilise plus el.style.display pour les vues standard)
+    let currentTab = '';
+
+    function majVisibiliteTransmettre() {
+        const btn = document.getElementById('btnTransmettre');
+        if (!btn) return;
+        const classe = document.getElementById('selectClasse')?.value || '';
+        btn.classList.toggle('hidden', !(currentTab === 'activities' && classe));
+    }
+
     window.switchTab = function(tabName) {
+        currentTab = tabName;
     ['admin', 'activities', 'live', 'tools', 'evaluations', 'carnet', 'inaptitudes', 'sync', 'cross', 'scancamera', 'presences', 'planner', 'calendrier', 'groupes', 'plan', 'unss'].forEach(t => {
         const viewId = 'view' + t.charAt(0).toUpperCase() + t.slice(1);
         const el = document.getElementById(viewId);
@@ -221,6 +231,7 @@ if (tabName === 'sync') {
         if (window.syncAfficherResume) window.syncAfficherResume();
     }, 50);
 }
+    majVisibiliteTransmettre();
 };
 
     // 2. Gestion des classes
@@ -237,28 +248,34 @@ if (tabName === 'sync') {
         });
     }
     initClassesSelect();
+    const selectClasseEl = document.getElementById('selectClasse');
+    if (selectClasseEl) selectClasseEl.addEventListener('change', majVisibiliteTransmettre);
 
     window.addClasse = function() {
-        const nom = prompt("Nom de la classe ?");
-        if (nom) {
-            let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
-            if (!classes.includes(nom)) {
-                classes.push(nom);
-                localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
-                const select = document.getElementById('selectClasse');
-                if (select) {
-                    const option = document.createElement('option');
-                    option.value = nom; option.textContent = nom;
-                    select.appendChild(option); select.value = nom;
-                    select.dispatchEvent(new Event('change'));
-                }
-                alert("Classe ajoutée !");
-            } else {
-                alert("Cette classe existe déjà.");
-                const select = document.getElementById('selectClasse');
-                if (select) {
-                    select.value = nom; select.dispatchEvent(new Event('change'));
-                }
+        const input = document.getElementById('inputNouvelleClasse');
+        const nom = (input ? input.value : '').trim();
+        if (!nom) {
+            if (input) input.focus();
+            return alert("Saisis un nom de classe.");
+        }
+        let classes = JSON.parse(localStorage.getItem('eps_arena_classes')) || [];
+        if (!classes.includes(nom)) {
+            classes.push(nom);
+            localStorage.setItem('eps_arena_classes', JSON.stringify(classes));
+            const select = document.getElementById('selectClasse');
+            if (select) {
+                const option = document.createElement('option');
+                option.value = nom; option.textContent = nom;
+                select.appendChild(option); select.value = nom;
+                select.dispatchEvent(new Event('change'));
+            }
+            if (input) input.value = '';
+            alert("Classe ajoutée !");
+        } else {
+            alert("Cette classe existe déjà.");
+            const select = document.getElementById('selectClasse');
+            if (select) {
+                select.value = nom; select.dispatchEvent(new Event('change'));
             }
         }
     };

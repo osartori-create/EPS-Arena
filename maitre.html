@@ -106,13 +106,11 @@
             <span id="connLabel" class="text-xs font-bold uppercase text-slate-500">Connexion...</span>
         </div>
         <div class="flex items-center gap-3 flex-wrap">
-            <input type="text" id="profCode" placeholder="Code Prof" class="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs font-bold text-white w-24">
+            <label for="selectClasse" class="text-xs font-bold uppercase text-slate-500">Classe</label>
             <select id="selectClasse" class="bg-slate-800 border border-slate-600 rounded px-3 py-1 text-xs font-bold text-white outline-none">
                 <option value="">-- Classe --</option>
             </select>
-            <button onclick="addClasse()" class="btn btn-primary text-xs uppercase">+ Classe</button>
-            <button onclick="transmettreConfig()" class="bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">📡 Transmettre aux iPads</button>
-            <button onclick="openPurgeModal()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400 ml-2">🗑️ Purge</button>
+            <button id="btnTransmettre" onclick="transmettreConfig()" class="hidden bg-emerald-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-emerald-400">📡 Transmettre aux iPads</button>
         </div>
     </header>
 
@@ -141,6 +139,26 @@
    
         <!-- ONGLET ADMINISTRATION -->
         <div id="viewAdmin" class="space-y-4">
+            <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
+                <h3 class="font-black text-amber-400 uppercase text-sm w-full">⚙️ Identité & classes</h3>
+                <p class="text-xs text-slate-400 w-full">Code prof, établissement (RNE) et gestion de la liste des classes.</p>
+                <div class="flex gap-2 flex-wrap items-center">
+                    <label for="profCode" class="text-xs font-bold uppercase text-slate-400">Code Prof</label>
+                    <input type="text" id="profCode" placeholder="Code Prof" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 text-xs font-bold text-white w-28">
+                    <label for="inputNouvelleClasse" class="text-xs font-bold uppercase text-slate-400 ml-2">Nouvelle classe</label>
+                    <input type="text" id="inputNouvelleClasse" placeholder="ex : 302" class="bg-slate-900 border border-slate-600 rounded px-3 py-2 text-xs font-bold text-white w-28">
+                    <button onclick="addClasse()" class="btn btn-primary text-xs uppercase">+ Classe</button>
+                </div>
+                <div class="flex gap-2 flex-wrap items-center">
+                    <label for="rneAffichage" class="text-xs font-bold uppercase text-slate-400">Établissement (RNE)</label>
+                    <input type="text" id="rneAffichage" disabled placeholder="RNE" class="bg-slate-900/50 border border-slate-600 rounded px-3 py-2 text-xs font-bold text-slate-500 w-28 cursor-not-allowed">
+                    <button onclick="changerRNE()" class="btn bg-slate-700 text-xs uppercase border border-slate-500">✏️ Modifier</button>
+                    <span class="text-[10px] text-slate-500">Changer de RNE bascule sur les données d'un autre établissement.</span>
+                </div>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="openPurgeModal()" class="bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-400">🗑️ Purge</button>
+                </div>
+            </div>
             <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap items-center gap-4">
                 <h3 class="font-black text-blue-400 uppercase text-sm w-full">Gestion des classes (RGPD)</h3>
                 <p class="text-xs text-slate-400 w-full">Les noms et photos restent sur cet appareil (IndexedDB).</p>

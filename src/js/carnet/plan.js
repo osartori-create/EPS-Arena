@@ -4,7 +4,7 @@
 // Données (localStorage, RGPD) : eps_arena_plans_<classe> = { actif, plans: [{ id, nom, lignes, colonnes, placements, colonnesGroupes }] }
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/current-classe.js';
+import { getCurrentClasse, onClasseChange } from '../core/current-classe.js';
 import { lireGroupes, getGroupesEleve, creerGroupe, ajouterElevesGroupe, retirerEleveGroupe, retirerEleveDeTousGroupes, supprimerGroupe } from './groupes.js';
 import { lireAppelClasse, ecrireAppelClasse, STATUTS } from './appel.js';
 
@@ -19,6 +19,7 @@ let selection = new Set();
 let modeVue = 'grille';
 let modeAppel = false;
 const photosCache = {};
+let ecouteClasse = false;
 
 function lireData(classe) {
     let d = JSON.parse(localStorage.getItem(KEY + classe) || 'null');
@@ -70,6 +71,10 @@ export async function initPlanInterface() {
     selection = new Set();
     await chargerPhotos(getExistingEleves(currentClasse));
     render();
+    if (!ecouteClasse) {
+        ecouteClasse = true;
+        onClasseChange(() => initPlanInterface());
+    }
 }
 
 function render() {

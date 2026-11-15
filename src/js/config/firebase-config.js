@@ -137,7 +137,17 @@ export async function assurerRNE() {
     }
 }
 
-// Expose une commande de modification ultérieure (console).
+/**
+ * Modification du RNE depuis l'interface (Administration).
+ * Ouvre la modale de saisie puis recharge la page pour rebrancher Firebase
+ * sur la bonne racine d'établissement.
+ */
+export async function changerRNE() {
+    const rne = await demanderRNE();
+    if (rne) location.reload();
+}
+
+// Expose une commande de modification (console + bouton Administration).
 if (typeof window !== 'undefined') {
-    window.changerRNE = demanderRNE;
+    window.changerRNE = changerRNE;
 }

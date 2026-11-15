@@ -4,7 +4,7 @@
 // Clé : eps_arena_appel_<classe>  →  { [date AAAA-MM-JJ]: { [eleveId]: statut } }
 
 import { getExistingEleves, getPhotoUrl } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/current-classe.js';
+import { getCurrentClasse, onClasseChange } from '../core/current-classe.js';
 import { setClasseInaptitude, getInaptitude, sauvegarderInaptitude, libelleInaptitude, ouvrirModalInaptitude } from './inaptitude.js';
 import { getSeancesClasseDate, lirePeriodes } from './planner.js';
 import { getToutesGrilles, getEvaluationsClasse, calculerNoteFinale } from '../modules/grilles/grilles-core.js';
@@ -35,6 +35,7 @@ let currentClasse = '';
 let currentDate = '';
 let currentGroupe = '';
 const photosCache = {};
+let ecouteClasse = false;
 
 function formaterDate(d) {
     const y = d.getFullYear();
@@ -58,6 +59,13 @@ export function ecrireAppelClasse(classe, data) {
     localStorage.setItem(STORAGE_PREFIX + classe, JSON.stringify(data));
 }
 
+async function rechargerClasse() {
+    currentClasse = getCurrentClasse();
+    setClasseInaptitude(currentClasse);
+    await chargerPhotos(getExistingEleves(currentClasse));
+    render();
+}
+
 export async function initAppelInterface() {
     currentClasse = getCurrentClasse();
     const dateDemandee = localStorage.getItem('eps_arena_appel_date_demandee');
@@ -67,6 +75,10 @@ export async function initAppelInterface() {
     migrerDonneesAppel();
     await chargerPhotos(getExistingEleves(currentClasse));
     render();
+    if (!ecouteClasse) {
+        ecouteClasse = true;
+        onClasseChange(() => rechargerClasse());
+    }
 }
 
 // Convertit les anciennes données (chaînes) vers le nouveau format objet.

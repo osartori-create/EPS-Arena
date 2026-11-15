@@ -3,12 +3,13 @@
 // Données (localStorage, RGPD) : inaptitudes courantes + historique + appel (flag inapte).
 
 import { getExistingEleves } from '../services/admin-service.js';
-import { getCurrentClasse } from '../core/current-classe.js';
+import { getCurrentClasse, onClasseChange } from '../core/current-classe.js';
 import { MOTIFS, ZONES, labelZone, lireInaptitudesClasse, lireHistoriqueClasse, supprimerInaptitude, setClasseInaptitude, calculerTempsRestant } from './inaptitude.js';
 
 const KEY_CLASSES = 'eps_arena_classes';
 
 let classeSelectionnee = '';
+let ecouteClasse = false;
 
 function lireClasses() { return JSON.parse(localStorage.getItem(KEY_CLASSES) || '[]'); }
 function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -216,5 +217,9 @@ window.inaptLever = function(eleveId) {
 export function initBilanInaptitudes() {
     classeSelectionnee = getCurrentClasse() || '';
     render();
+    if (!ecouteClasse) {
+        ecouteClasse = true;
+        onClasseChange(() => initBilanInaptitudes());
+    }
 }
 

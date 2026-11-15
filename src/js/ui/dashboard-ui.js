@@ -4,6 +4,7 @@ import { openImportModal } from '../services/import-service.js';
 import { openImportINE } from '../services/ine-import.js';
 import '../services/merge-eleves.js'; // enregistre window.fusionnerDoublons / window.mergeFusionner
 import { migrerCodesAutoEval } from '../services/admin-service.js';
+import { getRNE } from '../config/firebase-config.js';
 
 let currentEleves = [];
 let activeClasse = "";
@@ -19,6 +20,9 @@ function loadLocalEleves() {
 }
 
 export function initAdminUI() {
+    const rneInput = document.getElementById('rneAffichage');
+    if (rneInput) rneInput.value = getRNE();
+
     const select = document.getElementById('selectClasse');
     if (select) {
         select.addEventListener('change', (e) => {
