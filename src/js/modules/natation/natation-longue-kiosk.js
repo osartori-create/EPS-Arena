@@ -179,12 +179,43 @@ window.nlKioskChoixCouleur = function(couleurId) {
 // ============================================================
 function renderAttente(container) {
     const couleur = getCouleurGroupe(state.couleur);
+    const distanceParClic = state.config?.distanceParClic || 50;
+
+    const numerosTries = [...state.codes].sort((a, b) => Number(a) - Number(b));
+    const numerosHtml = numerosTries.map(num =>
+        `<span class="inline-block rounded-xl font-black text-lg px-3 py-1 m-1" style="background:${couleur.bg}; color:${couleur.text}; border:2px solid ${couleur.border};">#${num}</span>`
+    ).join('');
+
     container.innerHTML = `
-        <div class="min-h-[70vh] flex flex-col items-center justify-center p-8" style="background:${couleur.bg}15;">
-            <div class="text-8xl mb-6 animate-pulse">⏳</div>
-            <h2 class="text-3xl font-black text-white mb-3">En attente du signal</h2>
-            <p class="text-slate-300 mb-8">Vague <span style="color:${couleur.bg}" class="font-black">${couleur.label}</span></p>
-            <button onclick="window.nlKioskRetour()" class="bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-2xl font-black text-sm text-white active:scale-95">← Retour</button>
+        <div class="p-4" style="background:${couleur.bg}10; min-height:100vh;">
+            <div class="text-center rounded-2xl py-4 mb-4" style="background:#ffffff; border:3px solid ${couleur.border};">
+                <div class="text-4xl mb-1">🏊</div>
+                <div class="text-2xl font-black" style="color:${couleur.bg};">Vague ${couleur.label}</div>
+                <div class="text-sm font-bold mt-1" style="color:#475569;">⏳ En attente du signal du professeur…</div>
+            </div>
+            <div class="rounded-2xl p-4 mb-3" style="background:#ffffff; border:2px solid #cbd5e1;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#0f172a;">🎯 Votre rôle : juge</h3>
+                <ul class="space-y-2 text-sm" style="color:#0f172a;">
+                    <li>👆 Touchez la case du <strong>numéro</strong> de l'élève à <strong>chaque retour au mur</strong> (côté tablettes).</li>
+                    <li>✅ Chaque touche = <strong>+${distanceParClic} m</strong> pour cet élève (la case passe au <strong>vert ✓</strong>).</li>
+                    <li>↩️ En cas d'erreur de touche : <strong>« Annuler le dernier clic »</strong>.</li>
+                    <li>📝 À la fin du temps : saisissez pour chaque élève les <strong>mètres supplémentaires</strong> parcourus depuis son dernier passage au mur (<strong>0 à ${distanceParClic - 1} m</strong>).</li>
+                </ul>
+            </div>
+            <div class="rounded-2xl p-4 mb-3" style="background:#fffbeb; border:2px solid #fcd34d;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#92400e;">⚠️ Consignes pour les nageurs</h3>
+                <ul class="space-y-2 text-sm" style="color:#451a03;">
+                    <li>🛑 Arrêts autorisés <strong>uniquement aux extrémités du bassin</strong>.</li>
+                    <li>🚫 Interdit de s'arrêter <strong>au milieu</strong> ou de <strong>tenir la ligne d'eau</strong>.</li>
+                    <li>🏊 <strong>Allers</strong> : nage de votre choix.</li>
+                    <li>🏊 <strong>Retours</strong> (vers les tablettes) : <strong>CRAWL obligatoire</strong>.</li>
+                </ul>
+            </div>
+            <div class="rounded-2xl p-4 mb-3" style="background:#ffffff; border:2px solid #cbd5e1;">
+                <h3 class="font-black text-sm uppercase mb-2" style="color:#0f172a;">👥 Numéros de la vague (${numerosTries.length})</h3>
+                <div class="flex flex-wrap">${numerosHtml}</div>
+            </div>
+            <button onclick="window.nlKioskRetour()" class="w-full py-3 rounded-2xl font-black text-sm active:scale-95" style="background:#e2e8f0; color:#0f172a; border:2px solid #cbd5e1;">← Retour</button>
         </div>
     `;
 }

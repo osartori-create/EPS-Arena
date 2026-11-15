@@ -6,10 +6,12 @@ import { getEtab } from '../../core/firebase-service.js';
 import { db, ref, set, onValue } from '../../core/firebase-service.js';
 import { getPhotoUrl } from '../../services/admin-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
+import { enregistrerCritereEleve } from '../../services/criteria-service.js';
 import {
     COULEURS_GROUPES, getGroupesKey, getConfigKey, getStatutsKey,
     getBasePath, setMapping, getElevesNumerotes, getStatuts,
-    creerSessionId, getSessionActivePath, getSessionsPath
+    creerSessionId, getSessionActivePath, getSessionsPath,
+    getMapping, getSessionObsPath
 } from './natation-longue-common.js';
 import { DEFAUT_PARAMS, TITRE_AFFICHE } from './natation-longue-core.js';
 
@@ -66,10 +68,19 @@ function createHeader() {
                         title="Affecte les élèves présents par numéro croissant (ex. 1-10, 11-20, 21-28)">
                     🔢 Affecter par ordre
                 </button>
+                <select id="nlCritereTri" class="bg-slate-900 border border-slate-600 rounded p-1 text-white text-xs font-bold" title="Critère de tri pour « Par niveau »">
+                    <option value="indice">🏊 Indice de nage</option>
+                    <option value="distance">🏊 Distance natation</option>
+                </select>
                 <button onclick="window.nlRepartirParNiveau()"
                         class="bg-cyan-600 hover:bg-cyan-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-cyan-400 active:scale-95"
-                        title="Répartit les élèves par niveau de nage (indice de nage) si les données existent">
+                        title="Répartit les élèves par niveau selon le critère choisi (indice ou distance)">
                     🏊 Par niveau
+                </button>
+                <button onclick="window.nlEnregistrerDistances()"
+                        class="bg-amber-600 hover:bg-amber-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-amber-400 active:scale-95"
+                        title="Lit la dernière épreuve et écrit la distance de chaque élève sur sa fiche">
+                    📊 Enregistrer les distances
                 </button>
                 <button onclick="window.nlViderGroupes()"
                         class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-slate-500 active:scale-95"
@@ -319,11 +330,19 @@ async function createEleveCard(eleve) {
     const photoHtml = photoUrl
         ? `<img src="${photoUrl}" class="w-9 h-9 rounded-full object-cover border border-slate-500 flex-shrink-0">`
         : `<div class="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-sm flex-shrink-0">👤</div>`;
+
+    const criteres = [];
+    if (Number(eleve.indiceNage) > 0) criteres.push(`🏊 ${Number(eleve.indiceNage).toFixed(2)}`);
+    if (Number(eleve.distanceNatation) > 0) criteres.push(`📏 ${Math.round(eleve.distanceNatation)} m`);
+    const badgesCriteres = criteres.length
+        ? `<div class="text-[10px] text-slate-400 font-bold">${criteres.join(' · ')}</div>`
+        : '';
     card.innerHTML = `
         <div class="w-9 h-9 rounded-full bg-yellow-400 text-black flex items-center justify-center font-black text-base flex-shrink-0 border-2 border-yellow-600">${eleve.numero}</div>
         ${photoHtml}
         <div class="min-w-0 flex-1">
             <div class="text-xs font-bold text-white truncate">${eleve.prenom} ${eleve.nom}</div>
+            ${badgesCriteres}
         </div>
     `;
     return card;
@@ -556,25 +575,26 @@ window.nlRepartirParNiveau = function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
     const statuts = getStatuts(currentClasse);
     const nbVagues = parseInt(document.getElementById('nlNbVagues')?.value) || DEFAUT_PARAMS.nbVagues;
+    const critere = document.getElementById('nlCritereTri')?.value || 'indice';
+    const champ = critere === 'distance' ? 'distanceNatation' : 'indiceNage';
+    const label = critere === 'distance' ? 'distance natation' : 'indice de nage';
     const elevesNumerotes = getElevesNumerotes(currentClasse);
     const presents = elevesNumerotes.filter(e => !(statuts[e.id] === 'absent' || statuts[e.id] === 'inapte'));
 
-    const avecIndice = presents.filter(e => Number(e.indiceNage) > 0);
-    const sansIndice = presents.filter(e => !(Number(e.indiceNage) > 0));
+    const avecValeur = presents.filter(e => Number(e[champ]) > 0);
+    const sansValeur = presents.filter(e => !(Number(e[champ]) > 0));
 
-    if (avecIndice.length === 0) {
-        alert('Aucun indice de nage disponible pour ces élèves.\n\nEnregistre d\'abord des résultats dans le mode « Indice de nage » puis clique « 📡 Transmettre » (l\'indice est alors écrit sur chaque fiche élève).');
+    if (avecValeur.length === 0) {
+        alert(`Aucune valeur de ${label} disponible pour ces élèves.`);
         return;
     }
 
-    // Du meilleur nageur (indice le plus élevé) au moins bon.
-    avecIndice.sort((a, b) => Number(b.indiceNage) - Number(a.indiceNage));
+    avecValeur.sort((a, b) => Number(b[champ]) - Number(a[champ]));
 
-    // Bandes homogènes : vague 1 = meilleurs, dernière vague = moins bons.
     const groupesIds = {};
     COULEURS_GROUPES.forEach(c => { groupesIds[c.id] = []; });
-    const taille = Math.ceil(avecIndice.length / nbVagues);
-    avecIndice.forEach((e, i) => {
+    const taille = Math.ceil(avecValeur.length / nbVagues);
+    avecValeur.forEach((e, i) => {
         const idx = Math.min(nbVagues - 1, Math.floor(i / taille));
         groupesIds[COULEURS_GROUPES[idx].id].push(e.id);
     });
@@ -582,10 +602,47 @@ window.nlRepartirParNiveau = function() {
     saveGroupes(groupesIds);
     loadAffectations();
 
-    const msg = sansIndice.length > 0
-        ? `\n⚠️ ${sansIndice.length} élève(s) sans indice de nage laissé(s) en réserve (à affecter manuellement).`
+    const msg = sansValeur.length > 0
+        ? `⚠️ ${sansValeur.length} élève(s) sans ${label} en réserve.`
         : '';
-    alert(`🏊 Répartition par niveau effectuée pour ${avecIndice.length} élève(s) sur ${nbVagues} vague(s).${msg}`);
+    alert(`🏊 Répartition par niveau (${label}) : ${avecValeur.length} élève(s) sur ${nbVagues} vague(s).${msg}`);
+};
+
+window.nlEnregistrerDistances = async function() {
+    if (!currentClasse) return alert('Sélectionnez une classe.');
+    const basePath = getBasePath(currentClasse);
+
+    const sessionSnap = await new Promise(resolve => onValue(ref(db, getSessionActivePath(currentClasse)), resolve, { onlyOnce: true }));
+    const sessionId = sessionSnap.val();
+    if (!sessionId) return alert(`Aucune épreuve active. Lance une épreuve avant d'enregistrer les distances.`);
+
+    const configSnap = await new Promise(resolve => onValue(ref(db, `${basePath}/config`), resolve, { onlyOnce: true }));
+    const config = configSnap.val() || {};
+    const distanceParClic = config.distanceParClic || 50;
+
+    const mapping = getMapping(currentClasse);
+    const obsBase = getSessionObsPath(currentClasse, sessionId);
+    let nbEcrits = 0;
+    for (const couleur of COULEURS_GROUPES) {
+        const obsSnap = await new Promise(resolve => onValue(ref(db, `${obsBase}/${couleur.id}`), resolve, { onlyOnce: true }));
+        const parNumero = obsSnap.val() || {};
+        for (const numero of Object.keys(parNumero)) {
+            const obs = parNumero[numero];
+            if (!obs || obs.abandon) continue;
+            const distance = (obs.timestamps || []).length * distanceParClic + (obs.partiel || 0);
+            const eleveId = mapping[String(numero)];
+            if (eleveId && enregistrerCritereEleve(currentClasse, eleveId, 'distanceNatation', distance)) {
+                nbEcrits++;
+            }
+        }
+    }
+
+    if (nbEcrits > 0) {
+        loadAffectations();
+        alert(`✅ ${nbEcrits} distance(s) enregistrée(s) sur les fiches (critère « Distance natation »).`);
+    } else {
+        alert('Aucune distance trouvée dans cette épreuve.');
+    }
 };
 
 window.nlViderGroupes = function() {

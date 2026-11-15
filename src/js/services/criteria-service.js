@@ -72,6 +72,7 @@ export const CRITERES_STATIQUES = [
 export const CRITERES_DERIVES = [
     { id: 'indiceNage', label: '🏊 Indice de nage' },
     { id: 'vitesseDemiFond', label: '🏃 Vitesse 1/2 fond (km/h)' },
+    { id: 'distanceNatation', label: '🏊 Distance natation (m)' },
 ];
 
 /**
