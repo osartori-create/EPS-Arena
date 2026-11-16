@@ -19,6 +19,7 @@ import {
     transmettreConfigBloc
 } from './escalade-prof-blocs.js';
 import { initSuiviProf, cleanupSuiviProf } from './escalade-voies-prof.js';
+import { initContratsProf, cleanupContratsProf } from './escalade-contrats-prof.js';
 
 import { registerModule, getModule } from '../registry.js';
 
@@ -53,6 +54,7 @@ export function initEscaladeModeSelector() {
         <button id="escalade-mode-classic" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white">🧗 Escalade classique</button>
         <button id="escalade-mode-bloc" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">🧗 Bloc Contest</button>
         <button id="escalade-mode-suivi" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">🏔️ Suivi des réalisations</button>
+        <button id="escalade-mode-contrats" class="px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300">⛰️ Contrats</button>
     `;
     // Insérer en haut de la vue
     escView.prepend(selector);
@@ -66,10 +68,13 @@ export function initEscaladeModeSelector() {
     document.getElementById('escalade-mode-suivi').addEventListener('click', () => {
         setEscaladeMode('suivi');
     });
+    document.getElementById('escalade-mode-contrats').addEventListener('click', () => {
+        setEscaladeMode('contrats');
+    });
     
     // Restaurer le mode sauvegardé (par classe), sinon classique.
     const saved = localStorage.getItem(getEscaladeModeKey());
-    setEscaladeMode(saved === 'bloc' || saved === 'suivi' ? saved : 'classic');
+    setEscaladeMode(saved === 'bloc' || saved === 'suivi' || saved === 'contrats' ? saved : 'classic');
 }
 
 function setEscaladeMode(mode) {
@@ -80,10 +85,12 @@ function setEscaladeMode(mode) {
     const classicEl = document.getElementById('escalade-classic-block');
     let blocEl = document.getElementById('bloc-prof-container');
     let suiviEl = document.getElementById('suivi-prof-container');
+    let contratsEl = document.getElementById('contrats-prof-container');
 
     const btnClassic = document.getElementById('escalade-mode-classic');
     const btnBloc = document.getElementById('escalade-mode-bloc');
     const btnSuivi = document.getElementById('escalade-mode-suivi');
+    const btnContrats = document.getElementById('escalade-mode-contrats');
 
     const clsOn = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-blue-600 text-white';
     const clsOff = 'px-4 py-2 rounded-xl font-black text-xs uppercase bg-slate-700 text-slate-300';
@@ -92,10 +99,12 @@ function setEscaladeMode(mode) {
     if (classicEl) classicEl.style.display = (mode === 'classic') ? '' : 'none';
     if (blocEl) blocEl.style.display = (mode === 'bloc') ? '' : 'none';
     if (suiviEl) suiviEl.style.display = (mode === 'suivi') ? '' : 'none';
+    if (contratsEl) contratsEl.style.display = (mode === 'contrats') ? '' : 'none';
 
     if (btnClassic) btnClassic.className = (mode === 'classic') ? clsOn : clsOff;
     if (btnBloc) btnBloc.className = (mode === 'bloc') ? clsOn : clsOff;
     if (btnSuivi) btnSuivi.className = (mode === 'suivi') ? clsOn : clsOff;
+    if (btnContrats) btnContrats.className = (mode === 'contrats') ? clsOn : clsOff;
 
     const activeClasse = document.getElementById('selectClasse') ? document.getElementById('selectClasse').value : '';
 
@@ -116,6 +125,9 @@ function setEscaladeMode(mode) {
     } else if (mode === 'suivi') {
         if (activeClasse) initSuiviProf(activeClasse);
         else if (suiviEl) suiviEl.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
+    } else if (mode === 'contrats') {
+        if (activeClasse) initContratsProf(activeClasse);
+        else if (contratsEl) contratsEl.innerHTML = '<p class="text-slate-500">Sélectionnez une classe.</p>';
     }
 
     // Émettre un événement pour que activities.js mette à jour currentDiscipline
@@ -164,6 +176,10 @@ export async function transmettre(classe) {
     }
     if (escaladeMode === 'suivi') {
         if (window.suiviTransmettre) { await window.suiviTransmettre(); }
+        return;
+    }
+    if (escaladeMode === 'contrats') {
+        if (window.contratsTransmettre) { await window.contratsTransmettre(); }
         return;
     }
 
@@ -266,6 +282,7 @@ export function registerEscaladeModule() {
         cleanup: () => {
             cleanupBlocProf();
             cleanupSuiviProf();
+            cleanupContratsProf();
             console.log('[Escalade] Nettoyage effectué');
         }
     });

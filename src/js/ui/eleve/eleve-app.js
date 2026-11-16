@@ -16,6 +16,7 @@ import { initRelaisKiosk, cleanupRelaisKiosk } from '../../modules/relais/relais
 import { initGrillesKiosk, cleanupGrillesKiosk } from '../../modules/grilles/grilles-kiosk.js';
 import { initDemiFondKiosk, cleanupDemiFondKiosk } from '../../modules/demi-fond/demifond-kiosk.js';
 import { initSuiviKiosk, cleanupSuiviKiosk } from '../../modules/escalade/escalade-voies-kiosk.js';
+import { initContratsKiosk, cleanupContratsKiosk } from '../../modules/escalade/escalade-contrats-kiosk.js';
 
 export { db };
 
@@ -41,6 +42,7 @@ const relaisModule = document.getElementById('relais-module');
 const grillesModule = document.getElementById('grilles-module');
 const demiFondModule = document.getElementById('demi-fond-module');
 const suiviModule = document.getElementById('suivi-module');
+const contratsModule = document.getElementById('contrats-module');
 const codeInfo = document.getElementById('code-info');
 const btnQuit = document.getElementById('btn-quit');
 const btnBackTerrain = document.getElementById('btn-back-terrain');
@@ -136,6 +138,10 @@ export function initApp() {
     console.log('[eleve] Activité Suivi des réalisations détectée');
     masquerElementsCO();
     showLoginSuivi();
+} else if (config.activite === 'escalade-contrats') {
+    console.log('[eleve] Activité Contrats escalade détectée');
+    masquerElementsCO();
+    showLoginContrats();
 } else if (config.activite === 'ppg') {
     console.log('[eleve] Activité PPG détectée');
     masquerElementsCO();
@@ -194,6 +200,7 @@ function masquerTousLesModules() {
     if (grillesModule) grillesModule.classList.add('hidden');
     if (demiFondModule) demiFondModule.classList.add('hidden');
     if (suiviModule) suiviModule.classList.add('hidden');
+    if (contratsModule) contratsModule.classList.add('hidden');
     const ppgEl = document.getElementById('ppg-module');
     if (ppgEl) {
         ppgEl.classList.add('hidden');
@@ -531,6 +538,28 @@ function showLoginSuivi() {
         initSuiviKiosk(selectedClass);
     } else {
         console.error('[eleve] Conteneur suivi-module introuvable !');
+    }
+
+    masquerElementsCO();
+}
+
+// ============================================================
+// SPÉCIAL CONTRATS ESCALADE
+// ============================================================
+function showLoginContrats() {
+    loginScreen.classList.add('hidden');
+    activityScreen.classList.remove('hidden');
+    waitingScreen.classList.add('hidden');
+
+    setContainerWidth(true);
+    masquerTousLesModules();
+
+    if (contratsModule) {
+        contratsModule.classList.remove('hidden');
+        contratsModule.style.display = 'block';
+        initContratsKiosk(selectedClass);
+    } else {
+        console.error('[eleve] Conteneur contrats-module introuvable !');
     }
 
     masquerElementsCO();
@@ -876,6 +905,10 @@ export function resetToLogin() {
         suiviModule.style.display = 'none';
         suiviModule.innerHTML = '';
     }
+    if (contratsModule) {
+        contratsModule.style.display = 'none';
+        contratsModule.innerHTML = '';
+    }
 
     const ppgModuleEl = document.getElementById('ppg-module');
     if (ppgModuleEl) {
@@ -885,6 +918,7 @@ export function resetToLogin() {
 
     if (typeof cleanupDemiFondKiosk === 'function') cleanupDemiFondKiosk();
     if (typeof cleanupSuiviKiosk === 'function') cleanupSuiviKiosk();
+    if (typeof cleanupContratsKiosk === 'function') cleanupContratsKiosk();
     if (typeof cleanupGrillesKiosk === 'function') cleanupGrillesKiosk();
     if (typeof cleanupRelaisKiosk === 'function') cleanupRelaisKiosk();
 
