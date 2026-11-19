@@ -35,7 +35,26 @@ export function initEnchainementKiosk(classe) {
 
     const basePath = getBasePath(classe);
     if (configListener) configListener();
-    configListener = onValue(ref(db, `${basePath}/config`), (snap) => { state.config = snap.val() || null; render(); });
+    configListener = onValue(ref(db, `${basePath}/config`), (snap) => {
+        state.config = snap.val() || null;
+        // Nouvelle transmission = nouvelle epreuve : si la sequence precedente est
+        // terminee (saisie_finale / bilan), on repart sur le choix de la couleur.
+        if (state.phase === 'saisie_finale' || state.phase === 'bilan') {
+            state.phase = 'choix';
+            state.couleur = null;
+            state.codes = [];
+            state.timestampsParEleve = {};
+            state.partielsParEleve = {};
+            state.abandonsParEleve = {};
+            state.lastClickAt = {};
+            state.dernierClic = null;
+            state.derniereCourseEnvoyee = 0;
+            state.bilanCodeActif = null;
+        } else if (state.phase === 'attente' && state.couleur) {
+            state.codes = state.config?.groupes?.[state.couleur] || [];
+        }
+        render();
+    });
 
     if (sequenceListener) sequenceListener();
     sequenceListener = onValue(ref(db, `${basePath}/commandes/sequence`), async (snap) => {
@@ -52,6 +71,9 @@ export function initEnchainementKiosk(classe) {
                 // attend encore d'être envoyée (plots partiels saisis pendant la pause).
                 if (seq.action === 'skip' && state.phase === 'pause') {
                     await envoyerResultatsCourse(state.courseNum);
+                }
+                if (seq.action === 'go' && state.couleur) {
+                    state.codes = state.config?.groupes?.[state.couleur] || [];
                 }
                 state.timestampsParEleve = {}; state.partielsParEleve = {}; state.abandonsParEleve = {}; state.lastClickAt = {}; state.dernierClic = null; state.derniereCourseEnvoyee = 0;
                 state.codes.forEach(code => { state.timestampsParEleve[code] = []; });

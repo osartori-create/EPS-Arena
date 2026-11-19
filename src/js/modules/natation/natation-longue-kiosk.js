@@ -75,12 +75,41 @@ export function initNatationLongueKiosk(classe) {
     if (configListener) configListener();
     configListener = onValue(ref(db, `${basePath}/config`), (snap) => {
         state.config = snap.val() || null;
+        // Nouvelle transmission = nouvelle épreuve : si la vague précédente est
+        // terminée (saisie_finale / bilan), on repart sur le choix de la couleur.
+        if (state.phase === 'saisie_finale' || state.phase === 'bilan') {
+            state.phase = 'choix';
+            state.couleur = null;
+            state.codes = [];
+            state.timestampsParEleve = {};
+            state.partielsParEleve = {};
+            state.abandonsParEleve = {};
+            state.lastClickAt = {};
+            historiqueClics = [];
+        } else if (state.phase === 'attente' && state.couleur) {
+            // Les groupes ont pu changer pendant l'attente : on rafraîchit les codes.
+            state.codes = (state.config?.groupes?.[state.couleur] || []).map(String);
+        }
         render();
     });
 
     if (sessionListener) sessionListener();
     sessionListener = onValue(ref(db, getSessionActivePath(classe)), (snap) => {
-        state.sessionId = snap.val() || null;
+        const nouveau = snap.val() || null;
+        // Nouvelle épreuve : si la vague précédente est terminée, on repart au choix.
+        if (state.sessionId && nouveau && nouveau !== state.sessionId
+            && (state.phase === 'saisie_finale' || state.phase === 'bilan')) {
+            state.phase = 'choix';
+            state.couleur = null;
+            state.codes = [];
+            state.timestampsParEleve = {};
+            state.partielsParEleve = {};
+            state.abandonsParEleve = {};
+            state.lastClickAt = {};
+            historiqueClics = [];
+            render();
+        }
+        state.sessionId = nouveau;
     });
 
     if (sequenceListener) sequenceListener();
@@ -94,6 +123,8 @@ export function initNatationLongueKiosk(classe) {
         if (seq.etat === 'course' && seq.vague === state.couleur) {
             state.phase = 'course';
             state.timestampDebut = seq.timestampDebut;
+            // Groupes éventuellement retransmis : on reprend les codes à jour.
+            state.codes = (state.config?.groupes?.[state.couleur] || []).map(String);
             state.timestampsParEleve = {};
             state.partielsParEleve = {};
             state.abandonsParEleve = {};

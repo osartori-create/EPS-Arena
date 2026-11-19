@@ -76,13 +76,46 @@ export function initTroisCinqMinKiosk(classe) {
     if (configListener) configListener();
     configListener = onValue(ref(db, `${basePath}/config`), (snap) => {
         state.config = snap.val() || null;
+        // Nouvelle transmission = nouvelle epreuve : si la sequence precedente est
+        // terminee (saisie_finale / bilan), on repart sur le choix de la couleur.
+        if (state.phase === 'saisie_finale' || state.phase === 'bilan') {
+            state.phase = 'choix';
+            state.couleur = null;
+            state.codes = [];
+            state.timestampsParEleve = {};
+            state.partielsParEleve = {};
+            state.abandonsParEleve = {};
+            state.lastClickAt = {};
+            state.dernierClic = null;
+            state.derniereCourseEnvoyee = 0;
+            state.bilanCodeActif = null;
+        } else if (state.phase === 'attente' && state.couleur) {
+            // Groupes eventuellement modifies : on rafraichit les codes.
+            state.codes = state.config?.groupes?.[state.couleur] || [];
+        }
         render();
     });
 
     // Écoute session active
     if (sessionListener) sessionListener();
     sessionListener = onValue(ref(db, getSessionActivePath(classe)), (snap) => {
-        state.sessionId = snap.val() || null;
+        const nouveau = snap.val() || null;
+        // Nouvelle epreuve : si la sequence precedente est terminee, on repart au choix.
+        if (state.sessionId && nouveau && nouveau !== state.sessionId
+            && (state.phase === 'saisie_finale' || state.phase === 'bilan')) {
+            state.phase = 'choix';
+            state.couleur = null;
+            state.codes = [];
+            state.timestampsParEleve = {};
+            state.partielsParEleve = {};
+            state.abandonsParEleve = {};
+            state.lastClickAt = {};
+            state.dernierClic = null;
+            state.derniereCourseEnvoyee = 0;
+            state.bilanCodeActif = null;
+            render();
+        }
+        state.sessionId = nouveau;
         console.log('[DemiFond] Session active :', state.sessionId);
     });
 
@@ -122,6 +155,10 @@ export function initTroisCinqMinKiosk(classe) {
             // terminer attend encore d'être envoyée (partiels saisis pendant la pause).
             if (seq.action === 'skip' && state.phase === 'pause') {
                 await envoyerResultatsCourse(state.courseNum);
+            }
+            // Nouveau GO = nouvelle course : on reprend les codes a jour (groupes retransmis).
+            if (seq.action === 'go' && state.couleur) {
+                state.codes = state.config?.groupes?.[state.couleur] || [];
             }
             state.timestampsParEleve = {};
             state.partielsParEleve = {};
