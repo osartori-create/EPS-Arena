@@ -59,8 +59,8 @@ function formaterDate(d) {
 }
 async function chargerPhotos(eleves) {
     await Promise.all(eleves.map(async e => {
-        if (photosCache[e.id] !== undefined) return;
-        try { photosCache[e.id] = await getPhotoUrl(e.id); } catch (err) { photosCache[e.id] = null; }
+        if (photosCache[e.id]) return;
+        try { const url = await getPhotoUrl(e.id); if (url) photosCache[e.id] = url; } catch (err) { /* photo absente : on retentera */ }
     }));
 }
 

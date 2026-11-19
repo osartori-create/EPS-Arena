@@ -4,25 +4,41 @@
 const Papa = window.Papa;
 const JSZip = window.JSZip;
 
-let dbPhotos;
-const request = indexedDB.open("EPS_Arena_LocalDB", 1);
-request.onupgradeneeded = e => {
-    dbPhotos = e.target.result;
-    if (!dbPhotos.objectStoreNames.contains("eleves")) {
-        dbPhotos.createObjectStore("eleves", { keyPath: "id" });
-    }
-};
-request.onsuccess = e => { dbPhotos = e.target.result; };
+let dbPhotos = null;
+let dbPhotosPromise = null;
 
-function savePhoto(id, blob) {
-    if (!dbPhotos) return;
+// Ouvre (une seule fois) la base IndexedDB des photos et résout quand elle est prête.
+function ouvrirDBPhotos() {
+    if (dbPhotosPromise) return dbPhotosPromise;
+    dbPhotosPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open("EPS_Arena_LocalDB", 1);
+        request.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains("eleves")) {
+                db.createObjectStore("eleves", { keyPath: "id" });
+            }
+        };
+        request.onsuccess = e => {
+            dbPhotos = e.target.result;
+            resolve(dbPhotos);
+        };
+        request.onerror = e => {
+            console.error('[Photos] IndexedDB indisponible :', e.target.error);
+            reject(e.target.error);
+        };
+    });
+    return dbPhotosPromise;
+}
+
+async function savePhoto(id, blob) {
+    try { await ouvrirDBPhotos(); } catch (e) { return; }
     const tx = dbPhotos.transaction("eleves", "readwrite");
     tx.objectStore("eleves").put({ id, blob });
 }
 
 async function getPhotoUrl(id) {
+    try { await ouvrirDBPhotos(); } catch (e) { return null; }
     return new Promise(resolve => {
-        if (!dbPhotos) return resolve(null);
         const tx = dbPhotos.transaction("eleves", "readonly");
         const req = tx.objectStore("eleves").get(id);
         req.onsuccess = () => resolve(req.result ? URL.createObjectURL(req.result.blob) : null);
@@ -264,7 +280,7 @@ export async function importZIP(file, classeName) {
             if (eleve.nom !== infos.nom) eleve.nom = infos.nom;
             if (eleve.prenom !== infos.prenom) eleve.prenom = infos.prenom;
             const blob = await entry.async('blob');
-            savePhoto(eleve.id, blob);
+            await savePhoto(eleve.id, blob);
         } else {
             const newId = infos.cleUnique;
             eleve = {
@@ -279,7 +295,7 @@ export async function importZIP(file, classeName) {
                 force: 0
             };
             const blob = await entry.async('blob');
-            savePhoto(newId, blob);
+            await savePhoto(newId, blob);
             nouveauxEleves.push(eleve);
         }
     }
@@ -402,6 +418,7 @@ export function updateStudentName(studentId, field, value, classeName) {
 }
 
 export async function assignPhotoToStudent(studentId, sourcePhotoId, classeName) {
+    try { await ouvrirDBPhotos(); } catch (e) { return false; }
     const tx = dbPhotos.transaction("eleves", "readwrite");
     const req = tx.objectStore("eleves").get(sourcePhotoId);
     return new Promise((resolve) => {
@@ -428,7 +445,7 @@ export async function assignPhotoToStudent(studentId, sourcePhotoId, classeName)
 
 export async function uploadManualPhoto(studentId, file, classeName) {
     const blob = await file;
-    savePhoto(studentId, blob);
+    await savePhoto(studentId, blob);
     const eleves = getExistingEleves(classeName);
     const target = eleves.find(e => e.id === studentId);
     if (target) target.force = target.force || 0;
@@ -438,7 +455,7 @@ export async function uploadManualPhoto(studentId, file, classeName) {
 
 // Copie la photo du doublon vers le survivant, uniquement si le survivant n'en a pas déjà une.
 export async function transfererPhoto(survivantId, doublonId) {
-    if (!dbPhotos) return false;
+    try { await ouvrirDBPhotos(); } catch (e) { return false; }
     const deja = await new Promise(res => {
         const tx = dbPhotos.transaction("eleves", "readonly");
         const r = tx.objectStore("eleves").get(survivantId);
