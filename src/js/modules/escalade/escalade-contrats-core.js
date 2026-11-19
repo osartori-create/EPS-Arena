@@ -17,26 +17,20 @@ export function scoreErreur(nbErreurs) {
     return 9 - n;
 }
 
-// Nombre d'erreurs retenu pour une épreuve :
-// - 'toutes' (ou vide) -> somme de tous les types ;
-// - sinon -> le compteur du type demandé.
-export function nbErreursSaisie(saisie, erreurType) {
-    const map = saisie.erreurs || {};
-    if (!erreurType || erreurType === 'toutes') {
-        return Object.values(map).reduce((acc, v) => acc + (parseInt(v, 10) || 0), 0);
-    }
-    return parseInt(map[erreurType], 10) || 0;
+// Depuis V1.1 : un seul scoreur d'erreurs au kiosk -> un seul compteur (0..9).
+export function nbErreursSaisie(saisie) {
+    return Math.max(0, Math.min(9, parseInt(saisie.erreurs, 10) || 0));
 }
 
 /**
  * Compose le « score parlant » d'une épreuve à partir de la saisie.
- * @param {Object} saisie - { degaines, erreurs: {typeId: nb}, cotationChiffre, cotationLettre }
- * @param {Object} epreuve - { type, erreurType, ... }
+ * @param {Object} saisie - { degaines, erreurs, cotationChiffre, cotationLettre }
+ * @param {Object} epreuve - { type, ... }
  * @returns {number}
  */
 export function composerScoreParlant(saisie, epreuve) {
     const degaines = parseInt(saisie.degaines, 10) || 0;
-    const erreurs = nbErreursSaisie(saisie, epreuve.erreurType);
+    const erreurs = nbErreursSaisie(saisie);
     const cotChiffre = parseInt(saisie.cotationChiffre, 10) || 0;
     const cotLettre = valeurLettre(saisie.cotationLettre);
 
@@ -58,24 +52,39 @@ export function composerScoreParlant(saisie, epreuve) {
  * Évalue une épreuve d'un contrat grimpeur.
  * @returns {{ valide: boolean, scoreParlant: number }}
  */
-export function evaluerEpreuve(saisie, epreuve, nbDegainesMax) {
+// Cible « je cherche X » d'une épreuve : le score parlant à atteindre.
+export function cibleEpreuve(epreuve, nbDegainesMax) {
+    const sommet = epreuve.exigeSommet === false ? (epreuve.cibleDegaines || 0) : nbDegainesMax;
+    const scoreErreurCible = 9 - (epreuve.erreursMax ?? 0);
+    const cot = (epreuve.cotationChiffre || 0) * 10 + valeurLettre(epreuve.cotationLettre);
+
+    switch (epreuve.type) {
+        case 'degaines':
+        case 'degaines-moyenne':
+            return sommet;
+        case 'degaines-erreurs':
+            return sommet * 10 + scoreErreurCible;
+        case 'degaines-cotation':
+            return sommet * 100 + cot;
+        case 'degaines-cotation-erreurs':
+            return sommet * 1000 + cot * 10 + scoreErreurCible;
+        default:
+            return sommet;
+    }
+}
+
+export function evaluerEpreuve(saisie, epreuve, nbDegainesMax, cumul) {
+    // Épreuve « régularité » : moyenne des dégaines sur toutes les ascensions.
+    if (epreuve.type === 'degaines-moyenne') {
+        const totalDegaines = cumul?.totalDegaines ?? 0;
+        const nbAscents = cumul?.nbAscents ?? 0;
+        const moyenne = nbAscents > 0 ? totalDegaines / nbAscents : 0;
+        const arrondi = Math.round(moyenne * 10) / 10;
+        return { valide: arrondi >= cibleEpreuve(epreuve, nbDegainesMax), scoreParlant: arrondi };
+    }
+
     const scoreParlant = composerScoreParlant(saisie, epreuve);
-    const degaines = parseInt(saisie.degaines, 10) || 0;
-    const cible = epreuve.exigeSommet === false ? (epreuve.cibleDegaines || 0) : nbDegainesMax;
-    if (degaines < cible) return { valide: false, scoreParlant };
-
-    if (epreuve.type.includes('erreurs')) {
-        const nb = nbErreursSaisie(saisie, epreuve.erreurType);
-        if (nb > (epreuve.erreursMax ?? 0)) return { valide: false, scoreParlant };
-    }
-
-    if (epreuve.type.includes('cotation')) {
-        const cot = (parseInt(saisie.cotationChiffre, 10) || 0) * 10 + valeurLettre(saisie.cotationLettre);
-        const cibleCot = (epreuve.cotationChiffre || 0) * 10 + valeurLettre(epreuve.cotationLettre);
-        if (cot < cibleCot) return { valide: false, scoreParlant };
-    }
-
-    return { valide: true, scoreParlant };
+    return { valide: scoreParlant >= cibleEpreuve(epreuve, nbDegainesMax), scoreParlant };
 }
 
 /**
@@ -96,9 +105,9 @@ export function validerContratEchelle(notes, contrat) {
  * Valide un contrat quel que soit son mode.
  * @returns {{ valide: boolean, score: number, scoreParlant: number|null }}
  */
-export function evaluerContrat(saisie, contrat, nbDegainesMax) {
+export function evaluerContrat(saisie, contrat, nbDegainesMax, cumul) {
     if (contrat.mode === 'grimpeur') {
-        const epreuves = (contrat.epreuves || []).map(ep => evaluerEpreuve(saisie, ep, nbDegainesMax));
+        const epreuves = (contrat.epreuves || []).map(ep => evaluerEpreuve(saisie, ep, nbDegainesMax, cumul));
         const scoreParlant = epreuves.length ? epreuves[0].scoreParlant : null;
         return {
             valide: epreuves.length > 0 && epreuves.every(e => e.valide),

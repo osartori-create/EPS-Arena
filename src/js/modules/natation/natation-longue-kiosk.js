@@ -37,8 +37,18 @@ function injecterStyles() {
     if (document.getElementById('nl-kiosk-styles')) return;
     const style = document.createElement('style');
     style.id = 'nl-kiosk-styles';
-    style.textContent = '#natation-module button{ touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }@keyframes nl-blink{0%,49%{opacity:1}50%,100%{opacity:0.25}}.nl-chrono-alerte{animation:nl-blink 1s step-start infinite;}';
+    style.textContent = '#natation-module button{ touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }@keyframes nl-blink{0%,49%{opacity:1}50%,100%{opacity:0.25}}.nl-chrono-alerte{animation:nl-blink 1s step-start infinite;}';
     document.head.appendChild(style);
+
+    // Bloque le zoom pincement accidentel (gouttes d'eau) et le clic long.
+    const cont = document.getElementById('natation-module');
+    if (cont) {
+        cont.addEventListener('contextmenu', (e) => e.preventDefault());
+        cont.addEventListener('touchmove', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+    }
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('gesturechange', (e) => e.preventDefault());
+    document.addEventListener('gestureend', (e) => e.preventDefault());
 }
 
 // ============================================================
@@ -247,8 +257,8 @@ function renderCourse(container) {
                 <div id="nl-chrono-restant" style="font-size:4rem; font-weight:900; color:#0f172a; line-height:1; font-family:ui-monospace, SFMono-Regular, Menlo, monospace;">${formatDuree(state.config?.duree || 420)}</div>
             </div>
             <div class="text-center font-black mb-3" style="color:${couleur.bg}; font-size:1rem;">Vague ${couleur.label} · +${distanceParClic} m / passage</div>
-            <div class="grid grid-cols-3 md:grid-cols-4 gap-3">${btns}</div>
-            <button onclick="window.nlKioskAnnulerDernier()" class="w-full mt-3 py-3 rounded-xl font-black text-sm border-2 active:scale-95" style="background:#fef3c7; color:#92400e; border-color:#f59e0b;">↩️ Annuler le dernier clic</button>
+            <div class="grid grid-cols-3 md:grid-cols-4 gap-4">${btns}</div>
+            <button onclick="window.nlKioskAnnulerDernier()" class="w-full mt-3 py-4 rounded-xl font-black text-base border-2 active:scale-95" style="background:#fef3c7; color:#92400e; border-color:#f59e0b;">↩️ Annuler le dernier clic</button>
             <p class="text-slate-400 text-xs mt-4 text-center">Clique sur le numéro de l'élève à chaque retour au mur (aller-retour = ${distanceParClic} m).</p>
         </div>
     `;
@@ -387,8 +397,9 @@ function renderSaisieFinale(container) {
             <div class="bg-slate-900 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
                 <div class="text-2xl font-black w-12 text-center" style="color:${couleur.bg};">#${num}</div>
                 <div class="flex-1 text-sm text-slate-400">${nb} passage${nb > 1 ? 's' : ''} = ${nb * distanceParClic} m</div>
-                <input type="number" id="nl-partiel-${num}" value="${partiel}" min="0" max="${distanceParClic - 1}" step="5"
-                       class="w-20 bg-slate-900 border border-slate-600 rounded p-2 text-white text-center font-black">
+                <button onclick="window.nlKioskAjusterPartiel('${num}', -5)" class="w-12 h-12 rounded-xl font-black text-2xl active:scale-95 flex-shrink-0 select-none" style="background:#334155; color:#ffffff;">−</button>
+                <div id="nl-partiel-val-${num}" class="w-16 text-center text-xl font-black" style="color:#b45309;">${partiel}</div>
+                <button onclick="window.nlKioskAjusterPartiel('${num}', 5)" class="w-12 h-12 rounded-xl font-black text-2xl active:scale-95 flex-shrink-0 select-none" style="background:#334155; color:#ffffff;">+</button>
                 <span class="text-slate-400 text-sm">m</span>
             </div>
         `;
@@ -397,7 +408,7 @@ function renderSaisieFinale(container) {
     html += `
                 </div>
                 <button onclick="window.nlKioskValiderPartiels()"
-                        class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 py-3 rounded-xl font-black text-white text-sm active:scale-95">✅ Valider la vague</button>
+                        class="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 py-4 rounded-xl font-black text-white text-base active:scale-95">✅ Valider la vague</button>
             </div>
         </div>
     `;
@@ -405,14 +416,19 @@ function renderSaisieFinale(container) {
 }
 
 
-window.nlKioskValiderPartiels = function() {
+window.nlKioskAjusterPartiel = function(num, delta) {
     const distanceParClic = state.config?.distanceParClic || 50;
+    const max = Math.floor((distanceParClic - 1) / 5) * 5;
+    const actuel = state.partielsParEleve[num] || 0;
+    let val = actuel + delta;
+    val = Math.max(0, Math.min(max, val));
+    state.partielsParEleve[num] = val;
+    const display = document.getElementById(`nl-partiel-val-${num}`);
+    if (display) display.textContent = val;
+};
+
+window.nlKioskValiderPartiels = function() {
     state.codes.forEach(num => {
-        if (state.abandonsParEleve[num]) return;
-        const input = document.getElementById(`nl-partiel-${num}`);
-        let val = parseInt(input?.value) || 0;
-        val = Math.max(0, Math.min(distanceParClic - 1, val));
-        state.partielsParEleve[num] = val;
         pousserObservation(num);
     });
     state.phase = 'bilan';

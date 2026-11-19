@@ -11,15 +11,15 @@ export const COTATION_CHIFFRES = [3, 4, 5, 6, 7];
 
 // Codes erreurs par défaut (repris du document du collègue) + saisie libre.
 export const ERREURS_DEFAUT = [
-    { id: 'pose-precise-pieds', label: 'Pose précise des pieds' },
+    { id: 'pieds', label: 'Pieds (pose précise)' },
     { id: 'ppm', label: 'Pieds-pieds-mains-mains' },
-    { id: 'equilibre', label: 'Équilibre' },
-    { id: 'tractions', label: 'Tractions (trop de bras)' }
+    { id: 'equilibre', label: 'Équilibre' }
 ];
 
 // Épreuves grimpeur possibles (score parlant).
 export const EPREUVES_GRIMPEUR = [
     { id: 'degaines', label: 'Dégaines atteintes' },
+    { id: 'degaines-moyenne', label: 'Dégaines / ascensions' },
     { id: 'degaines-erreurs', label: 'Dégaines + score erreur' },
     { id: 'degaines-cotation', label: 'Dégaines + cotation' },
     { id: 'degaines-cotation-erreurs', label: 'Dégaines + cotation + score erreur' }
@@ -47,7 +47,7 @@ export function construireConfigContratsDefaut() {
 // GRIMPEUR — contrats « score parlant »
 // ============================================================
 // Fabrique une épreuve grimpeur (score parlant).
-// type : 'degaines' | 'degaines-erreurs' | 'degaines-cotation' | 'degaines-cotation-erreurs'
+// type : 'degaines' | 'degaines-moyenne' | 'degaines-erreurs' | 'degaines-cotation' | 'degaines-cotation-erreurs'
 function epreuve(type, opts = {}) {
     return {
         type,
@@ -60,28 +60,43 @@ function epreuve(type, opts = {}) {
     };
 }
 
-function contratGrimpeur(id, label, couleur, epreuves) {
-    return { id, label, couleur, mode: 'grimpeur', epreuves };
+function contratGrimpeur(id, couleur, label, descriptif, epreuves) {
+    return { id, couleur, label, descriptif, mode: 'grimpeur', epreuves };
 }
 
 function contratsGrimpeurDefaut() {
-    const types = ['pose-precise-pieds', 'ppm', 'equilibre', 'tractions'];
+    const BLEU = '#3b82f6';
     return [
         // Du plus accessible au plus exigeant (couleurs libres, éditable).
-        // Chaque niveau peut comporter PLUSIEURS épreuves.
-        contratGrimpeur('jaune', 'Jaune', '#eab308', [
+        // Le numéro (1, 2, 3…) est attribué automatiquement selon l'ordre des
+        // contrats d'une même couleur.
+        // « Je cherche X » = objectif calculé depuis l'épreuve (sommet + critères).
+        contratGrimpeur('jaune', '#eab308', 'Jaune', 'Atteindre le sommet', [
             epreuve('degaines')
         ]),
-        contratGrimpeur('vert', 'Vert', '#22c55e', types.map(t => epreuve('degaines-erreurs', { erreurType: t, erreursMax: 1 }))),
-        contratGrimpeur('bleu', 'Bleu', '#3b82f6', [
-            ...types.map(t => epreuve('degaines-erreurs', { erreurType: t, erreursMax: 0 })),
-            epreuve('degaines-erreurs', { erreurType: 'toutes', erreursMax: 2 })
+        contratGrimpeur('vert-1', '#22c55e', 'Vert', 'Atteindre le sommet', [
+            epreuve('degaines')
         ]),
-        contratGrimpeur('rouge', 'Rouge', '#ef4444', [
+        contratGrimpeur('vert-2', '#22c55e', 'Vert', 'Sommet en régularité (dégaines / ascensions)', [
+            epreuve('degaines-moyenne')
+        ]),
+        contratGrimpeur('bleu-1', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur Pieds', [
+            epreuve('degaines-erreurs', { erreurType: 'pieds', erreursMax: 1 })
+        ]),
+        contratGrimpeur('bleu-2', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur Pieds-pieds-mains-mains', [
+            epreuve('degaines-erreurs', { erreurType: 'ppm', erreursMax: 1 })
+        ]),
+        contratGrimpeur('bleu-3', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur Équilibre', [
+            epreuve('degaines-erreurs', { erreurType: 'equilibre', erreursMax: 1 })
+        ]),
+        contratGrimpeur('bleu-4', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur (Pieds + PPM + Équilibre)', [
+            epreuve('degaines-erreurs', { erreurType: 'toutes', erreursMax: 1 })
+        ]),
+        contratGrimpeur('rouge', '#ef4444', 'Rouge', 'Sommet avec cotation 5a', [
             epreuve('degaines-cotation', { cotationChiffre: 5, cotationLettre: 'a' })
         ]),
-        contratGrimpeur('noir', 'Noir', '#111827', [
-            epreuve('degaines-cotation-erreurs', { erreurType: 'toutes', erreursMax: 0, cotationChiffre: 5, cotationLettre: 'a' })
+        contratGrimpeur('noir', '#111827', 'Noir', 'Sommet avec cotation 5a et au plus 1 erreur', [
+            epreuve('degaines-cotation-erreurs', { erreurType: 'toutes', erreursMax: 1, cotationChiffre: 5, cotationLettre: 'a' })
         ])
     ];
 }
@@ -106,20 +121,20 @@ const COMPETENCES_ASSUREUR = [
 
 const TOUTES_ASSUREUR = COMPETENCES_ASSUREUR.map(c => c.id);
 
-function contratEchelleAssureur(id, label, couleur, idsCompetences, seuil) {
+function contratEchelleAssureur(id, couleur, label, descriptif, idsCompetences, seuil) {
     const competences = COMPETENCES_ASSUREUR
         .filter(c => idsCompetences.includes(c.id))
         .map(c => ({ ...c }));
-    return { id, label, couleur, mode: 'echelle', competences, seuil };
+    return { id, couleur, label, descriptif, mode: 'echelle', competences, seuil };
 }
 
 function contratsAssureurDefaut() {
     return [
-        contratEchelleAssureur('orange', 'Orange', '#f97316', ['s-equiper', 's-encorder', 'verifier', 'communiquer', 'vigilant'], 10),
-        contratEchelleAssureur('vert', 'Vert', '#22c55e', ['s-equiper', 's-encorder', 'frein', 'equilibrer', 'verifier', 'communiquer', 'cinq-temps', 'preparer-descente', 'assurer-descente', 'enrayer-chute', 'vigilant'], 22),
-        contratEchelleAssureur('bleu', 'Bleu', '#3b82f6', TOUTES_ASSUREUR, 24),
-        contratEchelleAssureur('rouge', 'Rouge', '#ef4444', TOUTES_ASSUREUR, 30),
-        contratEchelleAssureur('noir', 'Noir', '#111827', TOUTES_ASSUREUR, 36)
+        contratEchelleAssureur('orange', '#f97316', 'Orange', 'Contre-assureur en hauteur', ['s-equiper', 's-encorder', 'verifier', 'communiquer', 'vigilant'], 10),
+        contratEchelleAssureur('vert', '#22c55e', 'Vert', 'Assurer en moulinette', ['s-equiper', 's-encorder', 'frein', 'equilibrer', 'verifier', 'communiquer', 'cinq-temps', 'preparer-descente', 'assurer-descente', 'enrayer-chute', 'vigilant'], 22),
+        contratEchelleAssureur('bleu', '#3b82f6', 'Bleu', 'Assurer en moulinette en hauteur', TOUTES_ASSUREUR, 24),
+        contratEchelleAssureur('rouge', '#ef4444', 'Rouge', 'Assurer en moulinette haute confortablement', TOUTES_ASSUREUR, 30),
+        contratEchelleAssureur('noir', '#111827', 'Noir', 'Assurer et grimper en tête', TOUTES_ASSUREUR, 36)
     ];
 }
 
@@ -145,10 +160,10 @@ function competencesCitoyen(ids) {
 function contratsCitoyenDefaut() {
     const base7 = ['routines-sae', 'materiel', 'verif-materiel', 'regles-eps', 'tapis', 'calme', 'aide'];
     return [
-        { id: 'vert', label: 'Vert', couleur: '#22c55e', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 15 },
-        { id: 'bleu', label: 'Bleu', couleur: '#3b82f6', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 16 },
-        { id: 'rouge', label: 'Rouge', couleur: '#ef4444', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 17 },
-        { id: 'noir', label: 'Noir', couleur: '#111827', mode: 'echelle', competences: competencesCitoyen([...base7, 'epi', 'aider']), seuil: 24 }
+        { id: 'vert', couleur: '#22c55e', label: 'Vert', descriptif: 'Sécurité passive plutôt respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 15 },
+        { id: 'bleu', couleur: '#3b82f6', label: 'Bleu', descriptif: 'Sécurité passive respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 16 },
+        { id: 'rouge', couleur: '#ef4444', label: 'Rouge', descriptif: 'Sécurité passive respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 17 },
+        { id: 'noir', couleur: '#111827', label: 'Noir', descriptif: 'Sécurité respectée + initiatives', mode: 'echelle', competences: competencesCitoyen([...base7, 'epi', 'aider']), seuil: 24 }
     ];
 }
 

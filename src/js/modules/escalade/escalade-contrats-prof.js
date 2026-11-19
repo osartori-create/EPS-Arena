@@ -12,7 +12,8 @@ import {
     listenContratsEvaluations
 } from './escalade-contrats-firebase.js';
 import { construireConfigContratsDefaut, EPREUVES_GRIMPEUR, COTATION_CHIFFRES } from './escalade-contrats-config.js';
-import { getExistingEleves } from '../../services/admin-service.js';
+import { cibleEpreuve } from './escalade-contrats-core.js';
+import { getExistingEleves, getPhotoUrl } from '../../services/admin-service.js';
 
 const STORAGE_RESULTATS = 'eps_arena_escalade_contrats_resultats';
 
@@ -218,6 +219,8 @@ function contratHTML(roleId, c, ci) {
                     <input value="${c.label}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'label', this.value)"
                            class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm font-black text-white">
                 </div>
+                <input value="${c.descriptif || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'descriptif', this.value)"
+                       placeholder="Descriptif du contrat" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs font-bold text-white">
                 <div class="space-y-2">${epreuvesHTML}</div>
                 <button onclick="window.contratsAjouterEpreuve('${roleId}', ${ci})" class="w-full bg-slate-700 py-2 rounded-xl font-black text-xs text-white active:scale-95">+ Ajouter une épreuve</button>
             </div>
@@ -231,6 +234,8 @@ function contratHTML(roleId, c, ci) {
                 <input value="${c.label}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'label', this.value)"
                        class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm font-black text-white">
             </div>
+            <input value="${c.descriptif || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'descriptif', this.value)"
+                   placeholder="Descriptif du contrat" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs font-bold text-white">
             <div>
                 <label class="text-xs text-slate-400 uppercase">Seuil de validation (somme des notes 1-3)</label>
                 <input type="number" min="0" value="${c.seuil ?? 0}"
@@ -251,6 +256,24 @@ function epreuveHTML(roleId, ci, ei, ep) {
     const epreuvesOptions = EPREUVES_GRIMPEUR.map(e => `<option value="${e.id}" ${ep.type === e.id ? 'selected' : ''}>${e.label}</option>`).join('');
     const utiliseErreur = ep.type.includes('erreurs');
     const utiliseCotation = ep.type.includes('cotation');
+    const objectif = cibleEpreuve(ep, config?.nbDegainesMax || 7);
+    const avecTolerance = utiliseErreur && (ep.erreursMax ?? 0) > 0;
+
+    const erreursBlock = utiliseErreur ? `
+        <div class="grid grid-cols-2 gap-2 text-xs">
+            <div>
+                <label class="text-slate-400 uppercase">Erreurs max</label>
+                <input type="number" min="0" max="9" value="${ep.erreursMax ?? 0}"
+                       onchange="window.contratsSetEpreuve('${roleId}', ${ci}, ${ei}, 'erreursMax', parseInt(this.value))"
+                       class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">
+            </div>
+            <div>
+                <label class="text-slate-400 uppercase">Type d'erreur</label>
+                <select onchange="window.contratsSetEpreuve('${roleId}', ${ci}, ${ei}, 'erreurType', this.value)"
+                        class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">${erreurTypeOptions(ep.erreurType)}</select>
+            </div>
+        </div>
+    ` : '';
 
     return `
         <div class="bg-slate-900 p-2 rounded-lg border border-slate-700 space-y-2">
@@ -259,23 +282,11 @@ function epreuveHTML(roleId, ci, ei, ep) {
                         class="flex-1 bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 text-xs font-bold text-white">${epreuvesOptions}</select>
                 <button onclick="window.contratsSupprimerEpreuve('${roleId}', ${ci}, ${ei})" class="bg-red-600 px-2 py-2 rounded-lg font-black text-xs text-white active:scale-95">✕</button>
             </div>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                    <label class="text-slate-400 uppercase">Erreurs max</label>
-                    <input type="number" min="0" max="9" value="${ep.erreursMax ?? 0}" ${utiliseErreur ? '' : 'disabled'}
-                           onchange="window.contratsSetEpreuve('${roleId}', ${ci}, ${ei}, 'erreursMax', parseInt(this.value))"
-                           class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">
-                </div>
-                <div>
-                    <label class="text-slate-400 uppercase">Type d'erreur</label>
-                    <select ${utiliseErreur ? '' : 'disabled'} onchange="window.contratsSetEpreuve('${roleId}', ${ci}, ${ei}, 'erreurType', this.value)"
-                            class="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">${erreurTypeOptions(ep.erreurType)}</select>
-                </div>
-            </div>
             <label class="flex items-center gap-2 text-xs font-bold text-slate-300">
                 <input type="checkbox" ${ep.exigeSommet !== false ? 'checked' : ''} onchange="window.contratsSetEpreuve('${roleId}', ${ci}, ${ei}, 'exigeSommet', this.checked)">
                 Exige le sommet (nb dégaines max)
             </label>
+            ${erreursBlock}
             ${utiliseCotation ? `
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <div>
@@ -294,6 +305,7 @@ function epreuveHTML(roleId, ci, ei, ep) {
                     </div>
                 </div>
             ` : ''}
+            <p class="text-[10px] font-bold text-blue-300">Objectif : je cherche ${objectif}${avecTolerance ? ' ou ' + (objectif + 1) : ''}</p>
         </div>
     `;
 }
@@ -410,9 +422,11 @@ function renderSeance() {
             if (!ev) return '<td class="px-2 py-2 text-center text-slate-600">—</td>';
             const contrat = (config.roles.find(x => x.id === r.id)?.contrats || []).find(c => c.id === ev.contrat);
             const couleur = contrat?.couleur || '#64748b';
-            return `<td class="px-2 py-2 text-center"><span class="inline-block px-2 py-1 rounded-lg text-white text-xs font-black" style="background:${couleur}">${contrat?.label || ev.contrat} ${ev.valide ? '✓' : '✗'}</span></td>`;
+            const num = numeroContrat(r, contrat);
+            const suffix = (r.contrats || []).filter(x => x.label === contrat?.label).length > 1 ? ` N°${num}` : '';
+            return `<td class="px-2 py-2 text-center"><span class="inline-block px-2 py-1 rounded-lg text-white text-xs font-black" style="background:${couleur}">${contrat?.label || ev.contrat}${suffix} ${ev.valide ? '✓' : '✗'}</span></td>`;
         }).join('');
-        return `<tr class="border-t border-slate-700"><td class="px-2 py-2 text-xs font-bold text-white">${e.prenom} ${e.nom}</td>${cellules}</tr>`;
+        return `<tr class="border-t border-slate-700"><td class="px-2 py-2"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0" data-photo="${e.id}">👤</div><button onclick="window.contratsOuvrirFiche('${e.id}')" class="text-xs font-bold text-white hover:text-blue-400 text-left">${e.prenom} ${e.nom}</button></div></td>${cellules}</tr>`;
     }).join('');
 
     const entetes = rolesActifs.map(r => `<th class="px-2 py-2 text-xs uppercase text-slate-400">${r.label}</th>`).join('');
@@ -428,6 +442,7 @@ function renderSeance() {
             </div>
         </div>
     `;
+    chargerPhotosEleves(eleves);
 }
 
 // ============================================================
@@ -457,7 +472,7 @@ function renderSequence() {
             }).join('');
             return `<td class="px-2 py-2 text-center">${badges || '<span class="text-slate-600">—</span>'}</td>`;
         }).join('');
-        return `<tr class="border-t border-slate-700"><td class="px-2 py-2 text-xs font-bold text-white">${e.prenom} ${e.nom}</td>${cellules}</tr>`;
+        return `<tr class="border-t border-slate-700"><td class="px-2 py-2"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0" data-photo="${e.id}">👤</div><button onclick="window.contratsOuvrirFiche('${e.id}')" class="text-xs font-bold text-white hover:text-blue-400 text-left">${e.prenom} ${e.nom}</button></div></td>${cellules}</tr>`;
     }).join('');
 
     const entetes = seances.map(s => `<th class="px-2 py-2 text-xs uppercase text-slate-400">S${s}</th>`).join('');
@@ -471,6 +486,127 @@ function renderSequence() {
                     <tbody>${lignes}</tbody>
                 </table>
             </div>
+        </div>
+    `;
+    chargerPhotosEleves(eleves);
+}
+
+// ============================================================
+// PHOTOS + FICHE ÉLÈVE
+// ============================================================
+function numeroContrat(role, contrat) {
+    if (!role || !contrat) return 0;
+    const memeCouleur = (role.contrats || []).filter(c => c.label === contrat.label);
+    return memeCouleur.findIndex(c => c.id === contrat.id) + 1;
+}
+
+async function chargerPhotosEleves(eleves) {
+    for (const e of eleves) {
+        try {
+            const url = await getPhotoUrl(e.id);
+            if (url) {
+                document.querySelectorAll(`[data-photo="${e.id}"]`).forEach(el => {
+                    el.innerHTML = `<img src="${url}" class="w-8 h-8 rounded-full object-cover">`;
+                });
+            }
+        } catch (err) { /* photo absente : on garde l'emoji */ }
+    }
+}
+
+window.contratsOuvrirFiche = function(eleveId) {
+    const eleve = getExistingEleves(currentClasse).find(e => e.id === eleveId);
+    if (!eleve) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'contrats-fiche-modal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60';
+    modal.innerHTML = `
+        <div class="bg-slate-800 rounded-2xl border border-slate-600 max-w-2xl w-full max-h-[85vh] overflow-y-auto p-5">
+            <div class="flex items-center gap-3 mb-4">
+                <div id="contrats-fiche-photo" class="w-14 h-14 rounded-full bg-slate-700 flex items-center justify-center text-2xl shrink-0">👤</div>
+                <div>
+                    <h3 class="text-lg font-black text-white">${eleve.prenom} ${eleve.nom}</h3>
+                    <p class="text-xs text-slate-400">${currentClasse} · ${config?.sequence || ''}</p>
+                </div>
+                <button onclick="document.getElementById('contrats-fiche-modal').remove()" class="ml-auto bg-slate-700 px-3 py-2 rounded-xl font-black text-xs text-white">✕</button>
+            </div>
+            <div id="contrats-fiche-corps"></div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    getPhotoUrl(eleveId).then(url => {
+        const ph = document.getElementById('contrats-fiche-photo');
+        if (ph && url) ph.innerHTML = `<img src="${url}" class="w-14 h-14 rounded-full object-cover">`;
+    }).catch(() => {});
+
+    const corps = document.getElementById('contrats-fiche-corps');
+    const roles = config?.roles || [];
+    const evs = resultats.filter(r => r.eleveId === eleveId).sort((a, b) => (parseInt(a.seance, 10) || 0) - (parseInt(b.seance, 10) || 0));
+
+    if (evs.length === 0) {
+        corps.innerHTML = '<p class="text-slate-400 text-sm">Aucune évaluation enregistrée.</p>';
+        return;
+    }
+
+    // Dernier niveau validé par rôle.
+    const dernierValide = {};
+    evs.filter(ev => ev.valide).forEach(ev => {
+        const prev = dernierValide[ev.role];
+        if (!prev || (ev.timestamp || 0) > (prev.timestamp || 0)) dernierValide[ev.role] = ev;
+    });
+    const resume = roles.filter(r => dernierValide[r.id]).map(r => {
+        const ev = dernierValide[r.id];
+        const contrat = (r.contrats || []).find(c => c.id === ev.contrat);
+        const num = numeroContrat(r, contrat);
+        const suffix = (r.contrats || []).filter(x => x.label === contrat?.label).length > 1 ? ` N°${num}` : '';
+        return `<span class="inline-block px-2 py-1 rounded-lg text-white text-xs font-black mr-1 mb-1" style="background:${contrat?.couleur || '#64748b'}">${r.label} : ${contrat?.label || ev.contrat}${suffix}</span>`;
+    }).join('');
+
+    const parSeance = {};
+    evs.forEach(ev => {
+        const s = String(ev.seance);
+        if (!parSeance[s]) parSeance[s] = [];
+        parSeance[s].push(ev);
+    });
+
+    const detailSeances = Object.keys(parSeance).sort((a, b) => parseInt(a, 10) - parseInt(b, 10)).map(s => {
+        const items = parSeance[s].map(ev => ficheLigneEvaluation(ev, roles)).join('');
+        return `
+            <div class="mb-4">
+                <h4 class="text-xs font-black text-blue-400 uppercase mb-2">Séance ${s}</h4>
+                <div class="space-y-2">${items}</div>
+            </div>
+        `;
+    }).join('');
+
+    corps.innerHTML = (resume ? `<div class="mb-4"><p class="text-xs font-bold text-slate-400 uppercase mb-1">Dernier niveau validé</p><div>${resume}</div></div>` : '') + detailSeances;
+};
+
+function ficheLigneEvaluation(ev, roles) {
+    const role = roles.find(x => x.id === ev.role);
+    const contrat = (role?.contrats || []).find(c => c.id === ev.contrat);
+    const couleur = contrat?.couleur || '#64748b';
+    const num = numeroContrat(role, contrat);
+    const suffix = (role?.contrats || []).filter(x => x.label === contrat?.label).length > 1 ? ` N°${num}` : '';
+    const libelle = contrat ? `${contrat.label}${suffix}` : ev.contrat;
+
+    let detail = '';
+    if (contrat && contrat.mode === 'grimpeur') {
+        const ep = (ev.epreuves || []).map(e => `<span class="${e.valide ? 'text-emerald-400' : 'text-red-400'}">${e.scoreParlant}${e.valide ? '✓' : '✗'}</span>`).join(' · ');
+        detail = `<div class="text-[10px] text-slate-500 mt-1">Épreuves : ${ep}</div>`;
+    } else if (ev.notes) {
+        detail = `<div class="text-[10px] text-slate-500 mt-1">Notes : ${Object.values(ev.notes).join(' / ')}</div>`;
+    }
+
+    return `
+        <div class="bg-slate-900 p-3 rounded-xl border border-slate-700">
+            <div class="flex items-center gap-2">
+                <span class="inline-block w-3 h-3 rounded-full shrink-0" style="background:${couleur}"></span>
+                <span class="text-sm font-bold text-white">${role?.label || ev.role} — ${libelle}</span>
+                <span class="ml-auto text-xs font-black ${ev.valide ? 'text-emerald-400' : 'text-red-400'}">${ev.valide ? '✓ Validé' : '✗ Non validé'}</span>
+            </div>
+            ${detail}
         </div>
     `;
 }

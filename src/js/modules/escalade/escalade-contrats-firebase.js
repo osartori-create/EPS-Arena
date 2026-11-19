@@ -49,7 +49,7 @@ export function listenContratsEvaluations(classe, callback) {
 }
 
 export function addContratsEvaluation(classe, data) {
-    const clesAutorisees = ['code', 'role', 'contrat', 'notes', 'score', 'scoreParlant', 'epreuves', 'valide', 'seance', 'timestamp'];
+    const clesAutorisees = ['code', 'role', 'contrat', 'notes', 'degaines', 'erreurs', 'cotationChiffre', 'cotationLettre', 'score', 'scoreParlant', 'epreuves', 'valide', 'seance', 'timestamp'];
     const sanitized = {};
     clesAutorisees.forEach(k => {
         if (data[k] !== undefined) sanitized[k] = data[k];
