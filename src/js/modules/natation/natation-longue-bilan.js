@@ -90,9 +90,30 @@ export function agregerResultats(classe, observations, modifications, config, st
         }
     }
 
-    resultats.sort((a, b) => {
+    // Déduplication : un élève ne doit apparaître qu'une seule fois par épreuve.
+    // Si des données de plusieurs séances ont été accumulées dans la même épreuve,
+    // on conserve la meilleure performance (en préférant un résultat non exclu).
+    const parEleve = new Map();
+    const uniques = [];
+    for (const r of resultats) {
+        const key = r.eleveId || `numero:${r.numero}`;
+        const prev = parEleve.get(key);
+        if (!prev) {
+            parEleve.set(key, r);
+            uniques.push(r);
+            continue;
+        }
+        const mieux = (!r.exclu && prev.exclu) || (r.exclu === prev.exclu && r.distance > prev.distance);
+        if (mieux) {
+            const idx = uniques.indexOf(prev);
+            uniques[idx] = r;
+            parEleve.set(key, r);
+        }
+    }
+
+    uniques.sort((a, b) => {
         if (a.exclu !== b.exclu) return a.exclu ? 1 : -1;
         return b.distance - a.distance;
     });
-    return resultats;
+    return uniques;
 }

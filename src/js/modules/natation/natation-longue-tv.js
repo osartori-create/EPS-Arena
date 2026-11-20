@@ -3,16 +3,19 @@
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
-import { getBasePath, getSessionActivePath, getSessionObsPath, getSessionModifsPath, getStatuts, getCouleurGroupe } from './natation-longue-common.js';
+import { getBasePath, getSessionsPath, getSessionActivePath, getSessionObsPath, getSessionModifsPath, getStatuts, getCouleurGroupe } from './natation-longue-common.js';
 import { agregerResultats } from './natation-longue-bilan.js';
 
 let unsubs = [];
 let obsUnsubs = [];
 let _rafId = null;
+let _ecouterSession = null;
 let cache = {
     classe: '',
     config: null,
     sessionId: null,
+    viewSessionId: null,
+    sessions: {},
     observations: null,
     modifications: null,
     statuts: {}
@@ -57,6 +60,8 @@ export function renderNatationLongueTV() {
         classe,
         config: null,
         sessionId: null,
+        viewSessionId: null,
+        sessions: {},
         observations: null,
         modifications: null,
         statuts: getStatuts(classe)
@@ -65,19 +70,20 @@ export function renderNatationLongueTV() {
     const basePath = getBasePath(classe);
 
     unsubs.push(onValue(ref(db, `${basePath}/config`), snap => { cache.config = snap.val(); renderTV(); }));
+    unsubs.push(onValue(ref(db, getSessionsPath(classe)), snap => { cache.sessions = snap.val() || {}; renderTV(); }));
 
     const ecouterSession = (sessionId) => {
         obsUnsubs.forEach(u => { try { u(); } catch (e) {} });
         obsUnsubs = [];
-        cache.sessionId = sessionId;
+        cache.viewSessionId = sessionId;
         cache.observations = null;
         cache.modifications = null;
         if (sessionId) {
-            obsUnsubs.push(onValue(ref(db, getSessionObsPath(classe, sessionId)), snap => {
+            obsUnsubs.push(onValue(ref(db, getSessionObsPath(cache.classe, sessionId)), snap => {
                 cache.observations = snap.val() || {};
                 renderTV();
             }));
-            obsUnsubs.push(onValue(ref(db, getSessionModifsPath(classe, sessionId)), snap => {
+            obsUnsubs.push(onValue(ref(db, getSessionModifsPath(cache.classe, sessionId)), snap => {
                 cache.modifications = snap.val() || {};
                 renderTV();
             }));
@@ -85,7 +91,14 @@ export function renderNatationLongueTV() {
         renderTV();
     };
 
-    unsubs.push(onValue(ref(db, getSessionActivePath(classe)), snap => ecouterSession(snap.val() || null)));
+    _ecouterSession = ecouterSession;
+
+    unsubs.push(onValue(ref(db, getSessionActivePath(classe)), snap => {
+        cache.sessionId = snap.val() || null;
+        // Si aucune épreuve n'est sélectionnée manuellement, on suit l'épreuve active.
+        if (!cache.viewSessionId) ecouterSession(cache.sessionId);
+        else renderTV();
+    }));
 
     return cleanupNatationLongueTV;
 }
@@ -164,8 +177,19 @@ function renderTV() {
             </div>`;
     }
 
+    const sessionOptions = Object.keys(cache.sessions).sort().reverse()
+        .map(id => `<option value="${id}" ${id === cache.viewSessionId ? 'selected' : ''}>${id}</option>`)
+        .join('');
+
     container.innerHTML = `
-        <h1 style="text-align:center;color:#3b82f6;font-size:2.6rem;font-weight:900;margin-bottom:16px;">🏊 Natation — Longue distance</h1>
+        <h1 style="text-align:center;color:#3b82f6;font-size:2.6rem;font-weight:900;margin-bottom:8px;">🏊 Natation — Longue distance</h1>
+        <div style="display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="color:#94a3b8;font-weight:700;">Épreuve :</span>
+            <select id="nl-tv-session" onchange="window.nlTvChoisirSession(this.value)"
+                    style="background:#1e293b;color:white;border:1px solid #475569;border-radius:8px;padding:6px 10px;font-weight:700;font-size:1rem;">
+                ${sessionOptions || '<option value="">Aucune épreuve</option>'}
+            </select>
+        </div>
         <div style="display:flex;justify-content:center;align-items:flex-end;gap:40px;flex-shrink:0;">${podiumHtml}</div>
         <div id="nl-tv-scroller" style="flex:1;min-height:0;overflow:hidden;margin-top:20px;position:relative;">
             <div id="nl-tv-track" style="max-width:1400px;margin:0 auto;">${listeHtml}</div>
@@ -197,6 +221,10 @@ function demarrerDefilement() {
         _rafId = requestAnimationFrame(frame);
     }
 }
+
+window.nlTvChoisirSession = function(sessionId) {
+    if (_ecouterSession) _ecouterSession(sessionId || null);
+};
 
 export function cleanupNatationLongueTV() {
     unsubs.forEach(u => { try { u(); } catch (e) {} });
