@@ -60,8 +60,29 @@ function epreuve(type, opts = {}) {
     };
 }
 
-function contratGrimpeur(id, couleur, label, descriptif, epreuves) {
-    return { id, couleur, label, descriptif, mode: 'grimpeur', epreuves };
+// Sprite des mascottes (grille 3×2). Position = cellule dans la grille.
+const SPRITE_GRIMPEUR = 'assets/contrats/mascottes.png';
+const SPRITE_POS_PAR_LABEL = {
+    Jaune: '0% 0%',
+    Vert: '50% 0%',
+    Bleu: '100% 0%',
+    Rouge: '0% 100%',
+    Noir: '50% 100%'
+};
+
+function contratGrimpeur(id, couleur, label, titre, emoji, descriptif, epreuves) {
+    return {
+        id,
+        couleur,
+        label,
+        titre,
+        emoji,
+        descriptif,
+        image: SPRITE_GRIMPEUR,
+        imagePos: SPRITE_POS_PAR_LABEL[label] || '',
+        mode: 'grimpeur',
+        epreuves
+    };
 }
 
 function contratsGrimpeurDefaut() {
@@ -69,33 +90,32 @@ function contratsGrimpeurDefaut() {
     return [
         // Du plus accessible au plus exigeant (couleurs libres, éditable).
         // Le numéro (1, 2, 3…) est attribué automatiquement selon l'ordre des
-        // contrats d'une même couleur.
-        // « Je cherche X » = objectif calculé depuis l'épreuve (sommet + critères).
-        contratGrimpeur('jaune', '#eab308', 'Jaune', 'Atteindre le sommet', [
+        // contrats d'une même couleur. « Je cherche X » = objectif calculé.
+        contratGrimpeur('jaune', '#eab308', 'Jaune', `N'ose pas`, '🐣', 'Ose aller en haut du mur !', [
             epreuve('degaines')
         ]),
-        contratGrimpeur('vert-1', '#22c55e', 'Vert', 'Atteindre le sommet', [
+        contratGrimpeur('vert-1', '#22c55e', 'Vert', 'Gourmand', '🍽️', 'Atteins le sommet', [
             epreuve('degaines')
         ]),
-        contratGrimpeur('vert-2', '#22c55e', 'Vert', 'Sommet en régularité (dégaines / ascensions)', [
+        contratGrimpeur('vert-2', '#22c55e', 'Vert', 'Gourmand', '🍽️', 'Grimpe régulièrement (moyenne = sommet)', [
             epreuve('degaines-moyenne')
         ]),
-        contratGrimpeur('bleu-1', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur Pieds', [
+        contratGrimpeur('bleu-1', BLEU, 'Bleu', 'Énergivore', '⚡', 'Sommet avec au plus 1 erreur Pieds', [
             epreuve('degaines-erreurs', { erreurType: 'pieds', erreursMax: 1 })
         ]),
-        contratGrimpeur('bleu-2', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur Pieds-pieds-mains-mains', [
+        contratGrimpeur('bleu-2', BLEU, 'Bleu', 'Énergivore', '⚡', 'Sommet avec au plus 1 erreur Pieds-pieds-mains-mains', [
             epreuve('degaines-erreurs', { erreurType: 'ppm', erreursMax: 1 })
         ]),
-        contratGrimpeur('bleu-3', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur Équilibre', [
+        contratGrimpeur('bleu-3', BLEU, 'Bleu', 'Énergivore', '⚡', 'Sommet avec au plus 1 erreur Équilibre', [
             epreuve('degaines-erreurs', { erreurType: 'equilibre', erreursMax: 1 })
         ]),
-        contratGrimpeur('bleu-4', BLEU, 'Bleu', 'Sommet avec au plus 1 erreur (Pieds + PPM + Équilibre)', [
+        contratGrimpeur('bleu-4', BLEU, 'Bleu', 'Énergivore', '⚡', 'Sommet avec au plus 1 erreur (total)', [
             epreuve('degaines-erreurs', { erreurType: 'toutes', erreursMax: 1 })
         ]),
-        contratGrimpeur('rouge', '#ef4444', 'Rouge', 'Sommet avec cotation 5a', [
+        contratGrimpeur('rouge', '#ef4444', 'Rouge', 'Économe performant', '🌿', 'Sommet en 5a minimum', [
             epreuve('degaines-cotation', { cotationChiffre: 5, cotationLettre: 'a' })
         ]),
-        contratGrimpeur('noir', '#111827', 'Noir', 'Sommet avec cotation 5a et au plus 1 erreur', [
+        contratGrimpeur('noir', '#111827', 'Noir', 'En tête performant', '🏆', 'Sommet en 5a, au plus 1 erreur', [
             epreuve('degaines-cotation-erreurs', { erreurType: 'toutes', erreursMax: 1, cotationChiffre: 5, cotationLettre: 'a' })
         ])
     ];
@@ -125,7 +145,7 @@ function contratEchelleAssureur(id, couleur, label, descriptif, idsCompetences, 
     const competences = COMPETENCES_ASSUREUR
         .filter(c => idsCompetences.includes(c.id))
         .map(c => ({ ...c }));
-    return { id, couleur, label, descriptif, mode: 'echelle', competences, seuil };
+    return { id, couleur, label, titre: '', emoji: '', image: '', imagePos: '', descriptif, mode: 'echelle', competences, seuil };
 }
 
 function contratsAssureurDefaut() {
@@ -160,10 +180,10 @@ function competencesCitoyen(ids) {
 function contratsCitoyenDefaut() {
     const base7 = ['routines-sae', 'materiel', 'verif-materiel', 'regles-eps', 'tapis', 'calme', 'aide'];
     return [
-        { id: 'vert', couleur: '#22c55e', label: 'Vert', descriptif: 'Sécurité passive plutôt respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 15 },
-        { id: 'bleu', couleur: '#3b82f6', label: 'Bleu', descriptif: 'Sécurité passive respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 16 },
-        { id: 'rouge', couleur: '#ef4444', label: 'Rouge', descriptif: 'Sécurité passive respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 17 },
-        { id: 'noir', couleur: '#111827', label: 'Noir', descriptif: 'Sécurité respectée + initiatives', mode: 'echelle', competences: competencesCitoyen([...base7, 'epi', 'aider']), seuil: 24 }
+        { id: 'vert', couleur: '#22c55e', label: 'Vert', titre: '', emoji: '', image: '', imagePos: '', descriptif: 'Sécurité passive plutôt respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 15 },
+        { id: 'bleu', couleur: '#3b82f6', label: 'Bleu', titre: '', emoji: '', image: '', imagePos: '', descriptif: 'Sécurité passive respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 16 },
+        { id: 'rouge', couleur: '#ef4444', label: 'Rouge', titre: '', emoji: '', image: '', imagePos: '', descriptif: 'Sécurité passive respectée', mode: 'echelle', competences: competencesCitoyen(base7), seuil: 17 },
+        { id: 'noir', couleur: '#111827', label: 'Noir', titre: '', emoji: '', image: '', imagePos: '', descriptif: 'Sécurité respectée + initiatives', mode: 'echelle', competences: competencesCitoyen([...base7, 'epi', 'aider']), seuil: 24 }
     ];
 }
 

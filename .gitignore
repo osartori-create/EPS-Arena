@@ -40,3 +40,5 @@ bodychart.jpg
 *.jpg
 *.png
 *.jpeg
+# Exception : mascottes du module Contrats escalade (utilisées par l'app)
+!assets/contrats/*.png

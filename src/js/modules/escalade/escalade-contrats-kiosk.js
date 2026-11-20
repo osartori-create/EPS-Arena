@@ -77,6 +77,26 @@ function rolesActifs() {
     return (currentConfig?.roles || []).filter(r => r.actif);
 }
 
+// Choisit une couleur de texte lisible selon la luminance du fond.
+function texteLisible(couleur) {
+    const hex = String(couleur || '').replace('#', '');
+    if (hex.length < 6) return '#ffffff';
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 140 ? '#ffffff' : '#0f172a';
+}
+
+// Affiche la mascotte du contrat (sprite recadré) ou l'emoji en secours.
+function mascotteHTML(c, taille) {
+    if (c && c.image) {
+        const h = Math.round(taille * 1.5);
+        return `<div class="shrink-0 rounded-xl border border-white/30" style="width:${taille}px;height:${h}px;background-image:url('${c.image}');background-size:300% 200%;background-position:${c.imagePos || '0% 0%'};background-repeat:no-repeat;background-color:#fff;"></div>`;
+    }
+    const emoji = (c && c.emoji) ? c.emoji : '🎯';
+    return `<div class="shrink-0" style="font-size:${taille}px; line-height:1">${emoji}</div>`;
+}
+
 // ============================================================
 // ÉCRAN 1 — SAISIE DU NUMÉRO PERSONNEL
 // ============================================================
@@ -205,9 +225,12 @@ function afficherContrats() {
 
     const boutons = couleursDistinctes().map(c => `
         <button onclick="window.contratsKioskChoisirCouleur('${c.label}')"
-                class="w-full py-5 rounded-2xl font-black text-lg text-white active:scale-95 transition-transform"
-                style="background:${c.couleur};">
-            ${c.label}
+                class="w-full py-4 rounded-2xl font-black text-lg active:scale-95 transition-transform"
+                style="background:${c.couleur}; color:${texteLisible(c.couleur)} !important;">
+            <div class="flex items-center justify-center gap-3">
+                ${mascotteHTML(c, 44)}
+                <span>${c.titre || c.label}</span>
+            </div>
         </button>
     `).join('');
 
@@ -236,16 +259,21 @@ function afficherNumeros(label) {
 
     const boutons = contrats.map((c, idx) => `
         <button onclick="window.contratsKioskChoisirContrat('${c.id}')"
-                class="w-full py-4 px-4 rounded-2xl font-black text-white active:scale-95 transition-transform text-left"
-                style="background:${c.couleur};">
-            <div class="text-lg">N° ${idx + 1} — ${c.label}</div>
-            <div class="text-xs font-normal opacity-90 mt-1">${c.descriptif || ''}</div>
+                class="w-full py-3 px-3 rounded-2xl font-black active:scale-95 transition-transform text-left"
+                style="background:${c.couleur}; color:${texteLisible(c.couleur)} !important;">
+            <div class="flex items-center gap-3">
+                ${mascotteHTML(c, 40)}
+                <div>
+                    <div class="text-lg">${c.titre || c.label} ${idx + 1}</div>
+                    <div class="text-xs font-normal opacity-90 mt-1">${c.descriptif || ''}</div>
+                </div>
+            </div>
         </button>
     `).join('');
 
     container.innerHTML = `
         <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700">
-            <h2 class="text-xl font-black text-white mb-1 text-center">Choisis ton numéro</h2>
+            <h2 class="text-xl font-black text-white mb-1 text-center">Choisis ton niveau</h2>
             <p class="text-xs text-slate-400 mb-4 text-center">${label} · Numéro <span class="text-yellow-400 font-black">${currentCode}</span></p>
             <div class="space-y-3">${boutons}</div>
             <button onclick="window.contratsKioskRetourCouleurs()" class="mt-4 w-full bg-slate-700 py-3 rounded-2xl font-black text-sm text-white active:scale-95">← Changer de couleur</button>
@@ -283,7 +311,7 @@ function afficherSaisie() {
 
     const entete = `
         <div class="bg-slate-800 p-5 rounded-2xl border-2" style="border-color:${c.couleur};">
-            <h2 class="text-xl font-black text-white mb-1 text-center">${currentRole.label} — ${c.label} N° ${numeroContrat(c)}</h2>
+            <h2 class="text-xl font-black text-white mb-1 text-center">${currentRole.label} — ${c.emoji ? c.emoji + ' ' : ''}${c.titre || c.label} ${numeroContrat(c)}</h2>
             <p class="text-xs text-slate-300 mb-1 text-center">${c.descriptif || ''}</p>
             <p class="text-xs text-slate-400 mb-4 text-center">Numéro <span class="text-yellow-400 font-black">${currentCode}</span></p>
     `;

@@ -46,7 +46,7 @@ export function initContratsProf(classe) {
     if (evaluationsListener) evaluationsListener();
 
     configListener = listenContratsConfig(classe, (data) => {
-        config = data && data.roles ? data : construireConfigContratsDefaut();
+        config = migrerConfig(data && data.roles ? data : construireConfigContratsDefaut());
         resultats = lireResultatsClasse(classe);
         afficherInterface();
     });
@@ -61,6 +61,28 @@ export function initContratsProf(classe) {
 export function cleanupContratsProf() {
     if (configListener) { configListener(); configListener = null; }
     if (evaluationsListener) { evaluationsListener(); evaluationsListener = null; }
+}
+
+// Complète les champs manquants (titre, emoji, image, imagePos) d'une config
+// existante avec les valeurs par défaut, selon l'id de chaque contrat.
+function migrerConfig(config) {
+    const defaut = construireConfigContratsDefaut();
+    (config.roles || []).forEach(role => {
+        const roleDefaut = defaut.roles.find(r => r.id === role.id);
+        (role.contrats || []).forEach(contrat => {
+            const cDefaut = roleDefaut?.contrats?.find(c => c.id === contrat.id);
+            if (!cDefaut) return;
+            ['titre', 'emoji', 'image', 'imagePos'].forEach(champ => {
+                if (contrat[champ] === undefined || contrat[champ] === null) {
+                    contrat[champ] = cDefaut[champ] ?? '';
+                }
+            });
+        });
+    });
+    if (!config.erreurs || !Array.isArray(config.erreurs) || config.erreurs.length === 0) {
+        config.erreurs = defaut.erreurs.map(e => ({ ...e }));
+    }
+    return config;
 }
 
 // ============================================================
@@ -204,7 +226,10 @@ function renderConfig() {
                 <button onclick="window.contratsAjouterErreur()" class="mt-2 bg-slate-700 px-4 py-2 rounded-xl font-black text-xs text-white active:scale-95">+ Ajouter un code erreur</button>
             </div>
             <div class="space-y-3">${rolesHTML}</div>
-            <button onclick="window.contratsEnregistrer()" class="w-full bg-emerald-600 py-3 rounded-2xl font-black text-white active:scale-95">💾 Enregistrer la config</button>
+            <div class="flex gap-2">
+                <button onclick="window.contratsEnregistrer()" class="flex-1 bg-emerald-600 py-3 rounded-2xl font-black text-white active:scale-95">💾 Enregistrer</button>
+                <button onclick="window.contratsReinitialiser()" class="bg-amber-600 py-3 px-4 rounded-2xl font-black text-white active:scale-95">♻️ Réinitialiser</button>
+            </div>
         </div>
     `;
 }
@@ -218,6 +243,18 @@ function contratHTML(roleId, c, ci) {
                     <input type="color" value="${c.couleur}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'couleur', this.value)" class="w-8 h-8 rounded cursor-pointer bg-slate-700 border-0">
                     <input value="${c.label}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'label', this.value)"
                            class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm font-black text-white">
+                </div>
+                <div class="flex items-center gap-2">
+                    <input value="${c.emoji || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'emoji', this.value)"
+                           class="w-14 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-center font-black text-white" placeholder="😀">
+                    <input value="${c.titre || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'titre', this.value)"
+                           placeholder="Titre du niveau" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm font-black text-white">
+                </div>
+                <div class="flex items-center gap-2 text-xs">
+                    <input value="${c.image || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'image', this.value)"
+                           placeholder="Chemin image" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">
+                    <input value="${c.imagePos || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'imagePos', this.value)"
+                           placeholder="0% 0%" class="w-24 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">
                 </div>
                 <input value="${c.descriptif || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'descriptif', this.value)"
                        placeholder="Descriptif du contrat" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs font-bold text-white">
@@ -233,6 +270,18 @@ function contratHTML(roleId, c, ci) {
                 <input type="color" value="${c.couleur}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'couleur', this.value)" class="w-8 h-8 rounded cursor-pointer bg-slate-700 border-0">
                 <input value="${c.label}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'label', this.value)"
                        class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm font-black text-white">
+            </div>
+            <div class="flex items-center gap-2">
+                <input value="${c.emoji || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'emoji', this.value)"
+                       class="w-14 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-center font-black text-white" placeholder="😀">
+                <input value="${c.titre || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'titre', this.value)"
+                       placeholder="Titre du niveau" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm font-black text-white">
+            </div>
+            <div class="flex items-center gap-2 text-xs">
+                <input value="${c.image || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'image', this.value)"
+                       placeholder="Chemin image" class="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">
+                <input value="${c.imagePos || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'imagePos', this.value)"
+                       placeholder="0% 0%" class="w-24 bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 font-bold text-white">
             </div>
             <input value="${c.descriptif || ''}" onchange="window.contratsSetContrat('${roleId}', ${ci}, 'descriptif', this.value)"
                    placeholder="Descriptif du contrat" class="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-xs font-bold text-white">
@@ -392,6 +441,42 @@ window.contratsEnregistrer = async function() {
     }
 };
 
+window.contratsReinitialiser = async function() {
+    if (!currentClasse) return;
+    if (!confirm(`⚠️ Réinitialiser la config avec les valeurs par défaut ?\nCela remplacera tes contrats, couleurs et épreuves.`)) return;
+    config = construireConfigContratsDefaut();
+    try {
+        await setContratsConfig(currentClasse, config);
+        alert(`✅ Config réinitialisée. Clique « Transmettre » pour l'envoyer aux iPads.`);
+    } catch (err) {
+        console.error(err);
+        alert(`❌ Erreur : ${err.message}`);
+    }
+    afficherInterface();
+};
+
+// Validation prof : bascule le carré « validé » sur la dernière évaluation
+// (élève + rôle + séance courante). Stockée en local uniquement.
+window.contratsValider = function(eleveId, roleId) {
+    const seance = config?.seance || 1;
+    const liste = lireResultatsClasse(currentClasse);
+    let cibleIdx = -1;
+    let cible = null;
+    liste.forEach((r, idx) => {
+        if (r.eleveId === eleveId && r.role === roleId && String(r.seance) === String(seance)) {
+            if (!cible || (r.timestamp || 0) > (cible.timestamp || 0)) {
+                cible = r;
+                cibleIdx = idx;
+            }
+        }
+    });
+    if (cibleIdx < 0) return;
+    liste[cibleIdx].valideProf = liste[cibleIdx].valideProf === true ? false : true;
+    ecrireResultatsClasse(currentClasse, liste);
+    resultats = liste;
+    afficherInterface();
+};
+
 // ============================================================
 // ONGLET SÉANCE
 // ============================================================
@@ -424,16 +509,27 @@ function renderSeance() {
             const couleur = contrat?.couleur || '#64748b';
             const num = numeroContrat(r, contrat);
             const suffix = (r.contrats || []).filter(x => x.label === contrat?.label).length > 1 ? ` N°${num}` : '';
-            return `<td class="px-2 py-2 text-center"><span class="inline-block px-2 py-1 rounded-lg text-white text-xs font-black" style="background:${couleur}">${contrat?.label || ev.contrat}${suffix} ${ev.valide ? '✓' : '✗'}</span></td>`;
+            const valideProf = ev.valideProf === true;
+            return `<td class="px-2 py-2">
+                <div class="flex items-center justify-center gap-1.5">
+                    <button onclick="window.contratsValider('${e.id}', '${r.id}')" title="Validation prof"
+                            class="w-6 h-6 rounded-sm border-2 ${valideProf ? 'bg-emerald-500 border-emerald-300' : 'bg-transparent border-slate-500 hover:border-slate-300'} active:scale-95"></button>
+                    <span title="Auto-éval élève : ${contrat?.label || ev.contrat}${suffix} ${ev.valide ? 'réussi' : 'échoué'}"
+                          class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-black text-white border border-white/40"
+                          style="background:${couleur}">${ev.valide ? '✓' : '✗'}</span>
+                </div>
+                <div class="text-[9px] font-bold text-slate-400 mt-1">${contrat?.label || ev.contrat}${suffix}</div>
+            </td>`;
         }).join('');
-        return `<tr class="border-t border-slate-700"><td class="px-2 py-2"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0" data-photo="${e.id}">👤</div><button onclick="window.contratsOuvrirFiche('${e.id}')" class="text-xs font-bold text-white hover:text-blue-400 text-left">${e.prenom} ${e.nom}</button></div></td>${cellules}</tr>`;
+        return `<tr class="border-t border-slate-700"><td class="px-2 py-2"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0" data-photo="${e.id}">👤</div><button onclick="window.contratsOuvrirFiche('${e.id}')" class="text-xs font-bold text-white hover:text-blue-400 text-left">${e.prenom} ${e.nom}</button><div class="flex gap-1 ml-1">${dotsPositionnement(e.id, rolesActifs)}</div></div></td>${cellules}</tr>`;
     }).join('');
 
     const entetes = rolesActifs.map(r => `<th class="px-2 py-2 text-xs uppercase text-slate-400">${r.label}</th>`).join('');
 
     el.innerHTML = `
         <div class="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-            <h4 class="font-black text-white text-sm mb-2">📋 Séance ${seanceCourante} — ${config?.sequence || ''}</h4>
+            <h4 class="font-black text-white text-sm mb-1">📋 Séance ${seanceCourante} — ${config?.sequence || ''}</h4>
+            <p class="text-[10px] text-slate-500 mb-2">◻ validation prof (cliquer) · ⚪ auto-éval élève (✓ réussi / ✗ échoué)</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-left">
                     <thead><tr><th class="px-2 py-2 text-xs uppercase text-slate-400">Élève</th>${entetes}</tr></thead>
@@ -453,6 +549,7 @@ function renderSequence() {
     if (!el) return;
 
     const eleves = getExistingEleves(currentClasse);
+    const rolesActifs = (config?.roles || []).filter(r => r.actif);
     const seances = [...new Set(resultats.map(r => parseInt(r.seance, 10)).filter(n => !isNaN(n)))].sort((a, b) => a - b);
 
     if (eleves.length === 0 || seances.length === 0) {
@@ -472,7 +569,7 @@ function renderSequence() {
             }).join('');
             return `<td class="px-2 py-2 text-center">${badges || '<span class="text-slate-600">—</span>'}</td>`;
         }).join('');
-        return `<tr class="border-t border-slate-700"><td class="px-2 py-2"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0" data-photo="${e.id}">👤</div><button onclick="window.contratsOuvrirFiche('${e.id}')" class="text-xs font-bold text-white hover:text-blue-400 text-left">${e.prenom} ${e.nom}</button></div></td>${cellules}</tr>`;
+        return `<tr class="border-t border-slate-700"><td class="px-2 py-2"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-sm shrink-0" data-photo="${e.id}">👤</div><button onclick="window.contratsOuvrirFiche('${e.id}')" class="text-xs font-bold text-white hover:text-blue-400 text-left">${e.prenom} ${e.nom}</button><div class="flex gap-1 ml-1">${dotsPositionnement(e.id, rolesActifs)}</div></div></td>${cellules}</tr>`;
     }).join('');
 
     const entetes = seances.map(s => `<th class="px-2 py-2 text-xs uppercase text-slate-400">S${s}</th>`).join('');
@@ -498,6 +595,23 @@ function numeroContrat(role, contrat) {
     if (!role || !contrat) return 0;
     const memeCouleur = (role.contrats || []).filter(c => c.label === contrat.label);
     return memeCouleur.findIndex(c => c.id === contrat.id) + 1;
+}
+
+function dernierContratValide(eleveId, role) {
+    const valides = resultats.filter(r => r.eleveId === eleveId && r.role === role.id && r.valide);
+    if (!valides.length) return null;
+    const dernier = valides.reduce((a, b) => ((b.timestamp || 0) > (a.timestamp || 0) ? b : a));
+    return (role.contrats || []).find(c => c.id === dernier.contrat) || null;
+}
+
+function dotsPositionnement(eleveId, roles) {
+    return roles.map(r => {
+        const c = dernierContratValide(eleveId, r);
+        const couleur = c?.couleur || '#475569';
+        const suffix = c && (r.contrats || []).filter(x => x.label === c.label).length > 1 ? ` N°${numeroContrat(r, c)}` : '';
+        const titre = c ? `${r.label} : ${c.label}${suffix}` : `${r.label} : aucun`;
+        return `<span title="${titre}" class="inline-block w-3 h-3 rounded-full border border-slate-500" style="background:${couleur}"></span>`;
+    }).join('');
 }
 
 async function chargerPhotosEleves(eleves) {
