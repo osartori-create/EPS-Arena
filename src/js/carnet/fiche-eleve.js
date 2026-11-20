@@ -7,6 +7,7 @@ import { getLicenceParEleve } from './unss.js';
 import { getToutesGrilles, getEvaluationsClasse, calculerNoteFinale } from '../modules/grilles/grilles-core.js';
 import { setClasseInaptitude, getInaptitude, libelleInaptitude } from './inaptitude.js';
 import { getSeancesClasseDate } from './planner.js';
+import { chargerProgressionDistance, chargerProgressionIndice } from '../modules/natation/natation-progression.js';
 
 const FLAGS = [
     { id: 'absent', label: 'Absent', couleur: '#ef4444' },
@@ -179,6 +180,9 @@ export async function ouvrirFicheEleve(eleveId, classe) {
                 ${perf.map(([label, v]) => `<span class="px-3 py-1 rounded-full text-xs font-black text-white bg-slate-700">${label} : ${esc(v)}</span>`).join('')}
             </div>` : ''}
 
+            <h3 class="text-xs font-black text-slate-400 uppercase mb-2">📈 Progression natation</h3>
+            <div id="fiche-progression" class="mb-4"><p class="text-xs text-slate-500">Chargement…</p></div>
+
             <h3 class="text-xs font-black text-slate-400 uppercase mb-2">📋 Appel</h3>
             <div class="flex gap-2 flex-wrap mb-3">
                 ${FLAGS.map(f => `<span class="px-3 py-1 rounded-full text-xs font-black text-white" style="background-color:${f.couleur};">${f.label} : ${totaux[f.id]}</span>`).join('')}
@@ -227,6 +231,91 @@ export async function ouvrirFicheEleve(eleveId, classe) {
     overlay.innerHTML = htmlHaut + htmlBas;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    chargerProgressionFiche(classe, eleveId);
+}
+
+function formaterDateProgression(iso) {
+    // Supporte les clés date (AAAA-MM-JJ) et les anciennes clés horodatées (AAAA-MM-JJTHH-MM-SS).
+    const s = String(iso).slice(0, 10);
+    const parts = s.split('-');
+    if (parts.length < 3) return iso;
+    return `${parts[2]}/${parts[1]}`;
+}
+
+function rendreCourbeProgression(canvasId, points, valeurKey, couleur) {
+    const el = document.getElementById(canvasId);
+    if (!el || !window.Chart) return;
+    new window.Chart(el.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: points.map(p => formaterDateProgression(p.date)),
+            datasets: [{
+                data: points.map(p => p[valeurKey]),
+                borderColor: couleur,
+                backgroundColor: couleur + '33',
+                tension: 0.3,
+                fill: true,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: false } }
+        }
+    });
+}
+
+async function chargerProgressionFiche(classe, eleveId) {
+    const conteneur = document.getElementById('fiche-progression');
+    if (!conteneur) return;
+
+    const [dist, ind] = await Promise.all([
+        chargerProgressionDistance(classe, eleveId).catch(() => []),
+        chargerProgressionIndice(classe, eleveId).catch(() => [])
+    ]);
+
+    if (dist.length === 0 && ind.length === 0) {
+        conteneur.innerHTML = '<p class="text-xs text-slate-500">Aucune donnée natation enregistrée.</p>';
+        return;
+    }
+
+    let html = '';
+
+    if (dist.length >= 1) {
+        const max = Math.max(...dist.map(p => p.distance));
+        html += `
+            <div class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">🏊 Distance longue (m)</span>
+                    <span class="text-[10px] font-bold text-cyan-400">Max ${max} m · ${dist.length} séance(s)</span>
+                </div>
+                ${dist.length >= 2
+                    ? '<div style="height:120px;position:relative;"><canvas id="fiche-prog-distance"></canvas></div>'
+                    : `<p class="text-xs text-slate-300">${max} m (1 séance)</p>`}
+            </div>`;
+    }
+
+    if (ind.length >= 1) {
+        const max = Math.max(...ind.map(p => p.indice));
+        html += `
+            <div class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">🏊 Indice de nage</span>
+                    <span class="text-[10px] font-bold text-violet-400">Max ${max.toFixed(2)} · ${ind.length} séance(s)</span>
+                </div>
+                ${ind.length >= 2
+                    ? '<div style="height:120px;position:relative;"><canvas id="fiche-prog-indice"></canvas></div>'
+                    : `<p class="text-xs text-slate-300">${max.toFixed(2)} (1 séance)</p>`}
+            </div>`;
+    }
+
+    conteneur.innerHTML = html;
+
+    if (dist.length >= 2) rendreCourbeProgression('fiche-prog-distance', dist, 'distance', '#22d3ee');
+    if (ind.length >= 2) rendreCourbeProgression('fiche-prog-indice', ind, 'indice', '#a78bfa');
 }
 
 window.ouvrirFicheEleve = ouvrirFicheEleve;

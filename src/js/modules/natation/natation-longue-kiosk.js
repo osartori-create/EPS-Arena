@@ -4,7 +4,7 @@
 // saisie du partiel en mètres en fin de vague.
 
 import { db, ref, onValue, set } from '../../core/firebase-service.js';
-import { COULEURS_GROUPES, getCouleurGroupe, getBasePath, getSessionActivePath, getSessionObsPath, formatDuree } from './natation-longue-common.js';
+import { COULEURS_GROUPES, getCouleurGroupe, getBasePath, getSessionActivePath, getSessionObsPath, creerSessionId, formatDuree } from './natation-longue-common.js';
 
 // ============================================================
 // ÉTAT GLOBAL
@@ -95,7 +95,7 @@ export function initNatationLongueKiosk(classe) {
 
     if (sessionListener) sessionListener();
     sessionListener = onValue(ref(db, getSessionActivePath(classe)), (snap) => {
-        const nouveau = snap.val() || null;
+        const nouveau = snap.val() || creerSessionId();
         // Nouvelle épreuve : si la vague précédente est terminée, on repart au choix.
         if (state.sessionId && nouveau && nouveau !== state.sessionId
             && (state.phase === 'saisie_finale' || state.phase === 'bilan')) {

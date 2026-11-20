@@ -599,11 +599,13 @@ export async function transmettreNatationConfig() {
     // ✅ Exposer l'indice de nage comme critère transversal pour le multi.
     // On fige la donnée à chaque transmission (sur demande du prof).
     let nbIndicesEcrits = 0;
+    const indicesDuJour = {};
     elevesData.forEach(e => {
         const cle = String(e.numero);
         const indice = calculIndice(tempsData[cle], coupsData[cle]);
-        if (indice !== null && enregistrerCritereEleve(classe, e.id, 'indiceNage', indice)) {
-            nbIndicesEcrits++;
+        if (indice !== null) {
+            indicesDuJour[cle] = indice;
+            if (enregistrerCritereEleve(classe, e.id, 'indiceNage', indice)) nbIndicesEcrits++;
         }
     });
 
@@ -611,6 +613,15 @@ export async function transmettreNatationConfig() {
         await set(ref(db, `${baseProf}/${classe}/natation/config`), configData);
         await set(ref(db, `${baseProf}/${classe}/config`), { activite: 'natation', mode: mode });
         await set(ref(db, `${baseProf}/active_classes/${classe}`), true);
+
+        // Historique « épreuve du jour » de l'indice de nage (par numéro, anonyme).
+        if (Object.keys(indicesDuJour).length > 0) {
+            const j = new Date();
+            const p2 = (n) => String(n).padStart(2, '0');
+            const jourId = `${j.getFullYear()}-${p2(j.getMonth() + 1)}-${p2(j.getDate())}`;
+            await set(ref(db, `${baseProf}/${classe}/natation/indice/sessions/${jourId}/indices`), indicesDuJour);
+        }
+
         const modeLabel = mode === 'koh-lanta' ? '🏝️ Koh Lanta' : '🏊 Indice de nage';
         alert(`✅ Mode ${modeLabel} transmis aux iPads !`);
     } catch (e) {

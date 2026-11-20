@@ -39,8 +39,6 @@ export function initNatationLongueInterface(container) {
     setTimeout(() => {
         restaurerParams();
         loadAffectations();
-        ecouterSessionActive();
-        ecouterSessions();
     }, 100);
 }
 
@@ -82,10 +80,10 @@ function createHeader() {
                         title="Remet tous les élèves dans la réserve">
                     🗑️ Vider les vagues
                 </button>
-                <button onclick="window.nlNouvelleSession()"
-                        class="bg-violet-600 hover:bg-violet-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-violet-400 active:scale-95"
-                        title="Crée une nouvelle épreuve horodatée sans écraser les précédentes">
-                    🆕 Nouvelle épreuve
+                <button onclick="window.nlViderEpreuveJour()"
+                        class="bg-red-700 hover:bg-red-600 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-red-500 active:scale-95"
+                        title="Efface les observations de l'épreuve du jour pour repartir de zéro">
+                    🗑️ Vider l'épreuve du jour
                 </button>
                 <button onclick="window.nlExportConfig()"
                         class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-indigo-400 active:scale-95">
@@ -186,11 +184,8 @@ function createSequenceControls() {
     div.innerHTML = `
         <h4 class="font-black text-blue-400 uppercase text-xs mb-3">🎬 Vagues (une couleur = une vague)</h4>
         <div class="flex flex-wrap items-center gap-2 mb-3">
-            <label class="text-xs font-bold text-slate-400 uppercase">Épreuve :</label>
-            <select id="nlSessionSelect" onchange="window.nlChoisirSession(this.value)"
-                    class="bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs font-bold flex-1 min-w-[200px]"></select>
-            <button onclick="window.nlNouvelleSession()"
-                    class="bg-violet-600 hover:bg-violet-500 px-3 py-2 rounded-xl font-black text-xs uppercase text-white border-2 border-violet-400 active:scale-95">🆕 Nouvelle</button>
+            <label class="text-xs font-bold text-slate-400 uppercase">Épreuve du jour :</label>
+            <span class="bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-xs font-black">${creerSessionId()}</span>
         </div>
         <div id="nlSequenceButtons" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
     `;
@@ -216,34 +211,7 @@ function renderSequenceButtons() {
     container.innerHTML = html;
 }
 
-async function ecouterSessionActive() {
-    if (_profSessionListener) _profSessionListener();
-    if (!currentClasse) return;
-    _profSessionListener = onValue(ref(db, getSessionActivePath(currentClasse)), (snap) => {
-        const sid = snap.val() || '';
-        const select = document.getElementById('nlSessionSelect');
-        if (select && sid) select.value = sid;
-    });
-}
-
-async function ecouterSessions() {
-    if (_profSessionsListener) _profSessionsListener();
-    if (!currentClasse) return;
-    _profSessionsListener = onValue(ref(db, getSessionsPath(currentClasse)), (snap) => {
-        const sessions = snap.val() || {};
-        const select = document.getElementById('nlSessionSelect');
-        if (!select) return;
-        const ids = Object.keys(sessions).sort().reverse();
-        select.innerHTML = ids.length
-            ? ids.map(id => `<option value="${id}">${id}</option>`).join('')
-            : '<option value="">— aucune épreuve —</option>';
-    });
-}
-
-window.nlChoisirSession = async function(sessionId) {
-    if (!currentClasse || !sessionId) return;
-    await set(ref(db, getSessionActivePath(currentClasse)), sessionId);
-};
+// L'épreuve active est désormais toujours « l'épreuve du jour » (voir nlLancerVague).
 
 // ============================================================
 // GROUPES + RÉSERVES (drag & drop)
@@ -492,6 +460,12 @@ export async function transmettreNatationLongue() {
         await set(ref(db, `${baseProf}/${classe}/natation/config`), { activite: 'natation', mode: 'longue' });
         await set(ref(db, `${baseProf}/${classe}/config`), { activite: 'natation', mode: 'longue' });
         await set(ref(db, `${baseProf}/active_classes/${classe}`), true);
+
+        // L'épreuve du jour devient l'épreuve active (créée automatiquement).
+        const sessionId = creerSessionId();
+        await set(ref(db, getSessionActivePath(classe)), sessionId);
+        await set(ref(db, `${getSessionsPath(classe)}/${sessionId}/meta`), { creeLe: Date.now() });
+
         alert('✅ Configuration « Longue distance » transmise aux iPads !');
     } catch (e) {
         console.error(e);
@@ -662,13 +636,13 @@ window.nlViderGroupes = function() {
     loadAffectations();
 };
 
-window.nlNouvelleSession = async function() {
+window.nlViderEpreuveJour = async function() {
     if (!currentClasse) return alert('Sélectionnez une classe.');
-    if (!confirm('Créer une nouvelle épreuve horodatée ? Les résultats précédents sont conservés.')) return;
     const sessionId = creerSessionId();
-    await set(ref(db, getSessionActivePath(currentClasse)), sessionId);
-    await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}/meta`), { creeLe: Date.now() });
-    alert(`✅ Nouvelle épreuve créée : ${sessionId}`);
+    if (!confirm(`Effacer toutes les observations de l'épreuve du ${sessionId} ?\n(Les épreuves passées ne sont pas touchées.)`)) return;
+    await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}/observations`), null);
+    await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}/modifications`), null);
+    alert('✅ Épreuve du jour vidée.');
 };
 
 window.nlLancerVague = async function(couleurId) {
@@ -676,8 +650,9 @@ window.nlLancerVague = async function(couleurId) {
     const sessionRef = ref(db, getSessionActivePath(currentClasse));
     const snap = await new Promise(resolve => onValue(sessionRef, resolve, { onlyOnce: true }));
     let sessionId = snap.val();
-    if (!sessionId) {
-        sessionId = creerSessionId();
+    const aujourdhui = creerSessionId();
+    if (!sessionId || sessionId !== aujourdhui) {
+        sessionId = aujourdhui;
         await set(sessionRef, sessionId);
         await set(ref(db, `${getSessionsPath(currentClasse)}/${sessionId}/meta`), { creeLe: Date.now() });
     }

@@ -3,7 +3,7 @@
 
 import { db, ref, onValue } from '../../core/firebase-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
-import { getBasePath, getSessionsPath, getSessionActivePath, getSessionObsPath, getSessionModifsPath, getStatuts, getCouleurGroupe } from './natation-longue-common.js';
+import { getBasePath, getSessionsPath, getSessionActivePath, getSessionObsPath, getSessionModifsPath, getStatuts, getCouleurGroupe, creerSessionId } from './natation-longue-common.js';
 import { agregerResultats } from './natation-longue-bilan.js';
 
 let unsubs = [];
@@ -94,7 +94,7 @@ export function renderNatationLongueTV() {
     _ecouterSession = ecouterSession;
 
     unsubs.push(onValue(ref(db, getSessionActivePath(classe)), snap => {
-        cache.sessionId = snap.val() || null;
+        cache.sessionId = snap.val() || creerSessionId();
         // Si aucune épreuve n'est sélectionnée manuellement, on suit l'épreuve active.
         if (!cache.viewSessionId) ecouterSession(cache.sessionId);
         else renderTV();

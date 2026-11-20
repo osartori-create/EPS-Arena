@@ -594,7 +594,7 @@ function enregistrerTempsEtCoups(tempsMs, nbCoups) {
         );
         
         historique.push(nouvelEssai);
-        if (historique.length > 10) historique.shift();
+        if (historique.length > 60) historique.shift();
         
         set(historiqueRef, historique).then(() => {
             const tempsRef = ref(db, `${getEtab()}/profs/${profCode}/${currentClasse}/natation/temps/${numero}`);

@@ -57,9 +57,10 @@ export function getBasePath(classe) {
     return `${getEtab()}/profs/${profCode}/${classe}/natation/longue`;
 }
 
+// Identifiant de l'« épreuve du jour » : un jour = une épreuve (par classe).
 export function creerSessionId(now = new Date()) {
     const p = (n) => String(n).padStart(2, '0');
-    return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}T${p(now.getHours())}-${p(now.getMinutes())}-${p(now.getSeconds())}`;
+    return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
 export function getSessionsPath(classe) {

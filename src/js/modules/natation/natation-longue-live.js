@@ -6,7 +6,7 @@ import { db, ref, onValue, set, remove } from '../../core/firebase-service.js';
 import { getCurrentClasse } from '../../core/live-engine.js';
 import {
     getBasePath, getSessionActivePath, getSessionsPath,
-    getSessionObsPath, getSessionModifsPath, getStatuts, getCouleurGroupe
+    getSessionObsPath, getSessionModifsPath, getStatuts, getCouleurGroupe, creerSessionId
 } from './natation-longue-common.js';
 import { agregerResultats } from './natation-longue-bilan.js';
 
@@ -80,7 +80,7 @@ export function renderNatationLongueLive() {
     };
 
     unsubs.push(onValue(ref(db, getSessionActivePath(classe)), snap => {
-        cache.sessionId = snap.val() || null;
+        cache.sessionId = snap.val() || creerSessionId();
         // Si aucune épreuve n'est sélectionnée manuellement, on suit l'épreuve active.
         if (!cache.viewSessionId) ecouterSession(cache.sessionId);
         else render();
